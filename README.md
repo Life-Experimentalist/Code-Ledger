@@ -1,16 +1,10 @@
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
-[![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![Firefox](https://img.shields.io/badge/Firefox-supported-red?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)
-[![Chrome](https://img.shields.io/badge/Chrome-supported-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/)
-[![Platforms](https://img.shields.io/badge/platforms-3%2B-teal?style=flat-square)](docs/ADDING_PLATFORM_HANDLER.md)
-[![Views](https://counter.vkrishna04.me/api/views/codeledger/badge?style=flat-square&color=blueviolet&label=views)](https://counter.vkrishna04.me)
-[![Installs](https://counter.vkrishna04.me/api/views/codeledger-install/badge?style=flat-square&color=purple&label=installs)](https://counter.vkrishna04.me)
-
 <div align="center">
   <h1>CodeLedger</h1>
   <p><strong>Your DSA Journey, Committed.</strong></p>
   <p>Single GitHub repo. Every problem. Every language. Owned entirely by you.</p>
 </div>
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Firefox](https://img.shields.io/badge/Firefox-supported-red?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/) [![Chrome](https://img.shields.io/badge/Chrome-supported-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/) [![Platforms](https://img.shields.io/badge/platforms-3%2B-teal?style=flat-square)](docs/ADDING_PLATFORM_HANDLER.md) [![Views](https://counter.vkrishna04.me/api/views/codeledger/badge?style=flat-square&color=blueviolet&label=views)](https://counter.vkrishna04.me) [![Installs](https://counter.vkrishna04.me/api/views/codeledger-install/badge?style=flat-square&color=purple&label=installs)](https://counter.vkrishna04.me)
 
 ## 🌟 Why CodeLedger exists
 
@@ -45,14 +39,14 @@ graph TD
     A[LeetCode]:::platform -->|DOM Observer| C(Content Script)
     B[GeeksForGeeks]:::platform -->|DOM Observer| C(Content Script)
     K[Codeforces]:::platform -->|DOM Observer| C(Content Script)
-    
+
     C -->|problem:solved event| D{Service Worker}:::worker
-    
+
     D -->|1. Store| E[(Local chrome.storage)]
     D -->|2. Analyze| F[AI Reviewer <br> Gemini/OpenAI]
     D -->|3. Structure| G[Canonical Mapper]
     G -->|Atomic Commit| H[GitHub Repository]:::git
-    
+
     E -->|Read Data| I[Analytics Dashboard]:::ui
 ```
 
@@ -80,7 +74,7 @@ sequenceDiagram
     participant Extension
     participant CFWorker as Cloudflare Worker (codeledger.vkrishna04.me)
     participant GitHub as GitHub OAuth API
-    
+
     User->>Extension: Clicks "Connect GitHub"
     Extension->>CFWorker: Opens popup to /auth/github
     CFWorker->>GitHub: Redirects user to GitHub Authorize URI

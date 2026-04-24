@@ -1,35 +1,2035 @@
-[
-  {
-    "canonicalId": 1,
-    "slug": "two-sum",
-    "title": "Two Sum",
-    "platforms": {
-      "leetcode": "two-sum",
-      "geeksforgeeks": "key-pair5616"
+{
+  "$schema": "https://github.com/Life-Experimentalist/Code-Ledger/blob/main/src/data/schema/canonical-map.schema.json",
+  "version": 3,
+  "entries": [
+    {
+      "canonicalId": "two-sum",
+      "canonicalTitle": "Two Sum",
+      "topic": "arrays",
+      "difficulty": "easy",
+      "pattern": "hash-map",
+      "tags": [
+        "array",
+        "hash-table"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "two-sum",
+          "id": 1
+        },
+        {
+          "platform": "geeksforgeeks",
+          "slug": "key-pair5616"
+        }
+      ],
+      "voteCount": 100,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
     },
-    "difficulty": "Easy",
-    "patterns": ["Array", "Hash Table"]
-  },
-  {
-    "canonicalId": 2,
-    "slug": "add-two-numbers",
-    "title": "Add Two Numbers",
-    "platforms": {
-      "leetcode": "add-two-numbers",
-      "geeksforgeeks": "add-two-numbers-represented-by-linked-lists"
+    {
+      "canonicalId": "contains-duplicate",
+      "canonicalTitle": "Contains Duplicate",
+      "topic": "arrays",
+      "difficulty": "easy",
+      "pattern": "hash-set",
+      "tags": [
+        "array",
+        "hash-table"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "contains-duplicate",
+          "id": 217
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
     },
-    "difficulty": "Medium",
-    "patterns": ["Linked List", "Math"]
-  },
-  {
-    "canonicalId": 3,
-    "slug": "longest-substring-without-repeating-characters",
-    "title": "Longest Substring Without Repeating Characters",
-    "platforms": {
-      "leetcode": "longest-substring-without-repeating-characters",
-      "geeksforgeeks": "length-of-the-longest-substring3036"
+    {
+      "canonicalId": "valid-anagram",
+      "canonicalTitle": "Valid Anagram",
+      "topic": "arrays",
+      "difficulty": "easy",
+      "pattern": "counting",
+      "tags": [
+        "string",
+        "hash-table"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "valid-anagram",
+          "id": 242
+        }
+      ],
+      "voteCount": 92,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
     },
-    "difficulty": "Medium",
-    "patterns": ["Hash Table", "String", "Sliding Window"]
-  }
-]
+    {
+      "canonicalId": "group-anagrams",
+      "canonicalTitle": "Group Anagrams",
+      "topic": "arrays",
+      "difficulty": "medium",
+      "pattern": "hash-map",
+      "tags": [
+        "array",
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "group-anagrams",
+          "id": 49
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "top-k-frequent-elements",
+      "canonicalTitle": "Top K Frequent Elements",
+      "topic": "heap",
+      "difficulty": "medium",
+      "pattern": "heap",
+      "tags": [
+        "array",
+        "heap"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "top-k-frequent-elements",
+          "id": 347
+        }
+      ],
+      "voteCount": 93,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "product-of-array-except-self",
+      "canonicalTitle": "Product of Array Except Self",
+      "topic": "arrays",
+      "difficulty": "medium",
+      "pattern": "prefix-suffix",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "product-of-array-except-self",
+          "id": 238
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "valid-sudoku",
+      "canonicalTitle": "Valid Sudoku",
+      "topic": "arrays",
+      "difficulty": "medium",
+      "pattern": "simulation",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "valid-sudoku",
+          "id": 36
+        }
+      ],
+      "voteCount": 88,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "encode-and-decode-strings",
+      "canonicalTitle": "Encode and Decode Strings",
+      "topic": "arrays",
+      "difficulty": "medium",
+      "pattern": "design",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "encode-and-decode-strings"
+        }
+      ],
+      "voteCount": 85,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "longest-consecutive-sequence",
+      "canonicalTitle": "Longest Consecutive Sequence",
+      "topic": "arrays",
+      "difficulty": "medium",
+      "pattern": "hash-set",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "longest-consecutive-sequence",
+          "id": 128
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "valid-palindrome",
+      "canonicalTitle": "Valid Palindrome",
+      "topic": "two-pointers",
+      "difficulty": "easy",
+      "pattern": "two-pointer",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "valid-palindrome",
+          "id": 125
+        }
+      ],
+      "voteCount": 91,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "two-sum-ii-input-array-is-sorted",
+      "canonicalTitle": "Two Sum II - Input Array Is Sorted",
+      "topic": "two-pointers",
+      "difficulty": "medium",
+      "pattern": "two-pointer",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "two-sum-ii-input-array-is-sorted",
+          "id": 167
+        }
+      ],
+      "voteCount": 89,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "3sum",
+      "canonicalTitle": "3Sum",
+      "topic": "two-pointers",
+      "difficulty": "medium",
+      "pattern": "two-pointer",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "3sum",
+          "id": 15
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "container-with-most-water",
+      "canonicalTitle": "Container With Most Water",
+      "topic": "two-pointers",
+      "difficulty": "medium",
+      "pattern": "greedy",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "container-with-most-water",
+          "id": 11
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "trapping-rain-water",
+      "canonicalTitle": "Trapping Rain Water",
+      "topic": "two-pointers",
+      "difficulty": "hard",
+      "pattern": "two-pointer",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "trapping-rain-water",
+          "id": 42
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "best-time-to-buy-and-sell-stock",
+      "canonicalTitle": "Best Time to Buy and Sell Stock",
+      "topic": "sliding-window",
+      "difficulty": "easy",
+      "pattern": "two-pointer",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "best-time-to-buy-and-sell-stock",
+          "id": 121
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "longest-substring-without-repeating-characters",
+      "canonicalTitle": "Longest Substring Without Repeating Characters",
+      "topic": "sliding-window",
+      "difficulty": "medium",
+      "pattern": "sliding-window",
+      "tags": [
+        "string",
+        "hash-table"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "longest-substring-without-repeating-characters",
+          "id": 3
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "longest-repeating-character-replacement",
+      "canonicalTitle": "Longest Repeating Character Replacement",
+      "topic": "sliding-window",
+      "difficulty": "medium",
+      "pattern": "sliding-window",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "longest-repeating-character-replacement",
+          "id": 424
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "minimum-window-substring",
+      "canonicalTitle": "Minimum Window Substring",
+      "topic": "sliding-window",
+      "difficulty": "hard",
+      "pattern": "sliding-window",
+      "tags": [
+        "string",
+        "hash-table"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "minimum-window-substring",
+          "id": 76
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "permutation-in-string",
+      "canonicalTitle": "Permutation in String",
+      "topic": "sliding-window",
+      "difficulty": "medium",
+      "pattern": "sliding-window",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "permutation-in-string",
+          "id": 567
+        }
+      ],
+      "voteCount": 93,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "valid-parentheses",
+      "canonicalTitle": "Valid Parentheses",
+      "topic": "stack",
+      "difficulty": "easy",
+      "pattern": "stack",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "valid-parentheses",
+          "id": 20
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "min-stack",
+      "canonicalTitle": "Min Stack",
+      "topic": "stack",
+      "difficulty": "medium",
+      "pattern": "design",
+      "tags": [
+        "stack"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "min-stack",
+          "id": 155
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "evaluate-reverse-polish-notation",
+      "canonicalTitle": "Evaluate Reverse Polish Notation",
+      "topic": "stack",
+      "difficulty": "medium",
+      "pattern": "stack",
+      "tags": [
+        "stack"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "evaluate-reverse-polish-notation",
+          "id": 150
+        }
+      ],
+      "voteCount": 91,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "generate-parentheses",
+      "canonicalTitle": "Generate Parentheses",
+      "topic": "backtracking",
+      "difficulty": "medium",
+      "pattern": "backtracking",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "generate-parentheses",
+          "id": 22
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "daily-temperatures",
+      "canonicalTitle": "Daily Temperatures",
+      "topic": "stack",
+      "difficulty": "medium",
+      "pattern": "monotonic-stack",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "daily-temperatures",
+          "id": 739
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "binary-search",
+      "canonicalTitle": "Binary Search",
+      "topic": "binary-search",
+      "difficulty": "easy",
+      "pattern": "binary-search",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "binary-search",
+          "id": 704
+        }
+      ],
+      "voteCount": 90,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "search-a-2d-matrix",
+      "canonicalTitle": "Search a 2D Matrix",
+      "topic": "binary-search",
+      "difficulty": "medium",
+      "pattern": "binary-search",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "search-a-2d-matrix",
+          "id": 74
+        }
+      ],
+      "voteCount": 89,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "koko-eating-bananas",
+      "canonicalTitle": "Koko Eating Bananas",
+      "topic": "binary-search",
+      "difficulty": "medium",
+      "pattern": "binary-search",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "koko-eating-bananas",
+          "id": 875
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "find-minimum-in-rotated-sorted-array",
+      "canonicalTitle": "Find Minimum in Rotated Sorted Array",
+      "topic": "binary-search",
+      "difficulty": "medium",
+      "pattern": "binary-search",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "find-minimum-in-rotated-sorted-array",
+          "id": 153
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "search-in-rotated-sorted-array",
+      "canonicalTitle": "Search in Rotated Sorted Array",
+      "topic": "binary-search",
+      "difficulty": "medium",
+      "pattern": "binary-search",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "search-in-rotated-sorted-array",
+          "id": 33
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "reverse-linked-list",
+      "canonicalTitle": "Reverse Linked List",
+      "topic": "linked-list",
+      "difficulty": "easy",
+      "pattern": "iteration",
+      "tags": [
+        "linked-list"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "reverse-linked-list",
+          "id": 206
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "merge-two-sorted-lists",
+      "canonicalTitle": "Merge Two Sorted Lists",
+      "topic": "linked-list",
+      "difficulty": "easy",
+      "pattern": "merge",
+      "tags": [
+        "linked-list"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "merge-two-sorted-lists",
+          "id": 21
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "linked-list-cycle",
+      "canonicalTitle": "Linked List Cycle",
+      "topic": "linked-list",
+      "difficulty": "easy",
+      "pattern": "fast-slow",
+      "tags": [
+        "linked-list"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "linked-list-cycle",
+          "id": 141
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "reorder-list",
+      "canonicalTitle": "Reorder List",
+      "topic": "linked-list",
+      "difficulty": "medium",
+      "pattern": "fast-slow",
+      "tags": [
+        "linked-list"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "reorder-list",
+          "id": 143
+        }
+      ],
+      "voteCount": 93,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "remove-nth-node-from-end-of-list",
+      "canonicalTitle": "Remove Nth Node From End of List",
+      "topic": "linked-list",
+      "difficulty": "medium",
+      "pattern": "two-pointer",
+      "tags": [
+        "linked-list"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "remove-nth-node-from-end-of-list",
+          "id": 19
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "copy-list-with-random-pointer",
+      "canonicalTitle": "Copy List with Random Pointer",
+      "topic": "linked-list",
+      "difficulty": "medium",
+      "pattern": "hash-map",
+      "tags": [
+        "linked-list"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "copy-list-with-random-pointer",
+          "id": 138
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "add-two-numbers",
+      "canonicalTitle": "Add Two Numbers",
+      "topic": "linked-list",
+      "difficulty": "medium",
+      "pattern": "simulation",
+      "tags": [
+        "linked-list"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "add-two-numbers",
+          "id": 2
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "find-the-duplicate-number",
+      "canonicalTitle": "Find the Duplicate Number",
+      "topic": "two-pointers",
+      "difficulty": "medium",
+      "pattern": "fast-slow",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "find-the-duplicate-number",
+          "id": 287
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "invert-binary-tree",
+      "canonicalTitle": "Invert Binary Tree",
+      "topic": "trees",
+      "difficulty": "easy",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "invert-binary-tree",
+          "id": 226
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "maximum-depth-of-binary-tree",
+      "canonicalTitle": "Maximum Depth of Binary Tree",
+      "topic": "trees",
+      "difficulty": "easy",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "maximum-depth-of-binary-tree",
+          "id": 104
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "diameter-of-binary-tree",
+      "canonicalTitle": "Diameter of Binary Tree",
+      "topic": "trees",
+      "difficulty": "easy",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "diameter-of-binary-tree",
+          "id": 543
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "balanced-binary-tree",
+      "canonicalTitle": "Balanced Binary Tree",
+      "topic": "trees",
+      "difficulty": "easy",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "balanced-binary-tree",
+          "id": 110
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "same-tree",
+      "canonicalTitle": "Same Tree",
+      "topic": "trees",
+      "difficulty": "easy",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "same-tree",
+          "id": 100
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "subtree-of-another-tree",
+      "canonicalTitle": "Subtree of Another Tree",
+      "topic": "trees",
+      "difficulty": "easy",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "subtree-of-another-tree",
+          "id": 572
+        }
+      ],
+      "voteCount": 92,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "lowest-common-ancestor-of-a-binary-search-tree",
+      "canonicalTitle": "Lowest Common Ancestor of a Binary Search Tree",
+      "topic": "trees",
+      "difficulty": "medium",
+      "pattern": "bst",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "lowest-common-ancestor-of-a-binary-search-tree",
+          "id": 235
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "binary-tree-level-order-traversal",
+      "canonicalTitle": "Binary Tree Level Order Traversal",
+      "topic": "trees",
+      "difficulty": "medium",
+      "pattern": "bfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "binary-tree-level-order-traversal",
+          "id": 102
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "binary-tree-right-side-view",
+      "canonicalTitle": "Binary Tree Right Side View",
+      "topic": "trees",
+      "difficulty": "medium",
+      "pattern": "bfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "binary-tree-right-side-view",
+          "id": 199
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "count-good-nodes-in-binary-tree",
+      "canonicalTitle": "Count Good Nodes in Binary Tree",
+      "topic": "trees",
+      "difficulty": "medium",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "count-good-nodes-in-binary-tree",
+          "id": 1448
+        }
+      ],
+      "voteCount": 93,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "validate-binary-search-tree",
+      "canonicalTitle": "Validate Binary Search Tree",
+      "topic": "trees",
+      "difficulty": "medium",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "validate-binary-search-tree",
+          "id": 98
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "kth-smallest-element-in-a-bst",
+      "canonicalTitle": "Kth Smallest Element in a BST",
+      "topic": "trees",
+      "difficulty": "medium",
+      "pattern": "inorder",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "kth-smallest-element-in-a-bst",
+          "id": 230
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "construct-binary-tree-from-preorder-and-inorder-traversal",
+      "canonicalTitle": "Construct Binary Tree from Preorder and Inorder Traversal",
+      "topic": "trees",
+      "difficulty": "medium",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "construct-binary-tree-from-preorder-and-inorder-traversal",
+          "id": 105
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "binary-tree-maximum-path-sum",
+      "canonicalTitle": "Binary Tree Maximum Path Sum",
+      "topic": "trees",
+      "difficulty": "hard",
+      "pattern": "dfs",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "binary-tree-maximum-path-sum",
+          "id": 124
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "serialize-and-deserialize-binary-tree",
+      "canonicalTitle": "Serialize and Deserialize Binary Tree",
+      "topic": "trees",
+      "difficulty": "hard",
+      "pattern": "design",
+      "tags": [
+        "tree"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "serialize-and-deserialize-binary-tree",
+          "id": 297
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "implement-trie-prefix-tree",
+      "canonicalTitle": "Implement Trie (Prefix Tree)",
+      "topic": "tries",
+      "difficulty": "medium",
+      "pattern": "design",
+      "tags": [
+        "trie"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "implement-trie-prefix-tree",
+          "id": 208
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "design-add-and-search-words-data-structure",
+      "canonicalTitle": "Design Add and Search Words Data Structure",
+      "topic": "tries",
+      "difficulty": "medium",
+      "pattern": "backtracking",
+      "tags": [
+        "trie"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "design-add-and-search-words-data-structure",
+          "id": 211
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "word-search-ii",
+      "canonicalTitle": "Word Search II",
+      "topic": "tries",
+      "difficulty": "hard",
+      "pattern": "backtracking",
+      "tags": [
+        "trie"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "word-search-ii",
+          "id": 212
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "find-median-from-data-stream",
+      "canonicalTitle": "Find Median from Data Stream",
+      "topic": "heap",
+      "difficulty": "hard",
+      "pattern": "two-heaps",
+      "tags": [
+        "heap"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "find-median-from-data-stream",
+          "id": 295
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "last-stone-weight",
+      "canonicalTitle": "Last Stone Weight",
+      "topic": "heap",
+      "difficulty": "easy",
+      "pattern": "heap",
+      "tags": [
+        "heap"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "last-stone-weight",
+          "id": 1046
+        }
+      ],
+      "voteCount": 90,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "climbing-stairs",
+      "canonicalTitle": "Climbing Stairs",
+      "topic": "dynamic-programming",
+      "difficulty": "easy",
+      "pattern": "dp",
+      "tags": [
+        "dp"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "climbing-stairs",
+          "id": 70
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "house-robber",
+      "canonicalTitle": "House Robber",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "dp",
+      "tags": [
+        "dp"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "house-robber",
+          "id": 198
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "house-robber-ii",
+      "canonicalTitle": "House Robber II",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "dp",
+      "tags": [
+        "dp"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "house-robber-ii",
+          "id": 213
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "longest-palindromic-substring",
+      "canonicalTitle": "Longest Palindromic Substring",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "expand-around-center",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "longest-palindromic-substring",
+          "id": 5
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "palindromic-substrings",
+      "canonicalTitle": "Palindromic Substrings",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "expand-around-center",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "palindromic-substrings",
+          "id": 647
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "decode-ways",
+      "canonicalTitle": "Decode Ways",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "dp",
+      "tags": [
+        "dp"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "decode-ways",
+          "id": 91
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "coin-change",
+      "canonicalTitle": "Coin Change",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "unbounded-knapsack",
+      "tags": [
+        "dp"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "coin-change",
+          "id": 322
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "maximum-product-subarray",
+      "canonicalTitle": "Maximum Product Subarray",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "kadane-variant",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "maximum-product-subarray",
+          "id": 152
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "word-break",
+      "canonicalTitle": "Word Break",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "dp",
+      "tags": [
+        "string"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "word-break",
+          "id": 139
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "longest-increasing-subsequence",
+      "canonicalTitle": "Longest Increasing Subsequence",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "dp-binary-search",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "longest-increasing-subsequence",
+          "id": 300
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "unique-paths",
+      "canonicalTitle": "Unique Paths",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "grid-dp",
+      "tags": [
+        "dp"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "unique-paths",
+          "id": 62
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "longest-common-subsequence",
+      "canonicalTitle": "Longest Common Subsequence",
+      "topic": "dynamic-programming",
+      "difficulty": "medium",
+      "pattern": "dp",
+      "tags": [
+        "dp"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "longest-common-subsequence",
+          "id": 1143
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "number-of-islands",
+      "canonicalTitle": "Number of Islands",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "dfs",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "number-of-islands",
+          "id": 200
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "clone-graph",
+      "canonicalTitle": "Clone Graph",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "dfs",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "clone-graph",
+          "id": 133
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "max-area-of-island",
+      "canonicalTitle": "Max Area of Island",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "dfs",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "max-area-of-island",
+          "id": 695
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "pacific-atlantic-water-flow",
+      "canonicalTitle": "Pacific Atlantic Water Flow",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "dfs",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "pacific-atlantic-water-flow",
+          "id": 417
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "course-schedule",
+      "canonicalTitle": "Course Schedule",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "topological-sort",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "course-schedule",
+          "id": 207
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "course-schedule-ii",
+      "canonicalTitle": "Course Schedule II",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "topological-sort",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "course-schedule-ii",
+          "id": 210
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "redundant-connection",
+      "canonicalTitle": "Redundant Connection",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "union-find",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "redundant-connection",
+          "id": 684
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "number-of-connected-components-in-an-undirected-graph",
+      "canonicalTitle": "Number of Connected Components in an Undirected Graph",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "union-find",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "number-of-connected-components-in-an-undirected-graph",
+          "id": 323
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "graph-valid-tree",
+      "canonicalTitle": "Graph Valid Tree",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "union-find",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "graph-valid-tree",
+          "id": 261
+        }
+      ],
+      "voteCount": 93,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "alien-dictionary",
+      "canonicalTitle": "Alien Dictionary",
+      "topic": "graphs",
+      "difficulty": "hard",
+      "pattern": "topological-sort",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "alien-dictionary"
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "cheapest-flights-within-k-stops",
+      "canonicalTitle": "Cheapest Flights Within K Stops",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "shortest-path",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "cheapest-flights-within-k-stops",
+          "id": 787
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "network-delay-time",
+      "canonicalTitle": "Network Delay Time",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "dijkstra",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "network-delay-time",
+          "id": 743
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "swim-in-rising-water",
+      "canonicalTitle": "Swim in Rising Water",
+      "topic": "graphs",
+      "difficulty": "hard",
+      "pattern": "dijkstra",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "swim-in-rising-water",
+          "id": 778
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "reconstruct-itinerary",
+      "canonicalTitle": "Reconstruct Itinerary",
+      "topic": "graphs",
+      "difficulty": "hard",
+      "pattern": "eulerian-path",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "reconstruct-itinerary",
+          "id": 332
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "min-cost-to-connect-all-points",
+      "canonicalTitle": "Min Cost to Connect All Points",
+      "topic": "graphs",
+      "difficulty": "medium",
+      "pattern": "mst",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "min-cost-to-connect-all-points",
+          "id": 1584
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "word-ladder",
+      "canonicalTitle": "Word Ladder",
+      "topic": "graphs",
+      "difficulty": "hard",
+      "pattern": "bfs",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "word-ladder",
+          "id": 127
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "word-ladder-ii",
+      "canonicalTitle": "Word Ladder II",
+      "topic": "graphs",
+      "difficulty": "hard",
+      "pattern": "bfs",
+      "tags": [
+        "graph"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "word-ladder-ii",
+          "id": 126
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "combination-sum",
+      "canonicalTitle": "Combination Sum",
+      "topic": "backtracking",
+      "difficulty": "medium",
+      "pattern": "backtracking",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "combination-sum",
+          "id": 39
+        }
+      ],
+      "voteCount": 98,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "combination-sum-ii",
+      "canonicalTitle": "Combination Sum II",
+      "topic": "backtracking",
+      "difficulty": "medium",
+      "pattern": "backtracking",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "combination-sum-ii",
+          "id": 40
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "permutations",
+      "canonicalTitle": "Permutations",
+      "topic": "backtracking",
+      "difficulty": "medium",
+      "pattern": "backtracking",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "permutations",
+          "id": 46
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "subsets",
+      "canonicalTitle": "Subsets",
+      "topic": "backtracking",
+      "difficulty": "medium",
+      "pattern": "backtracking",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "subsets",
+          "id": 78
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "word-search",
+      "canonicalTitle": "Word Search",
+      "topic": "backtracking",
+      "difficulty": "medium",
+      "pattern": "backtracking",
+      "tags": [
+        "grid"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "word-search",
+          "id": 79
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "merge-intervals",
+      "canonicalTitle": "Merge Intervals",
+      "topic": "intervals",
+      "difficulty": "medium",
+      "pattern": "sorting",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "merge-intervals",
+          "id": 56
+        }
+      ],
+      "voteCount": 99,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "insert-interval",
+      "canonicalTitle": "Insert Interval",
+      "topic": "intervals",
+      "difficulty": "medium",
+      "pattern": "simulation",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "insert-interval",
+          "id": 57
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "non-overlapping-intervals",
+      "canonicalTitle": "Non-overlapping Intervals",
+      "topic": "intervals",
+      "difficulty": "medium",
+      "pattern": "greedy",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "non-overlapping-intervals",
+          "id": 435
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "meeting-rooms",
+      "canonicalTitle": "Meeting Rooms",
+      "topic": "intervals",
+      "difficulty": "easy",
+      "pattern": "sorting",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "meeting-rooms",
+          "id": 252
+        }
+      ],
+      "voteCount": 90,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "meeting-rooms-ii",
+      "canonicalTitle": "Meeting Rooms II",
+      "topic": "intervals",
+      "difficulty": "medium",
+      "pattern": "heap",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "meeting-rooms-ii",
+          "id": 253
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "rotate-image",
+      "canonicalTitle": "Rotate Image",
+      "topic": "math",
+      "difficulty": "medium",
+      "pattern": "matrix",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "rotate-image",
+          "id": 48
+        }
+      ],
+      "voteCount": 97,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "spiral-matrix",
+      "canonicalTitle": "Spiral Matrix",
+      "topic": "math",
+      "difficulty": "medium",
+      "pattern": "simulation",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "spiral-matrix",
+          "id": 54
+        }
+      ],
+      "voteCount": 96,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "set-matrix-zeroes",
+      "canonicalTitle": "Set Matrix Zeroes",
+      "topic": "math",
+      "difficulty": "medium",
+      "pattern": "matrix",
+      "tags": [
+        "array"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "set-matrix-zeroes",
+          "id": 73
+        }
+      ],
+      "voteCount": 95,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "number-of-1-bits",
+      "canonicalTitle": "Number of 1 Bits",
+      "topic": "bit-manipulation",
+      "difficulty": "easy",
+      "pattern": "bit",
+      "tags": [
+        "bit"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "number-of-1-bits",
+          "id": 191
+        }
+      ],
+      "voteCount": 92,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    },
+    {
+      "canonicalId": "counting-bits",
+      "canonicalTitle": "Counting Bits",
+      "topic": "bit-manipulation",
+      "difficulty": "easy",
+      "pattern": "dp",
+      "tags": [
+        "bit"
+      ],
+      "aliases": [
+        {
+          "platform": "leetcode",
+          "slug": "counting-bits",
+          "id": 338
+        }
+      ],
+      "voteCount": 94,
+      "confirmedBy": "system-init",
+      "addedAt": "2025-04-24"
+    }
+  ]
+}

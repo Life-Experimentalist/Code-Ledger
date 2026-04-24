@@ -1,0 +1,145 @@
+/* Canonical landing page styles for CodeLedger (source) */
+:root {
+  --bg-color: #050508;
+  --text-color: #e2e8f0;
+  --accent-color: #06b6d4;
+  --accent-hover: #0891b2;
+  --panel-bg: rgba(255, 255, 255, 0.05);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, oxygen, ubuntu, cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+}
+
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+
+.hero {
+  padding: 100px 20px;
+  background: radial-gradient(circle at 50% -20%, rgba(6, 182, 212, 0.15), transparent 60%);
+}
+
+.hero h1 {
+  font-size: 4rem;
+  margin-bottom: 0.2em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.hero .tagline {
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  margin-top: 0;
+  font-weight: 500;
+}
+
+.sub-tagline {
+  color: #94a3b8;
+  max-width: 600px;
+  margin: 0 auto 40px auto;
+}
+
+.actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-width: 150px;
+}
+
+.btn-primary {
+  background-color: var(--accent-color);
+  color: #fff;
+  border: 1px solid var(--accent-color);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: 0 0 25px rgba(6, 182, 212, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background-color: var(--panel-bg);
+  color: var(--text-color);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+}
+
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+}
+
+.feature {
+  background: var(--panel-bg);
+  padding: 30px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: border-color 0.3s ease;
+}
+
+.feature:hover {
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+.feature h2 {
+  font-size: 1.25rem;
+  color: #fff;
+  margin-top: 0;
+}
+
+.feature p {
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+footer {
+  text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.links {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.links a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+.links a:hover {
+  text-decoration: underline;
+}
