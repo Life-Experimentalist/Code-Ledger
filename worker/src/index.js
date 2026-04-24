@@ -290,6 +290,65 @@ app.post("/webhook/github", async (c) => {
 });
 
 // Serve static landing page and assets from worker/public
+// CORS preflight for canonical endpoint
+app.options("/data/canonical-map.json", (c) => {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,OPTIONS,POST",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+});
+
+// Canonical map endpoint: prefer KV storage, fallback to GitHub raw.
+app.get("/data/canonical-map.json", async (c) => {
+  const headers = {
+    "Content-Type": "application/json",
+    "Cache-Control": "public, max-age=3600, s-maxage=86400",
+    "Access-Control-Allow-Origin": "*",
+  };
+  try {
+    const kv = c.env.CANONICAL_MAP;
+    if (kv) {
+      const v = await kv.get("canonical-map");
+      if (v) return new Response(v, { status: 200, headers });
+    }
+  } catch (e) {
+    // ignore and fallback
+  }
+  // Fallback to GitHub raw
+  try {
+    const fallbackUrl =
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/data/canonical-map.json";
+    const res = await fetch(fallbackUrl);
+    const txt = await res.text();
+    return new Response(txt, { status: 200, headers });
+  } catch (e) {
+    return c.text("Canonical map unavailable", 503);
+  }
+});
+
+// Admin endpoint to update canonical map in KV (protected via CANONICAL_UPLOAD_TOKEN)
+app.post("/admin/canonical", async (c) => {
+  const authHeader =
+    c.req.headers.get("Authorization") ||
+    c.req.headers.get("x-admin-token") ||
+    "";
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader;
+  if (!token || token !== c.env.CANONICAL_UPLOAD_TOKEN)
+    return c.text("Unauthorized", 401);
+  const body = await c.req.text();
+  const kv = c.env.CANONICAL_MAP;
+  if (!kv) return c.text("KV not bound", 500);
+  await kv.put("canonical-map", body);
+  return c.json({ ok: true });
+});
+
+// Serve static landing page and assets from worker/public
 app.get("/*", serveStatic({ root: "./public" }));
 
 export default app;
