@@ -1,8 +1,8 @@
 {
-  "github_repo": "https://github.com/Life-Experimentalist/Code-Ledger",
-  "github_releases": "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
-  "chrome_store": "https://chrome.google.com/webstore/detail/",
-  "edge_store": "https://microsoftedge.microsoft.com/addons/detail/",
-  "firefox_store": "https://addons.mozilla.org/firefox/addon/",
-  "notes": "If you have the extension IDs, append them to the store URLs above (e.g. chrome_store + EXTENSION_ID_CHROME). Update src/core/constants.js to persist these IDs in the repo."
+    "github_repo": "https://github.com/Life-Experimentalist/Code-Ledger",
+    "github_releases": "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
+    "chrome_store": "https://chrome.google.com/webstore/detail/",
+    "edge_store": "https://microsoftedge.microsoft.com/addons/detail/",
+    "firefox_store": "https://addons.mozilla.org/firefox/addon/",
+    "notes": "If you have the extension IDs, append them to the store URLs above (e.g. chrome_store + EXTENSION_ID_CHROME). Update src/core/constants.js to persist these IDs in the repo."
 }

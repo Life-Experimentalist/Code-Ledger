@@ -49,6 +49,24 @@ const html = htm.bind(h);
 
 Components are exported as named functions. Props are typed via JSDoc. Every component is in its own file. Shared components are imported across popup, sidebar, library, and web app — same files, same import paths.
 
+## Recent UI Redesign Notes (automatic update)
+
+These notes describe the active UI changes applied to the CodeLedger repository to improve the Library, Popup, Sidebar, and Heatmap UX. They are authoritative and should be preserved when generating CI builds or when re-running the generator.
+
+- Library shell redesigned to be component-first and lightweight. The header no longer exposes a "Restart Runtime" button. A compact collapsible sidebar is provided with a single toggle to collapse/expand — the view adapts for narrow sidebars (used inside browser sidebars or popups).
+- Popup redesigned to be more useful: quick search box, "Add Solve" quick action, and stronger navigation to the web Library. Popup uses the extension compatibility shim (`src/lib/browser-compat.js`) rather than direct `chrome.*` calls.
+- Sidebar UI improvements: wider default width, responsive collapse, icon-first compact mode, and a small local database summary. Sidebar rendering is handled by the Library app and adapts to narrow (sidebar) contexts.
+- Contributions heatmap (`src/ui/components/HeatMap.js`) improved to compute relative intensity buckets based on observed solve counts per day; colors are mapped to 4 intensity levels to better mimic GitHub/LeetCode year calendar visuals. Tooltips show date and solve count.
+- Assets: library and PWA pages reference repository images in `src/assets/images` and `worker/public` serves a `config.json` mapping store/GitHub links. Landing and library HTML now reference served `/assets/*` paths for static files.
+- Security: OAuth message handling has been hardened in the settings UI to accept messages only from whitelisted origins (local origin and configured `CONSTANTS.URLS.AUTH_WORKER`). This reduces risk from arbitrary window.postMessage injections.
+- Feature toggles: the settings UI (`SettingsView` + `SettingsSchema`) already exposes toggle fields; handlers (platform, git, AI) can be enabled/disabled via settings. Ensure registry-provided schemas are used for these toggles.
+
+Actionable notes for generator runs:
+- Preserve `src/lib/browser-compat.js` as the ONLY file that touches `chrome.*` or `browser.*` directly. When modifying UI code that opens new tabs or uses runtime APIs, import `tabs` and `runtime` from the compat shim.
+- Keep the PWA `start_url` pointed at `/library` so installed webapps open the Library directly.
+- When adding new UI components, prefer small modules under `src/library/components/` and wire them into `src/library/library.js` to keep the app modular and testable.
+
+
 ### Charts: Chart.js (CDN, loaded in library/analytics pages only)
 ```js
 import Chart from 'https://esm.sh/chart.js/auto';

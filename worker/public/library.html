@@ -1,28 +1,37 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeLedger Web Library</title>
-  <script type="importmap">
-  {
-    "imports": {
-      "preact": "https://esm.sh/preact",
-      "preact/hooks": "https://esm.sh/preact/hooks",
-      "htm": "https://esm.sh/htm",
-      "chart.js/auto": "https://esm.sh/chart.js/auto"
-    }
-  }
-  </script>
-  <!-- Link to the extension's CSS which we will map or just serve -->
-  <style>
-    /* basic styles for web library context if UI compiled css cannot be reached easily */
-    body { background-color: #050508; color: #fff; margin: 0; font-family: sans-serif; overflow: hidden; height: 100vh; }
-  </style>
-</head>
-<body class="bg-[#050508] text-slate-300 font-sans selection:bg-cyan-500/30 overflow-hidden h-screen w-screen m-0 p-0">
-  <!-- The web app uses the GitHub OAuth flow via the worker -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodeLedger Web Library</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "preact": "https://esm.sh/preact",
+          "preact/hooks": "https://esm.sh/preact/hooks",
+          "htm": "https://esm.sh/htm",
+          "chart.js/auto": "https://esm.sh/chart.js/auto"
+        }
+      }
+    </script>
+    <!-- Link to the extension's CSS which we will map or just serve -->
+    <style>
+      /* basic styles for web library context if UI compiled css cannot be reached easily */
+      body {
+        background-color: #050508;
+        color: #fff;
+        margin: 0;
+        font-family: sans-serif;
+        overflow: hidden;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-[#050508] text-slate-300 font-sans selection:bg-cyan-500/30 overflow-hidden h-screen w-screen m-0 p-0"
+  >
+    <!-- The web app uses the GitHub OAuth flow via the worker -->
     <div id="root" class="h-full w-full"></div>
     <script src="/assets/library.js" defer></script>
-</body>
+  </body>
 </html>

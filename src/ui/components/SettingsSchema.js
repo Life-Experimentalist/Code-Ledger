@@ -7,6 +7,7 @@ import { h } from '../../vendor/preact-bundle.js';
 import { useEffect, useCallback, useState } from '../../vendor/preact-bundle.js';
 import { htm } from '../../vendor/preact-bundle.js';
 import { fetchAIModels } from '../../core/model-fetch.js';
+import { CONSTANTS } from '../../core/constants.js';
 const html = htm.bind(h);
 
 export function SettingsSchema({ schema, values, onChange }) {
@@ -29,7 +30,15 @@ export function SettingsSchema({ schema, values, onChange }) {
   }, []);
 
   useEffect(() => {
+    const allowedOrigins = [window.location.origin];
+    try {
+      const authUrl = new URL(CONSTANTS.URLS.AUTH_WORKER);
+      allowedOrigins.push(authUrl.origin);
+    } catch (e) { /* ignore */ }
+
     const receiveMessage = (event) => {
+      // Validate origin for security before accepting tokens
+      if (!(event && event.origin && allowedOrigins.includes(event.origin))) return;
       if (event.data && event.data.type === 'GITHUB_TOKEN') {
         const token = event.data.token;
         if (token) {

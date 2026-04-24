@@ -97,14 +97,20 @@ export function HeatMap({ problems }) {
       }
       compiledGrid.push(week);
     }
-    
-    return { grid: compiledGrid, currentStreak: cStreak, maxStreak: mStreak };
+    // Determine max count to create relative intensity buckets (GitHub-style)
+    const allCounts = Object.values(countMap);
+    const maxCount = allCounts.length ? Math.max(...allCounts) : 0;
+
+    return { grid: compiledGrid, currentStreak: cStreak, maxStreak: mStreak, maxCount };
   }, [problems, selectedPeriod]);
 
   const getColor = (count) => {
     if (!count) return 'bg-white/5';
-    if (count === 1) return 'bg-cyan-900/60';
-    if (count <= 3) return 'bg-cyan-700';
+    const max = Math.max(1, grid.maxCount || 1);
+    const ratio = count / max;
+    if (ratio <= 0.25) return 'bg-cyan-900/60';
+    if (ratio <= 0.5) return 'bg-cyan-700';
+    if (ratio <= 0.75) return 'bg-cyan-600';
     return 'bg-cyan-400';
   };
 

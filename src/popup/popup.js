@@ -8,6 +8,7 @@ import { useState, useEffect } from '../vendor/preact-bundle.js';
 import { htm } from '../vendor/preact-bundle.js';
 const html = htm.bind(h);
 import { Storage } from '../core/storage.js';
+import { tabs, runtime } from '../lib/browser-compat.js';
 
 function PopupApp() {
   const [stats, setStats] = useState({ total: 0, easy: 0, medium: 0, hard: 0 });
@@ -27,7 +28,21 @@ function PopupApp() {
   }, []);
 
   const openLibrary = (tab = 'dashboard') => {
-    chrome.tabs.create({url: chrome.runtime.getURL(`library/library.html?tab=${tab}`)});
+    const url = runtime.getURL(`library/library.html?tab=${tab}`);
+    try {
+      if (tabs && typeof tabs.create === 'function') {
+        tabs.create({ url });
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      window.open(url, '_blank');
+    }
+  };
+
+  const searchLibrary = (q) => {
+    const url = runtime.getURL(`library/library.html?tab=search&q=${encodeURIComponent(q)}`);
+    try { tabs.create({ url }); } catch { window.open(url, '_blank'); }
   };
 
   return html`
@@ -53,6 +68,13 @@ function PopupApp() {
       </div>
 
       <div class="mb-4 flex-1">
+        <div class="mb-3">
+          <input id="popup-search" placeholder="Search problems or topics" class="w-full px-3 py-2 rounded bg-black border border-white/10 text-sm text-white" />
+          <div class="mt-2 flex gap-2">
+            <button class="flex-1 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-xs font-bold uppercase tracking-widest" onClick=${() => searchLibrary(document.getElementById('popup-search').value || '')}>Search</button>
+            <button class="flex-1 py-2 bg-white/5 border border-white/10 rounded-lg text-slate-300 text-xs font-bold uppercase tracking-widest" onClick=${() => openLibrary('add')}>Add Solve</button>
+          </div>
+        </div>
         <h2 class="text-[10px] uppercase tracking-widest text-slate-500 mb-2">Recent Solves</h2>
         ${recent.length === 0 ? html`
           <div class="text-[10px] text-slate-600 italic py-2 text-center bg-white/5 rounded border border-white/5">
