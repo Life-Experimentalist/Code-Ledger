@@ -40,7 +40,7 @@ jobs:
               run: npm ci
 
             - name: Publish to Cloudflare Workers
-              uses: cloudflare/wrangler-action@v2
+              uses: cloudflare/wrangler-action@v3
               with:
                   apiToken: ${{ secrets.CF_API_TOKEN }}
                   workingDirectory: ./worker
