@@ -12,6 +12,14 @@ export const CONSTANTS = Object.freeze({
   // Extension store IDs
   EXTENSION_ID_CHROME: '',
   EXTENSION_ID_FIREFOX: '',
+  // Precomputed store links (append the extension id to the store URL if empty)
+  EXTENSION_STORE_URLS: {
+    chrome: 'https://chrome.google.com/webstore/detail/',
+    edge: 'https://microsoftedge.microsoft.com/addons/detail/',
+    firefox: 'https://addons.mozilla.org/firefox/addon/',
+    github: 'https://github.com/Life-Experimentalist/Code-Ledger',
+    github_releases: 'https://github.com/Life-Experimentalist/Code-Ledger/releases/latest'
+  },
 
   // ── External URLs ──
   URLS: {

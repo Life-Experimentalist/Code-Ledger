@@ -52,8 +52,12 @@
   <body class="theme-dark">
     <script>
       // Fallback JS redirect for browsers that ignore meta-refresh on install
-      if (location.pathname === '/' || location.pathname === '/index.html') {
-        try { location.replace('/library'); } catch (e) { /* ignore */ }
+      if (location.pathname === "/" || location.pathname === "/index.html") {
+        try {
+          location.replace("/library");
+        } catch (e) {
+          /* ignore */
+        }
       }
     </script>
     <!-- landing.js will inject checking for #codeledger-present if extension is active -->
@@ -73,6 +77,7 @@
       <div class="actions">
         <!-- Install and OAuth actions -->
         <a
+          id="install-btn"
           class="btn btn-primary"
           href="https://github.com/apps/code-ledger/installations/new"
           >Install on GitHub</a
