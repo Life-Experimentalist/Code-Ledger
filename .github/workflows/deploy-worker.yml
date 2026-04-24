@@ -1,0 +1,47 @@
+name: Deploy Worker
+
+on:
+    push:
+        branches: [ main ]
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Generate wrangler.toml from secrets
+              run: |
+                cat > worker/wrangler.toml <<'EOF'
+                name = "codeledger"
+                main = "src/index.js"
+                compatibility_date = "2026-04-25"
+                account_id = "${{ secrets.CF_ACCOUNT_ID }}"
+
+                [[kv_namespaces]]
+                binding = "CANONICAL_MAP"
+                id = "${{ secrets.CANONICAL_KV_ID }}"
+
+                [site]
+                bucket = "./public"
+
+                [env.production]
+                name = "codeledger"
+                route = "api.codeledger.vkrishna04.me/*"
+                EOF
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 18
+
+            - name: Install worker dependencies
+              working-directory: ./worker
+              run: npm ci
+
+            - name: Publish to Cloudflare Workers
+              uses: cloudflare/wrangler-action@2.1.0
+              with:
+                  apiToken: ${{ secrets.CF_API_TOKEN }}
+                  workingDirectory: ./worker
+                  args: deploy --env=production
