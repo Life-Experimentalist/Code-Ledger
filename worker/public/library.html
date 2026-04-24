@@ -1,38 +1,37 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeLedger Web Library</title>
-  <script type="importmap">
-  {
-    "imports": {
-      "preact": "https://esm.sh/preact",
-      "preact/hooks": "https://esm.sh/preact/hooks",
-      "htm": "https://esm.sh/htm",
-      "chart.js/auto": "https://esm.sh/chart.js/auto"
-    }
-  }
-  </script>
-  <!-- Link to the extension's CSS which we will map or just serve -->
-  <style>
-    /* basic styles for web library context if UI compiled css cannot be reached easily */
-    body { background-color: #050508; color: #fff; margin: 0; font-family: sans-serif; overflow: hidden; height: 100vh; }
-  </style>
-</head>
-<body class="bg-[#050508] text-slate-300 font-sans selection:bg-cyan-500/30 overflow-hidden h-screen w-screen m-0 p-0">
-  <!-- The web app uses the GitHub OAuth flow via the worker -->
-  <div id="root" class="h-full w-full"></div>
-  <script type="module">
-     // Pseudo integration script for web app library mode
-     // In a full environment we would fetch the raw UI files or bundle them.
-     document.getElementById('root').innerHTML = `
-      <div style="padding: 40px; text-align: center;">
-         <h1>Web Library Under Construction</h1>
-         <p>This web interface interacts directly with your DSA Repo via GitHub API.</p>
-         <button onclick="window.location.href='/auth/github'" style="padding: 10px 20px; background: #06b6d4; color: #fff; border:none; cursor: pointer; border-radius: 4px;">Connect GitHub</button>
-      </div>
-     `;
-  </script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodeLedger Web Library</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "preact": "https://esm.sh/preact",
+          "preact/hooks": "https://esm.sh/preact/hooks",
+          "htm": "https://esm.sh/htm",
+          "chart.js/auto": "https://esm.sh/chart.js/auto"
+        }
+      }
+    </script>
+    <!-- Link to the extension's CSS which we will map or just serve -->
+    <style>
+      /* basic styles for web library context if UI compiled css cannot be reached easily */
+      body {
+        background-color: #050508;
+        color: #fff;
+        margin: 0;
+        font-family: sans-serif;
+        overflow: hidden;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-[#050508] text-slate-300 font-sans selection:bg-cyan-500/30 overflow-hidden h-screen w-screen m-0 p-0"
+  >
+    <!-- The web app uses the GitHub OAuth flow via the worker -->
+    <div id="root" class="h-full w-full"></div>
+    <script src="/assets/library.js" defer></script>
+  </body>
 </html>

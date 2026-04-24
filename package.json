@@ -11,18 +11,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "start": "node server.ts",
-    "build:css": "npx @tailwindcss/cli -i src/index.css -o src/ui/styles/compiled.css",
-    "build:ext": "tsx dev/build.js",
-    "build": "npm run build:css && npm run build:ext",
-    "watch": "nodemon --watch src -e js,html,css --ignore src/ui/styles/compiled.css --exec \"npm run build\"",
+    "dev": "node dev/run-dev.js",
+    "start": "tsx server.ts",
+    "build:css": "npx @tailwindcss/cli -i src/index.css -o src/ui/styles/compiled.css --minify",
+    "build:dist": "node dev/build.js",
+    "build": "npm run build:css && npm run build:dist",
+    "watch": "node dev/watch.js",
+    "package": "node dev/package.js",
+    "clean": "node dev/clean.js",
     "deploy:worker": "cd worker && npx wrangler pages deploy public",
-    "validate:map": "node dev/build-canonical-map.js",
-    "import:leetcode": "node dev/import-profile/leetcode-importer.js",
-    "import:gfg": "node dev/import-profile/gfg-importer.js",
-    "clean": "rm -rf dist releases src/ui/styles/compiled.css",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "validate:openapi": "node dev/validate-openapi.js"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",
@@ -42,9 +41,12 @@
     "@types/node": "^22.13.10",
     "adm-zip": "^0.5.17",
     "bestzip": "^2.2.1",
+    "puppeteer": "^24.15.0",
+    "octokit": "^4.0.0",
     "esbuild": "^0.25.1",
     "nodemon": "^3.1.9",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "js-yaml": "^4.1.0"
   }
 }

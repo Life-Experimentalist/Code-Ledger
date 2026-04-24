@@ -4,44 +4,105 @@ info:
   description: CodeLedger relies heavily on standard GraphQL/REST platform endpoints and GitHub's Git Data Tree API. Below is the simplified spec indicating how CodeLedger interacts with Cloudflare workers for OAuth.
   version: 1.0.0
 
+# Servers: update these to match `CONSTANTS.URLS` in src/core/constants.js.
 servers:
+  - url: https://api.codeledger.vkrishna04.me
+    description: Production Cloudflare OAuth Bridge (AUTH_WORKER)
   - url: https://codeledger.vkrishna04.me
-    description: Production Cloudflare OAuth Bridge
+    description: Project landing / public docs
+  - url: http://localhost:8787
+    description: Local development worker (use when running the auth worker locally)
 
 paths:
-  /auth/github:
+  /app/installations:
     get:
-      summary: Initiate GitHub OAuth Flow
-      description: Redirects the user to GitHub authorization screen with `scope=repo`.
+      summary: List GitHub App installations
+      description: Returns a list of installations for the GitHub App. Requires an App JWT (server-side authentication).
+      security:
+        - app_jwt: []
       responses:
-        '302':
-          description: Redirection to https://github.com/login/oauth/authorize
+        "200":
+          description: A JSON array of installation objects.
 
-  /auth/github/callback:
-    get:
-      summary: GitHub OAuth Callback Receiver
-      description: Exchanges the short-lived authorization code for an OAuth access token, then sends it back to the extension via `window.postMessage`.
+  /app/installations/{id}/access_tokens:
+    post:
+      summary: Create an installation access token
+      description: Creates an installation access token for a given installation id (App JWT required).
       parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      security:
+        - app_jwt: []
+      responses:
+        "201":
+          description: Installation access token created (JSON)
+
+  /auth/{provider}:
+    get:
+      summary: Initiate OAuth Flow for provider
+      description: >
+        Redirects the user to the chosen provider's authorization screen.
+        Supported providers: github, gitlab, bitbucket.
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket]
+      responses:
+        "302":
+          description: Redirection to provider authorization URL
+
+  /auth/{provider}/callback:
+    get:
+      summary: OAuth Callback Receiver for provider
+      description: >
+        Exchanges the temporary authorization code for an access token, then
+        communicates it back to the extension using window.postMessage on the
+        opened window.
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket]
         - in: query
           name: code
           required: true
           schema:
             type: string
-          description: The temporary code from GitHub.
       responses:
-        '200':
-          description: HTML page wrapping standard JavaScript `window.postMessage` containing the `access_token`.
+        "200":
+          description: HTML page which posts the token back to the opener window.
           content:
             text/html:
               schema:
                 type: string
-                example: |
-                  <html><body>
-                    <script>
-                      window.opener.postMessage({ type: 'GITHUB_TOKEN', token: 'gho_12345...' }, '*');
-                      window.close();
-                    </script>
-                  </body></html>
+
+  /webhook/github:
+    post:
+      summary: GitHub Webhook receiver
+      description: >
+        Verifies the x-hub-signature-256 HMAC signature of the request body
+        and then processes webhook events.
+      parameters:
+        - in: header
+          name: x-hub-signature-256
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json: {}
+      responses:
+        "200":
+          description: Webhook processed
 
 components:
   securitySchemes:
@@ -49,3 +110,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: GitHub OAuth
+    app_jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
