@@ -45,7 +45,7 @@ export const CONSTANTS = Object.freeze({
   // ── External URLs ──
   URLS: {
     LANDING: "https://codeledger.vkrishna04.me",
-    AUTH_WORKER: "https://api.codeledger.vkrishna04.me",
+    AUTH_WORKER: "https://codeledger.vkrishna04.me/api",
     TELEMETRY: "https://counter.vkrishna04.me",
     CANONICAL_MAP_RAW:
       "https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/canonical-map.json",

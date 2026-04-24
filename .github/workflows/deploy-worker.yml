@@ -12,10 +12,10 @@ jobs:
 
             - name: Generate wrangler.toml from secrets
               run: |
-                  cat > worker/wrangler.toml <<'EOF'
+                  cat > worker/wrangler.toml <<EOF
                   name = "codeledger"
                   main = "src/index.js"
-                  compatibility_date = "2026-04-25"
+                  compatibility_date = "$(date -u +%F)"
                   account_id = "${{ secrets.CF_ACCOUNT_ID }}"
 
                   [[kv_namespaces]]
@@ -27,7 +27,7 @@ jobs:
 
                   [env.production]
                   name = "codeledger"
-                  route = "api.codeledger.vkrishna04.me/*"
+                  route = "codeledger.vkrishna04.me/api/*"
                   EOF
 
             - name: Setup Node.js
