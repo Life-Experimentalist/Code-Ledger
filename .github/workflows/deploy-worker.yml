@@ -12,23 +12,23 @@ jobs:
 
             - name: Generate wrangler.toml from secrets
               run: |
-                cat > worker/wrangler.toml <<'EOF'
-                name = "codeledger"
-                main = "src/index.js"
-                compatibility_date = "2026-04-25"
-                account_id = "${{ secrets.CF_ACCOUNT_ID }}"
+                  cat > worker/wrangler.toml <<'EOF'
+                  name = "codeledger"
+                  main = "src/index.js"
+                  compatibility_date = "2026-04-25"
+                  account_id = "${{ secrets.CF_ACCOUNT_ID }}"
 
-                [[kv_namespaces]]
-                binding = "CANONICAL_MAP"
-                id = "${{ secrets.CANONICAL_KV_ID }}"
+                  [[kv_namespaces]]
+                  binding = "CANONICAL_MAP"
+                  id = "${{ secrets.CANONICAL_KV_ID }}"
 
-                [site]
-                bucket = "./public"
+                  [site]
+                  bucket = "./public"
 
-                [env.production]
-                name = "codeledger"
-                route = "api.codeledger.vkrishna04.me/*"
-                EOF
+                  [env.production]
+                  name = "codeledger"
+                  route = "api.codeledger.vkrishna04.me/*"
+                  EOF
 
             - name: Setup Node.js
               uses: actions/setup-node@v4

@@ -1,0 +1,32 @@
+# Example Wrangler configuration for CodeLedger Worker
+# Copy this to `wrangler.toml` and replace placeholders with your values.
+
+name = "codeledger-worker"
+main = "src/index.js"
+compatibility_date = "2026-04-24"
+
+# Your Cloudflare Account ID (paste the 32-char id here)
+account_id = "<YOUR_ACCOUNT_ID>"
+
+[vars]
+# Client IDs should not be committed. Use Wrangler secrets or set these via the Cloudflare dashboard.
+# GITHUB_CLIENT_ID = "<GITHUB_CLIENT_ID>"
+# GITHUB_CLIENT_SECRET = "<GITHUB_CLIENT_SECRET>"
+
+[[kv_namespaces]]
+binding = "CANONICAL_MAP"
+# The KV namespace id looks like: abc123def456...
+id = "<CANONICAL_KV_NAMESPACE_ID>"
+
+[site]
+bucket = "./public"
+
+[env.production]
+route = "api.codeledger.vkrishna04.me/*"
+# zone_id is optional when using routes; fill if you want to bind explicitly
+zone_id = "<YOUR_ZONE_ID>"
+
+# Notes:
+# - Never commit private keys or secrets into git. Use `npx wrangler secret put <NAME>`
+#   to add secrets to Cloudflare and reference them in the Worker at runtime via env.
+# - This example file is safe to commit; do not copy real credentials into the repo.

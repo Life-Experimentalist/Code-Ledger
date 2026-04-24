@@ -12,6 +12,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     /* ignore */
   }
 
+  // If GitHub redirected here after app install, forward to the library page
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const installationId = params.get("installation_id");
+    if (installationId) {
+      const setupAction =
+        params.get("setup_action") || params.get("setupAction") || "";
+      const notice = document.createElement("div");
+      notice.style =
+        "position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(6,182,212,0.12);color:#cdeff6;padding:10px 14px;border-radius:8px;z-index:9999;font-weight:600;";
+      notice.textContent =
+        "GitHub App installed — redirecting to your Library...";
+      document.body.prepend(notice);
+      setTimeout(() => {
+        const q = new URLSearchParams();
+        q.set("installation_id", installationId);
+        if (setupAction) q.set("setup_action", setupAction);
+        window.location.href = `/library?${q.toString()}`;
+      }, 1200);
+      return;
+    }
+  } catch (e) {
+    /* ignore malformed params */
+  }
+
   // Wait briefly to allow a page-injected marker from the extension
   setTimeout(() => {
     const marker = document.getElementById("codeledger-present");
@@ -52,6 +77,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           config.github_repo ||
           "#";
         installBtn.classList.add("btn-primary");
+      }
+
+      // Configure GitHub App install link
+      try {
+        const appBtn = document.getElementById("install-app-btn");
+        if (appBtn) {
+          appBtn.href = config.github_app_install || "#";
+        }
+      } catch (e) {
+        /* ignore */
       }
 
       if (actions && !document.getElementById("store-links")) {

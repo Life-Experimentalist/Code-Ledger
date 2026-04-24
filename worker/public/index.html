@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Redirect root webapp to the library PWA start page -->
-    <meta http-equiv="refresh" content="0; url=/library" />
+    <!-- Landing page for CodeLedger; no automatic redirect so users can connect/install -->
     <title>CodeLedger - Your DSA Journey, Committed</title>
     <meta
       name="description"
@@ -51,14 +50,8 @@
   </head>
   <body class="theme-dark">
     <script>
-      // Fallback JS redirect for browsers that ignore meta-refresh on install
-      if (location.pathname === "/" || location.pathname === "/index.html") {
-        try {
-          location.replace("/library");
-        } catch (e) {
-          /* ignore */
-        }
-      }
+      // Early check: don't redirect automatically. Landing page has action buttons.
+      // The landing script will update the install button based on extension presence.
     </script>
     <!-- landing.js will inject checking for #codeledger-present if extension is active -->
 
@@ -75,14 +68,16 @@
         you.
       </p>
       <div class="actions">
-        <!-- Install and OAuth actions -->
-        <a
-          id="install-btn"
-          class="btn btn-primary"
-          href="https://github.com/apps/code-ledger/installations/new"
-          >Install on GitHub</a
+        <!-- Browser extension / store install -->
+        <a id="install-btn" class="btn btn-primary" href="#">Get Extension</a>
+        <!-- GitHub App install (configured from config.json) -->
+        <a id="install-app-btn" class="btn btn-secondary" href="#"
+          >Install GitHub App</a
         >
-        <a class="btn btn-secondary" href="/auth/github">Sign in with GitHub</a>
+        <!-- OAuth connect for personal tokens / auth -->
+        <a id="connect-github" class="btn btn-secondary" href="/auth/github"
+          >Connect GitHub</a
+        >
       </div>
 
       <p style="margin-top: 12px; color: #9ebbd6; font-size: 13px">
@@ -98,11 +93,11 @@
       >
         <li>
           <strong>Callback URL:</strong>
-          https://codeledger.vkrishna04.me/auth/github/callback
+          https://api.codeledger.vkrishna04.me/auth/github/callback
         </li>
         <li>
           <strong>Webhook URL:</strong>
-          https://codeledger.vkrishna04.me/webhook/github
+          https://api.codeledger.vkrishna04.me/webhook/github
         </li>
       </ul>
     </header>

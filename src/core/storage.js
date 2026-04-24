@@ -18,7 +18,30 @@ export const Storage = {
   async getSettings() {
     const { [CONSTANTS.SK.SETTINGS]: settings } =
       await browserStorage.local.get(CONSTANTS.SK.SETTINGS);
-    return settings || {};
+    const s = settings || {};
+    // Migration: if legacy primaryModel/secondaryModel were used to store provider ids,
+    // copy them to new keys `aiProvider` / `aiSecondary` when appropriate.
+    try {
+      const providerIds = Object.keys(CONSTANTS.AI_PROVIDERS || {});
+      if (
+        !s.aiProvider &&
+        s.primaryModel &&
+        providerIds.includes(s.primaryModel)
+      ) {
+        s.aiProvider = s.primaryModel;
+      }
+      if (
+        !s.aiSecondary &&
+        s.secondaryModel &&
+        providerIds.includes(s.secondaryModel)
+      ) {
+        s.aiSecondary = s.secondaryModel;
+      }
+    } catch (e) {
+      // ignore migration errors
+    }
+
+    return s;
   },
 
   async setSettings(settings) {

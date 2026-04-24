@@ -287,6 +287,32 @@ export function SettingsSchema({ schema, values, onChange }) {
                             </div>
                           `
                         : ""}
+                      ${f.type === "select"
+                        ? html`
+                            <div class="flex items-center gap-2 w-full">
+                              <select
+                                class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                                value=${values[f.key] ?? f.default}
+                                onChange=${(e) =>
+                                  onChange(f.key, e.target.value)}
+                              >
+                                ${f.options && f.options.length === 0
+                                  ? html`<option disabled value="">
+                                      No options
+                                    </option>`
+                                  : ""}
+                                ${f.options
+                                  ? f.options.map(
+                                      (opt) =>
+                                        html`<option value=${opt.value}>
+                                          ${opt.label}
+                                        </option>`,
+                                    )
+                                  : ""}
+                              </select>
+                            </div>
+                          `
+                        : ""}
                       ${f.type === "oauth"
                         ? html`
                             <div class="flex items-center gap-3">

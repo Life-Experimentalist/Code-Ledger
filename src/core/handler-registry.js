@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createDebugger } from '../lib/debug.js';
-const dbg = createDebugger('HandlerRegistry');
+import { createDebugger } from "../lib/debug.js";
+import { CONSTANTS } from "./constants.js";
+const dbg = createDebugger("HandlerRegistry");
 
 class HandlerRegistry {
   constructor() {
@@ -34,49 +35,72 @@ class HandlerRegistry {
     this.settingsSchema.set(id, schema);
   }
 
-  getPlatform(id) { return this.platforms.get(id); }
-  getGitProvider(id) { return this.gitProviders.get(id); }
-  getAIProvider(id) { return this.aiProviders.get(id); }
-  
+  getPlatform(id) {
+    return this.platforms.get(id);
+  }
+  getGitProvider(id) {
+    return this.gitProviders.get(id);
+  }
+  getAIProvider(id) {
+    return this.aiProviders.get(id);
+  }
+
   getAllSettingsSchemas() {
     const schemas = Array.from(this.settingsSchema.values());
-    
+
     // Add Core Settings
     schemas.push({
-      id: 'core',
-      title: 'General Settings',
+      id: "core",
+      title: "General Settings",
       order: 0,
-      description: 'Core configuration for CodeLedger.',
+      description: "Core configuration for CodeLedger.",
       fields: [
         {
-          key: 'gitEnabled',
-          label: 'Enable Git Sync',
-          type: 'toggle',
+          key: "gitEnabled",
+          label: "Enable Git Sync",
+          type: "toggle",
           default: true,
-          description: 'Automatically commit solved problems to your repository.'
+          description:
+            "Automatically commit solved problems to your repository.",
         },
         {
-          key: 'autoReview',
-          label: 'Enable AI Review',
-          type: 'toggle',
+          key: "autoReview",
+          label: "Enable AI Review",
+          type: "toggle",
           default: true,
-          description: 'Automatically analyze code using AI upon completion.'
+          description: "Automatically analyze code using AI upon completion.",
         },
         {
-          key: 'primaryModel',
-          label: 'Primary AI Model',
-          type: 'model-select',
-          default: '',
-          description: 'The preferred model for CodeLedger AI usage.'
+          key: "aiProvider",
+          label: "Primary AI Provider",
+          type: "select",
+          default: CONSTANTS.AI_DEFAULT_PRIMARY,
+          description: "Preferred AI provider to use for automated reviews.",
+          options: Object.keys(CONSTANTS.AI_PROVIDERS).map((id) => ({
+            value: id,
+            label: CONSTANTS.AI_PROVIDERS[id].name,
+          })),
         },
         {
-          key: 'secondaryModel',
-          label: 'Secondary AI Model',
-          type: 'model-select',
-          default: '',
-          description: 'Fallback model to be used if the primary model fails.'
-        }
-      ]
+          key: "aiSecondary",
+          label: "Secondary AI Provider",
+          type: "select",
+          default: "",
+          description: "Fallback provider to be used if the primary fails.",
+          options: Object.keys(CONSTANTS.AI_PROVIDERS).map((id) => ({
+            value: id,
+            label: CONSTANTS.AI_PROVIDERS[id].name,
+          })),
+        },
+        {
+          key: "aiModel",
+          label: "Global AI Model (optional)",
+          type: "text",
+          default: "",
+          description:
+            "Optional model name to use across providers that support a global model.",
+        },
+      ],
     });
 
     return schemas.sort((a, b) => a.order - b.order);

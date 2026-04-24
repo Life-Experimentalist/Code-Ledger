@@ -348,6 +348,24 @@ app.post("/admin/canonical", async (c) => {
   return c.json({ ok: true });
 });
 
+// Post-install redirect for GitHub App installs
+// GitHub will redirect installers to this URL if you set it as the
+// "Post-installation setup URL" in your GitHub App settings. We forward
+// the installation info to the landing site which can guide the user to
+// finish setup (choose repo, etc.).
+app.get("/post_install", (c) => {
+  const installationId =
+    c.req.query("installation_id") || c.req.query("installationId") || "";
+  const setupAction =
+    c.req.query("setup_action") || c.req.query("setupAction") || "";
+  const landing = c.env.LANDING_PAGE_URL || "https://codeledger.vkrishna04.me";
+  const params = new URLSearchParams();
+  if (installationId) params.set("installation_id", installationId);
+  if (setupAction) params.set("setup_action", setupAction);
+  const dest = `${landing}/?${params.toString()}`;
+  return c.redirect(dest);
+});
+
 // Serve static landing page and assets from worker/public
 app.get("/*", serveStatic({ root: "./public" }));
 
