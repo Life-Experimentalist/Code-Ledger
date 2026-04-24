@@ -1,0 +1,17 @@
+{
+  "name": "codeledger-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "@cloudflare/kv-asset-handler": "^0.4.2",
+    "hono": "^4.12.14"
+  },
+  "devDependencies": {
+    "wrangler": "^3.42.0"
+  }
+}

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeLedger - Your DSA Journey, Committed</title>
+    <meta name="description" content="CodeLedger is a unified browser extension that seamlessly tracks and commits your competitive programming solutions across LeetCode, GeeksForGeeks, and Codeforces to GitHub.">
+    <meta name="keywords" content="DSA, competitive programming, github sync, leetcode extension, geeksforgeeks, codeforces, code tracking, portfolio">
+    
+    <!-- Open Graph tags for rich social sharing -->
+    <meta property="og:title" content="CodeLedger - Your DSA Journey, Committed">
+    <meta property="og:description" content="Unify all your Data Structures and Algorithms solutions into one developer-owned GitHub repository automatically.">
+    <meta property="og:image" content="https://codeledger.vkrishna04.me/assets/og-image.png">
+    <meta property="og:url" content="https://codeledger.vkrishna04.me">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CodeLedger - Your DSA Journey, Committed">
+    <meta name="twitter:description" content="Automatically track and commit your LeetCode and competitive programming solutions to GitHub.">
+    
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <!-- Include basic landing page CSS -->
+    <link rel="stylesheet" href="/assets/landing.css">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/assets/manifest.webmanifest">
+</head>
+<body class="theme-dark">
+    <!-- landing.js will inject checking for #codeledger-present if extension is active -->
+    
+    <header class="hero text-center">
+        <h1>CodeLedger</h1>
+        <p class="tagline">Your DSA journey, committed.</p>
+        <p class="sub-tagline">Single GitHub repo. Every problem. Every language. Owned entirely by you.</p>
+        <div class="actions">
+            <!-- Dynamically changed based on extension install state -->
+            <a href="https://chrome.google.com/webstore/detail/codeledger/" class="btn btn-primary" id="install-btn">Install Extension</a>
+            <a href="/library" class="btn btn-secondary">Open Web Library</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="features">
+            <div class="feature text-left">
+                <h2>Automatic Git Commits</h2>
+                <p>Every problem solved securely triggers an atomic Git commit to your own repository containing your code, metadata, and constraints.</p>
+            </div>
+            <div class="feature text-left">
+                <h2>Cross-Platform Sync</h2>
+                <p>Tracks your progress across LeetCode, GeeksForGeeks, and Codeforces to ensure none of your work goes unrecorded.</p>
+            </div>
+            <div class="feature text-left">
+                <h2>AI Code Review</h2>
+                <p>Plug in your own AI keys from Google Gemini, OpenAI or Ollama. Automatically get your Big O bounds reviewed with personalized feedback upon submission.</p>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <p>Built with ❤️ by VKrishna04. Licensed under Apache 2.0.</p>
+        <div class="links">
+            <a href="https://github.com/vkrishna04/codeledger">View Source on GitHub</a>
+            <a href="/library">My Library</a>
+        </div>
+    </footer>
+    
+    <script src="/assets/landing.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+openapi: 3.1.0
+info:
+  title: CodeLedger GitHub Authentication & Sync API
+  description: CodeLedger relies heavily on standard GraphQL/REST platform endpoints and GitHub's Git Data Tree API. Below is the simplified spec indicating how CodeLedger interacts with Cloudflare workers for OAuth.
+  version: 1.0.0
+
+servers:
+  - url: https://codeledger.vkrishna04.me
+    description: Production Cloudflare OAuth Bridge
+
+paths:
+  /auth/github:
+    get:
+      summary: Initiate GitHub OAuth Flow
+      description: Redirects the user to GitHub authorization screen with `scope=repo`.
+      responses:
+        '302':
+          description: Redirection to https://github.com/login/oauth/authorize
+
+  /auth/github/callback:
+    get:
+      summary: GitHub OAuth Callback Receiver
+      description: Exchanges the short-lived authorization code for an OAuth access token, then sends it back to the extension via `window.postMessage`.
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema:
+            type: string
+          description: The temporary code from GitHub.
+      responses:
+        '200':
+          description: HTML page wrapping standard JavaScript `window.postMessage` containing the `access_token`.
+          content:
+            text/html:
+              schema:
+                type: string
+                example: |
+                  <html><body>
+                    <script>
+                      window.opener.postMessage({ type: 'GITHUB_TOKEN', token: 'gho_12345...' }, '*');
+                      window.close();
+                    </script>
+                  </body></html>
+
+components:
+  securitySchemes:
+    githubToken:
+      type: http
+      scheme: bearer
+      bearerFormat: GitHub OAuth

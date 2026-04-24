@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "canonicalId": { "type": "string" },
+      "canonicalTitle": { "type": "string" },
+      "topic": { "type": "string" },
+      "difficulty": { "type": "string", "enum": ["Easy", "Medium", "Hard"] },
+      "pattern": { "type": "string" },
+      "tags": { "type": "array", "items": { "type": "string" } },
+      "aliases": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "required": ["canonicalId", "canonicalTitle", "topic", "difficulty"]
+  }
+}

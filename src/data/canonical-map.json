@@ -1,0 +1,35 @@
+[
+  {
+    "canonicalId": 1,
+    "slug": "two-sum",
+    "title": "Two Sum",
+    "platforms": {
+      "leetcode": "two-sum",
+      "geeksforgeeks": "key-pair5616"
+    },
+    "difficulty": "Easy",
+    "patterns": ["Array", "Hash Table"]
+  },
+  {
+    "canonicalId": 2,
+    "slug": "add-two-numbers",
+    "title": "Add Two Numbers",
+    "platforms": {
+      "leetcode": "add-two-numbers",
+      "geeksforgeeks": "add-two-numbers-represented-by-linked-lists"
+    },
+    "difficulty": "Medium",
+    "patterns": ["Linked List", "Math"]
+  },
+  {
+    "canonicalId": 3,
+    "slug": "longest-substring-without-repeating-characters",
+    "title": "Longest Substring Without Repeating Characters",
+    "platforms": {
+      "leetcode": "longest-substring-without-repeating-characters",
+      "geeksforgeeks": "length-of-the-longest-substring3036"
+    },
+    "difficulty": "Medium",
+    "patterns": ["Hash Table", "String", "Sliding Window"]
+  }
+]

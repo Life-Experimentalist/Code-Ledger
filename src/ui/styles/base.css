@@ -1,0 +1,50 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+@import "tailwindcss";
+
+:root {
+  --cl-bg: #050508;
+  --cl-text: #cbd5e1;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--cl-bg);
+  color: var(--cl-text);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.cl-qol-btn {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  transition: background-color 0.2s;
+}
+.cl-qol-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.cl-copy-btn {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 50;
+}
+
+.model-selector-loading, .model-selector-empty {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #64748b;
+  font-weight: bold;
+  padding: 0 0.5rem;
+}

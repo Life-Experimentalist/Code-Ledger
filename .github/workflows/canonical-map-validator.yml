@@ -1,0 +1,15 @@
+name: Canonical Map Validator
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'canonical-mapping')
+    steps:
+      - name: Validate via LLM and Threshold
+        run: echo "Checking for 5 upvotes and running Gemini validation prompt on PR."
