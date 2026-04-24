@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Redirect root webapp to the library PWA start page -->
+    <meta http-equiv="refresh" content="0; url=/library" />
     <title>CodeLedger - Your DSA Journey, Committed</title>
     <meta
       name="description"
@@ -48,6 +50,12 @@
     <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body class="theme-dark">
+    <script>
+      // Fallback JS redirect for browsers that ignore meta-refresh on install
+      if (location.pathname === '/' || location.pathname === '/index.html') {
+        try { location.replace('/library'); } catch (e) { /* ignore */ }
+      }
+    </script>
     <!-- landing.js will inject checking for #codeledger-present if extension is active -->
 
     <header class="hero text-center">
