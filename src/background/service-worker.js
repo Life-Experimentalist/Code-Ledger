@@ -3,38 +3,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { initDebug, coreDebug } from '../lib/debug.js';
-import { registry } from '../core/handler-registry.js';
-import { eventBus } from '../core/event-bus.js';
-import { Storage } from '../core/storage.js';
-import { Telemetry } from '../core/telemetry.js';
-import { initializeHandlers } from '../handlers/init.js';
-import { CONSTANTS } from '../core/constants.js';
+import { initDebug, coreDebug } from "../lib/debug.js";
+import { registry } from "../core/handler-registry.js";
+import { eventBus } from "../core/event-bus.js";
+import { Storage } from "../core/storage.js";
+import { Telemetry } from "../core/telemetry.js";
+import { initializeHandlers } from "../handlers/init.js";
+import { CONSTANTS } from "../core/constants.js";
 
 // Init background
 async function init() {
   await initDebug();
-  coreDebug.log('Background starting...');
+  coreDebug.log("Background starting...");
 
   // Register handlers
   initializeHandlers();
 
   // Set up event listeners
-  eventBus.on('problem:solved', handleSolved);
+  eventBus.on("problem:solved", handleSolved);
 
-  coreDebug.log('Background initialized');
+  coreDebug.log("Background initialized");
 }
 
 async function handleSolved(data) {
-  coreDebug.log('Handling solve event', data);
-  
+  coreDebug.log("Handling solve event", data);
+
   // 1. Save locally
   await Storage.saveProblem(data);
-  
+
   // 2. AI Review (if enabled)
   const settings = await Storage.getSettings();
   if (settings.autoReview) {
-    const providers = [settings.aiProvider || 'gemini', ...CONSTANTS.AI_FALLBACK_CHAIN];
+    const providers = [
+      settings.aiProvider || "gemini",
+      ...CONSTANTS.AI_FALLBACK_CHAIN,
+    ];
     for (const providerId of providers) {
       try {
         const ai = registry.getAIProvider(providerId);
@@ -46,7 +49,10 @@ async function handleSolved(data) {
           break; // Success!
         }
       } catch (err) {
-        coreDebug.error(`AI Review failed with ${providerId}, trying next...`, err);
+        coreDebug.error(
+          `AI Review failed with ${providerId}, trying next...`,
+          err,
+        );
       }
     }
   }
@@ -54,38 +60,41 @@ async function handleSolved(data) {
   // 3. Git Commit
   if (settings.gitEnabled) {
     try {
-      const git = registry.getGitProvider(settings.gitProvider || 'github');
-      
+      const git = registry.getGitProvider(settings.gitProvider || "github");
+
       let filesToCommit = [];
       if (data.files && Array.isArray(data.files)) {
-         filesToCommit = [...data.files];
+        filesToCommit = [...data.files];
       } else {
-         const filePath = `topics/${data.topic || 'Uncategorized'}/${data.titleSlug}/${data.lang.name}.${data.lang.ext || 'js'}`;
-         filesToCommit.push({ path: filePath, content: data.code });
+        const filePath = `topics/${data.topic || "Uncategorized"}/${data.titleSlug}/${data.lang.name}.${data.lang.ext || "js"}`;
+        filesToCommit.push({ path: filePath, content: data.code });
       }
 
-      filesToCommit.push({ path: 'index.json', content: await buildIndexJson() });
+      filesToCommit.push({
+        path: "index.json",
+        content: await buildIndexJson(),
+      });
 
       await git.commit(
-        filesToCommit, 
-        `[${data.topic}] ${data.title} solved`, 
-        settings.gitRepo
+        filesToCommit,
+        `[${data.topic}] ${data.title} solved`,
+        settings.gitRepo,
       );
     } catch (err) {
-      coreDebug.error('Git commit failed', err);
+      coreDebug.error("Git commit failed", err);
     }
   }
 
-  Telemetry.track('solve', { platform: data.platform });
+  Telemetry.track("solve", { platform: data.platform });
 }
 
 async function buildIndexJson() {
   const problems = await Storage.getAllProblems();
   const stats = {
     total: problems.length,
-    easy: problems.filter(p => p.difficulty === 'Easy').length,
-    medium: problems.filter(p => p.difficulty === 'Medium').length,
-    hard: problems.filter(p => p.difficulty === 'Hard').length,
+    easy: problems.filter((p) => p.difficulty === "Easy").length,
+    medium: problems.filter((p) => p.difficulty === "Medium").length,
+    hard: problems.filter((p) => p.difficulty === "Hard").length,
   };
 
   return JSON.stringify({ stats, problems }, null, 2);
@@ -93,7 +102,46 @@ async function buildIndexJson() {
 
 chrome.runtime.onInstalled.addListener(() => {
   init();
-  Telemetry.track('install');
+  Telemetry.track("install");
 });
 
 init();
+
+// Allow content scripts to ask the background to open the extension popup (best-effort).
+// This enables the LeetCode QoL button to open the extension UI without requiring the user
+// to click the toolbar action directly.
+try {
+  chrome.runtime.onMessage.addListener((msg, sender) => {
+    if (msg && msg.type === "OPEN_POPUP") {
+      try {
+        if (chrome.action && typeof chrome.action.openPopup === "function") {
+          chrome.action.openPopup();
+          return;
+        }
+        if (
+          chrome.browserAction &&
+          typeof chrome.browserAction.openPopup === "function"
+        ) {
+          chrome.browserAction.openPopup();
+          return;
+        }
+        // Fallback: open the popup page as a tab
+        if (chrome.tabs && chrome.runtime && chrome.runtime.getURL) {
+          chrome.tabs.create({
+            url: chrome.runtime.getURL("popup/popup.html"),
+          });
+        }
+      } catch (e) {
+        try {
+          chrome.tabs.create({
+            url: chrome.runtime.getURL("popup/popup.html"),
+          });
+        } catch (err) {
+          /* ignore */
+        }
+      }
+    }
+  });
+} catch (e) {
+  // Some platforms may not support openPopup — ignore safely
+}

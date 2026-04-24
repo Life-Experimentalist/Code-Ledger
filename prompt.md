@@ -21,15 +21,15 @@ React + Vite + Tailwind, driven entirely by a `settings.json` in the repo. Dynam
 
 ## PROJECT IDENTITY
 
-| Field | Value |
-|---|---|
-| Name | CodeLedger |
-| Tagline | Your DSA journey, committed. |
-| License | Apache 2.0 |
-| Author | VKrishna04 |
-| Domain | `codeledger.vkrishna04.me` |
-| Auth worker | `https://api.codeledger.vkrishna04.me` |
-| Telemetry | `https://counter.vkrishna04.me` (CFlair-Counter, deployed) |
+| Field         | Value                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------- |
+| Name          | CodeLedger                                                                             |
+| Tagline       | Your DSA journey, committed.                                                           |
+| License       | Apache 2.0                                                                             |
+| Author        | VKrishna04                                                                             |
+| Domain        | `codeledger.vkrishna04.me`                                                             |
+| Auth worker   | `https://api.codeledger.vkrishna04.me`                                                 |
+| Telemetry     | `https://counter.vkrishna04.me` (CFlair-Counter, deployed)                             |
 | Canonical map | `https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/canonical-map.json` |
 
 ---

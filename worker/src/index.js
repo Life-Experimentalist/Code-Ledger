@@ -140,11 +140,35 @@ app.post("/app/installations/:id/access_tokens", async (c) => {
 });
 
 // Basic OAuth fallback (keeps existing simple flow). Returns token to opener
-app.get("/auth/github", (c) => {
-  const clientId = c.env.GITHUB_CLIENT_ID;
-  if (!clientId) return c.text("OAuth not configured", 400);
-  const redirect = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo`;
-  return c.redirect(redirect);
+// Generic OAuth starter for supported providers (github, gitlab, bitbucket)
+app.get("/auth/:provider", (c) => {
+  const provider = c.req.param("provider")?.toLowerCase();
+  const origin = new URL(c.req.url).origin;
+
+  if (provider === "github") {
+    const clientId = c.env.GITHUB_CLIENT_ID;
+    if (!clientId) return c.text("OAuth not configured", 400);
+    const redirect = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo`;
+    return c.redirect(redirect);
+  }
+
+  if (provider === "gitlab") {
+    const clientId = c.env.GITLAB_CLIENT_ID;
+    if (!clientId) return c.text("GitLab OAuth not configured", 400);
+    const redirectUri = `${origin}/auth/gitlab/callback`;
+    const url = `https://gitlab.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=read_user+api`;
+    return c.redirect(url);
+  }
+
+  if (provider === "bitbucket") {
+    const clientId = c.env.BITBUCKET_CLIENT_ID;
+    if (!clientId) return c.text("Bitbucket OAuth not configured", 400);
+    const redirectUri = `${origin}/auth/bitbucket/callback`;
+    const url = `https://bitbucket.org/site/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    return c.redirect(url);
+  }
+
+  return c.text("Unsupported provider", 404);
 });
 
 app.get("/auth/github/callback", async (c) => {
@@ -166,6 +190,69 @@ app.get("/auth/github/callback", async (c) => {
   return c.html(
     `<!DOCTYPE html><html><body><script>window.opener.postMessage({ type: 'GITHUB_TOKEN', token: '${data.access_token || ""}' }, '*'); window.close();</script></body></html>`,
   );
+});
+
+// Generic OAuth callback handler for GitLab and Bitbucket
+app.get("/auth/:provider/callback", async (c) => {
+  const provider = c.req.param("provider")?.toLowerCase();
+  const code = c.req.query("code");
+  const origin = new URL(c.req.url).origin;
+
+  if (provider === "gitlab") {
+    const clientId = c.env.GITLAB_CLIENT_ID;
+    const clientSecret = c.env.GITLAB_CLIENT_SECRET;
+    if (!clientId || !clientSecret)
+      return c.text("GitLab OAuth not configured", 400);
+    const tokenRes = await fetch("https://gitlab.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: `${origin}/auth/gitlab/callback`,
+      }),
+    });
+    const data = await tokenRes.json();
+    return c.html(
+      `<!DOCTYPE html><html><body><script>window.opener.postMessage({ type: 'GITLAB_TOKEN', token: '${data.access_token || ""}' }, '*'); window.close();</script></body></html>`,
+    );
+  }
+
+  if (provider === "bitbucket") {
+    const clientId = c.env.BITBUCKET_CLIENT_ID;
+    const clientSecret = c.env.BITBUCKET_CLIENT_SECRET;
+    if (!clientId || !clientSecret)
+      return c.text("Bitbucket OAuth not configured", 400);
+    // Bitbucket expects x-www-form-urlencoded
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: `${origin}/auth/bitbucket/callback`,
+    });
+    const basic =
+      typeof btoa === "function"
+        ? btoa(`${clientId}:${clientSecret}`)
+        : Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    const tokenRes = await fetch(
+      "https://bitbucket.org/site/oauth2/access_token",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${basic}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+      },
+    );
+    const data = await tokenRes.json();
+    return c.html(
+      `<!DOCTYPE html><html><body><script>window.opener.postMessage({ type: 'BITBUCKET_TOKEN', token: '${data.access_token || ""}' }, '*'); window.close();</script></body></html>`,
+    );
+  }
+
+  return c.text("Unsupported provider", 404);
 });
 
 // Webhook receiver: verify HMAC-SHA256 signature then accept

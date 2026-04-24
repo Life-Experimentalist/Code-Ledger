@@ -1,6 +1,27 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Application-wide constants and configuration values.
+ *
+ * Guidelines:
+ * - Change values here for different deployment environments (dev/stage/prod).
+ * - Keep provider metadata (AI_PROVIDERS) authoritative for model discovery and UI hints.
+ * - Storage keys (SK) are used with the Storage abstraction and should be stable.
+ *
+ * Possible value notes:
+ * - `URLS.AUTH_WORKER`: should point to your Cloudflare Worker or backend used for OAuth and server-side operations.
+ *   Examples: https://api.codeledger.example.com (production), http://localhost:8787 (local dev)
+ * - `AI_PROVIDERS` entries:
+ *   - `id`: unique provider id used throughout the codebase.
+ *   - `endpoint`: base API URL for the provider (no trailing slash preferred).
+ *   - `modelsEndpoint`: optional explicit models/listing endpoint (recommended when different from `${endpoint}/models`).
+ *   - `defaultModel`: a sensible default model name for prompt/initial selection.
+ *   - `supportsLiveFetch`: whether the provider supports listing models from the client (true) or requires server-side handling (false).
+ *   - `keyRequired`: whether an API key is required in order to use this provider.
+ *
+ * - `AI_DEFAULT_PRIMARY`: provider id used as the preferred primary provider.
+ * - `AI_FALLBACK_CHAIN`: ordered provider ids to try when the primary is unavailable.
  */
 
 export const CONSTANTS = Object.freeze({
@@ -42,7 +63,7 @@ export const CONSTANTS = Object.freeze({
       name: "Google Gemini",
       endpoint: "https://generativelanguage.googleapis.com/v1beta",
       modelsEndpoint: "https://generativelanguage.googleapis.com/v1beta/models",
-      defaultModel: "gemini-2.0-flash",
+      defaultModel: "gemini-3-flash-preview",
       supportsLiveFetch: true,
       keyRequired: true,
     },
@@ -51,7 +72,7 @@ export const CONSTANTS = Object.freeze({
       name: "OpenAI",
       endpoint: "https://api.openai.com/v1",
       modelsEndpoint: "https://api.openai.com/v1/models",
-      defaultModel: "gpt-4o-mini",
+      defaultModel: "gpt-5-mini",
       supportsLiveFetch: true,
       keyRequired: true,
     },
@@ -86,7 +107,7 @@ export const CONSTANTS = Object.freeze({
   },
 
   AI_DEFAULT_PRIMARY: "gemini",
-  AI_FALLBACK_CHAIN: ["ollama"],
+  AI_FALLBACK_CHAIN: ["openai", "ollama", "claude", "deepseek"],
 
   // ── Git Providers ──
   GIT_PROVIDERS: {
@@ -152,6 +173,8 @@ export const CONSTANTS = Object.freeze({
   HEARTBEAT_PORT_NAME: "heartbeat",
   HEARTBEAT_INTERVAL_MS: 20_000,
 
+  // Storage keys used with `Storage` helper. Values are the keys stored inside browser storage.
+  // Naming convention: short, dot-separated, stable across releases.
   SK: {
     SETTINGS: "settings",
     DEBUG: "codeledger.debug",
@@ -167,6 +190,9 @@ export const CONSTANTS = Object.freeze({
     AI_PROMPTS: "ai.prompts",
     SYNC_STATE: "sync.state",
     THEME: "ui.theme",
+    // Optional per-user difficulty mapping for non-standard difficulty labels.
+    // Stored shape: { "extra hard": "Hard", "school": "Easy" }
+    DIFFICULTY_MAP: "difficulty.map",
   },
 
   IDB_NAME: "codeledger",
