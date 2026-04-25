@@ -22,17 +22,9 @@ jobs:
                   [site]
                   bucket = "./public"
 
-                  [env.production]
-                  name = "codeledger"
-                  # Route is managed manually in the Cloudflare dashboard to avoid
-                  # requiring the CI token to have route/edit permissions. If you
-                  # want CI to manage routes, add the route line back and ensure
-                  # the CF token has the appropriate permissions.
-                  # route = "codeledger.vkrishna04.me/*"
-
-                  kv_namespaces = [
-                    { binding = "CANONICAL_MAP", id = "${{ secrets.CANONICAL_KV_ID }}" }
-                  ]
+                  [[kv_namespaces]]
+                  binding = "CANONICAL_MAP"
+                  id = "${{ secrets.CANONICAL_KV_ID }}"
                   EOF
 
             - name: Validate required secrets
@@ -56,16 +48,15 @@ jobs:
               env:
                   CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
               run: |
-                  printf "%s" "${{ secrets.CANONICAL_UPLOAD_TOKEN }}" | npx wrangler secret put CANONICAL_UPLOAD_TOKEN --env production
-                  printf "%s" "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET --env production
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_PRIVATE_KEY }}" | npx wrangler secret put CODELEDGER_GH_APP_PRIVATE_KEY --env production
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_ID }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_ID --env production
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_SECRET --env production
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_WEBHOOK_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_WEBHOOK_SECRET --env production
+                  printf "%s" "${{ secrets.CANONICAL_UPLOAD_TOKEN }}" | npx wrangler secret put CANONICAL_UPLOAD_TOKEN
+                  printf "%s" "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_PRIVATE_KEY }}" | npx wrangler secret put CODELEDGER_GH_APP_PRIVATE_KEY
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_ID }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_ID
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_SECRET
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_WEBHOOK_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_WEBHOOK_SECRET
 
             - name: Publish to Cloudflare Workers
               uses: cloudflare/wrangler-action@v3
               with:
                   apiToken: ${{ secrets.CF_API_TOKEN }}
                   workingDirectory: ./worker
-                  environment: production
