@@ -30,10 +30,17 @@ jobs:
                   route = "codeledger.vkrishna04.me/api/*"
                   EOF
 
+            - name: Validate required secrets
+              run: |
+                  if [ -z "${{ secrets.CF_API_TOKEN }}" ] || [ -z "${{ secrets.CF_ACCOUNT_ID }}" ] || [ -z "${{ secrets.CANONICAL_KV_ID }}" ]; then
+                    echo "Required secrets CF_API_TOKEN, CF_ACCOUNT_ID, and CANONICAL_KV_ID must be set in repository secrets.";
+                    exit 1;
+                  fi
+
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: 18
+                  node-version: 20
 
             - name: Install worker dependencies
               working-directory: ./worker
@@ -44,4 +51,4 @@ jobs:
               with:
                   apiToken: ${{ secrets.CF_API_TOKEN }}
                   workingDirectory: ./worker
-                  args: deploy --env=production
+                  environment: production
