@@ -3,6 +3,7 @@ name: Deploy Worker
 on:
     push:
         branches: [ main ]
+    workflow_dispatch:
 
 jobs:
     deploy:
@@ -27,7 +28,7 @@ jobs:
 
                   [env.production]
                   name = "codeledger"
-                  route = "codeledger.vkrishna04.me/api/*"
+                  route = "codeledger.vkrishna04.me/*"
                   EOF
 
             - name: Validate required secrets
@@ -45,6 +46,18 @@ jobs:
             - name: Install worker dependencies
               working-directory: ./worker
               run: npm ci
+
+            - name: Upload runtime secrets to Cloudflare
+              working-directory: ./worker
+              env:
+                  CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+              run: |
+                  printf "%s" "${{ secrets.CANONICAL_UPLOAD_TOKEN }}" | npx wrangler secret put CANONICAL_UPLOAD_TOKEN --env production
+                  printf "%s" "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET --env production
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_PRIVATE_KEY }}" | npx wrangler secret put CODELEDGER_GH_APP_PRIVATE_KEY --env production
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_ID }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_ID --env production
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_SECRET --env production
+                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_WEBHOOK_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_WEBHOOK_SECRET --env production
 
             - name: Publish to Cloudflare Workers
               uses: cloudflare/wrangler-action@v3
