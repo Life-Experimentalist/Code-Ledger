@@ -19,16 +19,20 @@ jobs:
                   compatibility_date = "$(date -u +%F)"
                   account_id = "${{ secrets.CF_ACCOUNT_ID }}"
 
-                  [[kv_namespaces]]
-                  binding = "CANONICAL_MAP"
-                  id = "${{ secrets.CANONICAL_KV_ID }}"
-
                   [site]
                   bucket = "./public"
 
                   [env.production]
                   name = "codeledger"
-                  route = "codeledger.vkrishna04.me/*"
+                  # Route is managed manually in the Cloudflare dashboard to avoid
+                  # requiring the CI token to have route/edit permissions. If you
+                  # want CI to manage routes, add the route line back and ensure
+                  # the CF token has the appropriate permissions.
+                  # route = "codeledger.vkrishna04.me/*"
+
+                  kv_namespaces = [
+                    { binding = "CANONICAL_MAP", id = "${{ secrets.CANONICAL_KV_ID }}" }
+                  ]
                   EOF
 
             - name: Validate required secrets
