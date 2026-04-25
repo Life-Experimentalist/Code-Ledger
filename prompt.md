@@ -28,7 +28,7 @@ React + Vite + Tailwind, driven entirely by a `settings.json` in the repo. Dynam
 | License       | Apache 2.0                                                                             |
 | Author        | VKrishna04                                                                             |
 | Domain        | `codeledger.vkrishna04.me`                                                             |
-| Auth worker   | `https://api.codeledger.vkrishna04.me`                                                 |
+| Auth worker   | `https://codeledger.vkrishna04.me/api`                                                 |
 | Telemetry     | `https://counter.vkrishna04.me` (CFlair-Counter, deployed)                             |
 | Canonical map | `https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/canonical-map.json` |
 
@@ -414,7 +414,7 @@ export const CONSTANTS = Object.freeze({
   // ── External URLs (all user-overridable via Settings > Advanced) ──
   URLS: {
     LANDING:            'https://codeledger.vkrishna04.me',
-    AUTH_WORKER:        'https://api.codeledger.vkrishna04.me',
+    AUTH_WORKER:        'https://codeledger.vkrishna04.me/api',
     TELEMETRY:          'https://counter.vkrishna04.me',
     CANONICAL_MAP_RAW:  'https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/canonical-map.json',
     CANONICAL_MAP_SCHEMA: 'https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/schema/canonical-map.schema.json',

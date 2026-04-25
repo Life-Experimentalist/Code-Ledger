@@ -12,6 +12,7 @@ import {
 import { htm } from "../../vendor/preact-bundle.js";
 import { fetchAIModels, testAIKey } from "../../core/model-fetch.js";
 import { Storage } from "../../core/storage.js";
+import { ModelSelector } from "./ModelSelector.js";
 import { CONSTANTS } from "../../core/constants.js";
 const html = htm.bind(h);
 
@@ -19,15 +20,20 @@ export function SettingsSchema({ schema, values, onChange }) {
   const [models, setModels] = useState(null);
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
+  const [enabledProviders, setEnabledProviders] = useState([]);
+  const [advancedMap, setAdvancedMap] = useState({});
 
   useEffect(() => {
     // Only auto-fetch models when the user has entered at least one API key
     const keyFields = [
       "gemini_key",
+      "gemini_keys",
       "openai_key",
       "claude_key",
       "deepseek_key",
       "ollama_key",
+      "openrouter_key",
+      "openrouter_keys",
     ];
     const hasKey = keyFields.some((k) => !!(values && values[k]));
     if (!hasKey) return;
@@ -45,6 +51,30 @@ export function SettingsSchema({ schema, values, onChange }) {
     values.ollama_key,
   ]);
 
+  // Determine enabled providers (those with keys stored or not requiring keys)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const stored = await Storage.getAIKeys();
+      const provs = Object.keys(CONSTANTS.AI_PROVIDERS || {}).filter((pid) => {
+        const p = CONSTANTS.AI_PROVIDERS[pid];
+        if (!p) return false;
+        if (!p.keyRequired) return true;
+        // check form values for {pid}_keys or {pid}_key or stored
+        const v1 = values?.[`${pid}_keys`];
+        const v2 = values?.[`${pid}_key`];
+        const storedHas = stored && stored[pid] && stored[pid].length;
+        return !!(
+          storedHas ||
+          (v1 && String(v1).trim()) ||
+          (v2 && String(v2).trim())
+        );
+      });
+      if (mounted) setEnabledProviders(provs);
+    })();
+    return () => (mounted = false);
+  }, [values]);
+
   const providerFromField = (key) => {
     const k = (key || "").toLowerCase();
     if (k.includes("gemini")) return "gemini";
@@ -52,6 +82,7 @@ export function SettingsSchema({ schema, values, onChange }) {
     if (k.includes("claude") || k.includes("anthropic")) return "claude";
     if (k.includes("ollama")) return "ollama";
     if (k.includes("deepseek")) return "deepseek";
+    if (k.includes("openrouter")) return "openrouter";
     return null;
   };
 
@@ -145,6 +176,16 @@ export function SettingsSchema({ schema, values, onChange }) {
             >
               ${section.icon ? html`<span>${section.icon}</span>` : ""}
               ${section.title || section.label}
+              <button
+                onClick=${() =>
+                  setAdvancedMap((m) => ({
+                    ...m,
+                    [section.id]: !m[section.id],
+                  }))}
+                class="ml-3 text-xs px-2 py-0.5 bg-white/5 rounded"
+              >
+                ${advancedMap[section.id] ? "Hide advanced" : "Show advanced"}
+              </button>
             </h3>
 
             <div class="space-y-4">
@@ -166,7 +207,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                         : ""}
                     </div>
 
-                    <div class="w-1/3 flex justify-end">
+                    <div class="w-1/3 flex flex-col items-end gap-2">
                       ${f.type === "toggle"
                         ? html`
                             <label
@@ -189,43 +230,49 @@ export function SettingsSchema({ schema, values, onChange }) {
                       f.type === "text" ||
                       f.type === "password"
                         ? html`
-                            <div class="flex items-center gap-2 w-full">
-                              <input
-                                type=${f.type}
-                                value=${values[f.key] ?? f.default}
-                                placeholder=${f.placeholder || ""}
-                                class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
-                                onChange=${(e) =>
-                                  onChange(f.key, e.target.value)}
-                              />
-                              ${(() => {
-                                const prov = providerFromField(f.key);
-                                return prov
-                                  ? html`
-                                      <button
-                                        onClick=${() =>
-                                          handleTestKey(
-                                            prov,
-                                            values[f.key] ?? "",
-                                            f.key,
-                                          )}
-                                        class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-                                      >
-                                        ${testing[f.key]
-                                          ? "Testing..."
-                                          : "Test"}
-                                      </button>
-                                    `
-                                  : "";
-                              })()}
-                            </div>
-                            ${testResults[f.key]
-                              ? html`<div
-                                  class="text-[11px] mt-1 text-slate-400"
-                                >
-                                  ${testResults[f.key]}
+                            ${f.advanced && !advancedMap[section.id]
+                              ? html`<div class="text-xs text-slate-500 italic">
+                                  Advanced field hidden
                                 </div>`
-                              : ""}
+                              : html`
+                                  <div class="flex items-center gap-2 w-full">
+                                    <input
+                                      type=${f.type}
+                                      value=${values[f.key] ?? f.default}
+                                      placeholder=${f.placeholder || ""}
+                                      class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                                      onChange=${(e) =>
+                                        onChange(f.key, e.target.value)}
+                                    />
+                                    ${(() => {
+                                      const prov = providerFromField(f.key);
+                                      return prov
+                                        ? html`
+                                            <button
+                                              onClick=${() =>
+                                                handleTestKey(
+                                                  prov,
+                                                  values[f.key] ?? "",
+                                                  f.key,
+                                                )}
+                                              class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                                            >
+                                              ${testing[f.key]
+                                                ? "Testing..."
+                                                : "Test"}
+                                            </button>
+                                          `
+                                        : "";
+                                    })()}
+                                  </div>
+                                  ${testResults[f.key]
+                                    ? html`<div
+                                        class="text-[11px] mt-1 text-slate-400"
+                                      >
+                                        ${testResults[f.key]}
+                                      </div>`
+                                    : ""}
+                                `}
                           `
                         : ""}
                       ${f.type === "model-select"
@@ -284,6 +331,46 @@ export function SettingsSchema({ schema, values, onChange }) {
                               >
                                 Refresh
                               </button>
+                            </div>
+                          `
+                        : ""}
+                      ${f.type === "select" &&
+                      (f.key === "aiProvider" || f.key === "aiSecondary")
+                        ? html`
+                            <div class="flex flex-col w-full gap-2">
+                              <select
+                                class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                                value=${values[f.key] ?? f.default}
+                                onChange=${(e) =>
+                                  onChange(f.key, e.target.value)}
+                              >
+                                <option value="">Select provider</option>
+                                ${Object.keys(CONSTANTS.AI_PROVIDERS || {}).map(
+                                  (pid) =>
+                                    html`<option value=${pid}>
+                                      ${CONSTANTS.AI_PROVIDERS[pid].name}
+                                    </option>`,
+                                )}
+                              </select>
+
+                              ${values[f.key]
+                                ? html`<div class="w-full">
+                                    <${ModelSelector}
+                                      providerId=${values[f.key]}
+                                      apiKey=${values[
+                                        `${values[f.key]}_keys`
+                                      ] || ""}
+                                      selectedModel=${values[
+                                        `${values[f.key]}_model`
+                                      ] || ""}
+                                      onSelect=${(v) =>
+                                        onChange(`${values[f.key]}_model`, v)}
+                                      endpoint=${values[
+                                        `${values[f.key]}_endpoint`
+                                      ] || ""}
+                                    />
+                                  </div>`
+                                : ""}
                             </div>
                           `
                         : ""}

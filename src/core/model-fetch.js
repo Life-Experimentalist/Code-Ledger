@@ -126,6 +126,29 @@ export async function fetchModelsForProvider(providerId) {
         // ignore
       }
     }
+
+    if (providerId === "openrouter") {
+      const key = await getFirstKeyForProvider("openrouter");
+      if (!key) return [];
+      const me = provider.modelsEndpoint;
+      const ep = me ? me.replace(/\/$/, "") : `${epFor()}/models`;
+      try {
+        const res = await fetch(ep, {
+          headers: { Authorization: `Bearer ${key}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const orModels = (data.data || data.models || []).map((m) => ({
+            id: m.id || m.name,
+            label: `${provider.name}: ${m.name || m.id}`,
+            group: provider.name,
+          }));
+          models.push(...orModels);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
   } catch (e) {
     // best-effort
   }
@@ -204,6 +227,22 @@ export async function testAIKey(providerId, key) {
     }
 
     if (providerId === "deepseek") {
+      const ep = me
+        ? me.replace(/\/$/, "")
+        : `${(provider.endpoint || "").replace(/\/$/, "")}/models`;
+      try {
+        const res = await fetch(ep, {
+          headers: { Authorization: `Bearer ${key}` },
+        });
+        if (res.ok) return { ok: true };
+        const text = await res.text();
+        return { ok: false, error: `Status ${res.status}: ${text}` };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    if (providerId === "openrouter") {
       const ep = me
         ? me.replace(/\/$/, "")
         : `${(provider.endpoint || "").replace(/\/$/, "")}/models`;

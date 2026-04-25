@@ -22,7 +22,7 @@ id = "<CANONICAL_KV_NAMESPACE_ID>"
 bucket = "./public"
 
 [env.production]
-route = "api.codeledger.vkrishna04.me/*"
+route = "codeledger.vkrishna04.me/*"
 # zone_id is optional when using routes; fill if you want to bind explicitly
 zone_id = "<YOUR_ZONE_ID>"
 

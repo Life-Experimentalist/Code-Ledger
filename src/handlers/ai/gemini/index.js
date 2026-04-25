@@ -36,6 +36,7 @@ export class GeminiHandler extends BaseAIHandler {
           default: "",
           placeholder: "https://generativelanguage.googleapis.com/v1beta",
           description: "Custom API base URL.",
+          advanced: true,
         },
         // Note: global model override may be provided in core settings via 'aiModel'.
       ],
@@ -47,11 +48,15 @@ export class GeminiHandler extends BaseAIHandler {
     if (!key) throw new Error("No Gemini API key available.");
 
     const settings = await Storage.getSettings();
-    // Prefer a global model override (`aiModel`), then provider-specific default.
+    // Prefer per-provider model, then a global model override (`aiModel`), then provider-specific default.
     const model =
-      settings.aiModel || CONSTANTS.AI_PROVIDERS.gemini.defaultModel;
+      settings.gemini_model ||
+      settings.aiModel ||
+      CONSTANTS.AI_PROVIDERS.gemini.defaultModel;
     const endpoint =
-      settings.gemini_endpoint || CONSTANTS.AI_PROVIDERS.gemini.endpoint;
+      settings.gemini_endpoint ||
+      settings.aiEndpoint ||
+      CONSTANTS.AI_PROVIDERS.gemini.endpoint;
 
     const prompt = `
       Review the following DSA solution for the problem: "${problemContext.title}".

@@ -6,9 +6,9 @@ This document provides recommended values and a manifest to create the GitHub Ap
 
 **Homepage URL**: https://codeledger.vkrishna04.me
 
-**Callback URL (OAuth / redirect)**: https://api.codeledger.vkrishna04.me/auth/github/callback
+**Callback URL (OAuth / redirect)**: https://codeledger.vkrishna04.me/api/auth/github/callback
 
-**Webhook URL**: https://api.codeledger.vkrishna04.me/webhook/github
+**Webhook URL**: https://codeledger.vkrishna04.me/api/webhook/github
 
 **Webhook secret**: generate a strong random secret and store it as an environment variable in your Cloudflare Worker (e.g. `GITHUB_APP_WEBHOOK_SECRET`).
 
@@ -49,8 +49,8 @@ Example GitHub App manifest (use via GitHub App creation flow):
 {
   "name": "Code Ledger",
   "url": "https://codeledger.vkrishna04.me",
-  "hook_attributes": { "url": "https://api.codeledger.vkrishna04.me/webhook/github" },
-  "redirect_url": "https://api.codeledger.vkrishna04.me/auth/github/callback",
+  "hook_attributes": { "url": "https://codeledger.vkrishna04.me/api/webhook/github" },
+  "redirect_url": "https://codeledger.vkrishna04.me/api/auth/github/callback",
   "public": false,
   "default_permissions": {
     "metadata": "read",
@@ -87,7 +87,7 @@ Manual Cloudflare Worker deployment (via Cloudflare dashboard):
 2. In the Cloudflare dashboard, create a new Worker, choose "Upload a script" or use the online editor and paste `worker/src/index.js`.
 3. In Worker settings, add the environment variables listed above under "Variables" (or "Secrets/Environment").
 4. If your Worker serves static assets (worker/public), configure a KV or Pages deployment, or copy the static assets into the Worker script's `serveStatic` root.
-5. Test the endpoints: `/auth/github` should redirect to GitHub, `/auth/github/callback` should return a small HTML page that posts the token back to the opener window.
+5. Test the endpoints: `/api/auth/github` should redirect to GitHub, `/api/auth/github/callback` should return a small HTML page that posts the token back to the opener window.
 
 Notes on the two auth modes:
 
@@ -97,21 +97,42 @@ Notes on the two auth modes:
 
 Deploying the worker from this repository (recommended GitHub Actions flow):
 
-- Add repository secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_WEBHOOK_SECRET`.
-- Create a GitHub Actions workflow that runs `wrangler publish` (or `wrangler deploy`) using those secrets.
+- Repository secrets required by CI (use these exact names):
+  - `CF_API_TOKEN` — Cloudflare API token with permissions to manage Workers, KV, and Routes.
+  - `CF_ACCOUNT_ID` — Your Cloudflare account ID (32-char string).
+  - `CANONICAL_KV_ID` — Workers KV namespace id used for `CANONICAL_MAP` binding.
+  - `CANONICAL_UPLOAD_TOKEN` — Admin token used by the Worker to accept canonical-map uploads.
+  - `SESSION_SECRET` — Long random signing secret for session/JWTs.
+  - `CODELEDGER_GH_APP_PRIVATE_KEY` — GitHub App private key (PEM contents).
+  - `CODELEDGER_GH_APP_ID` — GitHub App numeric ID.
+  - `CODELEDGER_GH_APP_CLIENT_ID` — (optional) OAuth client id if using OAuth flow.
+  - `CODELEDGER_GH_APP_CLIENT_SECRET` — (optional) OAuth client secret if using OAuth flow.
+  - `CODELEDGER_GH_APP_WEBHOOK_SECRET` — Webhook secret to validate GitHub webhooks.
 
-Quick local steps to publish the worker (you must have `wrangler` installed):
+> Note: GitHub Actions disallows repository secret names that begin with `GITHUB_`. That is why the CI and repo are configured to use the `CODELEDGER_GH_*` mapping instead of `GITHUB_*`.
+
+- The included workflow (`.github/workflows/deploy-worker.yml`) will:
+  1. Generate a runtime `worker/wrangler.toml` using `CF_ACCOUNT_ID` and `CANONICAL_KV_ID`.
+  2. Upload the runtime secrets listed above to Cloudflare (via `wrangler secret put`).
+  3. Publish the Worker to the route `https://codeledger.vkrishna04.me/*` (landing + API).
+
+Quick local steps to run a smoke test (no CI required):
 
 ```powershell
 cd worker
-wrangler login
-wrangler publish
+npm ci
+# Start a local dev server for the Worker (requires Wrangler installed)
+npx wrangler dev --local
 ```
+
+Notes:
+- If you prefer CI-based deployment, ensure `CF_API_TOKEN` and all required secrets are set in the repository before triggering the workflow — otherwise the workflow will fail early during validation.
+- If you want me to trigger the workflow now, I can do that (I will check whether `CF_API_TOKEN` exists in repo secrets first). Alternatively I can run `wrangler dev` locally for a smoke test instead.
 
 If you want, I can:
 
 - Add a `docs` page with a sample `worker/.env.example` and the minimal `worker/src/index.js` auth routes wired to the App settings.
-- Prepare a GitHub Actions workflow that deploys the worker using `CLOUDFLARE_API_TOKEN`.
+- Prepare or run the GitHub Actions workflow that deploys the worker using `CF_API_TOKEN`.
 
 ---
 File references:

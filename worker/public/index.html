@@ -41,12 +41,16 @@
       content="Automatically track and commit your LeetCode and competitive programming solutions to GitHub."
     />
 
-    <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+    <link
+      rel="icon"
+      href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/logo.png"
+      type="image/x-icon"
+    />
     <!-- Include basic landing page CSS (served from /assets) -->
-    <link rel="stylesheet" href="/assets/landing.css" />
+    <link rel="stylesheet" href="./assets/landing.css" />
 
     <!-- PWA Manifest (served from site root) -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="./manifest.webmanifest" />
   </head>
   <body class="theme-dark">
     <script>
@@ -75,7 +79,7 @@
           >Install GitHub App</a
         >
         <!-- OAuth connect for personal tokens / auth -->
-        <a id="connect-github" class="btn btn-secondary" href="/auth/github"
+        <a id="connect-github" class="btn btn-secondary" href="/api/auth/github"
           >Connect GitHub</a
         >
       </div>
@@ -93,11 +97,11 @@
       >
         <li>
           <strong>Callback URL:</strong>
-          https://api.codeledger.vkrishna04.me/auth/github/callback
+          https://codeledger.vkrishna04.me/api/auth/github/callback
         </li>
         <li>
           <strong>Webhook URL:</strong>
-          https://api.codeledger.vkrishna04.me/webhook/github
+          https://codeledger.vkrishna04.me/api/webhook/github
         </li>
       </ul>
     </header>
@@ -135,7 +139,7 @@
         <a href="https://github.com/vkrishna04/codeledger"
           >View Source on GitHub</a
         >
-        <a href="/library">My Library</a>
+        <a href="/library.html">My Library</a>
       </div>
     </footer>
 

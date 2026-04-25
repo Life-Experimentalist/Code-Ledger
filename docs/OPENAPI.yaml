@@ -6,7 +6,7 @@ info:
 
 # Servers: update these to match `CONSTANTS.URLS` in src/core/constants.js.
 servers:
-  - url: https://api.codeledger.vkrishna04.me
+  - url: https://codeledger.vkrishna04.me/api
     description: Production Cloudflare OAuth Bridge (AUTH_WORKER)
   - url: https://codeledger.vkrishna04.me
     description: Project landing / public docs

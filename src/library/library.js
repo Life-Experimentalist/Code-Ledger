@@ -22,6 +22,7 @@ function LibraryApp() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("archive");
+  const [searchQuery, setSearchQuery] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
@@ -34,6 +35,20 @@ function LibraryApp() {
       })
       .finally(() => mounted && setLoading(false));
     return () => (mounted = false);
+  }, []);
+
+  // Read URL params on load so external links (popup, OAuth, etc.) can open
+  // the correct tab (e.g. ?tab=settings or ?tab=search&q=...).
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      const tab = params.get("tab");
+      const q = params.get("q");
+      if (tab) setActiveTab(tab);
+      if (q) setSearchQuery(q);
+    } catch (e) {
+      // ignore
+    }
   }, []);
 
   const navItems = [
@@ -60,6 +75,12 @@ function LibraryApp() {
       >
         Loading workspace...
       </p>`;
+
+    if (activeTab === "search")
+      return html`<${ProblemsView}
+        problems=${problems}
+        searchQuery=${searchQuery}
+      />`;
 
     if (activeTab === "archive")
       return html`<${ProblemsView} problems=${problems} />`;
@@ -140,7 +161,7 @@ function LibraryApp() {
           <div class="flex items-center gap-3">
             <a
               class="text-xs text-slate-400 hover:text-cyan-400"
-              href="/auth/github"
+              href="/api/auth/github"
               >Connect</a
             >
           </div>

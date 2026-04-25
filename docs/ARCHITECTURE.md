@@ -11,10 +11,10 @@ graph TD
     Ext[Browser Extension] -->|Observes| LeetCode[LeetCode]
     Ext -->|Observes| GFG[GeeksForGeeks]
     Ext -->|Observes| CF[Codeforces]
-    
+
     Ext -->|Event: problem:solved| EventBus[Event Bus]
     EventBus --> BG[Background Service Worker]
-    
+
     BG --> Storage[Local chrome.storage]
     BG -->|AI Review| LLM[Gemini/OpenAI/Ollama]
     BG -->|GraphQL/REST| Git[GitHub API - Tree Commit]
@@ -41,7 +41,7 @@ sequenceDiagram
 ```
 
 **Explanation:**
-Upon installation or startup, the Service Worker initializes `BasePlatformHandler`, `BaseGitHandler`, and `BaseAIHandler` instances. This design means that adding a new platform (like HackerRank) only requires writing a single isolated class and registering it. 
+Upon installation or startup, the Service Worker initializes `BasePlatformHandler`, `BaseGitHandler`, and `BaseAIHandler` instances. This design means that adding a new platform (like HackerRank) only requires writing a single isolated class and registering it.
 
 ## 3. GitHub Secure OAuth Flow
 
@@ -51,11 +51,11 @@ Since MV3 service workers and cross-origin isolation make OAuth tricky without h
 sequenceDiagram
     participant User
     participant Ext as CodeLedger
-    participant CF as Cloudflare Worker (/auth/github)
+    participant CF as Cloudflare Worker (/api/auth/github)
     participant GH as GitHub OAuth
-    
+
     User->>Ext: Clicks Login
-    Ext->>CF: Popup window to /auth/github
+    Ext->>CF: Popup window to /api/auth/github
     CF->>GH: Redirect to authorization UI
     User->>GH: Approves
     GH->>CF: Callback with ?code=XXX
@@ -76,16 +76,16 @@ CodeLedger uses the GitHub Git Data APIs (`/git/trees`, `/git/commits`, `/git/re
 sequenceDiagram
     participant BG as Background Worker
     participant GH as GitHub API (Trees)
-    
+
     BG->>GH: GET /git/refs/heads/main
     GH-->>BG: Return base commit SHA
-    
+
     BG->>GH: POST /git/trees (Files & prev SHA)
     GH-->>BG: Return new tree SHA
-    
+
     BG->>GH: POST /git/commits (Tree SHA & Parent SHA)
     GH-->>BG: Return new commit SHA
-    
+
     BG->>GH: PATCH /git/refs/heads/main (New commit SHA)
     GH-->>BG: Branch Updated
 ```

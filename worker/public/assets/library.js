@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <a class="btn btn-secondary" href="${config.github_releases || config.github_repo || "#"}">GitHub</a>
         </div>
         <div style="margin-top:24px">
-          <a class="btn btn-secondary" href="/auth/github">Connect with GitHub</a>
+          <a class="btn btn-secondary" href="/api/auth/github">Connect with GitHub</a>
         </div>
       </div>
     `;

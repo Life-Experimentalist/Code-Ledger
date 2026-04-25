@@ -104,6 +104,15 @@ export const CONSTANTS = Object.freeze({
       supportsLiveFetch: true,
       keyRequired: false,
     },
+    openrouter: {
+      id: "openrouter",
+      name: "OpenRouter",
+      endpoint: "https://api.openrouter.ai/v1",
+      modelsEndpoint: "https://api.openrouter.ai/v1/models",
+      defaultModel: "openrouter/gpt-4o-mini",
+      supportsLiveFetch: true,
+      keyRequired: true,
+    },
   },
 
   AI_DEFAULT_PRIMARY: "gemini",

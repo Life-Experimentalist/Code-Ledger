@@ -57,7 +57,7 @@ If you are a developer compiling the extension from source and do not want to us
 1. Go to **GitHub Developer Settings** -> **GitHub Apps** -> **New GitHub App**.
 2. **GitHub App name:** `CodeLedger Dev` (or similar).
 3. **Homepage URL:** (Optional, your GitHub profile/repo URL).
-4. **Callback URL:** If using a web-backend like Cloudflare Workers, use `https://<your-worker-url>.workers.dev/auth/github/callback`. For Chrome Extension direct flows, use `https://<extension-id>.chromiumapp.org/`.
+4. **Callback URL:** If using a web-backend like Cloudflare Workers, use `https://<your-worker-url>.workers.dev/api/auth/github/callback`. For Chrome Extension direct flows, use `https://<extension-id>.chromiumapp.org/`.
 5. **Webhook:** Disable Webhook (Active: false).
 6. **Permissions:**
    * **Repository Permissions:**
@@ -76,7 +76,7 @@ sequenceDiagram
     participant GitHub as GitHub OAuth API
 
     User->>Extension: Clicks "Connect GitHub"
-    Extension->>CFWorker: Opens popup to /auth/github
+    Extension->>CFWorker: Opens popup to /api/auth/github
     CFWorker->>GitHub: Redirects user to GitHub Authorize URI
     GitHub-->>User: Prompts for permission (repo scope)
     User->>GitHub: Approves access
