@@ -20,6 +20,13 @@ export class OllamaHandler extends BaseAIHandler {
       description: "Configure local Ollama instance as backup for AI reviews.",
       fields: [
         {
+          key: "ollama_enabled",
+          label: "Enable Ollama",
+          type: "toggle",
+          default: true,
+          description: "Enable using the local Ollama instance for AI reviews.",
+        },
+        {
           key: "ollama_endpoint",
           label: "Endpoint",
           type: "text",
@@ -43,7 +50,9 @@ export class OllamaHandler extends BaseAIHandler {
   async review(code, problemContext) {
     const settings = await Storage.getSettings();
     const model =
-      settings.ollama_model || CONSTANTS.AI_PROVIDERS.ollama.defaultModel;
+      problemContext?.aiModelOverride ||
+      settings.ollama_model ||
+      CONSTANTS.AI_PROVIDERS.ollama.defaultModel;
     const endpoint =
       settings.ollama_endpoint || CONSTANTS.AI_PROVIDERS.ollama.endpoint;
 

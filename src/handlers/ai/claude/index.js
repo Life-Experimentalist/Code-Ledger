@@ -15,21 +15,30 @@ export class ClaudeHandler extends BaseAIHandler {
   }
 
   async review(code, problemContext) {
-    const key = await this.keyPool.getNextKey();
-    if (!key) throw new Error("No Claude API key available.");
-
     const settings = await Storage.getSettings();
     const model =
+      problemContext?.aiModelOverride ||
       settings.claude_model ||
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.claude.defaultModel;
+    const endpoint =
+      settings.claude_endpoint ||
+      settings.aiEndpoint ||
+      CONSTANTS.AI_PROVIDERS.claude.endpoint;
 
     const prompt = `Review this DSA solution for "${problemContext.title}". Language: ${problemContext.language}, Difficulty: ${problemContext.difficulty}. Code: \`${code}\`. Provide Time/Space complexity, optimizations, and key patterns.`;
 
-    try {
-      const res = await fetch(
-        `${CONSTANTS.AI_PROVIDERS.claude.endpoint}/messages`,
-        {
+    const keyCount = await this.keyPool.getKeyCount();
+    if (!keyCount) throw new Error("No Claude API key available.");
+
+    let lastErr = null;
+    for (let attempt = 0; attempt < keyCount; attempt++) {
+      // eslint-disable-next-line no-await-in-loop
+      const key = await this.keyPool.getNextKey();
+      if (!key) break;
+
+      try {
+        const res = await fetch(`${endpoint}/messages`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -42,19 +51,22 @@ export class ClaudeHandler extends BaseAIHandler {
             max_tokens: 1024,
             messages: [{ role: "user", content: prompt }],
           }),
-        },
-      );
+        });
 
-      if (!res.ok) {
-        if (res.status === 429) this.keyPool.markFailed(key);
-        throw new Error(`Claude API error: ${res.status}`);
+        if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
+
+        const data = await res.json();
+        return data.content?.[0]?.text || "";
+      } catch (err) {
+        lastErr = err;
+        this.keyPool.markFailed(key);
+        this.dbg.warn(
+          `Claude key failed, trying next key (${attempt + 1}/${keyCount})`,
+        );
       }
-
-      const data = await res.json();
-      return data.content[0].text;
-    } catch (err) {
-      this.dbg.error("Claude review failed", err);
-      throw err;
     }
+
+    this.dbg.error("Claude review failed", lastErr);
+    throw lastErr || new Error("Claude review failed with all available keys.");
   }
 }

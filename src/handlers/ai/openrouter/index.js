@@ -8,29 +8,28 @@ import { APIKeyPool } from "../../../core/api-key-pool.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 
-export class DeepSeekHandler extends BaseAIHandler {
+export class OpenRouterHandler extends BaseAIHandler {
   constructor() {
-    super("deepseek", "DeepSeek");
-    this.keyPool = new APIKeyPool("deepseek");
+    super("openrouter", "OpenRouter");
+    this.keyPool = new APIKeyPool("openrouter");
   }
 
   async review(code, problemContext) {
     const settings = await Storage.getSettings();
     const model =
       problemContext?.aiModelOverride ||
-      settings.deepseek_model ||
+      settings.openrouter_model ||
       settings.aiModel ||
-      CONSTANTS.AI_PROVIDERS.deepseek.defaultModel;
+      CONSTANTS.AI_PROVIDERS.openrouter.defaultModel;
+    const endpoint =
+      settings.openrouter_endpoint ||
+      settings.aiEndpoint ||
+      CONSTANTS.AI_PROVIDERS.openrouter.endpoint;
 
     const prompt = `Review this DSA solution for "${problemContext.title}". Language: ${problemContext.language}, Difficulty: ${problemContext.difficulty}. Code: \`${code}\`. Provide Time/Space complexity, optimizations, and key patterns.`;
 
-    const endpoint =
-      settings.deepseek_endpoint ||
-      settings.aiEndpoint ||
-      CONSTANTS.AI_PROVIDERS.deepseek.endpoint;
-
     const keyCount = await this.keyPool.getKeyCount();
-    if (!keyCount) throw new Error("No DeepSeek API key available.");
+    if (!keyCount) throw new Error("No OpenRouter API key available.");
 
     let lastErr = null;
     for (let attempt = 0; attempt < keyCount; attempt++) {
@@ -51,7 +50,7 @@ export class DeepSeekHandler extends BaseAIHandler {
           }),
         });
 
-        if (!res.ok) throw new Error(`DeepSeek API error: ${res.status}`);
+        if (!res.ok) throw new Error(`OpenRouter API error: ${res.status}`);
 
         const data = await res.json();
         return data.choices?.[0]?.message?.content || "";
@@ -59,14 +58,14 @@ export class DeepSeekHandler extends BaseAIHandler {
         lastErr = err;
         this.keyPool.markFailed(key);
         this.dbg.warn(
-          `DeepSeek key failed, trying next key (${attempt + 1}/${keyCount})`,
+          `OpenRouter key failed, trying next key (${attempt + 1}/${keyCount})`,
         );
       }
     }
 
-    this.dbg.error("DeepSeek review failed", lastErr);
+    this.dbg.error("OpenRouter review failed", lastErr);
     throw (
-      lastErr || new Error("DeepSeek review failed with all available keys.")
+      lastErr || new Error("OpenRouter review failed with all available keys.")
     );
   }
 }

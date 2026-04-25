@@ -44,12 +44,10 @@ export class GeminiHandler extends BaseAIHandler {
   }
 
   async review(code, problemContext) {
-    const key = await this.keyPool.getNextKey();
-    if (!key) throw new Error("No Gemini API key available.");
-
     const settings = await Storage.getSettings();
     // Prefer per-provider model, then a global model override (`aiModel`), then provider-specific default.
     const model =
+      problemContext?.aiModelOverride ||
       settings.gemini_model ||
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.gemini.defaultModel;
@@ -74,26 +72,39 @@ export class GeminiHandler extends BaseAIHandler {
       3. Key take-away patterns.
     `;
 
-    try {
-      const url = `${endpoint}/models/${model}:generateContent?key=${key}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      });
+    const keyCount = await this.keyPool.getKeyCount();
+    if (!keyCount) throw new Error("No Gemini API key available.");
 
-      if (!res.ok) {
-        if (res.status === 429) this.keyPool.markFailed(key);
-        throw new Error(`Gemini API error: ${res.status}`);
+    let lastErr = null;
+    for (let attempt = 0; attempt < keyCount; attempt++) {
+      // eslint-disable-next-line no-await-in-loop
+      const key = await this.keyPool.getNextKey();
+      if (!key) break;
+
+      try {
+        const url = `${endpoint}/models/${model}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        });
+
+        if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+
+        const data = await res.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } catch (err) {
+        lastErr = err;
+        this.keyPool.markFailed(key);
+        this.dbg.warn(
+          `Gemini key failed, trying next key (${attempt + 1}/${keyCount})`,
+        );
       }
-
-      const data = await res.json();
-      return data.candidates[0].content.parts[0].text;
-    } catch (err) {
-      this.dbg.error("Gemini review failed", err);
-      throw err;
     }
+
+    this.dbg.error("Gemini review failed", lastErr);
+    throw lastErr || new Error("Gemini review failed with all available keys.");
   }
 }

@@ -9,6 +9,7 @@ import { htm } from "../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "../core/storage.js";
+import { getQueryParam, updateQueryParams } from "../core/url-state.js";
 import { initializeHandlers } from "../handlers/init.js";
 import { ProblemsView } from "./views/ProblemsView.js";
 import { AnalyticsView } from "./views/AnalyticsView.js";
@@ -37,19 +38,26 @@ function LibraryApp() {
     return () => (mounted = false);
   }, []);
 
-  // Read URL params on load so external links (popup, OAuth, etc.) can open
-  // the correct tab (e.g. ?tab=settings or ?tab=search&q=...).
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search || "");
-      const tab = params.get("tab");
-      const q = params.get("q");
-      if (tab) setActiveTab(tab);
-      if (q) setSearchQuery(q);
-    } catch (e) {
-      // ignore
-    }
+    const tab = getQueryParam("tab", "");
+    const q = getQueryParam("q", "");
+    const allowed = new Set([
+      "archive",
+      "analytics",
+      "graph",
+      "settings",
+      "search",
+    ]);
+    if (allowed.has(tab)) setActiveTab(tab);
+    if (q) setSearchQuery(q);
   }, []);
+
+  useEffect(() => {
+    updateQueryParams({
+      tab: activeTab,
+      q: activeTab === "search" && searchQuery ? searchQuery : null,
+    });
+  }, [activeTab, searchQuery]);
 
   const navItems = [
     { id: "archive", label: "Archive", icon: "📚" },
@@ -68,7 +76,7 @@ function LibraryApp() {
     }
   };
 
-  const ActiveView = () => {
+  const renderActiveView = () => {
     if (loading)
       return html`<p
         class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold p-8"
@@ -246,7 +254,7 @@ function LibraryApp() {
         </aside>
 
         <div class="flex-1 bg-[#050508] p-6 overflow-y-auto">
-          <${ActiveView} />
+          ${renderActiveView()}
         </div>
       </main>
     </div>

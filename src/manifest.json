@@ -1,0 +1,94 @@
+{
+    "manifest_version": 3,
+    "name": "CodeLedger",
+    "version": "1.0.0",
+    "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
+    "author": "VKrishna04",
+    "homepage_url": "https://codeledger.vkrishna04.me",
+    "icons": {
+        "16": "icons/icon-16.png",
+        "32": "icons/icon-32.png",
+        "48": "icons/icon-48.png",
+        "128": "icons/icon-128.png"
+    },
+    "permissions": [
+        "storage",
+        "alarms",
+        "tabs",
+        "scripting",
+        "webRequest"
+    ],
+    "host_permissions": [
+        "*://*.leetcode.com/*",
+        "*://*.geeksforgeeks.org/*",
+        "*://*.codeforces.com/*",
+        "https://api.github.com/*",
+        "https://api.gitlab.com/*",
+        "https://bitbucket.org/api/*",
+        "https://api.openai.com/*",
+        "https://api.anthropic.com/*",
+        "https://generativelanguage.googleapis.com/*",
+        "https://api.deepseek.com/*",
+        "http://localhost:11434/*"
+    ],
+    "background": {
+        "service_worker": "background/service-worker.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.leetcode.com/*",
+                "*://*.geeksforgeeks.org/*",
+                "*://*.codeforces.com/*"
+            ],
+            "js": [
+                "content/handler-loader.js"
+            ],
+            "run_at": "document_start",
+            "all_frames": false
+        }
+    ],
+    "action": {
+        "default_title": "CodeLedger",
+        "default_popup": "popup/popup.html",
+        "default_icon": {
+            "16": "icons/icon-16.png",
+            "32": "icons/icon-32.png",
+            "48": "icons/icon-48.png"
+        }
+    },
+    "side_panel": {
+        "default_path": "library/library.html"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "library/library.html",
+                "library/library.js",
+                "library/library.css",
+                "ui/styles/base.css",
+                "ui/styles/compiled.css",
+                "vendor/*.js"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "codeledger@vkrishna04.me",
+            "strict_min_version": "109.0"
+        }
+    },
+    "browser_action": {
+        "default_title": "CodeLedger",
+        "default_popup": "popup/popup.html",
+        "default_icon": {
+            "16": "icons/icon-16.png",
+            "32": "icons/icon-32.png",
+            "48": "icons/icon-48.png"
+        }
+    }
+}

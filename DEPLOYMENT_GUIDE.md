@@ -50,19 +50,19 @@ Extension → stores token in chrome.storage.local
 
 All secrets are **already set** in your repository. Here's what they do:
 
-| Secret | Purpose | Set? |
-|--------|---------|------|
-| `CF_API_TOKEN` | Cloudflare API token for publishing Worker | ✅ |
-| `CF_ACCOUNT_ID` | Your Cloudflare account ID (32-char string) | ✅ |
-| `CF_ZONE_ID` | DNS zone ID for codeledger.vkrishna04.me | ✅ |
-| `CANONICAL_KV_ID` | Workers KV namespace ID for canonical map | ✅ |
-| `CANONICAL_UPLOAD_TOKEN` | Bearer token for admin `/api/admin/canonical` uploads | ✅ |
-| `SESSION_SECRET` | Secret for signing session tokens/JWTs | ✅ |
-| `CODELEDGER_GH_APP_ID` | GitHub App ID (numeric) | ✅ |
-| `CODELEDGER_GH_APP_PRIVATE_KEY` | GitHub App private key (PEM format) | ✅ |
-| `CODELEDGER_GH_APP_CLIENT_ID` | OAuth client ID from GitHub App | ✅ |
-| `CODELEDGER_GH_APP_CLIENT_SECRET` | OAuth client secret | ✅ |
-| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook secret for verifying GitHub events | ✅ |
+| Secret                             | Purpose                                               | Set? |
+| ---------------------------------- | ----------------------------------------------------- | ---- |
+| `CF_API_TOKEN`                     | Cloudflare API token for publishing Worker            | ✅    |
+| `CF_ACCOUNT_ID`                    | Your Cloudflare account ID (32-char string)           | ✅    |
+| `CF_ZONE_ID`                       | DNS zone ID for codeledger.vkrishna04.me              | ✅    |
+| `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | ✅    |
+| `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | ✅    |
+| `SESSION_SECRET`                   | Secret for signing session tokens/JWTs                | ✅    |
+| `CODELEDGER_GH_APP_ID`             | GitHub App ID (numeric)                               | ✅    |
+| `CODELEDGER_GH_APP_PRIVATE_KEY`    | GitHub App private key (PEM format)                   | ✅    |
+| `CODELEDGER_GH_APP_CLIENT_ID`      | OAuth client ID from GitHub App                       | ✅    |
+| `CODELEDGER_GH_APP_CLIENT_SECRET`  | OAuth client secret                                   | ✅    |
+| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook secret for verifying GitHub events            | ✅    |
 
 > **Note:** These are named `CODELEDGER_GH_*` instead of `GITHUB_*` because GitHub Actions forbids repository secret names starting with `GITHUB_`.
 
@@ -321,11 +321,11 @@ This is already fixed in the current code.
 
 ## Summary
 
-✅ **All secrets are set** in GitHub  
-✅ **Worker code is complete** with all OAuth, webhook, and API endpoints  
-✅ **CI workflow is configured** to generate wrangler config and upload secrets  
-✅ **Vite config has plugins array** to avoid Wrangler errors  
-✅ **Worker route manually created** in Cloudflare dashboard  
+✅ **All secrets are set** in GitHub
+✅ **Worker code is complete** with all OAuth, webhook, and API endpoints
+✅ **CI workflow is configured** to generate wrangler config and upload secrets
+✅ **Vite config has plugins array** to avoid Wrangler errors
+✅ **Worker route manually created** in Cloudflare dashboard
 
 **Next steps:**
 1. Trigger the deployment workflow (via GitHub Actions UI or CLI)

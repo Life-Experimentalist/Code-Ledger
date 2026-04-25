@@ -11,14 +11,32 @@ async function getFirstKeyForProvider(providerId) {
   return list.length ? list[0].trim() : null;
 }
 
-export async function fetchModelsForProvider(providerId) {
+export async function fetchModelsForProvider(
+  providerId,
+  endpointOverride,
+  options = {},
+) {
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return [];
   const models = [];
+  const throwOnError = !!options.throwOnError;
 
   const epFor = (useModelsEndpoint = false) => {
+    const baseOverride = endpointOverride
+      ? String(endpointOverride).replace(/\/$/, "")
+      : null;
     const me = provider.modelsEndpoint;
-    if (useModelsEndpoint && me) return me.replace(/\/$/, "");
+    if (useModelsEndpoint && me) {
+      if (
+        baseOverride &&
+        provider.endpoint &&
+        me.startsWith(provider.endpoint)
+      ) {
+        return baseOverride + me.substring(provider.endpoint.length);
+      }
+      return me.replace(/\/$/, "");
+    }
+    if (baseOverride) return baseOverride;
     return (provider.endpoint || "").replace(/\/$/, "");
   };
 
@@ -27,7 +45,12 @@ export async function fetchModelsForProvider(providerId) {
       const key = await getFirstKeyForProvider("gemini");
       if (!key) return [];
       const me = provider.modelsEndpoint;
-      const ep = me ? me.replace(/\/$/, "") : `${epFor()}/models`;
+      const ep = me
+        ? endpointOverride && me.startsWith(provider.endpoint)
+          ? endpointOverride.replace(/\/$/, "") +
+            me.substring(provider.endpoint.length)
+          : me.replace(/\/$/, "")
+        : `${epFor()}/models`;
       // Use header `x-goog-api-key` for Google Gemini model listing when possible.
       const res = await fetch(ep, { headers: { "x-goog-api-key": key } });
       if (!res.ok) return [];
@@ -48,7 +71,12 @@ export async function fetchModelsForProvider(providerId) {
       const key = await getFirstKeyForProvider("openai");
       if (!key) return [];
       const me = provider.modelsEndpoint;
-      const ep = me ? me.replace(/\/$/, "") : `${epFor()}/models`;
+      const ep = me
+        ? endpointOverride && me.startsWith(provider.endpoint)
+          ? endpointOverride.replace(/\/$/, "") +
+            me.substring(provider.endpoint.length)
+          : me.replace(/\/$/, "")
+        : `${epFor()}/models`;
       const res = await fetch(ep, {
         headers: { Authorization: `Bearer ${key}` },
       });
@@ -66,7 +94,12 @@ export async function fetchModelsForProvider(providerId) {
       const key = await getFirstKeyForProvider("claude");
       if (!key) return [];
       const me = provider.modelsEndpoint;
-      const ep = me ? me.replace(/\/$/, "") : `${epFor()}/models`;
+      const ep = me
+        ? endpointOverride && me.startsWith(provider.endpoint)
+          ? endpointOverride.replace(/\/$/, "") +
+            me.substring(provider.endpoint.length)
+          : me.replace(/\/$/, "")
+        : `${epFor()}/models`;
       try {
         const res = await fetch(ep, { headers: { "x-api-key": key } });
         if (res.ok) {
@@ -86,21 +119,28 @@ export async function fetchModelsForProvider(providerId) {
     if (providerId === "ollama") {
       // Ollama: tags endpoint typically returns model tags. Use modelsEndpoint directly if present.
       const me = provider.modelsEndpoint;
-      const ep = me ? me.replace(/\/$/, "") : `${epFor()}/tags`;
+      const ep = me
+        ? endpointOverride && me.startsWith(provider.endpoint)
+          ? endpointOverride.replace(/\/$/, "") +
+            me.substring(provider.endpoint.length)
+          : me.replace(/\/$/, "")
+        : `${epFor()}/tags`;
       try {
         const res = await fetch(ep);
-        if (res.ok) {
-          const data = await res.json();
-          const tags = data.tags || data;
-          const ollamaModels = (Array.isArray(tags) ? tags : []).map((t) => ({
-            id: t,
-            label: `${provider.name}: ${t}`,
-            group: provider.name,
-          }));
-          models.push(...ollamaModels);
+        if (!res.ok) {
+          if (throwOnError) throw new Error(`Status ${res.status}`);
+          return models;
         }
+        const data = await res.json();
+        const tags = data.tags || data;
+        const ollamaModels = (Array.isArray(tags) ? tags : []).map((t) => ({
+          id: t,
+          label: `${provider.name}: ${t}`,
+          group: provider.name,
+        }));
+        models.push(...ollamaModels);
       } catch (e) {
-        // ignore connection refused or other failures
+        if (throwOnError) throw e;
       }
     }
 
@@ -108,7 +148,12 @@ export async function fetchModelsForProvider(providerId) {
       const key = await getFirstKeyForProvider("deepseek");
       if (!key) return [];
       const me = provider.modelsEndpoint;
-      const ep = me ? me.replace(/\/$/, "") : `${epFor()}/models`;
+      const ep = me
+        ? endpointOverride && me.startsWith(provider.endpoint)
+          ? endpointOverride.replace(/\/$/, "") +
+            me.substring(provider.endpoint.length)
+          : me.replace(/\/$/, "")
+        : `${epFor()}/models`;
       try {
         const res = await fetch(ep, {
           headers: { Authorization: `Bearer ${key}` },
@@ -131,7 +176,12 @@ export async function fetchModelsForProvider(providerId) {
       const key = await getFirstKeyForProvider("openrouter");
       if (!key) return [];
       const me = provider.modelsEndpoint;
-      const ep = me ? me.replace(/\/$/, "") : `${epFor()}/models`;
+      const ep = me
+        ? endpointOverride && me.startsWith(provider.endpoint)
+          ? endpointOverride.replace(/\/$/, "") +
+            me.substring(provider.endpoint.length)
+          : me.replace(/\/$/, "")
+        : `${epFor()}/models`;
       try {
         const res = await fetch(ep, {
           headers: { Authorization: `Bearer ${key}` },
@@ -150,7 +200,7 @@ export async function fetchModelsForProvider(providerId) {
       }
     }
   } catch (e) {
-    // best-effort
+    if (throwOnError) throw e;
   }
 
   return models;
@@ -169,16 +219,33 @@ export async function fetchAIModels() {
   return out;
 }
 
-export async function testAIKey(providerId, key) {
+export async function testAIKey(providerId, key, endpointOverride = "") {
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return { ok: false, error: "Unknown provider" };
+  const baseOverride = endpointOverride
+    ? String(endpointOverride).replace(/\/$/, "")
+    : "";
+  const endpointForModels = () => {
+    const me = provider.modelsEndpoint;
+    if (me) {
+      if (
+        baseOverride &&
+        provider.endpoint &&
+        me.startsWith(provider.endpoint)
+      ) {
+        return baseOverride + me.substring(provider.endpoint.length);
+      }
+      return me.replace(/\/$/, "");
+    }
+    return `${baseOverride || (provider.endpoint || "").replace(/\/$/, "")}/${
+      providerId === "ollama" ? "tags" : "models"
+    }`;
+  };
   const me = provider.modelsEndpoint;
 
   try {
     if (providerId === "openai") {
-      const ep = me
-        ? me.replace(/\/$/, "")
-        : `${(provider.endpoint || "").replace(/\/$/, "")}/models`;
+      const ep = endpointForModels();
       const res = await fetch(ep, {
         headers: { Authorization: `Bearer ${key}` },
       });
@@ -188,9 +255,7 @@ export async function testAIKey(providerId, key) {
     }
 
     if (providerId === "gemini") {
-      const epBase = me
-        ? me.replace(/\/$/, "")
-        : `${(provider.endpoint || "").replace(/\/$/, "")}/models`;
+      const epBase = endpointForModels();
       // prefer header-based key for Google APIs
       const res = await fetch(epBase, { headers: { "x-goog-api-key": key } });
       if (res.ok) return { ok: true };
@@ -199,9 +264,7 @@ export async function testAIKey(providerId, key) {
     }
 
     if (providerId === "claude") {
-      const ep = me
-        ? me.replace(/\/$/, "")
-        : `${(provider.endpoint || "").replace(/\/$/, "")}/models`;
+      const ep = endpointForModels();
       try {
         const res = await fetch(ep, { headers: { "x-api-key": key } });
         if (res.ok) return { ok: true };
@@ -213,9 +276,7 @@ export async function testAIKey(providerId, key) {
     }
 
     if (providerId === "ollama") {
-      const ep = me
-        ? me.replace(/\/$/, "")
-        : `${(provider.endpoint || "").replace(/\/$/, "")}/tags`;
+      const ep = endpointForModels();
       try {
         const res = await fetch(ep);
         if (res.ok) return { ok: true };
@@ -227,9 +288,7 @@ export async function testAIKey(providerId, key) {
     }
 
     if (providerId === "deepseek") {
-      const ep = me
-        ? me.replace(/\/$/, "")
-        : `${(provider.endpoint || "").replace(/\/$/, "")}/models`;
+      const ep = endpointForModels();
       try {
         const res = await fetch(ep, {
           headers: { Authorization: `Bearer ${key}` },
@@ -243,9 +302,7 @@ export async function testAIKey(providerId, key) {
     }
 
     if (providerId === "openrouter") {
-      const ep = me
-        ? me.replace(/\/$/, "")
-        : `${(provider.endpoint || "").replace(/\/$/, "")}/models`;
+      const ep = endpointForModels();
       try {
         const res = await fetch(ep, {
           headers: { Authorization: `Bearer ${key}` },
@@ -259,6 +316,31 @@ export async function testAIKey(providerId, key) {
     }
 
     return { ok: false, error: "Provider does not support key testing" };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+export async function testProviderEndpoint(providerId, endpointOverride) {
+  const provider = CONSTANTS.AI_PROVIDERS[providerId];
+  if (!provider) return { ok: false, error: "Unknown provider" };
+
+  const baseOverride = endpointOverride
+    ? String(endpointOverride).replace(/\/$/, "")
+    : null;
+  const me = provider.modelsEndpoint;
+  const ep = me
+    ? baseOverride && provider.endpoint && me.startsWith(provider.endpoint)
+      ? baseOverride + me.substring(provider.endpoint.length)
+      : me.replace(/\/$/, "")
+    : (baseOverride || (provider.endpoint || "").replace(/\/$/, "")) +
+      (providerId === "ollama" ? "/tags" : "/models");
+
+  try {
+    const res = await fetch(ep);
+    if (res.ok) return { ok: true };
+    const text = await res.text();
+    return { ok: false, error: `Status ${res.status}: ${text}` };
   } catch (e) {
     return { ok: false, error: e.message };
   }

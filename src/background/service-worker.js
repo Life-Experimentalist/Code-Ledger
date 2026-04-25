@@ -34,15 +34,37 @@ async function handleSolved(data) {
   // 2. AI Review (if enabled)
   const settings = await Storage.getSettings();
   if (settings.autoReview) {
-    const providers = [
-      settings.aiProvider || "gemini",
-      ...CONSTANTS.AI_FALLBACK_CHAIN,
+    const providerPlan = [
+      {
+        id: settings.aiProvider || "gemini",
+        model: settings.aiPrimaryModel || "",
+      },
+      {
+        id: settings.aiSecondary || "",
+        model: settings.aiSecondaryModel || "",
+      },
+      ...CONSTANTS.AI_FALLBACK_CHAIN.map((id) => ({ id, model: "" })),
     ];
-    for (const providerId of providers) {
+
+    const seen = new Set();
+    const providers = providerPlan.filter((p) => {
+      if (!p.id) return false;
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+
+    for (const provider of providers) {
       try {
+        const providerId = provider.id;
+        if (settings[`${providerId}_enabled`] === false) continue;
+
         const ai = registry.getAIProvider(providerId);
         if (ai) {
-          const review = await ai.review(data.code, data);
+          const review = await ai.review(data.code, {
+            ...data,
+            aiModelOverride: provider.model || "",
+          });
           data.aiReview = review;
           await Storage.saveProblem(data);
           coreDebug.log(`AI Review success via ${providerId}`);

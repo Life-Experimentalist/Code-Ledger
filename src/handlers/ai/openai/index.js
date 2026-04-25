@@ -15,11 +15,9 @@ export class OpenAIHandler extends BaseAIHandler {
   }
 
   async review(code, problemContext) {
-    const key = await this.keyPool.getNextKey();
-    if (!key) throw new Error("No OpenAI API key available.");
-
     const settings = await Storage.getSettings();
     const model =
+      problemContext?.aiModelOverride ||
       settings.openai_model ||
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.openai.defaultModel;
@@ -30,29 +28,42 @@ export class OpenAIHandler extends BaseAIHandler {
 
     const prompt = `Review this DSA solution for "${problemContext.title}". Language: ${problemContext.language}, Difficulty: ${problemContext.difficulty}. Code: \`${code}\`. Provide Time/Space complexity, optimizations, and key patterns.`;
 
-    try {
-      const res = await fetch(`${endpoint}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${key}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
+    const keyCount = await this.keyPool.getKeyCount();
+    if (!keyCount) throw new Error("No OpenAI API key available.");
 
-      if (!res.ok) {
-        if (res.status === 429) this.keyPool.markFailed(key);
-        throw new Error(`OpenAI API error: ${res.status}`);
+    let lastErr = null;
+    for (let attempt = 0; attempt < keyCount; attempt++) {
+      // eslint-disable-next-line no-await-in-loop
+      const key = await this.keyPool.getNextKey();
+      if (!key) break;
+
+      try {
+        const res = await fetch(`${endpoint}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+
+        if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
+
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content || "";
+      } catch (err) {
+        lastErr = err;
+        this.keyPool.markFailed(key);
+        this.dbg.warn(
+          `OpenAI key failed, trying next key (${attempt + 1}/${keyCount})`,
+        );
       }
-
-      const data = await res.json();
-      return data.choices[0].message.content;
-    } catch (err) {
-      this.dbg.error("OpenAI review failed", err);
-      throw err;
     }
+
+    this.dbg.error("OpenAI review failed", lastErr);
+    throw lastErr || new Error("OpenAI review failed with all available keys.");
   }
 }

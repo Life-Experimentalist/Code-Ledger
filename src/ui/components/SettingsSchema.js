@@ -8,72 +8,93 @@ import {
   useEffect,
   useCallback,
   useState,
+  useRef,
 } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
-import { fetchAIModels, testAIKey } from "../../core/model-fetch.js";
+import {
+  fetchAIModels,
+  testAIKey,
+  testProviderEndpoint,
+  fetchModelsForProvider,
+} from "../../core/model-fetch.js";
 import { Storage } from "../../core/storage.js";
 import { ModelSelector } from "./ModelSelector.js";
 import { CONSTANTS } from "../../core/constants.js";
+import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
+import {
+  getDefaultAIPrompts,
+  normalizeAIPrompts,
+  PROMPT_PLACEHOLDERS,
+} from "../../core/ai-prompts.js";
 const html = htm.bind(h);
+
+const KEY_STRATEGY_OPTIONS = [
+  { value: "round-robin", label: "Round Robin" },
+  { value: "random", label: "Random" },
+  { value: "sticky-first", label: "Sticky First" },
+];
+
+function parseKeys(raw) {
+  return String(raw || "")
+    .split(/[\n,]/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function maskKey(k) {
+  const s = String(k || "");
+  if (s.length <= 8)
+    return `${"*".repeat(Math.max(0, s.length - 2))}${s.slice(-2)}`;
+  return `${s.slice(0, 4)}...${s.slice(-4)}`;
+}
 
 export function SettingsSchema({ schema, values, onChange }) {
   const [models, setModels] = useState(null);
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
-  const [enabledProviders, setEnabledProviders] = useState([]);
   const [advancedMap, setAdvancedMap] = useState({});
+  const [activeTab, setActiveTab] = useState("general");
+  const [showAdvancedProviders, setShowAdvancedProviders] = useState(false);
+  const [promptDraft, setPromptDraft] = useState(getDefaultAIPrompts());
+  const [promptStatus, setPromptStatus] = useState("");
+  const [promptBusy, setPromptBusy] = useState(false);
+  const initializedFromQueryRef = useRef(false);
+  const scrolledFromQueryRef = useRef(false);
 
   useEffect(() => {
-    // Only auto-fetch models when the user has entered at least one API key
-    const keyFields = [
-      "gemini_key",
-      "gemini_keys",
-      "openai_key",
-      "claude_key",
-      "deepseek_key",
-      "ollama_key",
-      "openrouter_key",
-      "openrouter_keys",
-    ];
-    const hasKey = keyFields.some((k) => !!(values && values[k]));
-    if (!hasKey) return;
+    const hasAnyProviderKey = Object.keys(CONSTANTS.AI_PROVIDERS || {}).some(
+      (pid) => {
+        const raw = values?.[`${pid}_keys`] || values?.[`${pid}_key`];
+        return !!String(raw || "").trim();
+      },
+    );
+    if (!hasAnyProviderKey) return;
 
     let mounted = true;
     fetchAIModels()
       .then((res) => mounted && setModels(res))
       .catch(() => mounted && setModels([]));
-    return () => (mounted = false);
-  }, [
-    values.gemini_key,
-    values.openai_key,
-    values.claude_key,
-    values.deepseek_key,
-    values.ollama_key,
-  ]);
 
-  // Determine enabled providers (those with keys stored or not requiring keys)
+    return () => {
+      mounted = false;
+    };
+  }, [values]);
+
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const stored = await Storage.getAIKeys();
-      const provs = Object.keys(CONSTANTS.AI_PROVIDERS || {}).filter((pid) => {
-        const p = CONSTANTS.AI_PROVIDERS[pid];
-        if (!p) return false;
-        if (!p.keyRequired) return true;
-        // check form values for {pid}_keys or {pid}_key or stored
-        const v1 = values?.[`${pid}_keys`];
-        const v2 = values?.[`${pid}_key`];
-        const storedHas = stored && stored[pid] && stored[pid].length;
-        return !!(
-          storedHas ||
-          (v1 && String(v1).trim()) ||
-          (v2 && String(v2).trim())
-        );
+    Storage.getAIPrompts()
+      .then((raw) => {
+        if (!mounted) return;
+        setPromptDraft(normalizeAIPrompts(raw));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setPromptDraft(getDefaultAIPrompts());
       });
-      if (mounted) setEnabledProviders(provs);
-    })();
-    return () => (mounted = false);
-  }, [values]);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const providerFromField = (key) => {
     const k = (key || "").toLowerCase();
@@ -86,33 +107,168 @@ export function SettingsSchema({ schema, values, onChange }) {
     return null;
   };
 
-  const handleTestKey = async (providerId, rawVal, fieldKey) => {
-    if (!providerId) return;
-    const first = (rawVal || "").split(",")[0]?.trim();
-    if (!first) {
-      setTestResults((s) => ({ ...s, [fieldKey]: "No key provided" }));
+  const getSectionCategory = (section) => {
+    if (section.id === "core") return "general";
+    if (CONSTANTS.PLATFORMS?.[section.id]) return "platforms";
+    if (CONSTANTS.GIT_PROVIDERS?.[section.id]) return "git";
+    if (CONSTANTS.AI_PROVIDERS?.[section.id]) return "ai";
+    return "general";
+  };
+
+  useEffect(() => {
+    if (initializedFromQueryRef.current) return;
+    initializedFromQueryRef.current = true;
+
+    const routeTab = getQueryParam("settingsTab", "");
+    const routeSection = getQueryParam("settingsSection", "");
+    const routeProvider = getQueryParam("settingsProvider", "");
+    const routeAdvanced = getQueryParam("settingsAdvanced", "");
+    const validTabs = new Set(["general", "ai", "platforms", "git", "prompts"]);
+
+    if (routeAdvanced === "1") setShowAdvancedProviders(true);
+
+    if (validTabs.has(routeTab)) {
+      setActiveTab(routeTab);
       return;
     }
+
+    if (routeProvider && CONSTANTS.AI_PROVIDERS?.[routeProvider]) {
+      setActiveTab("ai");
+      return;
+    }
+
+    if (routeSection && Array.isArray(schema)) {
+      const section = schema.find((s) => s.id === routeSection);
+      if (section) {
+        setActiveTab(getSectionCategory(section));
+      }
+    }
+  }, [schema]);
+
+  useEffect(() => {
+    updateQueryParams({
+      settingsTab: activeTab,
+      settingsAdvanced: showAdvancedProviders ? "1" : null,
+    });
+  }, [activeTab, showAdvancedProviders]);
+
+  useEffect(() => {
+    if (scrolledFromQueryRef.current) return;
+
+    const routeProvider = getQueryParam("settingsProvider", "");
+    const routeSection = getQueryParam("settingsSection", "");
+    if (!routeProvider && !routeSection) return;
+
+    const targetId = routeProvider
+      ? `settings-provider-${routeProvider}`
+      : `settings-section-${routeSection}`;
+
+    const el = document.getElementById(targetId);
+    if (!el) return;
+
+    scrolledFromQueryRef.current = true;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [activeTab, schema]);
+
+  useEffect(() => {
+    const selected = [values?.aiProvider, values?.aiSecondary].filter(Boolean);
+    selected.forEach((pid) => {
+      if (values?.[`${pid}_enabled`] === false) {
+        onChange(`${pid}_enabled`, true);
+      }
+    });
+  }, [values?.aiProvider, values?.aiSecondary, onChange]);
+
+  const persistProviderKeys = async (providerId, rawVal) => {
+    const all = await Storage.getAIKeys();
+    all[providerId] = parseKeys(rawVal);
+    await Storage.setAIKeys(all);
+  };
+
+  const handleProviderKeysChange = async (providerId, fieldKey, rawVal) => {
+    onChange(fieldKey, rawVal);
+    try {
+      await persistProviderKeys(providerId, rawVal);
+    } catch (e) {
+      // ignore persistence failure in UI layer
+    }
+  };
+
+  const handleTestKey = async (
+    providerId,
+    keyVal,
+    resultKey,
+    endpointOverride = "",
+  ) => {
+    if (!providerId) return;
+    const key = String(keyVal || "").trim();
+    if (!key) {
+      setTestResults((s) => ({ ...s, [resultKey]: "No key provided" }));
+      return;
+    }
+
+    setTesting((s) => ({ ...s, [resultKey]: true }));
+    try {
+      const res = await testAIKey(providerId, key, endpointOverride);
+      setTestResults((s) => ({
+        ...s,
+        [resultKey]: res.ok ? "OK" : res.error || "Failed",
+      }));
+    } catch (e) {
+      setTestResults((s) => ({ ...s, [resultKey]: e.message || "Failed" }));
+    } finally {
+      setTesting((s) => ({ ...s, [resultKey]: false }));
+    }
+  };
+
+  const handleTestAllKeys = async (providerId, rawVal, baseResultKey) => {
+    const keys = parseKeys(rawVal);
+    if (!keys.length) {
+      setTestResults((s) => ({
+        ...s,
+        [`${baseResultKey}:all`]: "No keys to test",
+      }));
+      return;
+    }
+    for (let i = 0; i < keys.length; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await handleTestKey(
+        providerId,
+        keys[i],
+        `${baseResultKey}:${i}`,
+        values?.[`${providerId}_endpoint`] || "",
+      );
+    }
+    setTestResults((s) => ({
+      ...s,
+      [`${baseResultKey}:all`]: `Tested ${keys.length} key(s)`,
+    }));
+  };
+
+  const handleTestEndpoint = async (providerId, endpointVal, fieldKey) => {
+    if (!providerId) return;
+    const ep = String(endpointVal || "").trim();
+    if (!ep) {
+      setTestResults((s) => ({ ...s, [fieldKey]: "No endpoint provided" }));
+      return;
+    }
+
     setTesting((s) => ({ ...s, [fieldKey]: true }));
     try {
-      const res = await testAIKey(providerId, first);
+      const res = await testProviderEndpoint(providerId, ep);
       if (res.ok) {
-        // persist keys for provider
-        const existing = await Storage.getAIKeys();
-        existing[providerId] = (rawVal || "")
-          .split(",")
-          .map((v) => v.trim())
-          .filter(Boolean);
-        await Storage.setAIKeys(existing);
         setTestResults((s) => ({ ...s, [fieldKey]: "OK" }));
-        // refresh models
-        const ms = await fetchAIModels();
-        setModels(ms);
+        try {
+          const ms = await fetchModelsForProvider(providerId, ep);
+          setModels(ms || []);
+        } catch (e) {
+          // ignore model refresh errors
+        }
       } else {
         setTestResults((s) => ({ ...s, [fieldKey]: res.error || "Failed" }));
       }
     } catch (e) {
-      setTestResults((s) => ({ ...s, [fieldKey]: e.message }));
+      setTestResults((s) => ({ ...s, [fieldKey]: e.message || "Failed" }));
     } finally {
       setTesting((s) => ({ ...s, [fieldKey]: false }));
     }
@@ -138,8 +294,6 @@ export function SettingsSchema({ schema, values, onChange }) {
           await Storage.setAIKeys(existing);
           onChange(key, data.token);
           setTestResults((s) => ({ ...s, [key]: "OK" }));
-          const ms = await fetchAIModels();
-          setModels(ms);
         } catch (e) {
           // ignore
         } finally {
@@ -163,278 +317,579 @@ export function SettingsSchema({ schema, values, onChange }) {
     [onChange],
   );
 
-  return html`
-    <div class="space-y-6">
-      ${schema.map(
-        (section) => html`
-          <div
-            key=${section.id}
-            class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4"
+  const isProviderEffectivelyEnabled = (providerId) => {
+    if (!providerId) return false;
+    if (
+      values?.aiProvider === providerId ||
+      values?.aiSecondary === providerId
+    ) {
+      return true;
+    }
+    return values?.[`${providerId}_enabled`] !== false;
+  };
+
+  const savePromptDraft = async () => {
+    setPromptBusy(true);
+    setPromptStatus("");
+    try {
+      const normalized = normalizeAIPrompts(promptDraft);
+      await Storage.setAIPrompts(normalized);
+      setPromptDraft(normalized);
+      setPromptStatus("Saved");
+    } catch (e) {
+      setPromptStatus(`Save failed: ${e.message || "Unknown error"}`);
+    } finally {
+      setPromptBusy(false);
+    }
+  };
+
+  const resetPromptDraft = () => {
+    setPromptDraft(getDefaultAIPrompts());
+    setPromptStatus("Reset to defaults (not saved yet)");
+  };
+
+  const shouldRenderField = (section, field) => {
+    if (section.id !== "core") return true;
+    if (activeTab === "general") {
+      return !["autoReview", "aiProvider", "aiSecondary", "aiModel"].includes(
+        field.key,
+      );
+    }
+    return true;
+  };
+
+  const renderStandardField = (section, f) => html`
+    <div
+      class="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
+      key=${f.key}
+    >
+      <div class="flex flex-col gap-1 w-2/3 pr-4">
+        <span class="text-sm font-medium text-slate-300">${f.label}</span>
+        ${f.description
+          ? html`<span class="text-[10px] text-slate-500 leading-tight"
+              >${f.description}</span
+            >`
+          : ""}
+      </div>
+
+      <div class="w-1/3 flex flex-col items-end gap-2">
+        ${f.type === "toggle"
+          ? html`
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  class="sr-only peer"
+                  checked=${values[f.key] ?? f.default}
+                  onChange=${(e) => onChange(f.key, e.target.checked)}
+                />
+                <div
+                  class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
+                ></div>
+              </label>
+            `
+          : ""}
+        ${f.type === "url" || f.type === "text" || f.type === "password"
+          ? html`
+              ${f.advanced && !advancedMap[section.id]
+                ? html`<div class="text-xs text-slate-500 italic">
+                    Advanced field hidden
+                  </div>`
+                : html`
+                    <div class="flex items-center gap-2 w-full">
+                      <input
+                        type=${f.type}
+                        value=${values[f.key] ?? f.default}
+                        placeholder=${f.placeholder || ""}
+                        class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                        onChange=${(e) => onChange(f.key, e.target.value)}
+                      />
+                      ${(() => {
+                        const prov = providerFromField(f.key);
+                        if (!prov) return "";
+                        const isEndpoint = String(f.key || "")
+                          .toLowerCase()
+                          .includes("_endpoint");
+                        return html`
+                          <button
+                            onClick=${() =>
+                              isEndpoint
+                                ? handleTestEndpoint(
+                                    prov,
+                                    values[f.key] ?? "",
+                                    f.key,
+                                  )
+                                : handleTestKey(
+                                    prov,
+                                    parseKeys(values[f.key] ?? "")[0] || "",
+                                    f.key,
+                                    values?.[`${prov}_endpoint`] || "",
+                                  )}
+                            class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                          >
+                            ${testing[f.key]
+                              ? "Testing..."
+                              : isEndpoint
+                                ? "Check"
+                                : "Test"}
+                          </button>
+                        `;
+                      })()}
+                    </div>
+                    ${testResults[f.key]
+                      ? html`<div class="text-[11px] mt-1 text-slate-400">
+                          ${testResults[f.key]}
+                        </div>`
+                      : ""}
+                  `}
+            `
+          : ""}
+        ${f.type === "select"
+          ? html`
+              <div class="flex items-center gap-2 w-full">
+                <select
+                  class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                  value=${values[f.key] ?? f.default}
+                  onChange=${(e) => onChange(f.key, e.target.value)}
+                >
+                  ${f.options && f.options.length === 0
+                    ? html`<option disabled value="">No options</option>`
+                    : ""}
+                  ${f.options
+                    ? f.options.map(
+                        (opt) =>
+                          html`<option value=${opt.value}>
+                            ${opt.label}
+                          </option>`,
+                      )
+                    : ""}
+                </select>
+              </div>
+            `
+          : ""}
+        ${f.type === "oauth"
+          ? html`
+              <div class="flex items-center gap-3">
+                <button
+                  onClick=${() => handleOAuth(f.provider, f.key)}
+                  class="px-4 py-2 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  ${values[f.key] ? "Reconnect" : "Connect"}
+                </button>
+                ${values[f.key]
+                  ? html`<span
+                      title="Connected"
+                      class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                    ></span>`
+                  : ""}
+              </div>
+            `
+          : ""}
+      </div>
+    </div>
+  `;
+
+  const renderSection = (section) => {
+    const fields = (section.fields || []).filter((f) =>
+      shouldRenderField(section, f),
+    );
+    if (!fields.length) return "";
+
+    return html`
+      <div
+        id=${`settings-section-${section.id}`}
+        key=${section.id}
+        class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4"
+      >
+        <h3
+          class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"
+        >
+          ${section.icon ? html`<span>${section.icon}</span>` : ""}
+          ${section.title || section.label}
+          <button
+            onClick=${() =>
+              setAdvancedMap((m) => ({
+                ...m,
+                [section.id]: !m[section.id],
+              }))}
+            class="ml-3 text-xs px-2 py-0.5 bg-white/5 rounded"
           >
-            <h3
-              class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"
-            >
-              ${section.icon ? html`<span>${section.icon}</span>` : ""}
-              ${section.title || section.label}
-              <button
-                onClick=${() =>
-                  setAdvancedMap((m) => ({
-                    ...m,
-                    [section.id]: !m[section.id],
-                  }))}
-                class="ml-3 text-xs px-2 py-0.5 bg-white/5 rounded"
+            ${advancedMap[section.id] ? "Hide advanced" : "Show advanced"}
+          </button>
+        </h3>
+
+        <div class="space-y-4">
+          ${fields.map((f) => renderStandardField(section, f))}
+        </div>
+      </div>
+    `;
+  };
+
+  const renderAIRouting = () => {
+    const primaryProvider = values.aiProvider || "";
+    const secondaryProvider = values.aiSecondary || "";
+    const selectableProviders = Object.keys(
+      CONSTANTS.AI_PROVIDERS || {},
+    ).filter((pid) => isProviderEffectivelyEnabled(pid));
+
+    return html`
+      <div
+        class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4"
+      >
+        <h3 class="text-sm font-bold text-white uppercase tracking-widest">
+          AI Routing
+        </h3>
+
+        <div class="space-y-4">
+          <div
+            class="flex items-center justify-between py-3 border-b border-white/5"
+          >
+            <div class="flex flex-col gap-1 w-2/3 pr-4">
+              <span class="text-sm font-medium text-slate-300"
+                >Enable AI Review</span
               >
-                ${advancedMap[section.id] ? "Hide advanced" : "Show advanced"}
-              </button>
-            </h3>
-
-            <div class="space-y-4">
-              ${section.fields.map(
-                (f) => html`
-                  <div
-                    class="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
-                    key=${f.key}
-                  >
-                    <div class="flex flex-col gap-1 w-2/3 pr-4">
-                      <span class="text-sm font-medium text-slate-300"
-                        >${f.label}</span
-                      >
-                      ${f.description
-                        ? html`<span
-                            class="text-[10px] text-slate-500 leading-tight"
-                            >${f.description}</span
-                          >`
-                        : ""}
-                    </div>
-
-                    <div class="w-1/3 flex flex-col items-end gap-2">
-                      ${f.type === "toggle"
-                        ? html`
-                            <label
-                              class="relative inline-flex items-center cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                class="sr-only peer"
-                                checked=${values[f.key] ?? f.default}
-                                onChange=${(e) =>
-                                  onChange(f.key, e.target.checked)}
-                              />
-                              <div
-                                class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
-                              ></div>
-                            </label>
-                          `
-                        : ""}
-                      ${f.type === "url" ||
-                      f.type === "text" ||
-                      f.type === "password"
-                        ? html`
-                            ${f.advanced && !advancedMap[section.id]
-                              ? html`<div class="text-xs text-slate-500 italic">
-                                  Advanced field hidden
-                                </div>`
-                              : html`
-                                  <div class="flex items-center gap-2 w-full">
-                                    <input
-                                      type=${f.type}
-                                      value=${values[f.key] ?? f.default}
-                                      placeholder=${f.placeholder || ""}
-                                      class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
-                                      onChange=${(e) =>
-                                        onChange(f.key, e.target.value)}
-                                    />
-                                    ${(() => {
-                                      const prov = providerFromField(f.key);
-                                      return prov
-                                        ? html`
-                                            <button
-                                              onClick=${() =>
-                                                handleTestKey(
-                                                  prov,
-                                                  values[f.key] ?? "",
-                                                  f.key,
-                                                )}
-                                              class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-                                            >
-                                              ${testing[f.key]
-                                                ? "Testing..."
-                                                : "Test"}
-                                            </button>
-                                          `
-                                        : "";
-                                    })()}
-                                  </div>
-                                  ${testResults[f.key]
-                                    ? html`<div
-                                        class="text-[11px] mt-1 text-slate-400"
-                                      >
-                                        ${testResults[f.key]}
-                                      </div>`
-                                    : ""}
-                                `}
-                          `
-                        : ""}
-                      ${f.type === "model-select"
-                        ? html`
-                            <div class="flex items-center gap-2 w-full">
-                              <select
-                                class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
-                                value=${values[f.key] ?? f.default}
-                                onChange=${(e) =>
-                                  onChange(f.key, e.target.value)}
-                              >
-                                ${models === null
-                                  ? html`<option disabled value="">
-                                      Fetching models...
-                                    </option>`
-                                  : ""}
-                                ${models !== null && models.length === 0
-                                  ? html`<option disabled value="">
-                                      Enter API Key above to load
-                                    </option>`
-                                  : ""}
-                                ${(models || []).length > 0 &&
-                                !(models || []).find(
-                                  (m) => m.id === values[f.key],
-                                ) &&
-                                values[f.key]
-                                  ? html`<option value=${values[f.key]}>
-                                      ${values[f.key]}
-                                    </option>`
-                                  : ""}
-                                ${Array.from(
-                                  new Set((models || []).map((m) => m.group)),
-                                ).map(
-                                  (group) => html`
-                                    <optgroup label=${group}>
-                                      ${(models || [])
-                                        .filter((m) => m.group === group)
-                                        .map(
-                                          (m) => html`
-                                            <option value=${m.id}>
-                                              ${m.label}
-                                            </option>
-                                          `,
-                                        )}
-                                    </optgroup>
-                                  `,
-                                )}
-                              </select>
-                              <button
-                                onClick=${async () => {
-                                  setModels(null);
-                                  const ms = await fetchAIModels();
-                                  setModels(ms);
-                                }}
-                                class="px-2 py-1 text-xs bg-[#111827] rounded text-white"
-                              >
-                                Refresh
-                              </button>
-                            </div>
-                          `
-                        : ""}
-                      ${f.type === "select" &&
-                      (f.key === "aiProvider" || f.key === "aiSecondary")
-                        ? html`
-                            <div class="flex flex-col w-full gap-2">
-                              <select
-                                class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
-                                value=${values[f.key] ?? f.default}
-                                onChange=${(e) =>
-                                  onChange(f.key, e.target.value)}
-                              >
-                                <option value="">Select provider</option>
-                                ${Object.keys(CONSTANTS.AI_PROVIDERS || {}).map(
-                                  (pid) =>
-                                    html`<option value=${pid}>
-                                      ${CONSTANTS.AI_PROVIDERS[pid].name}
-                                    </option>`,
-                                )}
-                              </select>
-
-                              ${values[f.key]
-                                ? html`<div class="w-full">
-                                    <${ModelSelector}
-                                      providerId=${values[f.key]}
-                                      apiKey=${values[
-                                        `${values[f.key]}_keys`
-                                      ] || ""}
-                                      selectedModel=${values[
-                                        `${values[f.key]}_model`
-                                      ] || ""}
-                                      onSelect=${(v) =>
-                                        onChange(`${values[f.key]}_model`, v)}
-                                      endpoint=${values[
-                                        `${values[f.key]}_endpoint`
-                                      ] || ""}
-                                    />
-                                  </div>`
-                                : ""}
-                            </div>
-                          `
-                        : ""}
-                      ${f.type === "select"
-                        ? html`
-                            <div class="flex items-center gap-2 w-full">
-                              <select
-                                class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
-                                value=${values[f.key] ?? f.default}
-                                onChange=${(e) =>
-                                  onChange(f.key, e.target.value)}
-                              >
-                                ${f.options && f.options.length === 0
-                                  ? html`<option disabled value="">
-                                      No options
-                                    </option>`
-                                  : ""}
-                                ${f.options
-                                  ? f.options.map(
-                                      (opt) =>
-                                        html`<option value=${opt.value}>
-                                          ${opt.label}
-                                        </option>`,
-                                    )
-                                  : ""}
-                              </select>
-                            </div>
-                          `
-                        : ""}
-                      ${f.type === "oauth"
-                        ? html`
-                            <div class="flex items-center gap-3">
-                              <button
-                                onClick=${() => handleOAuth(f.provider, f.key)}
-                                class="px-4 py-2 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg flex items-center gap-2 transition-colors"
-                              >
-                                <svg
-                                  role="img"
-                                  viewBox="0 0 24 24"
-                                  class="w-3.5 h-3.5 fill-current"
-                                >
-                                  <path
-                                    d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-                                  />
-                                </svg>
-                                ${values[f.key] ? "Reconnect" : "Connect"}
-                              </button>
-                              ${values[f.key]
-                                ? html`<span
-                                    title="Connected"
-                                    class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
-                                  ></span>`
-                                : ""}
-                            </div>
-                          `
-                        : ""}
-                    </div>
-                  </div>
-                `,
-              )}
+              <span class="text-[10px] text-slate-500 leading-tight"
+                >Automatically analyze code using AI upon completion.</span
+              >
+            </div>
+            <div class="w-1/3 flex justify-end">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  class="sr-only peer"
+                  checked=${values.autoReview ?? true}
+                  onChange=${(e) => onChange("autoReview", e.target.checked)}
+                />
+                <div
+                  class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
+                ></div>
+              </label>
             </div>
           </div>
-        `,
-      )}
+
+          <div
+            class="flex items-start justify-between py-3 border-b border-white/5"
+          >
+            <div class="flex flex-col gap-1 w-2/3 pr-4">
+              <span class="text-sm font-medium text-slate-300"
+                >Primary AI Provider</span
+              >
+              <span class="text-[10px] text-slate-500 leading-tight"
+                >Preferred AI provider to use for automated reviews.</span
+              >
+            </div>
+            <div class="w-1/3 flex flex-col items-end gap-2">
+              <div class="flex flex-col w-full gap-2">
+                <select
+                  class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                  value=${primaryProvider}
+                  onChange=${(e) => onChange("aiProvider", e.target.value)}
+                >
+                  <option value="">None</option>
+                  ${selectableProviders.map(
+                    (pid) =>
+                      html`<option value=${pid}>
+                        ${CONSTANTS.AI_PROVIDERS[pid].name}
+                      </option>`,
+                  )}
+                </select>
+
+                ${primaryProvider
+                  ? html`<${ModelSelector}
+                      providerId=${primaryProvider}
+                      apiKey=${values[`${primaryProvider}_keys`] || ""}
+                      selectedModel=${values.aiPrimaryModel || ""}
+                      onSelect=${(v) => onChange("aiPrimaryModel", v)}
+                      endpoint=${values[`${primaryProvider}_endpoint`] || ""}
+                      providerEnabled=${isProviderEffectivelyEnabled(
+                        primaryProvider,
+                      )}
+                      onToggleEnabled=${(val) =>
+                        onChange(`${primaryProvider}_enabled`, val)}
+                    />`
+                  : ""}
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="flex items-start justify-between py-3 border-b border-white/5"
+          >
+            <div class="flex flex-col gap-1 w-2/3 pr-4">
+              <span class="text-sm font-medium text-slate-300"
+                >Secondary AI Provider</span
+              >
+              <span class="text-[10px] text-slate-500 leading-tight"
+                >Fallback provider to be used if the primary fails.</span
+              >
+            </div>
+            <div class="w-1/3 flex flex-col items-end gap-2">
+              <div class="flex flex-col w-full gap-2">
+                <select
+                  class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                  value=${secondaryProvider}
+                  onChange=${(e) => onChange("aiSecondary", e.target.value)}
+                >
+                  <option value="">None</option>
+                  ${selectableProviders.map(
+                    (pid) =>
+                      html`<option value=${pid}>
+                        ${CONSTANTS.AI_PROVIDERS[pid].name}
+                      </option>`,
+                  )}
+                </select>
+
+                ${secondaryProvider
+                  ? html`<${ModelSelector}
+                      providerId=${secondaryProvider}
+                      apiKey=${values[`${secondaryProvider}_keys`] || ""}
+                      selectedModel=${values.aiSecondaryModel || ""}
+                      onSelect=${(v) => onChange("aiSecondaryModel", v)}
+                      endpoint=${values[`${secondaryProvider}_endpoint`] || ""}
+                      providerEnabled=${isProviderEffectivelyEnabled(
+                        secondaryProvider,
+                      )}
+                      onToggleEnabled=${(val) =>
+                        onChange(`${secondaryProvider}_enabled`, val)}
+                    />`
+                  : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const renderAIProviderCards = () => {
+    const providerIds = Object.keys(CONSTANTS.AI_PROVIDERS || {});
+    return html`
+      <div class="space-y-6">
+        ${providerIds.map((pid) => {
+          const p = CONSTANTS.AI_PROVIDERS[pid];
+          const keyField = `${pid}_keys`;
+          const endpointField = `${pid}_endpoint`;
+          const modelField = `${pid}_model`;
+          const enabledField = `${pid}_enabled`;
+          const strategyField = `${pid}_keyStrategy`;
+          const rawKeys = values[keyField] || "";
+          const keyList = parseKeys(rawKeys);
+          const endpoint = values[endpointField] || p.endpoint || "";
+          const providerEnabled =
+            typeof values[enabledField] === "undefined"
+              ? true
+              : !!values[enabledField];
+
+          return html`
+            <div
+              key=${pid}
+              class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3
+                    class="text-sm font-bold text-white uppercase tracking-widest"
+                  >
+                    ${p.name}
+                  </h3>
+                  <p class="text-[10px] text-slate-500 mt-1">
+                    Provider configuration and key management.
+                  </p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    class="sr-only peer"
+                    checked=${providerEnabled}
+                    onChange=${(e) => onChange(enabledField, e.target.checked)}
+                  />
+                  <div
+                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
+                  ></div>
+                </label>
+              </div>
+
+              ${p.keyRequired
+                ? html`
+                    <div class="space-y-3">
+                      <label
+                        class="text-xs uppercase tracking-wider text-slate-400"
+                        >API Keys</label
+                      >
+                      <textarea
+                        value=${rawKeys}
+                        onInput=${(e) =>
+                          handleProviderKeysChange(
+                            pid,
+                            keyField,
+                            e.target.value,
+                          )}
+                        placeholder="Enter keys separated by commas or new lines"
+                        class="w-full min-h-[90px] px-3 py-2 bg-black border border-white/10 rounded text-sm text-white"
+                      ></textarea>
+                      <div class="flex items-center justify-between">
+                        <span class="text-[11px] text-slate-500"
+                          >${keyList.length} key(s) detected</span
+                        >
+                        <button
+                          onClick=${() =>
+                            handleTestAllKeys(pid, rawKeys, keyField)}
+                          class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                        >
+                          Test All
+                        </button>
+                      </div>
+                      ${testResults[`${keyField}:all`]
+                        ? html`<div class="text-[11px] text-slate-400">
+                            ${testResults[`${keyField}:all`]}
+                          </div>`
+                        : ""}
+
+                      <div class="space-y-2">
+                        ${keyList.map(
+                          (k, idx) => html`
+                            <div
+                              key=${`${pid}-${idx}`}
+                              class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
+                            >
+                              <span class="text-xs text-slate-300 font-mono"
+                                >${maskKey(k)}</span
+                              >
+                              <div class="flex items-center gap-2">
+                                <button
+                                  onClick=${() =>
+                                    handleTestKey(
+                                      pid,
+                                      k,
+                                      `${keyField}:${idx}`,
+                                      endpoint,
+                                    )}
+                                  class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                                >
+                                  ${testing[`${keyField}:${idx}`]
+                                    ? "Testing..."
+                                    : "Test"}
+                                </button>
+                                <span class="text-[11px] text-slate-400"
+                                  >${testResults[`${keyField}:${idx}`] ||
+                                  ""}</span
+                                >
+                              </div>
+                            </div>
+                          `,
+                        )}
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <label
+                          class="text-xs uppercase tracking-wider text-slate-400 min-w-[98px]"
+                          >Key Strategy</label
+                        >
+                        <select
+                          class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                          value=${values[strategyField] || "round-robin"}
+                          onChange=${(e) =>
+                            onChange(strategyField, e.target.value)}
+                        >
+                          ${KEY_STRATEGY_OPTIONS.map(
+                            (opt) =>
+                              html`<option value=${opt.value}>
+                                ${opt.label}
+                              </option>`,
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                  `
+                : html`<div class="text-xs text-slate-500">
+                    No API key required for this provider.
+                  </div>`}
+
+              <div class="space-y-2">
+                <label class="text-xs uppercase tracking-wider text-slate-400"
+                  >Endpoint</label
+                >
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value=${endpoint}
+                    onChange=${(e) => onChange(endpointField, e.target.value)}
+                    class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                  />
+                  <button
+                    onClick=${() =>
+                      handleTestEndpoint(pid, endpoint, endpointField)}
+                    class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                  >
+                    ${testing[endpointField] ? "Checking..." : "Check"}
+                  </button>
+                </div>
+                ${testResults[endpointField]
+                  ? html`<div class="text-[11px] text-slate-400">
+                      ${testResults[endpointField]}
+                    </div>`
+                  : ""}
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-xs uppercase tracking-wider text-slate-400"
+                  >Default Provider Model</label
+                >
+                <${ModelSelector}
+                  providerId=${pid}
+                  apiKey=${rawKeys}
+                  selectedModel=${values[modelField] || ""}
+                  onSelect=${(v) => onChange(modelField, v)}
+                  endpoint=${endpoint}
+                  providerEnabled=${providerEnabled}
+                  onToggleEnabled=${(val) => onChange(enabledField, val)}
+                />
+              </div>
+            </div>
+          `;
+        })}
+      </div>
+    `;
+  };
+
+  const tabs = [
+    { id: "general", label: "General" },
+    { id: "ai", label: "AI" },
+    { id: "platforms", label: "Platforms" },
+    { id: "git", label: "Git" },
+  ];
+
+  const standardSections = (schema || []).filter((section) => {
+    const cat = getSectionCategory(section);
+    if (activeTab === "ai") return false;
+    return cat === activeTab;
+  });
+
+  return html`
+    <div class="space-y-6">
+      <div class="flex flex-wrap gap-2">
+        ${tabs.map(
+          (t) => html`
+            <button
+              key=${t.id}
+              onClick=${() => setActiveTab(t.id)}
+              class="px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider border ${activeTab ===
+              t.id
+                ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
+                : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"}"
+            >
+              ${t.label}
+            </button>
+          `,
+        )}
+      </div>
+
+      ${activeTab === "ai"
+        ? html` ${renderAIRouting()} ${renderAIProviderCards()} `
+        : html`
+            <div class="space-y-6">
+              ${standardSections.map((section) => renderSection(section))}
+            </div>
+          `}
     </div>
   `;
 }
