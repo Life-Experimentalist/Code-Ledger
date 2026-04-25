@@ -2,7 +2,7 @@
 
 This document provides recommended values and a manifest to create the GitHub App used by CodeLedger. Use these values when creating the App in the GitHub settings for the `Life-Experimentalist` account.
 
-**App name**: Code Ledger
+**App name**: Code Ledger GitHub
 
 **Homepage URL**: https://codeledger.vkrishna04.me
 
