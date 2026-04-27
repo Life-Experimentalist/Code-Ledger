@@ -88,7 +88,9 @@ async function handleSolved(data) {
       if (data.files && Array.isArray(data.files)) {
         filesToCommit = [...data.files];
       } else {
-        const filePath = `topics/${data.topic || "Uncategorized"}/${data.titleSlug}/${data.lang.name}.${data.lang.ext || "js"}`;
+        const langName = data.lang?.name || "Solution";
+        const langExt = data.lang?.ext || "txt";
+        const filePath = `topics/${data.topic || "Uncategorized"}/${data.titleSlug}/${langName}.${langExt}`;
         filesToCommit.push({ path: filePath, content: data.code });
       }
 

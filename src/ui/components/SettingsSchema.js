@@ -261,11 +261,10 @@ export function SettingsSchema({ schema, values, onChange }) {
         try {
           const data = ev && ev.data;
           if (!data) return;
+          if (data.type !== "CODELEDGER_AUTH") return;
           if (data.provider !== provider) return;
           if (!data.token) return;
-          const existing = await Storage.getAIKeys();
-          existing[provider] = [data.token];
-          await Storage.setAIKeys(existing);
+          await Storage.setAuthToken(provider, data.token);
           onChange(key, data.token);
           setTestResults((s) => ({ ...s, [key]: "OK" }));
         } catch (e) {
