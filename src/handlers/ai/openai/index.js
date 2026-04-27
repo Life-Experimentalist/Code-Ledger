@@ -7,6 +7,7 @@ import { BaseAIHandler } from "../../_base/BaseAIHandler.js";
 import { APIKeyPool } from "../../../core/api-key-pool.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
+import { buildReviewPrompt } from "../../../core/ai-prompts.js";
 
 export class OpenAIHandler extends BaseAIHandler {
   constructor() {
@@ -26,7 +27,8 @@ export class OpenAIHandler extends BaseAIHandler {
       settings.aiEndpoint ||
       CONSTANTS.AI_PROVIDERS.openai.endpoint;
 
-    const prompt = `Review this DSA solution for "${problemContext.title}". Language: ${problemContext.language}, Difficulty: ${problemContext.difficulty}. Code: \`${code}\`. Provide Time/Space complexity, optimizations, and key patterns.`;
+    const prompts = await Storage.getAIPrompts();
+    const prompt = buildReviewPrompt(problemContext, code, prompts);
 
     const keyCount = await this.keyPool.getKeyCount();
     if (!keyCount) throw new Error("No OpenAI API key available.");

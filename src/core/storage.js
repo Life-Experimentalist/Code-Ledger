@@ -6,6 +6,7 @@
 import { storage as browserStorage } from "../lib/browser-compat.js";
 import { CONSTANTS } from "./constants.js";
 import { createDebugger } from "../lib/debug.js";
+import { normalizeAIPrompts } from "./ai-prompts.js";
 const dbg = createDebugger("Storage");
 
 /**
@@ -59,6 +60,16 @@ export const Storage = {
     // map: { providerId: [key1,key2] }
     const payload = { [CONSTANTS.SK.AI_KEYS]: map };
     await browserStorage.local.set(payload);
+  },
+
+  async getAIPrompts() {
+    const res = await browserStorage.local.get(CONSTANTS.SK.AI_PROMPTS);
+    return normalizeAIPrompts(res[CONSTANTS.SK.AI_PROMPTS] || {});
+  },
+
+  async setAIPrompts(prompts) {
+    const normalized = normalizeAIPrompts(prompts || {});
+    await browserStorage.local.set({ [CONSTANTS.SK.AI_PROMPTS]: normalized });
   },
 
   async getAuthToken(provider) {

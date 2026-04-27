@@ -36,3 +36,22 @@ export function updateQueryParams(partial, options = {}) {
   }
   window.history.pushState(null, "", next);
 }
+
+export function buildSettingsHref({
+  tab = "settings",
+  settingsTab,
+  settingsSection,
+  settingsProvider,
+  settingsAdvanced,
+  q,
+} = {}) {
+  const params = new URLSearchParams();
+  if (tab) params.set("tab", tab);
+  if (settingsTab) params.set("settingsTab", settingsTab);
+  if (settingsSection) params.set("settingsSection", settingsSection);
+  if (settingsProvider) params.set("settingsProvider", settingsProvider);
+  if (settingsAdvanced)
+    params.set("settingsAdvanced", String(settingsAdvanced));
+  if (q) params.set("q", q);
+  return `${window.location.pathname}?${params.toString()}`;
+}
