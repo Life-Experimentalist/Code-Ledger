@@ -202,7 +202,9 @@ export class GitHubHandler extends BaseGitHandler {
   }
 
   async getToken() {
+    const oauthToken = await Storage.getAuthToken("github");
+    if (oauthToken) return oauthToken;
     const settings = await Storage.getSettings();
-    return settings["github_token"] || (await Storage.getAuthToken("github"));
+    return settings["github_token"] || null;
   }
 }
