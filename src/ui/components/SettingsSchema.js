@@ -12,7 +12,6 @@ import {
 } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 import {
-  fetchAIModels,
   testAIKey,
   testProviderEndpoint,
   fetchModelsForProvider,
@@ -49,7 +48,6 @@ function maskKey(k) {
 }
 
 export function SettingsSchema({ schema, values, onChange }) {
-  const [models, setModels] = useState(null);
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
   const [advancedMap, setAdvancedMap] = useState({});
@@ -60,25 +58,6 @@ export function SettingsSchema({ schema, values, onChange }) {
   const [promptBusy, setPromptBusy] = useState(false);
   const initializedFromQueryRef = useRef(false);
   const scrolledFromQueryRef = useRef(false);
-
-  useEffect(() => {
-    const hasAnyProviderKey = Object.keys(CONSTANTS.AI_PROVIDERS || {}).some(
-      (pid) => {
-        const raw = values?.[`${pid}_keys`] || values?.[`${pid}_key`];
-        return !!String(raw || "").trim();
-      },
-    );
-    if (!hasAnyProviderKey) return;
-
-    let mounted = true;
-    fetchAIModels()
-      .then((res) => mounted && setModels(res))
-      .catch(() => mounted && setModels([]));
-
-    return () => {
-      mounted = false;
-    };
-  }, [values]);
 
   useEffect(() => {
     let mounted = true;
@@ -258,12 +237,7 @@ export function SettingsSchema({ schema, values, onChange }) {
       const res = await testProviderEndpoint(providerId, ep);
       if (res.ok) {
         setTestResults((s) => ({ ...s, [fieldKey]: "OK" }));
-        try {
-          const ms = await fetchModelsForProvider(providerId, ep);
-          setModels(ms || []);
-        } catch (e) {
-          // ignore model refresh errors
-        }
+        await fetchModelsForProvider(providerId, ep);
       } else {
         setTestResults((s) => ({ ...s, [fieldKey]: res.error || "Failed" }));
       }
@@ -538,6 +512,16 @@ export function SettingsSchema({ schema, values, onChange }) {
         <h3 class="text-sm font-bold text-white uppercase tracking-widest">
           AI Routing
         </h3>
+        <div class="flex items-center justify-end">
+          <button
+            onClick=${() => setShowAdvancedProviders((v) => !v)}
+            class="text-xs px-2 py-1 bg-white/5 rounded border border-white/10 text-slate-300"
+          >
+            ${showAdvancedProviders
+              ? "Hide advanced provider settings"
+              : "Show advanced provider settings"}
+          </button>
+        </div>
 
         <div class="space-y-4">
           <div
@@ -678,9 +662,12 @@ export function SettingsSchema({ schema, values, onChange }) {
             typeof values[enabledField] === "undefined"
               ? true
               : !!values[enabledField];
+          const isPinned =
+            values?.aiProvider === pid || values?.aiSecondary === pid;
 
           return html`
             <div
+              id=${`settings-provider-${pid}`}
               key=${pid}
               class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4"
             >
@@ -700,14 +687,21 @@ export function SettingsSchema({ schema, values, onChange }) {
                     type="checkbox"
                     class="sr-only peer"
                     checked=${providerEnabled}
+                    disabled=${isPinned}
                     onChange=${(e) => onChange(enabledField, e.target.checked)}
                   />
                   <div
-                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
+                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500 disabled:opacity-50"
                   ></div>
                 </label>
               </div>
-
+              ${isPinned
+                ? html`<p class="text-[11px] text-amber-400">
+                    This provider is active as
+                    ${values?.aiProvider === pid ? "primary" : "secondary"} and
+                    cannot be disabled.
+                  </p>`
+                : ""}
               ${p.keyRequired
                 ? html`
                     <div class="space-y-3">
@@ -803,32 +797,35 @@ export function SettingsSchema({ schema, values, onChange }) {
                 : html`<div class="text-xs text-slate-500">
                     No API key required for this provider.
                   </div>`}
-
-              <div class="space-y-2">
-                <label class="text-xs uppercase tracking-wider text-slate-400"
-                  >Endpoint</label
-                >
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value=${endpoint}
-                    onChange=${(e) => onChange(endpointField, e.target.value)}
-                    class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
-                  />
-                  <button
-                    onClick=${() =>
-                      handleTestEndpoint(pid, endpoint, endpointField)}
-                    class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-                  >
-                    ${testing[endpointField] ? "Checking..." : "Check"}
-                  </button>
-                </div>
-                ${testResults[endpointField]
-                  ? html`<div class="text-[11px] text-slate-400">
-                      ${testResults[endpointField]}
-                    </div>`
-                  : ""}
-              </div>
+              ${showAdvancedProviders
+                ? html`<div class="space-y-2">
+                    <label
+                      class="text-xs uppercase tracking-wider text-slate-400"
+                      >Endpoint</label
+                    >
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value=${endpoint}
+                        onChange=${(e) =>
+                          onChange(endpointField, e.target.value)}
+                        class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                      />
+                      <button
+                        onClick=${() =>
+                          handleTestEndpoint(pid, endpoint, endpointField)}
+                        class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                      >
+                        ${testing[endpointField] ? "Checking..." : "Check"}
+                      </button>
+                    </div>
+                    ${testResults[endpointField]
+                      ? html`<div class="text-[11px] text-slate-400">
+                          ${testResults[endpointField]}
+                        </div>`
+                      : ""}
+                  </div>`
+                : ""}
 
               <div class="space-y-2">
                 <label class="text-xs uppercase tracking-wider text-slate-400"
@@ -854,15 +851,62 @@ export function SettingsSchema({ schema, values, onChange }) {
   const tabs = [
     { id: "general", label: "General" },
     { id: "ai", label: "AI" },
+    { id: "prompts", label: "Prompts" },
     { id: "platforms", label: "Platforms" },
     { id: "git", label: "Git" },
   ];
 
   const standardSections = (schema || []).filter((section) => {
     const cat = getSectionCategory(section);
-    if (activeTab === "ai") return false;
+    if (activeTab === "ai" || activeTab === "prompts") return false;
     return cat === activeTab;
   });
+
+  const renderPromptsTab = () => html`
+    <div
+      class="p-6 bg-[#0a0a0f] rounded-2xl border border-amber-500/30 flex flex-col gap-4"
+    >
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest">
+        AI Prompts
+      </h3>
+      <div
+        class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-3"
+      >
+        Warning: changing prompts can reduce review quality or expose sensitive
+        context.
+      </div>
+      <div class="text-[11px] text-slate-400">
+        Placeholders: ${PROMPT_PLACEHOLDERS.join(", ")}
+      </div>
+      <label class="text-xs uppercase tracking-wider text-slate-400"
+        >Review Prompt Template</label
+      >
+      <textarea
+        value=${promptDraft.review || ""}
+        onInput=${(e) =>
+          setPromptDraft((s) => ({ ...s, review: e.target.value }))}
+        class="w-full min-h-[140px] px-3 py-2 bg-black border border-white/10 rounded text-sm text-white"
+      ></textarea>
+      <div class="flex items-center gap-2">
+        <button
+          onClick=${savePromptDraft}
+          disabled=${promptBusy}
+          class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-xs text-white rounded disabled:opacity-50"
+        >
+          ${promptBusy ? "Saving..." : "Save prompts"}
+        </button>
+        <button
+          onClick=${resetPromptDraft}
+          class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+        >
+          Reset to default
+        </button>
+      </div>
+      ${promptStatus
+        ? html`<div class="text-[11px] text-slate-400">${promptStatus}</div>`
+        : ""}
+    </div>
+  `;
 
   return html`
     <div class="space-y-6">
@@ -885,11 +929,13 @@ export function SettingsSchema({ schema, values, onChange }) {
 
       ${activeTab === "ai"
         ? html` ${renderAIRouting()} ${renderAIProviderCards()} `
-        : html`
-            <div class="space-y-6">
-              ${standardSections.map((section) => renderSection(section))}
-            </div>
-          `}
+        : activeTab === "prompts"
+          ? html`${renderPromptsTab()}`
+          : html`
+              <div class="space-y-6">
+                ${standardSections.map((section) => renderSection(section))}
+              </div>
+            `}
     </div>
   `;
 }

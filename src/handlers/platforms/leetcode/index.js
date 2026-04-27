@@ -11,312 +11,330 @@ import { eventBus } from "../../../core/event-bus.js";
 import { injectQoL } from "./qol.js";
 import { Storage } from "../../../core/storage.js";
 import { canonicalMapper } from "../../../core/canonical-mapper.js";
+import { createDebugger } from "../../../lib/debug.js";
+
+const dbg = createDebugger("LeetCode");
+
+// Module-level debounce timer — prevents rapid-fire MutationObserver callbacks
+let _debounceTimer = null;
+
+const LANG_EXT = {
+  python: "py", python3: "py", cpp: "cpp", "c++": "cpp",
+  c: "c", java: "java", javascript: "js", js: "js",
+  typescript: "ts", ts: "ts", ruby: "rb", golang: "go",
+  go: "go", swift: "swift", kotlin: "kt", scala: "scala",
+  rust: "rs", php: "php", csharp: "cs", "c#": "cs",
+  dart: "dart", racket: "rkt", erlang: "erl", elixir: "ex",
+  mysql: "sql", postgresql: "sql", bash: "sh",
+};
+
+function langExt(name = "") {
+  return LANG_EXT[name.toLowerCase().replace(/\s+/g, "")] || "txt";
+}
 
 export class LeetCodeHandler extends BasePlatformHandler {
   constructor() {
     super("leetcode", "LeetCode", {});
     this.mutationObserver = null;
     this.lastDetectedId = null;
-  }
-
-  languageToExt(langName) {
-    if (!langName) return "txt";
-    const n = langName.toLowerCase();
-    if (n.includes("python")) return "py";
-    if (n.includes("c++") || n === "cpp") return "cpp";
-    if (n.includes("c#") || n === "csharp") return "cs";
-    if (n.includes("java")) return "java";
-    if (n.includes("javascript") || n === "js") return "js";
-    if (n.includes("typescript") || n === "ts") return "ts";
-    if (n.includes("ruby")) return "rb";
-    if (n.includes("go")) return "go";
-    if (n.includes("swift")) return "swift";
-    return "txt";
+    this._processingLock = false;
   }
 
   getSettingsSchema() {
     return {
       id: this.id,
-      title: "LeetCode Integration",
+      title: "LeetCode",
       order: 10,
-      description: "Configure automated submission tracking for LeetCode.",
       fields: [
-        {
-          key: "leetcode_enable",
-          label: "Enable Tracking",
-          type: "toggle",
-          default: true,
-          description: "Automatically track successful LeetCode submissions.",
-        },
-        {
-          key: "leetcode_sync_hints",
-          label: "Sync Hints",
-          type: "toggle",
-          default: false,
-          description:
-            "Include official hints in the repository as a separate file.",
-        },
+        { key: "leetcode_enable",     label: "Enable tracking",             type: "toggle", default: true },
+        { key: "leetcode_sync_hints", label: "Include hints in commit",     type: "toggle", default: false },
+        { key: "leetcode_similar",    label: "Include similar problems",    type: "toggle", default: true },
+        { key: "leetcode_readme",     label: "Include problem description", type: "toggle", default: true },
       ],
     };
   }
 
   async init() {
-    this.dbg.log("Initializing LeetCode handler");
-    this.setupMutationObserver();
+    dbg.log("LeetCode handler active");
+    this._setupMutationObserver();
+    this._injectManualSyncBtn();
 
-    // Check if we are on a problem page to inject QoL features
-    const pageInfo = detectPage(window.location.pathname);
-    if (pageInfo.type === "problem") {
+    // QoL on problem pages
+    const page = detectPage(window.location.pathname);
+    if (page.type === PAGE_TYPES.PROBLEM) {
       setTimeout(() => {
         const editor = this.safeQuery(SELECTORS.qol.editorContainer);
-        if (editor) {
-          this.dbg.log("Injecting QoL features into editor");
-          injectQoL(editor, SELECTORS);
-        }
-      }, 2500); // Give the editor time to mount via React
+        if (editor) injectQoL(editor, SELECTORS);
+      }, 2500);
     }
   }
 
-  setupMutationObserver() {
+  _setupMutationObserver() {
     this.mutationObserver = new MutationObserver(() => {
-      this.checkSubmission();
+      // Debounce: wait 2 s after DOM settles before checking submission
+      clearTimeout(_debounceTimer);
+      _debounceTimer = setTimeout(() => this._checkSubmission(), 2000);
     });
-
-    this.mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    this.mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
 
-  async checkSubmission() {
-    const pageInfo = detectPage(window.location.pathname);
+  /* ── Manual sync button on submission detail pages ────────────────── */
+  _injectManualSyncBtn() {
+    // Watch for the submission page toolbar and inject "Sync to CodeLedger" button
+    const observer = new MutationObserver(() => {
+      const page = detectPage(window.location.pathname);
+      if (page.type !== PAGE_TYPES.SUBMISSION) return;
+      if (document.getElementById("cl-sync-btn")) return;
 
-    // Only proceed for pages that can produce submissions
-    if (
-      !pageInfo ||
-      (pageInfo.type !== PAGE_TYPES.PROBLEM &&
-        pageInfo.type !== PAGE_TYPES.SUBMISSION)
-    )
-      return;
+      // LeetCode's submission toolbar — same selector pattern as LeetHub inspiration
+      const toolbar = document.querySelector(
+        ".flex.flex-none.gap-2:not(.justify-center):not(.justify-between)"
+      );
+      if (!toolbar) return;
 
-    // Use any visible success indicator as primary signal
-    const successEl =
-      this.safeQuery(SELECTORS.submission.successIndicator) ||
-      Array.from(
-        document.querySelectorAll(
-          '[data-cy="submission-result"], .accepted, .success',
-        ),
-      ).find((e) => /accepted/i.test(e.textContent || ""));
-    if (!successEl && pageInfo.type !== PAGE_TYPES.SUBMISSION) return;
+      const btn = document.createElement("button");
+      btn.id = "cl-sync-btn";
+      btn.title = "Sync this submission to GitHub via CodeLedger";
+      btn.className =
+        "group whitespace-nowrap focus:outline-none flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-transparent hover:bg-fill-secondary text-text-secondary";
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 5v6l5 3-1 1.7-6-3.7V7h2z" fill="currentColor"/><path d="M5 12H2l4-4 4 4H7a5 5 0 005 5v2a7 7 0 01-7-7z" fill="currentColor" opacity=".5"/></svg> Sync`;
+      btn.addEventListener("click", () => this._manualSync(page));
+      toolbar.appendChild(btn);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
 
+  async _manualSync(page) {
+    const btn = document.getElementById("cl-sync-btn");
+    if (btn) { btn.textContent = "⏳ Syncing…"; btn.disabled = true; }
     try {
-      // If it's a submission detail page, fetch by ID; otherwise use slug from URL
-      let slug = pageInfo.slug;
-      let submissionDetail = null;
+      await this._processSubmission(page, true);
+      if (btn) { btn.textContent = "✓ Synced"; setTimeout(() => { btn.textContent = "Sync"; btn.disabled = false; }, 3000); }
+    } catch (e) {
+      dbg.error("Manual sync failed", e);
+      if (btn) { btn.textContent = "✗ Failed"; btn.disabled = false; }
+    }
+  }
 
-      if (pageInfo.type === PAGE_TYPES.SUBMISSION && pageInfo.submissionId) {
-        // Attempt to fetch submission detail directly
-        submissionDetail = await this.fetchGraphQL(QUERIES.SUBMISSION_DETAIL, {
-          submissionId: parseInt(pageInfo.submissionId),
-        });
-        submissionDetail =
-          submissionDetail.data?.submissionDetails || submissionDetail.data;
-        slug = submissionDetail?.question?.titleSlug || slug;
+  /* ── Automatic submission detection ──────────────────────────────── */
+  async _checkSubmission() {
+    if (this._processingLock) return;
+
+    const page = detectPage(window.location.pathname);
+    if (page.type !== PAGE_TYPES.PROBLEM && page.type !== PAGE_TYPES.SUBMISSION) return;
+
+    // Only fire when an "Accepted" banner is visible (problem pages)
+    if (page.type === PAGE_TYPES.PROBLEM) {
+      const accepted =
+        this.safeQuery(SELECTORS.submission.successIndicator) ||
+        [...document.querySelectorAll('[data-cy="submission-result"], .accepted, [class*="accepted"]')]
+          .find(el => /accepted/i.test(el.textContent || ""));
+      if (!accepted) return;
+    }
+
+    await this._processSubmission(page, false);
+  }
+
+  async _processSubmission(page, isManual) {
+    this._processingLock = true;
+    try {
+      const settings = await Storage.getSettings();
+      if (!settings.leetcode_enable && !isManual) return;
+
+      let submission = null;
+      let slug = page.slug;
+
+      if (page.type === PAGE_TYPES.SUBMISSION && page.submissionId) {
+        const res = await this._gql(QUERIES.SUBMISSION_DETAIL, { submissionId: +page.submissionId });
+        submission = res.data?.submissionDetails;
+        slug = submission?.question?.titleSlug || slug;
       } else {
-        // Problem page flow — pick the latest accepted submission for this question
-        const listRes = await this.fetchGraphQL(QUERIES.SUBMISSION_LIST, {
-          offset: 0,
-          limit: 10,
-          questionSlug: slug,
+        // Problem page: find the latest accepted submission
+        const listRes = await this._gql(QUERIES.SUBMISSION_LIST, {
+          offset: 0, limit: 10, questionSlug: slug,
         });
         const subs = listRes.data?.questionSubmissionList?.submissions || [];
-        const accepted =
-          subs.find((s) => /accepted/i.test(s.statusDisplay)) || subs[0];
-        if (!accepted) return;
-        // Fetch detailed submission for code
-        const detailRes = await this.fetchGraphQL(QUERIES.SUBMISSION_DETAIL, {
-          submissionId: parseInt(accepted.id),
-        });
-        submissionDetail = detailRes.data?.submissionDetails || detailRes.data;
+        const latest = subs.find(s => /accepted/i.test(s.statusDisplay)) || subs[0];
+        if (!latest) return;
+
+        // Dedup: skip if we already committed this submission this browser session
+        const dedupKey = `cl_committed_${slug}`;
+        const lastId = sessionStorage.getItem(dedupKey);
+        if (!isManual && lastId === String(latest.id)) {
+          dbg.log("Skipping already-committed submission", slug, latest.id);
+          return;
+        }
+
+        const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, { submissionId: +latest.id });
+        submission = detailRes.data?.submissionDetails;
+        if (!submission) return;
+
+        sessionStorage.setItem(dedupKey, String(latest.id));
       }
 
-      if (!submissionDetail) return;
-
-      // Throttle duplicate detections: combine slug + submission timestamp
-      const detectionId = `${slug}:${submissionDetail.timestamp || submissionDetail.id || Date.now()}`;
-      if (detectionId === this.lastDetectedId) return;
+      // Module-level dedup (same JS runtime, catches fast double-fires)
+      const detectionId = `${slug}:${submission.timestamp || submission.id || Date.now()}`;
+      if (!isManual && detectionId === this.lastDetectedId) return;
       this.lastDetectedId = detectionId;
 
-      // Load canonical map (best-effort)
-      try {
-        await canonicalMapper.loadMap();
-      } catch (e) {
-        /* ignore */
-      }
+      // Fetch rich metadata
+      const meta = await this._fetchMetadata(slug);
+
+      // Build file list for the single atomic commit
+      const files = this._buildFileSet(submission, meta, settings, slug);
+
+      // Canonical mapping
+      try { await canonicalMapper.loadMap(); } catch (_) {}
       const canonical = canonicalMapper.resolve("leetcode", slug);
 
-      const metadata = slug ? await this.getProblemMetadata(slug) : null;
-      const settings = await Storage.getSettings();
-      const topic =
-        (metadata?.topicTags &&
-          metadata.topicTags[0] &&
-          metadata.topicTags[0].name) ||
-        "Uncategorized";
-      const basePath = `topics/${topic}/${metadata?.titleSlug || slug || "unknown"}/`;
+      const langVerbose = submission.lang?.verboseName || submission.lang?.name || "Solution";
+      const langName   = submission.lang?.name || "txt";
 
-      // Prefer code from submissionDetail; fallback to reading the editor
-      let code = submissionDetail.code || submissionDetail.codeText || null;
-      if (!code) {
-        code = this.extractCodeFromEditor();
-      }
-
-      const langVerbose =
-        submissionDetail.lang?.verboseName ||
-        submissionDetail.lang ||
-        "Solution";
-      const langName =
-        (submissionDetail.lang && submissionDetail.lang.name) ||
-        submissionDetail.lang ||
-        "txt";
-      const ext = this.languageToExt(langName || langVerbose);
-
-      const files = [];
-      files.push({
-        path: `${basePath}${langVerbose.replace(/\s+/g, "_") || "Solution"}.${ext}`,
-        content: code || "// (no code retrieved)",
-      });
-
-      // Save description as HTML to preserve formatting safely
-      if (metadata && metadata.content) {
-        files.push({
-          path: `${basePath}README.html`,
-          content: `<!-- Auto-saved from LeetCode: ${metadata.title} -->\n${metadata.content}`,
-        });
-      }
-
-      if (
-        settings.leetcode_sync_hints &&
-        metadata &&
-        metadata.hints &&
-        metadata.hints.length > 0
-      ) {
-        const hintsMd =
-          `# Hints for ${metadata.title}\n\n` +
-          metadata.hints.map((h, i) => `### Hint ${i + 1}\n${h}\n`).join("\n");
-        files.push({ path: `${basePath}Hints.md`, content: hintsMd });
-      }
-
-      // Emit enriched event including canonical mapping
       eventBus.emit("problem:solved", {
-        platform: "leetcode",
-        id:
-          metadata?.questionId ||
-          submissionDetail?.question?.questionId ||
-          null,
-        title: metadata?.title || submissionDetail?.question?.title || null,
-        titleSlug: metadata?.titleSlug || slug,
-        difficulty: metadata?.difficulty || null,
-        topic: topic,
-        tags: metadata?.topicTags?.map((t) => t.name) || [],
-        canonical: canonical
-          ? { id: canonical.canonicalId, title: canonical.canonicalTitle }
-          : null,
-        code: code,
-        files: files,
-        lang: { name: langVerbose, ext },
-        runtime: submissionDetail.runtime || null,
-        memory: submissionDetail.memory || null,
-        timestamp: submissionDetail.timestamp || Math.floor(Date.now() / 1000),
+        platform:   "leetcode",
+        id:         meta?.questionId || submission.question?.questionId || null,
+        title:      meta?.title || submission.question?.title || slug,
+        titleSlug:  slug,
+        difficulty: meta?.difficulty || submission.question?.difficulty || null,
+        topic:      meta?.topicTags?.[0]?.name || "Uncategorized",
+        tags:       meta?.topicTags?.map(t => t.name) || [],
+        canonical:  canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
+        code:       submission.code || "",
+        files,
+        lang:       { name: langVerbose, ext: langExt(langName) },
+        runtime:    submission.runtimeDisplay || submission.runtime || null,
+        memory:     submission.memoryDisplay  || submission.memory  || null,
+        runtimePct: submission.runtimePercentile || null,
+        memoryPct:  submission.memoryPercentile  || null,
+        timestamp:  submission.timestamp || Math.floor(Date.now() / 1000),
+        acRate:     meta?.acRate || null,
+        likes:      meta?.likes  || null,
+        dislikes:   meta?.dislikes || null,
       });
 
-      this.dbg.log("Solve processed", {
-        slug,
-        canonical: canonical?.canonicalId,
-      });
+      dbg.log("Solve emitted", { slug, canonical: canonical?.canonicalId, lang: langVerbose });
     } catch (err) {
-      this.dbg.error("Failed to process submission", err);
+      dbg.error("Failed to process submission", err);
+    } finally {
+      this._processingLock = false;
     }
   }
 
-  extractCodeFromEditor() {
-    try {
-      // Monaco editor: read view-lines
-      const lines = document.querySelectorAll(".view-line");
-      if (lines && lines.length) {
-        return Array.from(lines)
-          .map((l) => l.textContent.replace(/\u00a0/g, " "))
-          .join("\n");
-      }
+  /* ── File set builder ────────────────────────────────────────────── */
+  _buildFileSet(submission, meta, settings, slug) {
+    const langVerbose = submission.lang?.verboseName || submission.lang?.name || "Solution";
+    const langName   = submission.lang?.name || "txt";
+    const ext        = langExt(langName);
+    const topic      = meta?.topicTags?.[0]?.name || "Uncategorized";
+    const title      = meta?.title || slug;
+    const base       = `topics/${topic}/${slug}/`;
 
-      // Generic editor fallbacks
-      const pre =
-        document.querySelector(".CodeMirror-code") ||
-        document.querySelector("#editor") ||
-        document.querySelector(".monaco-editor");
-      if (pre) return pre.textContent || "";
+    const files = [];
 
-      // Nothing found
-      return "";
-    } catch (e) {
-      this.dbg.warn("extractCodeFromEditor failed", e);
-      return "";
-    }
-  }
-
-  async getProblemMetadata(slug) {
-    const res = await this.fetchGraphQL(QUERIES.QUESTION, { titleSlug: slug });
-    return res.data.question;
-  }
-
-  async getLatestSubmission(slug) {
-    // LeetCode's Accepted status ID is typically 10 (though they use string 'Accepted' in display normally)
-    const res = await this.fetchGraphQL(QUERIES.SUBMISSION_LIST, {
-      offset: 0,
-      limit: 1,
-      questionSlug: slug,
+    // 1. Solution file
+    files.push({
+      path: `${base}${langVerbose.replace(/\s+/g, "_")}.${ext}`,
+      content: submission.code || "// (no code retrieved)",
     });
 
-    if (!res.data.questionSubmissionList.submissions.length) {
-      throw new Error("No submissions found");
-    }
+    // 2. README (problem description + stats)
+    if (settings.leetcode_readme !== false && meta?.content) {
+      const stats = this._formatStats(submission, meta);
+      const similar = this._formatSimilar(meta, settings);
+      const hints   = this._formatHints(meta, settings);
 
-    // Find the first accepted submission or just the first if latest
-    const sub =
-      res.data.questionSubmissionList.submissions.find(
-        (s) => s.statusDisplay === "Accepted",
-      ) || res.data.questionSubmissionList.submissions[0];
-
-    // Get strictly code payload
-    const detail = await this.fetchGraphQL(QUERIES.SUBMISSION_DETAIL, {
-      submissionId: parseInt(sub.id),
-    });
-
-    return detail.data.submissionDetails;
-  }
-
-  async fetchGraphQL(query, variables) {
-    // Use same-origin GraphQL endpoint and include credentials so cookies are sent
-    try {
-      const endpoint = `${window.location.origin}/graphql`;
-      const res = await fetch(endpoint, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify({ query, variables }),
+      files.push({
+        path: `${base}README.md`,
+        content: [
+          `# ${meta.questionFrontendId ? `[${meta.questionFrontendId}] ` : ""}${title}`,
+          "",
+          `**Difficulty:** ${meta.difficulty || "?"}  |  **Acceptance:** ${meta.acRate ? meta.acRate.toFixed(1) + "%" : "?"}  |  **Likes:** ${meta.likes ?? "?"} / **Dislikes:** ${meta.dislikes ?? "?"}`,
+          "",
+          `**Tags:** ${(meta.topicTags || []).map(t => `\`${t.name}\``).join(", ") || "—"}`,
+          "",
+          "## Problem",
+          "",
+          meta.content
+            .replace(/<[^>]+>/g, "")   // strip HTML tags for plain text
+            .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+            .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+            .replace(/\n{3,}/g, "\n\n")
+            .trim(),
+          "",
+          stats,
+          similar,
+          hints,
+        ].filter(Boolean).join("\n"),
       });
+    }
 
-      const parsed = await res.json();
-      if (parsed.errors)
-        throw new Error(
-          parsed.errors[0]?.message || JSON.stringify(parsed.errors),
-        );
-      return parsed;
-    } catch (err) {
-      this.dbg.error("GraphQL fetch failed", err);
-      throw err;
+    // 3. Hints (separate file if enabled)
+    if (settings.leetcode_sync_hints && meta?.hints?.length) {
+      files.push({
+        path: `${base}hints.md`,
+        content: [
+          `# Hints — ${title}`,
+          "",
+          ...meta.hints.map((h, i) => `### Hint ${i + 1}\n\n${h}\n`),
+        ].join("\n"),
+      });
+    }
+
+    return files;
+  }
+
+  _formatStats(submission, meta) {
+    const parts = [];
+    if (submission.runtimeDisplay)  parts.push(`Runtime: ${submission.runtimeDisplay}${submission.runtimePercentile ? ` (beats ${submission.runtimePercentile.toFixed(1)}%)` : ""}`);
+    if (submission.memoryDisplay)   parts.push(`Memory: ${submission.memoryDisplay}${submission.memoryPercentile  ? ` (beats ${submission.memoryPercentile.toFixed(1)}%)`  : ""}`);
+    if (!parts.length) return "";
+    return `## My Submission\n\n${parts.map(p => `- ${p}`).join("\n")}\n`;
+  }
+
+  _formatSimilar(meta, settings) {
+    if (settings.leetcode_similar === false) return "";
+    const similar = (meta?.similarQuestionList || []).filter(q => !q.isPaidOnly).slice(0, 5);
+    if (!similar.length) return "";
+    return [
+      "## Similar Problems",
+      "",
+      ...similar.map(q => `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`),
+      "",
+    ].join("\n");
+  }
+
+  _formatHints(meta, settings) {
+    if (settings.leetcode_sync_hints || !meta?.hints?.length) return "";
+    return "";  // hints go in separate file when that setting is on
+  }
+
+  /* ── GraphQL + metadata ──────────────────────────────────────────── */
+  async _fetchMetadata(slug) {
+    try {
+      const res = await this._gql(QUERIES.QUESTION, { titleSlug: slug });
+      return res.data?.question || null;
+    } catch (_) {
+      return null;
     }
   }
+
+  async _gql(query, variables) {
+    const res = await fetch(`${window.location.origin}/graphql`, {
+      method:      "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type":    "application/json",
+        "X-Requested-With":"XMLHttpRequest",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    const json = await res.json();
+    if (json.errors) throw new Error(json.errors[0]?.message || "GraphQL error");
+    return json;
+  }
+
+  /* ── Legacy compat ─────────────────────────────────────────────── */
+  async checkSubmission() { return this._checkSubmission(); }
+  async fetchGraphQL(q, v) { return this._gql(q, v); }
+  async getProblemMetadata(slug) { return this._fetchMetadata(slug); }
 }

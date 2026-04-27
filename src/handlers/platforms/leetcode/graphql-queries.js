@@ -4,7 +4,6 @@
  */
 
 export const QUERIES = {
-  // Fetches problem details via slug
   QUESTION: `
     query questionData($titleSlug: String!) {
       question(titleSlug: $titleSlug) {
@@ -17,32 +16,41 @@ export const QUERIES = {
         difficulty
         likes
         dislikes
+        stats
+        hints
         topicTags {
           name
           slug
         }
-        stats
-        hints
+        similarQuestionList {
+          difficulty
+          titleSlug
+          title
+          isPaidOnly
+        }
+        codeSnippets {
+          lang
+          langSlug
+          code
+        }
+        companyTagStats
+        acRate
       }
     }
   `,
 
-  // Fetches detailed submission info including code
   SUBMISSION_DETAIL: `
     query submissionDetails($submissionId: Int!) {
       submissionDetails(submissionId: $submissionId) {
         runtime
         runtimeDisplay
         runtimePercentile
-        runtimeDistribution
         memory
         memoryDisplay
         memoryPercentile
-        memoryDistribution
         code
         timestamp
         statusCode
-        statusDisplay
         lang {
           name
           verboseName
@@ -50,12 +58,13 @@ export const QUERIES = {
         question {
           questionId
           titleSlug
+          title
+          difficulty
         }
       }
     }
   `,
 
-  // Fetches recent submissions list
   SUBMISSION_LIST: `
     query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!, $status: Int) {
       questionSubmissionList(
@@ -86,36 +95,34 @@ export const QUERIES = {
     }
   `,
 
-  // Fetches the user's public profile and stats
-  USER_PROFILE: `
-    query getUserProfile($username: String!) {
-      allQuestionsCount {
-        difficulty
-        count
+  // Fetches the currently logged-in user's username
+  GLOBAL_DATA: `
+    query globalData {
+      userStatus {
+        isSignedIn
+        username
+        avatar
+        isPremium
       }
-      matchedUser(username: $username) {
-        contributions {
-          points
-        }
-        profile {
-          reputation
-          ranking
-        }
-        submissionCalendar
-        submitStats {
-          acSubmissionNum {
-            difficulty
-            count
-            submissions
-          }
-          totalSubmissionNum {
-            difficulty
-            count
-            submissions
+    }
+  `,
+
+  // Daily challenge — for QoL banner
+  DAILY_CHALLENGE: `
+    query questionOfToday {
+      activeDailyCodingChallengeQuestion {
+        date
+        link
+        question {
+          questionFrontendId
+          title
+          titleSlug
+          difficulty
+          topicTags {
+            name
           }
         }
       }
     }
-  `
+  `,
 };
-

@@ -7,6 +7,7 @@ import { BaseAIHandler } from "../../_base/BaseAIHandler.js";
 import { APIKeyPool } from "../../../core/api-key-pool.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
+import { buildReviewPrompt } from "../../../core/ai-prompts.js";
 
 export class GeminiHandler extends BaseAIHandler {
   constructor() {
@@ -55,22 +56,8 @@ export class GeminiHandler extends BaseAIHandler {
       settings.gemini_endpoint ||
       settings.aiEndpoint ||
       CONSTANTS.AI_PROVIDERS.gemini.endpoint;
-
-    const prompt = `
-      Review the following DSA solution for the problem: "${problemContext.title}".
-      Language: ${problemContext.language || problemContext.lang?.name || "Unknown"}
-      Difficulty: ${problemContext.difficulty}
-
-      Code:
-      \`\`\`
-      ${code}
-      \`\`\`
-
-      Please provide a brief, professional analysis:
-      1. Time & Space Complexity (using Big-O notation).
-      2. Potential optimizations or cleaner approaches.
-      3. Key take-away patterns.
-    `;
+    const prompts = await Storage.getAIPrompts();
+    const prompt = buildReviewPrompt(problemContext, code, prompts);
 
     const keyCount = await this.keyPool.getKeyCount();
     if (!keyCount) throw new Error("No Gemini API key available.");
