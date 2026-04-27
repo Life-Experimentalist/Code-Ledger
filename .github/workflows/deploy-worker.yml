@@ -1,62 +1,52 @@
 name: Deploy Worker
 
 on:
-    push:
-        branches: [ main ]
-    workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:
 
 jobs:
-    deploy:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  deploy:
+    name: Deploy to Cloudflare Workers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
-            - name: Generate wrangler.toml from secrets
-              run: |
-                  cat > worker/wrangler.toml <<EOF
-                  name = "codeledger"
-                  main = "src/index.js"
-                  compatibility_date = "$(date -u +%F)"
-                  account_id = "${{ secrets.CF_ACCOUNT_ID }}"
+    steps:
+      - uses: actions/checkout@v4
 
-                  [site]
-                  bucket = "./public"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
 
-                  [[kv_namespaces]]
-                  binding = "CANONICAL_MAP"
-                  id = "${{ secrets.CANONICAL_KV_ID }}"
-                  EOF
+      - name: Install worker deps
+        working-directory: worker
+        run: npm ci
 
-            - name: Validate required secrets
-              run: |
-                  if [ -z "${{ secrets.CF_API_TOKEN }}" ] || [ -z "${{ secrets.CF_ACCOUNT_ID }}" ] || [ -z "${{ secrets.CANONICAL_KV_ID }}" ]; then
-                    echo "Required secrets CF_API_TOKEN, CF_ACCOUNT_ID, and CANONICAL_KV_ID must be set in repository secrets.";
-                    exit 1;
-                  fi
+      - name: Write wrangler.toml
+        working-directory: worker
+        run: |
+          cat > wrangler.toml << TOML
+          name = "codeledger"
+          main = "src/index.js"
+          compatibility_date = "2026-04-25"
+          account_id = "${{ secrets.CF_ACCOUNT_ID }}"
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
+          [assets]
+          directory = "./public"
+          binding = "ASSETS"
 
-            - name: Install worker dependencies
-              working-directory: ./worker
-              run: npm ci
+          [[kv_namespaces]]
+          binding = "CANONICAL_MAP"
+          id = "${{ secrets.CANONICAL_KV_ID }}"
+          TOML
 
-            - name: Upload runtime secrets to Cloudflare
-              working-directory: ./worker
-              env:
-                  CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-              run: |
-                  printf "%s" "${{ secrets.CANONICAL_UPLOAD_TOKEN }}" | npx wrangler secret put CANONICAL_UPLOAD_TOKEN
-                  printf "%s" "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_PRIVATE_KEY }}" | npx wrangler secret put CODELEDGER_GH_APP_PRIVATE_KEY
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_ID }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_ID
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_CLIENT_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_CLIENT_SECRET
-                  printf "%s" "${{ secrets.CODELEDGER_GH_APP_WEBHOOK_SECRET }}" | npx wrangler secret put CODELEDGER_GH_APP_WEBHOOK_SECRET
-
-            - name: Publish to Cloudflare Workers
-              uses: cloudflare/wrangler-action@v3
-              with:
-                  apiToken: ${{ secrets.CF_API_TOKEN }}
-                  workingDirectory: ./worker
+      - name: Deploy
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: npx wrangler deploy

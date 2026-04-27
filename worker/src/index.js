@@ -18,7 +18,6 @@
  * KV binding: CANONICAL_MAP
  */
 import { Hono } from "hono";
-import { serveStatic } from "hono/cloudflare-workers";
 
 const app = new Hono();
 
@@ -308,7 +307,23 @@ app.get("/api/post_install", (c) => {
   return c.redirect(`/?${params.toString()}`);
 });
 
-// Static assets — must be last
-app.get("/*", serveStatic({ root: "./public" }));
+// favicon fallback — redirect to the extension icon
+app.get("/favicon.ico", (c) =>
+  c.redirect(
+    "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png",
+    301,
+  )
+);
+
+// Static assets via ASSETS binding — must be last
+app.get("/*", async (c) => {
+  if (c.env?.ASSETS) {
+    try {
+      const res = await c.env.ASSETS.fetch(c.req.raw);
+      if (res.status !== 404) return res;
+    } catch (_) {}
+  }
+  return c.notFound();
+});
 
 export default app;
