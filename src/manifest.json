@@ -45,7 +45,13 @@
             "js": [
                 "content/handler-loader.js"
             ],
-            "run_at": "document_start",
+            "run_at": "document_idle",
+            "all_frames": false
+        },
+        {
+            "matches": ["*://codeledger.vkrishna04.me/*"],
+            "js": ["content/presence-marker.js"],
+            "run_at": "document_end",
             "all_frames": false
         }
     ],
@@ -64,16 +70,25 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "library/library.html",
-                "library/library.js",
-                "library/library.css",
-                "ui/styles/base.css",
-                "ui/styles/compiled.css",
-                "vendor/*.js"
+                "handlers/platforms/leetcode/*",
+                "handlers/platforms/geeksforgeeks/*",
+                "handlers/platforms/codeforces/*",
+                "handlers/_base/*",
+                "handlers/ai/*",
+                "handlers/git/*",
+                "handlers/init.js",
+                "core/*",
+                "lib/*",
+                "vendor/*",
+                "data/*",
+                "library/*",
+                "ui/*",
+                "popup/*",
+                "sidebar/*",
+                "assets/*",
+                "content/*"
             ],
-            "matches": [
-                "<all_urls>"
-            ]
+            "matches": ["<all_urls>"]
         }
     ],
     "browser_specific_settings": {
