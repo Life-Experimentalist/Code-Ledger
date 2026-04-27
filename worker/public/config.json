@@ -4,6 +4,5 @@
     "chrome_store": "https://chrome.google.com/webstore/detail/",
     "edge_store": "https://microsoftedge.microsoft.com/addons/detail/",
     "firefox_store": "https://addons.mozilla.org/firefox/addon/",
-    "github_app_install": "https://github.com/apps/<YOUR_APP_NAME>/installations/new",
-    "notes": "If you have the extension IDs, append them to the store URLs above (e.g. chrome_store + EXTENSION_ID_CHROME). Update src/core/constants.js to persist these IDs in the repo. Replace <YOUR_APP_NAME> with your GitHub App slug."
+    "github_app_install": "https://github.com/apps/YOUR-APP-SLUG/installations/new"
 }
