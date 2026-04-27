@@ -1,148 +1,159 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Landing page for CodeLedger; no automatic redirect so users can connect/install -->
-    <title>CodeLedger - Your DSA Journey, Committed</title>
-    <meta
-      name="description"
-      content="CodeLedger is a unified browser extension that seamlessly tracks and commits your competitive programming solutions across LeetCode, GeeksForGeeks, and Codeforces to GitHub."
-    />
-    <meta
-      name="keywords"
-      content="DSA, competitive programming, github sync, leetcode extension, geeksforgeeks, codeforces, code tracking, portfolio"
-    />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeLedger — Your DSA journey, committed.</title>
+  <meta name="description" content="Automatically commit every solved DSA problem from LeetCode, GeeksForGeeks and Codeforces to your own GitHub repository. Bring your own AI keys. Everything stays on your machine." />
+  <meta property="og:title" content="CodeLedger — Your DSA journey, committed." />
+  <meta property="og:description" content="One GitHub repo. Every problem. Every language. Owned entirely by you." />
+  <meta property="og:image" content="https://codeledger.vkrishna04.me/assets/og-image.png" />
+  <meta property="og:url" content="https://codeledger.vkrishna04.me" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/assets/landing.css" />
+</head>
+<body>
 
-    <!-- Open Graph tags for rich social sharing -->
-    <meta
-      property="og:title"
-      content="CodeLedger - Your DSA Journey, Committed"
-    />
-    <meta
-      property="og:description"
-      content="Unify all your Data Structures and Algorithms solutions into one developer-owned GitHub repository automatically."
-    />
-    <meta
-      property="og:image"
-      content="https://codeledger.vkrishna04.me/assets/og-image.png"
-    />
-    <meta property="og:url" content="https://codeledger.vkrishna04.me" />
-    <meta property="og:type" content="website" />
+<!-- ── Nav ───────────────────────────────────────────────────────────── -->
+<nav>
+  <a class="nav-brand" href="/">
+    <img src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" alt="CodeLedger" />
+    CodeLedger
+  </a>
+  <div class="nav-links">
+    <a href="/library">📚 <span>Library</span></a>
+    <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">⭐ <span>GitHub</span></a>
+    <a href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md" target="_blank" rel="noopener" class="nav-cta">Contribute</a>
+  </div>
+</nav>
 
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:title"
-      content="CodeLedger - Your DSA Journey, Committed"
-    />
-    <meta
-      name="twitter:description"
-      content="Automatically track and commit your LeetCode and competitive programming solutions to GitHub."
-    />
+<!-- ── Hero ──────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="hero-badge">✦ Open source · Apache 2.0</div>
+  <h1>Your DSA journey,<br/><span>committed.</span></h1>
+  <p class="tagline">Every solved problem, automatically pushed to your own GitHub repository. Your data, your keys, your repo.</p>
+  <div class="hero-actions">
+    <a id="install-btn" class="btn btn-primary" href="#">⬇ Get Extension</a>
+    <a href="/library" class="btn btn-secondary">📚 Open Library</a>
+    <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener" class="btn btn-ghost">View Source</a>
+  </div>
+  <div class="platform-strip">
+    <span>Works with</span>
+    <span class="platform-chip">🟠 LeetCode</span>
+    <span class="platform-chip">🟢 GeeksForGeeks</span>
+    <span class="platform-chip">🔵 Codeforces</span>
+  </div>
+</div>
 
-    <link
-      rel="icon"
-      href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/logo.png"
-      type="image/x-icon"
-    />
-    <!-- Include basic landing page CSS (served from /assets) -->
-    <link rel="stylesheet" href="./assets/landing.css" />
+<!-- ── How it works ──────────────────────────────────────────────────── -->
+<section id="how-it-works">
+  <p class="section-label">How it works</p>
+  <h2 class="section-title">Three steps to a complete DSA portfolio</h2>
+  <p class="section-sub">No servers. No databases. No accounts. Just an extension, your API keys, and your GitHub repo.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Install the extension</h3>
+      <p>Load it unpacked from GitHub or install from the Chrome Web Store. Connect your GitHub account via OAuth — we only request <code>repo</code> scope.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Add your API keys</h3>
+      <p>Paste your own Gemini, OpenAI, or other AI keys into Settings. Keys stay in your browser's local storage — they never leave your machine.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Solve problems as usual</h3>
+      <p>Submit an accepted solution on LeetCode, GFG, or Codeforces. CodeLedger automatically commits it to your repo with metadata and an optional AI review.</p>
+    </div>
+  </div>
+</section>
 
-    <!-- PWA Manifest (served from site root) -->
-    <link rel="manifest" href="./manifest.webmanifest" />
-  </head>
-  <body class="theme-dark">
-    <script>
-      // Early check: don't redirect automatically. Landing page has action buttons.
-      // The landing script will update the install button based on extension presence.
-    </script>
-    <!-- landing.js will inject checking for #codeledger-present if extension is active -->
+<hr />
 
-    <header class="hero text-center">
-      <img
-        src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/logo.png"
-        alt="CodeLedger logo"
-        style="height: 86px; margin-bottom: 8px"
-      />
-      <h1>CodeLedger</h1>
-      <p class="tagline">Your DSA journey, committed.</p>
-      <p class="sub-tagline">
-        Single GitHub repo. Every problem. Every language. Owned entirely by
-        you.
-      </p>
-      <div class="actions">
-        <!-- Browser extension / store install -->
-        <a id="install-btn" class="btn btn-primary" href="#">Get Extension</a>
-        <!-- GitHub App install (configured from config.json) -->
-        <a id="install-app-btn" class="btn btn-secondary" href="#"
-          >Install GitHub App</a
-        >
-        <!-- OAuth connect for personal tokens / auth -->
-        <a id="connect-github" class="btn btn-secondary" href="/api/auth/github"
-          >Connect GitHub</a
-        >
-      </div>
+<!-- ── Features ──────────────────────────────────────────────────────── -->
+<section id="features">
+  <p class="section-label">Features</p>
+  <h2 class="section-title">Everything you need, nothing you don't</h2>
+  <p class="section-sub">Plugin-based architecture — add platforms, AI providers, and git hosts without touching core code.</p>
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">⚡</div>
+      <h3>Atomic git commits</h3>
+      <p>Uses the GitHub Tree API to commit code, metadata, and AI review in a single atomic operation. No partial states.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🤖</div>
+      <h3>AI code review</h3>
+      <p>Gemini, OpenAI, Claude, DeepSeek, or local Ollama. Round-robin key pools with automatic fallback if one provider fails.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <h3>Analytics dashboard</h3>
+      <p>Heatmap, topic radar, difficulty donut, solve velocity — all built from your local IndexedDB. No telemetry unless you opt in.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔌</div>
+      <h3>Plugin architecture</h3>
+      <p>Adding a new platform or AI provider is a single file. The <code>BasePlatformHandler</code> contract makes contribution straightforward.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🦊</div>
+      <h3>Chrome + Firefox</h3>
+      <p>A single codebase works on both browsers. No <code>webextension-polyfill</code> — a lightweight compat shim handles the differences.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🗺️</div>
+      <h3>Knowledge graph</h3>
+      <p>Problems are linked by topic and algorithmic pattern. Visualize your progress as a graph and spot gaps in your preparation.</p>
+    </div>
+  </div>
+</section>
 
-      <p style="margin-top: 12px; color: #9ebbd6; font-size: 13px">
-        Set these exact URLs in GitHub App settings:
-      </p>
-      <ul
-        style="
-          color: #9ebbd6;
-          font-size: 13px;
-          list-style: none;
-          padding-left: 0;
-        "
-      >
-        <li>
-          <strong>Callback URL:</strong>
-          https://codeledger.vkrishna04.me/api/auth/github/callback
-        </li>
-        <li>
-          <strong>Webhook URL:</strong>
-          https://codeledger.vkrishna04.me/api/webhook/github
-        </li>
-      </ul>
-    </header>
+<hr />
 
-    <main>
-      <section class="features">
-        <div class="feature text-left">
-          <h2>Automatic Git Commits</h2>
-          <p>
-            Every problem solved securely triggers an atomic Git commit to your
-            own repository containing your code, metadata, and constraints.
-          </p>
-        </div>
-        <div class="feature text-left">
-          <h2>Cross-Platform Sync</h2>
-          <p>
-            Tracks your progress across LeetCode, GeeksForGeeks, and Codeforces
-            to ensure none of your work goes unrecorded.
-          </p>
-        </div>
-        <div class="feature text-left">
-          <h2>AI Code Review</h2>
-          <p>
-            Plug in your own AI keys from Google Gemini, OpenAI or Ollama.
-            Automatically get your Big O bounds reviewed with personalized
-            feedback upon submission.
-          </p>
-        </div>
-      </section>
-    </main>
+<!-- ── BYOK ───────────────────────────────────────────────────────────── -->
+<section id="byok" style="display:flex;justify-content:center;">
+  <div class="byok">
+    <div class="icon">🔑</div>
+    <h2>Bring your own everything</h2>
+    <p>Your solutions live in <strong style="color:#fff">your GitHub repo</strong>. Your AI keys stay in <strong style="color:#fff">your browser</strong>. We run exactly one server — the OAuth relay — and it never sees your code or your keys.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a href="/api/auth/github" class="btn btn-ghost">Connect GitHub</a>
+      <a href="/library" class="btn btn-secondary">Open Library</a>
+    </div>
+    <div class="byok-pills">
+      <span class="pill active">✓ Gemini</span>
+      <span class="pill active">✓ OpenAI</span>
+      <span class="pill active">✓ Claude</span>
+      <span class="pill active">✓ DeepSeek</span>
+      <span class="pill active">✓ Ollama</span>
+      <span class="pill">GitLab (soon)</span>
+      <span class="pill">Bitbucket (soon)</span>
+    </div>
+  </div>
+</section>
 
-    <footer>
-      <p>Built with ❤️ by VKrishna04. Licensed under Apache 2.0.</p>
-      <div class="links">
-        <a href="https://github.com/vkrishna04/codeledger"
-          >View Source on GitHub</a
-        >
-        <a href="/library.html">My Library</a>
-      </div>
-    </footer>
+<!-- ── Library CTA ────────────────────────────────────────────────────── -->
+<div class="library-cta">
+  <h2>Browse your solved problems</h2>
+  <p>The Library works as a web app too — connect with GitHub OAuth to read your DSA repo from anywhere.</p>
+  <a href="/library" class="btn btn-primary">📚 Open Library</a>
+</div>
 
-    <script src="/assets/landing.js"></script>
-  </body>
+<!-- ── Footer ─────────────────────────────────────────────────────────── -->
+<footer>
+  <span>CodeLedger — Apache 2.0 · Built by <a href="https://github.com/VKrishna04" style="color:var(--accent);text-decoration:none">VKrishna04</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md" target="_blank" rel="noopener">Contribute</a>
+    <a href="/api/health">API Status</a>
+  </div>
+</footer>
+
+<script src="/assets/landing.js"></script>
+</body>
 </html>
