@@ -210,6 +210,7 @@ export class LeetCodeHandler extends BasePlatformHandler {
         acRate:     meta?.acRate || null,
         likes:      meta?.likes  || null,
         dislikes:   meta?.dislikes || null,
+        similar:    (meta?.similarQuestionList || []).filter(q => !q.isPaidOnly),
       });
 
       dbg.log("Solve emitted", { slug, canonical: canonical?.canonicalId, lang: langVerbose });
