@@ -12,3 +12,7 @@ worker/wrangler.toml
 # Ignore local env file with secrets
 .env
 env
+codeledger.zip
+
+# graphify output (local analysis only)
+graphify-out/
