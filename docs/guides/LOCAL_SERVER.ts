@@ -27,7 +27,7 @@ async function startServer() {
   });
 
   // Serve extension files natively
-  app.use(express.static(path.join(__dirname, 'src')));
+  app.use(express.static(path.join(__dirname, "src")));
 
   // Fallback for direct library access (web app mode)
   app.get("/library", (req, res) => {
