@@ -1,37 +1,616 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CodeLedger Web Library</title>
-    <script type="importmap">
-      {
-        "imports": {
-          "preact": "https://esm.sh/preact",
-          "preact/hooks": "https://esm.sh/preact/hooks",
-          "htm": "https://esm.sh/htm",
-          "chart.js/auto": "https://esm.sh/chart.js/auto"
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeLedger Library</title>
+  <link rel="icon" href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" />
+  <style>
+    :root {
+      --bg:       #050508;
+      --bg2:      #0a0a12;
+      --surface:  #0f0f18;
+      --border:   rgba(255,255,255,0.07);
+      --glow:     rgba(6,182,212,0.22);
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --subtle:   #94a3b8;
+      --accent:   #06b6d4;
+      --accent-d: rgba(6,182,212,0.12);
+      --green:    #10b981;
+      --orange:   #f59e0b;
+      --red:      #ef4444;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+
+    /* ── Shell ── */
+    .shell { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 0;
+      transition: width 0.2s;
+    }
+    .sidebar.collapsed { width: 56px; min-width: 56px; }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px 20px;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .sidebar-brand img { width: 24px; height: 24px; flex-shrink: 0; object-fit: contain; }
+    .sidebar.collapsed .sidebar-brand span { display: none; }
+
+    .sidebar-nav { flex: 1; padding: 0 8px; display: flex; flex-direction: column; gap: 2px; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--subtle);
+      font-size: 0.9rem;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover   { background: rgba(255,255,255,0.05); color: var(--text); }
+    .nav-item.active  { background: var(--accent-d); color: var(--accent); }
+    .nav-item .icon   { font-size: 1.1rem; flex-shrink: 0; }
+    .sidebar.collapsed .nav-item span { display: none; }
+
+    .sidebar-footer {
+      padding: 12px 8px 0;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    /* ── Main ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .topbar {
+      height: 56px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      background: var(--bg2);
+      flex-shrink: 0;
+    }
+
+    .topbar h1 { font-size: 1rem; font-weight: 600; color: var(--text); }
+    .topbar-spacer { flex: 1; }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      flex: 1;
+      max-width: 340px;
+    }
+    .search-box input {
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 0.875rem;
+      width: 100%;
+    }
+    .search-box input::placeholder { color: var(--muted); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: #08d0ec; }
+    .btn-secondary { background: rgba(255,255,255,0.06); color: var(--text); border-color: var(--border); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    .btn-ghost { background: transparent; color: var(--accent); border-color: var(--glow); }
+    .btn-ghost:hover { background: var(--accent-d); }
+    .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+
+    /* ── Content area ── */
+    .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+    /* ── Problem list ── */
+    .problem-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .problem-row {
+      display: grid;
+      grid-template-columns: 1fr 100px 100px 80px;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: border-color 0.15s;
+    }
+    .problem-row:hover { border-color: var(--glow); }
+
+    .problem-title { font-weight: 500; font-size: 0.9rem; }
+    .problem-platform { font-size: 0.8rem; color: var(--muted); }
+    .problem-lang { font-size: 0.8rem; color: var(--subtle); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-easy   { background: rgba(16,185,129,0.12); color: var(--green); }
+    .badge-medium { background: rgba(245,158,11,0.12); color: var(--orange); }
+    .badge-hard   { background: rgba(239,68,68,0.12);  color: var(--red); }
+
+    .list-header {
+      display: grid;
+      grid-template-columns: 1fr 100px 100px 80px;
+      gap: 12px;
+      padding: 8px 16px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    /* ── Stats cards ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .stat-card .num { font-size: 2rem; font-weight: 700; color: #fff; }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Empty / connect states ── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px;
+      gap: 16px;
+    }
+    .empty-state .icon { font-size: 3rem; }
+    .empty-state h2 { color: #fff; font-size: 1.4rem; }
+    .empty-state p { color: var(--subtle); max-width: 420px; }
+    .empty-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .filter-chip {
+      padding: 4px 14px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--subtle);
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .filter-chip:hover  { border-color: var(--glow); color: var(--text); }
+    .filter-chip.active { background: var(--accent-d); border-color: var(--glow); color: var(--accent); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 40px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 680px) {
+      .sidebar { width: 56px; min-width: 56px; }
+      .sidebar .sidebar-brand span, .sidebar .nav-item span { display: none; }
+      .problem-row { grid-template-columns: 1fr 80px; }
+      .problem-row .problem-platform, .problem-row .problem-lang { display: none; }
+      .list-header .h-platform, .list-header .h-lang { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" alt="CL" />
+      <span>CodeLedger</span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-view="problems">
+        <span class="icon">📋</span><span>Problems</span>
+      </button>
+      <button class="nav-item" data-view="analytics">
+        <span class="icon">📊</span><span>Analytics</span>
+      </button>
+      <button class="nav-item" data-view="graph">
+        <span class="icon">🕸️</span><span>Graph</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <span class="icon">⚙️</span><span>Settings</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="nav-item" id="collapse-btn">
+        <span class="icon">◀</span><span>Collapse</span>
+      </button>
+      <a class="nav-item" href="/" style="text-decoration:none;color:inherit">
+        <span class="icon">🏠</span><span>Home</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <h1 id="view-title">Problems</h1>
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="search-input" placeholder="Search problems…" />
+      </div>
+      <div class="topbar-spacer"></div>
+      <div id="auth-status"></div>
+    </header>
+
+    <div class="content" id="content">
+      <div class="spinner"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(async () => {
+  /* ── State ── */
+  const state = {
+    view: 'problems',
+    problems: [],
+    filter: { difficulty: 'all', platform: 'all', search: '' },
+    githubToken: null,
+    config: {},
+    isExtension: false,
+  };
+
+  /* ── DOM refs ── */
+  const sidebar    = document.getElementById('sidebar');
+  const content    = document.getElementById('content');
+  const viewTitle  = document.getElementById('view-title');
+  const searchInput = document.getElementById('search-input');
+  const authStatus = document.getElementById('auth-status');
+
+  /* ── Config ── */
+  try {
+    const r = await fetch('/config.json');
+    if (r.ok) state.config = await r.json();
+  } catch (_) {}
+
+  /* ── Extension detection ── */
+  await new Promise(r => setTimeout(r, 300));
+  state.isExtension = !!document.getElementById('codeledger-present');
+
+  /* ── Sidebar collapse ── */
+  let collapsed = window.innerWidth < 680;
+  function applyCollapse() {
+    sidebar.classList.toggle('collapsed', collapsed);
+    const btn = document.getElementById('collapse-btn');
+    btn.querySelector('.icon').textContent = collapsed ? '▶' : '◀';
+  }
+  applyCollapse();
+  document.getElementById('collapse-btn').addEventListener('click', () => {
+    collapsed = !collapsed;
+    applyCollapse();
+  });
+
+  /* ── Nav ── */
+  document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.view = btn.dataset.view;
+      viewTitle.textContent = btn.querySelector('span:last-child').textContent;
+      render();
+    });
+  });
+
+  /* ── Search ── */
+  searchInput.addEventListener('input', () => {
+    state.filter.search = searchInput.value.toLowerCase();
+    if (state.view === 'problems') renderProblems();
+  });
+
+  /* ── Auth token from URL hash (OAuth redirect) ── */
+  (() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    const token = hash.get('token') || localStorage.getItem('cl_gh_token');
+    if (token) {
+      state.githubToken = token;
+      localStorage.setItem('cl_gh_token', token);
+      history.replaceState(null, '', window.location.pathname);
+    }
+  })();
+
+  /* ── Load problems ── */
+  async function loadProblems() {
+    // From extension IndexedDB
+    if (state.isExtension || window.indexedDB) {
+      try {
+        const problems = await readIndexedDB();
+        if (problems.length) return problems;
+      } catch (_) {}
+    }
+    // From GitHub repo via API
+    if (state.githubToken) {
+      try {
+        return await loadFromGitHub();
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  function readIndexedDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('codeledger');
+      req.onerror = () => reject(new Error('db-open'));
+      req.onupgradeneeded = () => {};
+      req.onsuccess = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('problems')) { resolve([]); return; }
+        const tx = db.transaction('problems', 'readonly');
+        const store = tx.objectStore('problems');
+        const all = store.getAll();
+        all.onsuccess = () => resolve(all.result || []);
+        all.onerror  = () => reject(new Error('db-read'));
+      };
+    });
+  }
+
+  async function loadFromGitHub() {
+    const { repoOwner, repoName } = state.config;
+    if (!repoOwner || !repoName) return [];
+    const r = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/index.json`, {
+      headers: { Authorization: `Bearer ${state.githubToken}`, Accept: 'application/vnd.github.raw' },
+    });
+    if (!r.ok) throw new Error(r.statusText);
+    const idx = await r.json();
+    return Array.isArray(idx.problems) ? idx.problems : [];
+  }
+
+  /* ── Render ── */
+  async function render() {
+    content.innerHTML = '<div class="spinner"></div>';
+    if (state.view === 'problems') {
+      state.problems = await loadProblems();
+      renderProblems();
+    } else if (state.view === 'analytics') {
+      renderAnalytics();
+    } else if (state.view === 'settings') {
+      renderSettings();
+    } else {
+      content.innerHTML = `<div class="empty-state"><div class="icon">🚧</div><h2>Coming soon</h2><p>This view is under construction.</p></div>`;
+    }
+    renderAuthStatus();
+  }
+
+  function renderAuthStatus() {
+    if (state.githubToken) {
+      authStatus.innerHTML = `<span style="color:var(--subtle);font-size:0.8rem;margin-right:8px">Connected</span><button class="btn btn-sm btn-secondary" id="disconnect-btn">Disconnect</button>`;
+      document.getElementById('disconnect-btn').addEventListener('click', () => {
+        localStorage.removeItem('cl_gh_token');
+        state.githubToken = null;
+        render();
+      });
+    } else {
+      authStatus.innerHTML = `<a class="btn btn-sm btn-ghost" href="/api/auth/github">Connect GitHub</a>`;
+    }
+  }
+
+  function renderProblems() {
+    const problems = state.problems.filter(p => {
+      if (state.filter.difficulty !== 'all' && (p.difficulty||'').toLowerCase() !== state.filter.difficulty) return false;
+      if (state.filter.platform !== 'all' && (p.platform||'').toLowerCase() !== state.filter.platform) return false;
+      if (state.filter.search && !((p.title||'')+(p.platform||'')+(p.language||'')).toLowerCase().includes(state.filter.search)) return false;
+      return true;
+    });
+
+    if (!state.problems.length && !state.githubToken) {
+      content.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📚</div>
+          <h2>No problems yet</h2>
+          <p>Install the extension to start tracking, or connect GitHub to load from your DSA repo.</p>
+          <div class="empty-actions">
+            <a class="btn btn-primary" href="${state.config.chrome_store || '#'}">Install Extension</a>
+            <a class="btn btn-ghost" href="/api/auth/github">Connect GitHub</a>
+            <a class="btn btn-secondary" href="/">Back to home</a>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const difficulties = ['all', 'easy', 'medium', 'hard'];
+    const platforms = ['all', ...new Set(state.problems.map(p => (p.platform||'').toLowerCase()).filter(Boolean))];
+
+    const filterBar = `
+      <div class="filter-bar" id="diff-filter">
+        ${difficulties.map(d => `<button class="filter-chip ${state.filter.difficulty === d ? 'active' : ''}" data-diff="${d}">${d.charAt(0).toUpperCase() + d.slice(1)}</button>`).join('')}
+        <span style="width:1px;background:var(--border);margin:0 4px"></span>
+        ${platforms.map(p => `<button class="filter-chip ${state.filter.platform === p ? 'active' : ''}" data-plat="${p}">${p.charAt(0).toUpperCase() + p.slice(1)}</button>`).join('')}
+      </div>`;
+
+    const listHeader = `
+      <div class="list-header">
+        <span>Problem</span>
+        <span class="h-platform">Platform</span>
+        <span class="h-lang">Language</span>
+        <span>Difficulty</span>
+      </div>`;
+
+    const rows = problems.length
+      ? problems.map(p => {
+          const diff = (p.difficulty || '').toLowerCase();
+          const badgeClass = diff === 'easy' ? 'badge-easy' : diff === 'hard' ? 'badge-hard' : 'badge-medium';
+          return `
+            <div class="problem-row">
+              <span class="problem-title">${esc(p.title || p.id || 'Unknown')}</span>
+              <span class="problem-platform">${esc(p.platform || '—')}</span>
+              <span class="problem-lang">${esc(p.language || p.lang?.name || '—')}</span>
+              <span class="badge ${badgeClass}">${esc(p.difficulty || '?')}</span>
+            </div>`;
+        }).join('')
+      : `<div class="empty-state" style="padding:40px"><div class="icon">🔍</div><p style="color:var(--subtle)">No problems match your filters.</p></div>`;
+
+    const stats = `
+      <div class="stats-grid">
+        <div class="stat-card"><div class="num">${state.problems.length}</div><div class="label">Total solved</div></div>
+        <div class="stat-card"><div class="num">${state.problems.filter(p => (p.difficulty||'').toLowerCase()==='easy').length}</div><div class="label" style="color:var(--green)">Easy</div></div>
+        <div class="stat-card"><div class="num">${state.problems.filter(p => (p.difficulty||'').toLowerCase()==='medium').length}</div><div class="label" style="color:var(--orange)">Medium</div></div>
+        <div class="stat-card"><div class="num">${state.problems.filter(p => (p.difficulty||'').toLowerCase()==='hard').length}</div><div class="label" style="color:var(--red)">Hard</div></div>
+      </div>`;
+
+    content.innerHTML = stats + filterBar + listHeader + `<div class="problem-list">${rows}</div>`;
+
+    content.querySelectorAll('[data-diff]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.filter.difficulty = btn.dataset.diff;
+        renderProblems();
+      });
+    });
+    content.querySelectorAll('[data-plat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.filter.platform = btn.dataset.plat;
+        renderProblems();
+      });
+    });
+  }
+
+  function renderAnalytics() {
+    if (!state.problems.length) {
+      content.innerHTML = `<div class="empty-state"><div class="icon">📊</div><h2>No data yet</h2><p>Solve some problems first to see analytics.</p></div>`;
+      return;
+    }
+    const byTopic = {};
+    state.problems.forEach(p => {
+      const t = p.topic || p.tags?.[0] || 'Other';
+      byTopic[t] = (byTopic[t] || 0) + 1;
+    });
+    const topicRows = Object.entries(byTopic).sort((a,b) => b[1]-a[1]).map(([t,n]) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="min-width:140px;font-size:0.88rem">${esc(t)}</span>
+        <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${Math.round(n/state.problems.length*100)}%;background:var(--accent);border-radius:3px"></div>
+        </div>
+        <span style="color:var(--muted);font-size:0.8rem;min-width:30px;text-align:right">${n}</span>
+      </div>`).join('');
+
+    content.innerHTML = `
+      <div class="stats-grid" style="margin-bottom:32px">
+        <div class="stat-card"><div class="num">${state.problems.length}</div><div class="label">Total solved</div></div>
+        <div class="stat-card"><div class="num">${new Set(state.problems.map(p=>p.language||p.lang?.name)).size}</div><div class="label">Languages</div></div>
+        <div class="stat-card"><div class="num">${Object.keys(byTopic).length}</div><div class="label">Topics</div></div>
+        <div class="stat-card"><div class="num">${new Set(state.problems.map(p=>p.platform)).size}</div><div class="label">Platforms</div></div>
+      </div>
+      <h3 style="color:#fff;margin-bottom:16px;font-size:1rem">By topic</h3>
+      ${topicRows}`;
+  }
+
+  function renderSettings() {
+    content.innerHTML = `
+      <div style="max-width:520px">
+        <h2 style="color:#fff;margin-bottom:8px;font-size:1.1rem">GitHub</h2>
+        <p style="color:var(--subtle);font-size:0.875rem;margin-bottom:16px">Connect your GitHub account to load problems from your DSA repository.</p>
+        ${state.githubToken
+          ? `<div style="display:flex;gap:10px;align-items:center;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:24px">
+               <span style="color:var(--green)">✓</span>
+               <span style="flex:1;font-size:0.875rem">GitHub connected</span>
+               <button class="btn btn-sm btn-secondary" id="dc-settings">Disconnect</button>
+             </div>`
+          : `<a class="btn btn-ghost" href="/api/auth/github" style="margin-bottom:24px">Connect GitHub</a>`
         }
-      }
-    </script>
-    <!-- Link to the extension's CSS which we will map or just serve -->
-    <style>
-      /* basic styles for web library context if UI compiled css cannot be reached easily */
-      body {
-        background-color: #050508;
-        color: #fff;
-        margin: 0;
-        font-family: sans-serif;
-        overflow: hidden;
-        height: 100vh;
-      }
-    </style>
-  </head>
-  <body
-    class="bg-[#050508] text-slate-300 font-sans selection:bg-cyan-500/30 overflow-hidden h-screen w-screen m-0 p-0"
-  >
-    <!-- The web app uses the GitHub OAuth flow via the worker -->
-    <div id="root" class="h-full w-full"></div>
-    <script src="/assets/library.js" defer></script>
-  </body>
+        <h2 style="color:#fff;margin-bottom:8px;font-size:1.1rem;margin-top:32px">Extension</h2>
+        <p style="color:var(--subtle);font-size:0.875rem;margin-bottom:16px">
+          ${state.isExtension
+            ? '<span style="color:var(--green)">✓ Extension detected</span> — problems are synced from your local browser storage.'
+            : 'Extension not detected. Install it to automatically track your solved problems.'
+          }
+        </p>
+        ${!state.isExtension ? `<a class="btn btn-primary" href="${state.config.chrome_store || '#'}">Install Extension</a>` : ''}
+      </div>`;
+
+    document.getElementById('dc-settings')?.addEventListener('click', () => {
+      localStorage.removeItem('cl_gh_token');
+      state.githubToken = null;
+      render();
+    });
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ── Start ── */
+  render();
+})();
+</script>
+</body>
 </html>
