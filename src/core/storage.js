@@ -85,6 +85,10 @@ export const Storage = {
     await browserStorage.local.set({ [CONSTANTS.SK.AUTH_TOKENS]: tokens });
   },
 
+  async setDebugEnabled(enabled) {
+    await browserStorage.local.set({ [CONSTANTS.SK.DEBUG]: !!enabled });
+  },
+
   /**
    * IndexedDB access for large data (problems, history).
    */

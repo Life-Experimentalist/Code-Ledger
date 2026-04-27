@@ -467,28 +467,53 @@ export function SettingsSchema({ schema, values, onChange }) {
     );
     if (!fields.length) return "";
 
+    const isGitProvider = !!CONSTANTS.GIT_PROVIDERS?.[section.id];
+    const enabledField = `${section.id}_enabled`;
+    const gitEnabled = isGitProvider
+      ? (typeof values?.[enabledField] === "undefined"
+          ? true
+          : !!values[enabledField])
+      : true;
+
     return html`
       <div
         id=${`settings-section-${section.id}`}
         key=${section.id}
         class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4"
       >
-        <h3
-          class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"
-        >
-          ${section.icon ? html`<span>${section.icon}</span>` : ""}
-          ${section.title || section.label}
-          <button
-            onClick=${() =>
-              setAdvancedMap((m) => ({
-                ...m,
-                [section.id]: !m[section.id],
-              }))}
-            class="ml-3 text-xs px-2 py-0.5 bg-white/5 rounded"
+        <div class="flex items-center justify-between">
+          <h3
+            class="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2"
           >
-            ${advancedMap[section.id] ? "Hide advanced" : "Show advanced"}
-          </button>
-        </h3>
+            ${section.icon ? html`<span>${section.icon}</span>` : ""}
+            ${section.title || section.label}
+            <button
+              onClick=${() =>
+                setAdvancedMap((m) => ({
+                  ...m,
+                  [section.id]: !m[section.id],
+                }))}
+              class="ml-3 text-xs px-2 py-0.5 bg-white/5 rounded"
+            >
+              ${advancedMap[section.id] ? "Hide advanced" : "Show advanced"}
+            </button>
+          </h3>
+          ${isGitProvider
+            ? html`
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    class="sr-only peer"
+                    checked=${gitEnabled}
+                    onChange=${(e) => onChange(enabledField, e.target.checked)}
+                  />
+                  <div
+                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
+                  ></div>
+                </label>
+              `
+            : ""}
+        </div>
 
         <div class="space-y-4">
           ${fields.map((f) => renderStandardField(section, f))}
@@ -861,32 +886,50 @@ export function SettingsSchema({ schema, values, onChange }) {
     return cat === activeTab;
   });
 
+  const PROMPT_PLATFORM_LABELS = {
+    leetcode: "LeetCode",
+    geeksforgeeks: "GeeksForGeeks",
+    codeforces: "Codeforces",
+    default: "Default (all other platforms)",
+  };
+
   const renderPromptsTab = () => html`
     <div
       class="p-6 bg-[#0a0a0f] rounded-2xl border border-amber-500/30 flex flex-col gap-4"
     >
       <h3 class="text-sm font-bold text-white uppercase tracking-widest">
-        AI Prompts
+        AI Review Prompts
       </h3>
       <div
         class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-3"
       >
-        Warning: changing prompts can reduce review quality or expose sensitive
-        context.
+        Warning: changing prompts can reduce review quality. Restore with
+        "Reset to defaults".
       </div>
-      <div class="text-[11px] text-slate-400">
-        Placeholders: ${PROMPT_PLACEHOLDERS.join(", ")}
+      <div class="text-[11px] text-slate-400 bg-black/30 border border-white/5 rounded px-3 py-2">
+        Template variables: <code class="text-cyan-400">{"{title}"}</code>,{" "}
+        <code class="text-cyan-400">{"{difficulty}"}</code>,{" "}
+        <code class="text-cyan-400">{"{language}"}</code>
       </div>
-      <label class="text-xs uppercase tracking-wider text-slate-400"
-        >Review Prompt Template</label
-      >
-      <textarea
-        value=${promptDraft.review || ""}
-        onInput=${(e) =>
-          setPromptDraft((s) => ({ ...s, review: e.target.value }))}
-        class="w-full min-h-[140px] px-3 py-2 bg-black border border-white/10 rounded text-sm text-white"
-      ></textarea>
-      <div class="flex items-center gap-2">
+
+      ${Object.keys(PROMPT_PLACEHOLDERS).map(
+        (platform) => html`
+          <div key=${platform} class="flex flex-col gap-2">
+            <label class="text-xs uppercase tracking-wider text-slate-400">
+              ${PROMPT_PLATFORM_LABELS[platform] || platform}
+            </label>
+            <textarea
+              value=${promptDraft[platform] || ""}
+              onInput=${(e) =>
+                setPromptDraft((s) => ({ ...s, [platform]: e.target.value }))}
+              rows="6"
+              class="w-full px-3 py-2 bg-black border border-white/10 rounded text-sm text-white font-mono resize-y"
+            ></textarea>
+          </div>
+        `,
+      )}
+
+      <div class="flex items-center gap-2 pt-2">
         <button
           onClick=${savePromptDraft}
           disabled=${promptBusy}
@@ -898,7 +941,7 @@ export function SettingsSchema({ schema, values, onChange }) {
           onClick=${resetPromptDraft}
           class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
         >
-          Reset to default
+          Reset to defaults
         </button>
       </div>
       ${promptStatus

@@ -100,6 +100,14 @@ class HandlerRegistry {
           description:
             "Optional model name to use across providers that support a global model.",
         },
+        {
+          key: "debugMode",
+          label: "Debug Logging",
+          type: "toggle",
+          default: false,
+          description:
+            "Show detailed console logs from all CodeLedger handlers. Reload the page after toggling.",
+        },
       ],
     });
 

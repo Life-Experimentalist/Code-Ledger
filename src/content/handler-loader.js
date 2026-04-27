@@ -8,6 +8,13 @@ async function loadHandler() {
   const hostname = window.location.hostname;
 
   try {
+    // Read debug state from storage so createDebugger() calls work in this context.
+    const debugUrl = chrome.runtime.getURL("lib/debug.js");
+    const { initDebug } = await import(debugUrl);
+    await initDebug();
+  } catch (_) {}
+
+  try {
     if (hostname.includes("leetcode.com")) {
       const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
       const { LeetCodeHandler } = await import(url);

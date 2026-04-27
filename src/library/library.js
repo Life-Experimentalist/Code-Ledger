@@ -71,6 +71,9 @@ function LibraryApp() {
     setSettings(next);
     try {
       await Storage.setSettings(next);
+      if (key === "debugMode") {
+        await Storage.setDebugEnabled(value);
+      }
     } catch (e) {
       // noop
     }
