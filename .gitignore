@@ -9,40 +9,16 @@ coverage/
 .vscode/settings.json
 worker/wrangler.toml
 
-# Generated files
-*.zip
-*.pem
-*.pdf
-
-# Analysis outputs
-graphify-out/
-docs/analysis/graphify/
-.graphify*
-
 # IDE & build
 .claude/
-settings.json
 settings.local.json
 
 # Generated files
 *.zip
 *.pem
 *.pdf
-
-# Analysis outputs
-graphify-out/
-docs/analysis/graphify/
-.graphify*
-
-# IDE & build
-.claude/
-settings.json
-settings.local.json
 
 # Ignore local env file with secrets
 .env
 env
 codeledger.zip
-
-# graphify output (local analysis only)
-graphify-out/
