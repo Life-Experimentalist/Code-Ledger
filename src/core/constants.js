@@ -28,6 +28,7 @@ export const CONSTANTS = Object.freeze({
   VERSION: "1.0.0",
   EXTENSION_NAME: "CodeLedger",
   DEBUG_DEFAULT: false,
+  DEBUG_OVERRIDE: null, // null = use stored setting; true/false = force override (dev use)
 
   // Extension store IDs
   EXTENSION_ID_CHROME: "",

@@ -89,6 +89,13 @@ export const Storage = {
     await browserStorage.local.set({ [CONSTANTS.SK.DEBUG]: !!enabled });
   },
 
+  async clearAuthToken(provider) {
+    const keys = await browserStorage.local.get(CONSTANTS.SK.AUTH_TOKENS);
+    const tokens = keys[CONSTANTS.SK.AUTH_TOKENS] || {};
+    delete tokens[provider];
+    await browserStorage.local.set({ [CONSTANTS.SK.AUTH_TOKENS]: tokens });
+  },
+
   /**
    * IndexedDB access for large data (problems, history).
    */

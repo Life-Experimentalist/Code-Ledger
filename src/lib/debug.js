@@ -3,18 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { CONSTANTS } from '../core/constants.js';
+
 const DEBUG_KEY = 'codeledger.debug';
 
-// Read debug state synchronously from storage
 let _debugEnabled = false;
 
-// Called once at extension startup from service-worker.js
+// Called once at extension startup (service-worker) and in handler-loader (content script).
 export async function initDebug() {
+  // Constants override takes priority — useful during local development.
+  if (CONSTANTS.DEBUG_OVERRIDE !== null && CONSTANTS.DEBUG_OVERRIDE !== undefined) {
+    _debugEnabled = !!CONSTANTS.DEBUG_OVERRIDE;
+    return;
+  }
   try {
     const res = await import('./browser-compat.js').then(m => m.storage.local.get(DEBUG_KEY));
     _debugEnabled = res[DEBUG_KEY] === true;
   } catch (_) {
-    _debugEnabled = false;
+    _debugEnabled = !!CONSTANTS.DEBUG_DEFAULT;
   }
 }
 

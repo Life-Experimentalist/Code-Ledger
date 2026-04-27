@@ -6,6 +6,43 @@
 import { storage, runtime } from "../../../lib/browser-compat.js";
 import { CONSTANTS } from "../../../core/constants.js";
 
+/** Pastes clipboard text into the Monaco editor at cursor, bypassing auto-indentation. */
+async function pasteWithoutIndent() {
+  let text = "";
+  try {
+    text = await navigator.clipboard.readText();
+  } catch (_) {
+    return;
+  }
+  if (!text) return;
+
+  // Monaco's hidden textarea captures input — insertText via execCommand
+  // bypasses Monaco's paste handler and does not trigger auto-indentation.
+  const inputArea = document.querySelector(
+    ".monaco-editor .inputarea.monaco-mouse-cursor-text",
+  );
+  if (inputArea) {
+    inputArea.focus();
+    const ok = document.execCommand("insertText", false, text);
+    if (ok) return;
+  }
+
+  // Fallback: dispatch a synthetic ClipboardEvent with the plain text
+  const target = inputArea || document.activeElement;
+  if (!target) return;
+  try {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    target.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  } catch (_) {}
+}
+
 export function injectQoL(container, selectors) {
   if (
     document.getElementById("cl-code-copy") &&
@@ -47,6 +84,31 @@ export function injectQoL(container, selectors) {
         <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="check" class="svg-inline--fa fa-check h-3.5 w-3.5" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path fill="currentColor" d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"></path></svg>
       </div>`;
       setTimeout(() => (copyBtn.innerHTML = originalSvg), 2000);
+    }
+  };
+
+  // Paste button — inserts clipboard text without Monaco auto-indentation
+  const pasteBtn = document.createElement("button");
+  pasteBtn.id = "cl-code-paste";
+  pasteBtn.title = "Paste from clipboard (no auto-indent)";
+  pasteBtn.className =
+    "relative inline-flex gap-2 items-center justify-center font-medium cursor-pointer focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-colors bg-transparent enabled:hover:bg-fill-secondary enabled:active:bg-fill-primary text-caption rounded text-text-primary group ml-auto aspect-1 h-full p-1";
+  pasteBtn.innerHTML = `
+    <div class="relative text-[14px] leading-[normal] p-[1px] before:block text-sd-muted-foreground flex items-center justify-center">
+      <svg aria-hidden="true" focusable="false" class="h-3.5 w-3.5" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448h192v-32h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>
+    </div>
+  `;
+
+  pasteBtn.onclick = async () => {
+    const originalHtml = pasteBtn.innerHTML;
+    try {
+      await pasteWithoutIndent();
+      pasteBtn.innerHTML = `<div class="relative text-[14px] leading-[normal] p-[1px] before:block text-emerald-500 flex items-center justify-center">
+        <svg aria-hidden="true" focusable="false" class="h-3.5 w-3.5" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"></path></svg>
+      </div>`;
+      setTimeout(() => (pasteBtn.innerHTML = originalHtml), 1500);
+    } catch (_) {
+      pasteBtn.innerHTML = originalHtml;
     }
   };
 
@@ -126,5 +188,6 @@ export function injectQoL(container, selectors) {
 
   if (editorHeaderActions) {
     editorHeaderActions.insertBefore(copyBtn, editorHeaderActions.firstChild);
+    editorHeaderActions.insertBefore(pasteBtn, copyBtn.nextSibling);
   }
 }

@@ -23,7 +23,7 @@ import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import {
   getDefaultAIPrompts,
   normalizeAIPrompts,
-  PROMPT_PLACEHOLDERS,
+  getRegisteredPlatforms,
 } from "../../core/ai-prompts.js";
 const html = htm.bind(h);
 
@@ -56,6 +56,8 @@ export function SettingsSchema({ schema, values, onChange }) {
   const [promptDraft, setPromptDraft] = useState(getDefaultAIPrompts());
   const [promptStatus, setPromptStatus] = useState("");
   const [promptBusy, setPromptBusy] = useState(false);
+  // Repo setup: tracks "new" | "existing" | null per provider
+  const [repoSetup, setRepoSetup] = useState({});
   const initializedFromQueryRef = useRef(false);
   const scrolledFromQueryRef = useRef(false);
 
@@ -290,6 +292,17 @@ export function SettingsSchema({ schema, values, onChange }) {
     [onChange],
   );
 
+  const handleDisconnect = useCallback(
+    async (provider, key) => {
+      try {
+        await Storage.clearAuthToken(provider);
+      } catch (_) {}
+      onChange(key, "");
+      setTestResults((s) => ({ ...s, [key]: "" }));
+    },
+    [onChange],
+  );
+
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
     if (
@@ -441,18 +454,173 @@ export function SettingsSchema({ schema, values, onChange }) {
           : ""}
         ${f.type === "oauth"
           ? html`
-              <div class="flex items-center gap-3">
-                <button
-                  onClick=${() => handleOAuth(f.provider, f.key)}
-                  class="px-4 py-2 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  ${values[f.key] ? "Reconnect" : "Connect"}
-                </button>
-                ${values[f.key]
-                  ? html`<span
-                      title="Connected"
-                      class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
-                    ></span>`
+              <div class="flex flex-col gap-2 items-end">
+                <div class="flex items-center gap-2">
+                  ${values[f.key]
+                    ? html`
+                        <span
+                          title="Connected"
+                          class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                        ></span>
+                        <button
+                          onClick=${() => handleOAuth(f.provider, f.key)}
+                          class="px-3 py-1.5 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg transition-colors"
+                        >
+                          Reconnect
+                        </button>
+                        <button
+                          onClick=${() => handleDisconnect(f.provider, f.key)}
+                          class="px-3 py-1.5 bg-red-900/40 hover:bg-red-900/70 text-red-300 text-xs font-medium border border-red-700/30 rounded-lg transition-colors"
+                        >
+                          Disconnect
+                        </button>
+                      `
+                    : html`
+                        <button
+                          onClick=${() => handleOAuth(f.provider, f.key)}
+                          class="px-4 py-2 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg flex items-center gap-2 transition-colors"
+                        >
+                          Connect
+                        </button>
+                      `}
+                </div>
+
+                ${/* Repo setup prompt shown after first connect */ ""}
+                ${values[f.key] && f.provider === "github"
+                  ? html`
+                      ${!repoSetup[f.provider]
+                        ? html`
+                            <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
+                              <p class="text-[11px] text-cyan-300 font-medium">
+                                Set up your repository
+                              </p>
+                              <div class="flex gap-2">
+                                <button
+                                  onClick=${() =>
+                                    setRepoSetup((s) => ({
+                                      ...s,
+                                      [f.provider]: "new",
+                                    }))}
+                                  class="flex-1 px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors"
+                                >
+                                  Create new repo
+                                </button>
+                                <button
+                                  onClick=${() =>
+                                    setRepoSetup((s) => ({
+                                      ...s,
+                                      [f.provider]: "existing",
+                                    }))}
+                                  class="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors"
+                                >
+                                  Link existing repo
+                                </button>
+                              </div>
+                            </div>
+                          `
+                        : repoSetup[f.provider] === "new"
+                          ? html`
+                              <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
+                                <p class="text-[11px] text-cyan-300 font-medium">
+                                  New repository name
+                                </p>
+                                <div class="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value=${values["github_repo"] ||
+                                    "dsa-solutions"}
+                                    placeholder="dsa-solutions"
+                                    class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
+                                    onChange=${(e) =>
+                                      onChange("github_repo", e.target.value)}
+                                  />
+                                  <button
+                                    onClick=${() =>
+                                      setRepoSetup((s) => ({
+                                        ...s,
+                                        [f.provider]: "done",
+                                      }))}
+                                    class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
+                                  >
+                                    Save
+                                  </button>
+                                </div>
+                                <p class="text-[10px] text-slate-500">
+                                  Will be created automatically on first commit.
+                                </p>
+                                <button
+                                  onClick=${() =>
+                                    setRepoSetup((s) => ({
+                                      ...s,
+                                      [f.provider]: null,
+                                    }))}
+                                  class="text-[10px] text-slate-500 underline self-start"
+                                >
+                                  ← Back
+                                </button>
+                              </div>
+                            `
+                          : repoSetup[f.provider] === "existing"
+                            ? html`
+                                <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
+                                  <p class="text-[11px] text-cyan-300 font-medium">
+                                    Existing repository name
+                                  </p>
+                                  <div class="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value=${values["github_repo"] || ""}
+                                      placeholder="owner/repo-name or just repo-name"
+                                      class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
+                                      onChange=${(e) =>
+                                        onChange(
+                                          "github_repo",
+                                          e.target.value.split("/").pop(),
+                                        )}
+                                    />
+                                    <button
+                                      onClick=${() =>
+                                        setRepoSetup((s) => ({
+                                          ...s,
+                                          [f.provider]: "done",
+                                        }))}
+                                      class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
+                                    >
+                                      Link
+                                    </button>
+                                  </div>
+                                  <p class="text-[10px] text-slate-500">
+                                    Enter the repository name (not the full URL).
+                                  </p>
+                                  <button
+                                    onClick=${() =>
+                                      setRepoSetup((s) => ({
+                                        ...s,
+                                        [f.provider]: null,
+                                      }))}
+                                    class="text-[10px] text-slate-500 underline self-start"
+                                  >
+                                    ← Back
+                                  </button>
+                                </div>
+                              `
+                            : html`
+                                <p class="text-[11px] text-emerald-400 mt-1">
+                                  Repository configured:
+                                  <strong>${values["github_repo"] || "dsa-solutions"}</strong>
+                                </p>
+                                <button
+                                  onClick=${() =>
+                                    setRepoSetup((s) => ({
+                                      ...s,
+                                      [f.provider]: null,
+                                    }))}
+                                  class="text-[10px] text-slate-500 underline"
+                                >
+                                  Change
+                                </button>
+                              `}
+                    `
                   : ""}
               </div>
             `
@@ -514,6 +682,14 @@ export function SettingsSchema({ schema, values, onChange }) {
               `
             : ""}
         </div>
+
+        ${isGitProvider && section.id !== "github"
+          ? html`
+              <div class="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
+                ⚠️ ${CONSTANTS.GIT_PROVIDERS[section.id]?.name || section.id} support is in testing — do not use in production yet.
+              </div>
+            `
+          : ""}
 
         <div class="space-y-4">
           ${fields.map((f) => renderStandardField(section, f))}
@@ -886,69 +1062,75 @@ export function SettingsSchema({ schema, values, onChange }) {
     return cat === activeTab;
   });
 
-  const PROMPT_PLATFORM_LABELS = {
-    leetcode: "LeetCode",
-    geeksforgeeks: "GeeksForGeeks",
-    codeforces: "Codeforces",
-    default: "Default (all other platforms)",
-  };
+  const renderPromptsTab = () => {
+    // Build ordered platform list from registered handlers — no hardcoded keys
+    const registeredPlatforms = getRegisteredPlatforms();
+    const allPlatformKeys = [...registeredPlatforms, "default"];
 
-  const renderPromptsTab = () => html`
-    <div
-      class="p-6 bg-[#0a0a0f] rounded-2xl border border-amber-500/30 flex flex-col gap-4"
-    >
-      <h3 class="text-sm font-bold text-white uppercase tracking-widest">
-        AI Review Prompts
-      </h3>
+    return html`
       <div
-        class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-3"
+        class="p-6 bg-[#0a0a0f] rounded-2xl border border-amber-500/30 flex flex-col gap-4"
       >
-        Warning: changing prompts can reduce review quality. Restore with
-        "Reset to defaults".
-      </div>
-      <div class="text-[11px] text-slate-400 bg-black/30 border border-white/5 rounded px-3 py-2">
-        Template variables: <code class="text-cyan-400">{"{title}"}</code>,{" "}
-        <code class="text-cyan-400">{"{difficulty}"}</code>,{" "}
-        <code class="text-cyan-400">{"{language}"}</code>
-      </div>
-
-      ${Object.keys(PROMPT_PLACEHOLDERS).map(
-        (platform) => html`
-          <div key=${platform} class="flex flex-col gap-2">
-            <label class="text-xs uppercase tracking-wider text-slate-400">
-              ${PROMPT_PLATFORM_LABELS[platform] || platform}
-            </label>
-            <textarea
-              value=${promptDraft[platform] || ""}
-              onInput=${(e) =>
-                setPromptDraft((s) => ({ ...s, [platform]: e.target.value }))}
-              rows="6"
-              class="w-full px-3 py-2 bg-black border border-white/10 rounded text-sm text-white font-mono resize-y"
-            ></textarea>
-          </div>
-        `,
-      )}
-
-      <div class="flex items-center gap-2 pt-2">
-        <button
-          onClick=${savePromptDraft}
-          disabled=${promptBusy}
-          class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-xs text-white rounded disabled:opacity-50"
+        <h3 class="text-sm font-bold text-white uppercase tracking-widest">
+          AI Review Prompts
+        </h3>
+        <div
+          class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-3"
         >
-          ${promptBusy ? "Saving..." : "Save prompts"}
-        </button>
-        <button
-          onClick=${resetPromptDraft}
-          class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-        >
-          Reset to defaults
-        </button>
+          Warning: changing prompts can reduce review quality. Restore with
+          "Reset to defaults".
+        </div>
+        <div class="text-[11px] text-slate-400 bg-black/30 border border-white/5 rounded px-3 py-2">
+          Template variables:${" "}
+          <code class="text-cyan-400">{"{title}"}</code>,${" "}
+          <code class="text-cyan-400">{"{difficulty}"}</code>,${" "}
+          <code class="text-cyan-400">{"{language}"}</code>,${" "}
+          <code class="text-cyan-400">{"{platform}"}</code>
+        </div>
+
+        ${allPlatformKeys.map(
+          (platform) => html`
+            <div key=${platform} class="flex flex-col gap-2">
+              <label class="text-xs uppercase tracking-wider text-slate-400">
+                ${platform === "default"
+                  ? "Default (all other platforms)"
+                  : platform.charAt(0).toUpperCase() + platform.slice(1)}
+              </label>
+              <textarea
+                value=${promptDraft[platform] || ""}
+                onInput=${(e) =>
+                  setPromptDraft((s) => ({
+                    ...s,
+                    [platform]: e.target.value,
+                  }))}
+                rows="6"
+                class="w-full px-3 py-2 bg-black border border-white/10 rounded text-sm text-white font-mono resize-y"
+              ></textarea>
+            </div>
+          `,
+        )}
+
+        <div class="flex items-center gap-2 pt-2">
+          <button
+            onClick=${savePromptDraft}
+            disabled=${promptBusy}
+            class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-xs text-white rounded disabled:opacity-50"
+          >
+            ${promptBusy ? "Saving..." : "Save prompts"}
+          </button>
+          <button
+            onClick=${resetPromptDraft}
+            class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+          >
+            Reset to defaults
+          </button>
+        </div>
+        ${promptStatus
+          ? html`<div class="text-[11px] text-slate-400">${promptStatus}</div>`
+          : ""}
       </div>
-      ${promptStatus
-        ? html`<div class="text-[11px] text-slate-400">${promptStatus}</div>`
-        : ""}
-    </div>
-  `;
+    `;
+  };
 
   return html`
     <div class="space-y-6">

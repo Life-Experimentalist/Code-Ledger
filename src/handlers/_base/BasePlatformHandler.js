@@ -41,6 +41,16 @@ export class BasePlatformHandler {
     return el ? el.textContent.trim() : '';
   }
 
+  /**
+   * Returns the default AI review prompt template for this platform.
+   * Return null to skip registration (uses the global default).
+   * Tokens: {title}, {difficulty}, {language}, {platform}
+   * @returns {string|null}
+   */
+  getDefaultPrompt() {
+    return null;
+  }
+
   // To be implemented by subclasses
   async detectSubmission() { throw new Error('Not implemented'); }
   async getProblemMetadata() { throw new Error('Not implemented'); }

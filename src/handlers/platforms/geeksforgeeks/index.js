@@ -10,6 +10,7 @@ import { eventBus } from "../../../core/event-bus.js";
 import { Storage } from "../../../core/storage.js";
 import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
+import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 
 const dbg = createDebugger("GFG");
 
@@ -32,6 +33,19 @@ export class GFGHandler extends BasePlatformHandler {
     this.mutationObserver = null;
     this.lastDetectedId = null;
     this._processingLock = false;
+    registerPlatformPrompt("geeksforgeeks", this.getDefaultPrompt());
+  }
+
+  getDefaultPrompt() {
+    return `Review this {difficulty} {language} solution for GeeksForGeeks problem '{title}'.
+
+Provide:
+1. Time complexity (Big-O) and space complexity
+2. Correctness — any edge cases that could fail?
+3. One concrete optimisation if applicable
+4. Key algorithmic pattern used
+
+Be concise. Max 200 words.`;
   }
 
   getSettingsSchema() {
