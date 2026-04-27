@@ -2,26 +2,58 @@
   "name": "codeledger",
   "version": "1.0.0",
   "description": "CodeLedger is a universal browser extension that atomically commits your solved Data Structures and Algorithms problems (from LeetCode, GeeksForGeeks, etc.) to your own GitHub repository.",
-  "author": "CodeLedger Team",
+  "author": "VKrishna04",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vkrishna04/codeledger.git"
+    "url": "https://github.com/Life-Experimentalist/Code-Ledger.git"
+  },
+  "homepage": "https://codeledger.vkrishna04.me/",
+  "keywords": [
+    "leetcode",
+    "geeksforgeeks",
+    "codeforces",
+    "dsa",
+    "browser-extension",
+    "chrome",
+    "firefox",
+    "github",
+    "git",
+    "automation"
+  ],
+  "displayName": "Code Ledger",
+  "packageManager": "npm@24.15.10",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=10.0.0"
   },
   "private": true,
   "type": "module",
+  "prettier": {
+    "tabWidth": 4,
+    "useTabs": false,
+    "semi": true,
+    "singleQuote": false,
+    "trailingComma": "es5",
+    "bracketSpacing": true,
+    "endOfLine": "crlf"
+  },
   "scripts": {
     "dev": "node dev/run-dev.js",
     "start": "tsx server.ts",
     "build:css": "npx @tailwindcss/cli -i src/index.css -o src/ui/styles/compiled.css --minify",
     "build:dist": "node dev/build.js",
+    "build:fast": "node dev/build.js --skip-css",
     "build": "npm run build:css && npm run build:dist",
     "watch": "node dev/watch.js",
-    "package": "node dev/package.js",
     "clean": "node dev/clean.js",
-    "deploy:worker": "cd worker && npx wrangler pages deploy public",
+    "package": "npm run build && node dev/package.js",
+    "package:chrome": "npm run build && node dev/package-chrome.js",
+    "package:firefox": "npm run build && node dev/package-firefox.js",
+    "publish": "npm run clean && npm run build && node dev/package.js",
     "lint": "tsc --noEmit",
-    "validate:openapi": "node dev/validate-openapi.js"
+    "validate:openapi": "node dev/validate-openapi.js",
+    "deploy:worker": "cd worker && npx wrangler pages deploy public"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",

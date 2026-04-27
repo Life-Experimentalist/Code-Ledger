@@ -5,6 +5,7 @@ import { execSync } from "child_process";
 const SRC_DIR = "./src";
 const DIST_DIR = "./dist";
 const RELEASES_DIR = "./releases";
+const SKIP_CSS = process.argv.includes("--skip-css"); // Check for --skip-css argument
 
 // Function to safely extract version without needing full node execution wrapper
 function getVersion() {
@@ -32,6 +33,16 @@ try {
   }
 } catch (e) {
   console.warn("Could not sync package.json version:", e.message);
+}
+
+// Ensure CSS is built first (unless explicitly skipped)
+if (!SKIP_CSS) {
+  try {
+    console.log("Building CSS...");
+    execSync("npm run build:css", { stdio: "inherit" });
+  } catch (err) {
+    console.warn("CSS build failed:", err.message);
+  }
 }
 
 if (fs.existsSync(DIST_DIR))
