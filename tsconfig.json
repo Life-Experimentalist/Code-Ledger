@@ -26,6 +26,7 @@
   "exclude": [
     "dist",
     "releases",
+    "env",
     "src/vendor",
     "node_modules"
   ]

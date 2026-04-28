@@ -142,6 +142,23 @@ Extension listens for exactly `data.type === 'CODELEDGER_AUTH'`. Any mismatch si
 - Manual PAT: `settings['github_token']`
 - `GitHubHandler.getToken()` checks OAuth path first, then settings PAT — order matters.
 
+### OpenAPI spec maintenance
+**Source of truth:** `docs/OPENAPI.yaml`
+
+**When to update the spec:**
+- Adding new Worker endpoints or routes
+- Changing request/response schemas, parameters, or status codes
+- Modifying authentication methods or security schemes
+- Updating server URLs (must match `CONSTANTS.URLS` in `src/core/constants.js`)
+
+**Spec compliance rules:**
+- Every Worker route must be documented in `docs/OPENAPI.yaml`
+- Code implementation must match the spec (path, method, parameters, response format)
+- If Worker behavior changes, update the spec **and** the code in the same commit
+- Run `npm run validate:openapi` (or equivalent) to lint the spec for syntax errors
+- Use the spec as the source of truth for API contracts; never let code drift from documented behavior
+- When implementing features that touch Worker routes, reference `docs/OPENAPI.yaml` first
+
 ---
 
 ## Current State (as of CODELEDGER_EXECUTION_GUIDE.md)
