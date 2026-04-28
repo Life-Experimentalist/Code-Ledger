@@ -152,4 +152,25 @@ export const Storage = {
       request.onerror = () => reject(request.error);
     });
   },
+
+  // ── First-commit tracking ──────────────────────────────────────────────
+  // Stores which (titleSlug, langName) pairs have been auto-committed so the
+  // extension never double-pushes the same problem+language combination.
+  async getCommittedSlugLangs() {
+    const key = "cl.committed.sluglangs";
+    const res = await browserStorage.local.get(key);
+    return res[key] || {};
+  },
+
+  async markSlugLangCommitted(titleSlug, langName) {
+    const key = "cl.committed.sluglangs";
+    const map = await this.getCommittedSlugLangs();
+    map[`${titleSlug}::${String(langName || "").toLowerCase()}`] = Date.now();
+    await browserStorage.local.set({ [key]: map });
+  },
+
+  async isSlugLangCommitted(titleSlug, langName) {
+    const map = await this.getCommittedSlugLangs();
+    return !!map[`${titleSlug}::${String(langName || "").toLowerCase()}`];
+  },
 };

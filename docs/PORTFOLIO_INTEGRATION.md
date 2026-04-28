@@ -12,7 +12,7 @@ In your portfolio repository (e.g., `VKrishna04.github.io`), update `public/sett
     "codeledger": {
       "enabled": true,
       "dsaRepoOwner": "vkrishna04",
-      "dsaRepoName": "dsa-solutions",
+      "dsaRepoName": "CodeLedger-Sync",
       "statsDisplaySection": "skills",
       "showInHero": true,
       "badgeStyle": "flat-square"

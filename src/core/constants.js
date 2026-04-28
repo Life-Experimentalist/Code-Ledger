@@ -29,7 +29,6 @@ export const CONSTANTS = Object.freeze({
   EXTENSION_NAME: "CodeLedger",
   DEBUG_DEFAULT: false,
   DEBUG_OVERRIDE: null, // null = use stored setting; true/false = force override (dev use)
-
   // Extension store IDs
   EXTENSION_ID_CHROME: "",
   EXTENSION_ID_FIREFOX: "",
@@ -173,7 +172,7 @@ export const CONSTANTS = Object.freeze({
 
   KEY_POOL_RETRY_AFTER_MS: 60_000,
 
-  DEFAULT_REPO_NAME: "dsa-solutions",
+  DEFAULT_REPO_NAME: "CodeLedger-Sync",
   REPO_BRANCH: "main",
   COMMIT_MESSAGE_TEMPLATE: "[{topic}] {title} — {difficulty} | {language}",
   IMPORT_COMMIT_MESSAGE:

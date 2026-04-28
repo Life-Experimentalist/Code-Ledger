@@ -77,6 +77,15 @@ export function buildKnowledgeGraph(problems) {
       topic,
       titleSlug: p.titleSlug,
       solved: true,
+      // Rich metadata for the info panel
+      runtime: p.runtime || null,
+      memory: p.memory || null,
+      lang: p.lang?.name || p.language || null,
+      timestamp: p.timestamp || null,
+      tags: Array.isArray(p.tags) ? p.tags : [],
+      acRate: p.acRate || null,
+      runtimePct: p.runtimePct || null,
+      memoryPct: p.memoryPct || null,
     });
 
     if (p.titleSlug) slugToId.set(p.titleSlug, id);

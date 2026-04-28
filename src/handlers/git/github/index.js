@@ -37,6 +37,15 @@ export class GitHubHandler extends BaseGitHandler {
           description:
             "The exact name of the repository (e.g. CodeLedger-Sync).",
         },
+        {
+          key: "github_owner",
+          label: "Organization / Owner (optional)",
+          type: "text",
+          default: "",
+          description:
+            "Leave blank to use your personal account. Set to an org login to commit to an org repo.",
+          advanced: true,
+        },
       ],
     };
   }
@@ -50,24 +59,26 @@ export class GitHubHandler extends BaseGitHandler {
     if (!token) throw new Error("Not authenticated with GitHub");
 
     // 1. Resolve owner, repo and branch
-    const userRes = await this.apiFetch("/user", token);
-    const owner = userRes.login;
     const settings = await Storage.getSettings();
+    const userRes = await this.apiFetch("/user", token);
+    const owner = settings["github_owner"]?.trim() || userRes.login;
     const name =
       repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME;
     const branch = CONSTANTS.REPO_BRANCH || "main";
 
-    // 2. Ensure repository exists and get the latest commit SHA
+    // 2. Ensure repository exists and get the latest commit SHA.
+    //    Use the singular /git/ref/ endpoint — /git/refs/ (plural) returns an
+    //    array which has no .object property and silently breaks the commit.
     let latestCommitSha;
     try {
       const refRes = await this.apiFetch(
-        `/repos/${owner}/${name}/git/refs/heads/${branch}`,
+        `/repos/${owner}/${name}/git/ref/heads/${branch}`,
         token,
       );
       latestCommitSha = refRes.object.sha;
     } catch (err) {
       if (err.status === 404) {
-        this.dbg.log("Repo not found. Attempting to create repository...");
+        this.dbg.log("Repo/branch not found. Creating repository...");
         try {
           await this.apiFetch("/user/repos", token, {
             method: "POST",
@@ -79,10 +90,10 @@ export class GitHubHandler extends BaseGitHandler {
               auto_init: true,
             }),
           });
-          // Give GitHub a moment to initialize
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          // Give GitHub time to initialize the default branch
+          await new Promise((resolve) => setTimeout(resolve, 3000));
           const refRes = await this.apiFetch(
-            `/repos/${owner}/${name}/git/refs/heads/${branch}`,
+            `/repos/${owner}/${name}/git/ref/heads/${branch}`,
             token,
           );
           latestCommitSha = refRes.object.sha;

@@ -338,28 +338,77 @@ export function GraphView({ problems }) {
 
         <!-- Selected node panel -->
         ${selected && html`
-          <div class="absolute top-3 right-3 bg-black/80 backdrop-blur border border-white/10 rounded-xl p-4 text-sm max-w-[220px]">
-            <div class="font-medium text-white mb-1">${selected.label}</div>
-            ${selected.type === "topic" ? html`
-              <div class="text-xs text-slate-400">${selected.count} problems</div>
-            ` : html`
-              <div class="text-xs text-slate-400 space-y-1">
-                <div>${selected.platform} · ${selected.difficulty || "?"}</div>
-                <div>${selected.solved ? "✓ Solved" : "○ Not yet solved"}</div>
-                ${selected.titleSlug && html`
-                  <a
-                    href="https://leetcode.com/problems/${selected.titleSlug}/"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-cyan-400 hover:underline block mt-2"
-                  >Open on LeetCode →</a>
-                `}
-              </div>
-            `}
+          <div class="absolute top-3 right-3 bg-[#071018]/95 backdrop-blur border border-white/10 rounded-xl p-4 text-sm w-56 shadow-2xl">
             <button
               onClick=${() => setSelected(null)}
-              class="absolute top-2 right-2 text-slate-500 hover:text-slate-300 text-xs"
+              class="absolute top-2 right-2 text-slate-500 hover:text-slate-300 text-xs leading-none"
             >✕</button>
+            <div class="font-semibold text-white mb-2 pr-4 leading-snug">${selected.label}</div>
+            ${selected.type === "topic" ? html`
+              <div class="flex flex-col gap-1 text-xs text-slate-400">
+                <div class="flex items-center justify-between">
+                  <span>Problems solved</span>
+                  <span class="text-white font-mono">${selected.count}</span>
+                </div>
+              </div>
+            ` : html`
+              <div class="flex flex-col gap-1.5 text-[11px]">
+                <div class="flex items-center gap-2">
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    selected.difficulty === "Easy" ? "bg-emerald-500/20 text-emerald-400"
+                    : selected.difficulty === "Medium" ? "bg-amber-500/20 text-amber-400"
+                    : selected.difficulty === "Hard" ? "bg-rose-500/20 text-rose-400"
+                    : "bg-white/10 text-slate-400"
+                  }">${selected.difficulty || "?"}</span>
+                  <span class="text-slate-500 capitalize">${selected.platform || "?"}</span>
+                  <span class="${selected.solved ? "text-emerald-400" : "text-slate-600"}">${selected.solved ? "✓ Solved" : "○ Unsolved"}</span>
+                </div>
+                ${selected.lang ? html`
+                  <div class="flex justify-between text-slate-400">
+                    <span>Language</span><span class="text-slate-200">${selected.lang}</span>
+                  </div>` : ""}
+                ${selected.runtime ? html`
+                  <div class="flex justify-between text-slate-400">
+                    <span>Runtime</span>
+                    <span class="text-slate-200">${selected.runtime}${selected.runtimePct ? html` <span class="text-cyan-500/70 text-[10px]">beats ${selected.runtimePct.toFixed(0)}%</span>` : ""}</span>
+                  </div>` : ""}
+                ${selected.memory ? html`
+                  <div class="flex justify-between text-slate-400">
+                    <span>Memory</span>
+                    <span class="text-slate-200">${selected.memory}${selected.memoryPct ? html` <span class="text-cyan-500/70 text-[10px]">beats ${selected.memoryPct.toFixed(0)}%</span>` : ""}</span>
+                  </div>` : ""}
+                ${selected.acRate ? html`
+                  <div class="flex justify-between text-slate-400">
+                    <span>Acceptance</span><span class="text-slate-200">${selected.acRate.toFixed(1)}%</span>
+                  </div>` : ""}
+                ${selected.timestamp ? html`
+                  <div class="flex justify-between text-slate-400">
+                    <span>Solved</span>
+                    <span class="text-slate-200">${new Date(selected.timestamp * 1000).toLocaleDateString()}</span>
+                  </div>` : ""}
+                ${selected.tags?.length ? html`
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    ${selected.tags.slice(0, 4).map(t => html`
+                      <span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] text-slate-400">${t}</span>
+                    `)}
+                    ${selected.tags.length > 4 ? html`<span class="text-[9px] text-slate-600">+${selected.tags.length - 4}</span>` : ""}
+                  </div>` : ""}
+                ${selected.titleSlug ? html`
+                  <a
+                    href=${
+                      selected.platform === "geeksforgeeks"
+                        ? "https://practice.geeksforgeeks.org/problems/" + selected.titleSlug
+                        : selected.platform === "codeforces"
+                          ? "https://codeforces.com/problemset/problem/" + selected.titleSlug
+                          : "https://leetcode.com/problems/" + selected.titleSlug + "/"
+                    }
+                    target="_blank"
+                    rel="noopener"
+                    class="text-cyan-400 hover:text-cyan-300 text-[11px] mt-1 block border-t border-white/5 pt-1.5"
+                  >Open problem ↗</a>
+                ` : ""}
+              </div>
+            `}
           </div>
         `}
       </div>

@@ -28,10 +28,16 @@ async function init() {
 async function handleSolved(data) {
   coreDebug.log("Handling solve event", data);
 
-  // 1. Save locally
+  // 1. First-time check: only auto-commit the very first time this
+  //    (titleSlug, language) pair is seen — subsequent solves require manual sync.
+  const titleSlug = data.titleSlug || "";
+  const langName  = data.lang?.name || "";
+  const isFirstCommit = !(await Storage.isSlugLangCommitted(titleSlug, langName).catch(() => false));
+
+  // 2. Save locally
   await Storage.saveProblem(data);
 
-  // 2. AI Review (if enabled)
+  // 3. AI Review (if enabled)
   const settings = await Storage.getSettings();
   if (settings.autoReview) {
     const providerPlan = [
@@ -79,8 +85,11 @@ async function handleSolved(data) {
     }
   }
 
-  // 3. Git Commit
-  if (settings.gitEnabled) {
+  // 4. Git Commit — only auto-commit first time per (slug, language)
+  if (settings.gitEnabled && !isFirstCommit) {
+    coreDebug.log("Already committed slug+lang before — skipping auto-commit. Use manual sync.", titleSlug, langName);
+  }
+  if (settings.gitEnabled && isFirstCommit) {
     try {
       const git = registry.getGitProvider(settings.gitProvider || "github");
 
@@ -88,9 +97,9 @@ async function handleSolved(data) {
       if (data.files && Array.isArray(data.files)) {
         filesToCommit = [...data.files];
       } else {
-        const langName = data.lang?.name || "Solution";
-        const langExt = data.lang?.ext || "txt";
-        const filePath = `topics/${data.topic || "Uncategorized"}/${data.titleSlug}/${langName}.${langExt}`;
+        const fallbackLang = data.lang?.name || "Solution";
+        const fallbackExt  = data.lang?.ext || "txt";
+        const filePath = `topics/${data.topic || "Uncategorized"}/${data.titleSlug}/${fallbackLang}.${fallbackExt}`;
         filesToCommit.push({ path: filePath, content: data.code });
       }
 
@@ -104,6 +113,9 @@ async function handleSolved(data) {
         `[${data.topic}] ${data.title} solved`,
         settings.gitRepo,
       );
+      // Mark committed so subsequent solves of the same slug+lang don't auto-push
+      await Storage.markSlugLangCommitted(titleSlug, langName).catch(() => {});
+      coreDebug.log("Git commit successful", titleSlug, langName);
     } catch (err) {
       coreDebug.error("Git commit failed", err);
     }

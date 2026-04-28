@@ -179,7 +179,7 @@ export function SettingsSchema({ schema, values, onChange }) {
     providerId,
     keyVal,
     resultKey,
-    endpointOverride = "",
+    endpointOverride = ""
   ) => {
     if (!providerId) return;
     const key = String(keyVal || "").trim();
@@ -217,7 +217,7 @@ export function SettingsSchema({ schema, values, onChange }) {
         providerId,
         keys[i],
         `${baseResultKey}:${i}`,
-        values?.[`${providerId}_endpoint`] || "",
+        values?.[`${providerId}_endpoint`] || ""
       );
     }
     setTestResults((s) => ({
@@ -289,7 +289,7 @@ export function SettingsSchema({ schema, values, onChange }) {
         }
       }, 500);
     },
-    [onChange],
+    [onChange]
   );
 
   const handleDisconnect = useCallback(
@@ -300,7 +300,7 @@ export function SettingsSchema({ schema, values, onChange }) {
       onChange(key, "");
       setTestResults((s) => ({ ...s, [key]: "" }));
     },
-    [onChange],
+    [onChange]
   );
 
   const isProviderEffectivelyEnabled = (providerId) => {
@@ -337,9 +337,8 @@ export function SettingsSchema({ schema, values, onChange }) {
   const shouldRenderField = (section, field) => {
     if (section.id !== "core") return true;
     if (activeTab === "general") {
-      return !["autoReview", "aiProvider", "aiSecondary", "aiModel"].includes(
-        field.key,
-      );
+      // AI-routing fields are owned by the AI tab; hide them here to avoid duplication
+      return !["aiProvider", "aiSecondary", "aiModel"].includes(field.key);
     }
     return true;
   };
@@ -376,57 +375,51 @@ export function SettingsSchema({ schema, values, onChange }) {
           : ""}
         ${f.type === "url" || f.type === "text" || f.type === "password"
           ? html`
-              ${f.advanced && !advancedMap[section.id]
-                ? html`<div class="text-xs text-slate-500 italic">
-                    Advanced field hidden
+              <div class="flex items-center gap-2 w-full">
+                <input
+                  type=${f.type}
+                  value=${values[f.key] ?? f.default}
+                  placeholder=${f.placeholder || ""}
+                  class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
+                  onChange=${(e) => onChange(f.key, e.target.value)}
+                />
+                ${(() => {
+                  const prov = providerFromField(f.key);
+                  if (!prov) return "";
+                  const isEndpoint = String(f.key || "")
+                    .toLowerCase()
+                    .includes("_endpoint");
+                  return html`
+                    <button
+                      onClick=${() =>
+                        isEndpoint
+                          ? handleTestEndpoint(
+                              prov,
+                              values[f.key] ?? "",
+                              f.key
+                            )
+                          : handleTestKey(
+                              prov,
+                              parseKeys(values[f.key] ?? "")[0] || "",
+                              f.key,
+                              values?.[`${prov}_endpoint`] || ""
+                            )}
+                      class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                    >
+                      ${testing[f.key]
+                        ? "Testing..."
+                        : isEndpoint
+                          ? "Check"
+                          : "Test"}
+                    </button>
+                  `;
+                })()}
+              </div>
+              ${testResults[f.key]
+                ? html`<div class="text-[11px] mt-1 text-slate-400">
+                    ${testResults[f.key]}
                   </div>`
-                : html`
-                    <div class="flex items-center gap-2 w-full">
-                      <input
-                        type=${f.type}
-                        value=${values[f.key] ?? f.default}
-                        placeholder=${f.placeholder || ""}
-                        class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
-                        onChange=${(e) => onChange(f.key, e.target.value)}
-                      />
-                      ${(() => {
-                        const prov = providerFromField(f.key);
-                        if (!prov) return "";
-                        const isEndpoint = String(f.key || "")
-                          .toLowerCase()
-                          .includes("_endpoint");
-                        return html`
-                          <button
-                            onClick=${() =>
-                              isEndpoint
-                                ? handleTestEndpoint(
-                                    prov,
-                                    values[f.key] ?? "",
-                                    f.key,
-                                  )
-                                : handleTestKey(
-                                    prov,
-                                    parseKeys(values[f.key] ?? "")[0] || "",
-                                    f.key,
-                                    values?.[`${prov}_endpoint`] || "",
-                                  )}
-                            class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-                          >
-                            ${testing[f.key]
-                              ? "Testing..."
-                              : isEndpoint
-                                ? "Check"
-                                : "Test"}
-                          </button>
-                        `;
-                      })()}
-                    </div>
-                    ${testResults[f.key]
-                      ? html`<div class="text-[11px] mt-1 text-slate-400">
-                          ${testResults[f.key]}
-                        </div>`
-                      : ""}
-                  `}
+                : ""}
             `
           : ""}
         ${f.type === "select"
@@ -443,9 +436,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                   ${f.options
                     ? f.options.map(
                         (opt) =>
-                          html`<option value=${opt.value}>
-                            ${opt.label}
-                          </option>`,
+                          html`<option value=${opt.value}>${opt.label}</option>`
                       )
                     : ""}
                 </select>
@@ -485,141 +476,98 @@ export function SettingsSchema({ schema, values, onChange }) {
                       `}
                 </div>
 
-                ${/* Repo setup prompt shown after first connect */ ""}
                 ${values[f.key] && f.provider === "github"
                   ? html`
-                      ${!repoSetup[f.provider]
-                        ? html`
-                            <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-                              <p class="text-[11px] text-cyan-300 font-medium">
-                                Set up your repository
-                              </p>
-                              <div class="flex gap-2">
-                                <button
-                                  onClick=${() =>
-                                    setRepoSetup((s) => ({
-                                      ...s,
-                                      [f.provider]: "new",
-                                    }))}
-                                  class="flex-1 px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors"
-                                >
-                                  Create new repo
-                                </button>
-                                <button
-                                  onClick=${() =>
-                                    setRepoSetup((s) => ({
-                                      ...s,
-                                      [f.provider]: "existing",
-                                    }))}
-                                  class="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors"
-                                >
-                                  Link existing repo
-                                </button>
-                              </div>
+                      ${(() => {
+                        const rs = repoSetup[f.provider];
+                        const savedRepo = values["github_repo"];
+
+                        // ── Edit: create new repo ──────────────────────
+                        if (rs === "new") return html`
+                          <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
+                            <p class="text-[11px] text-cyan-300 font-medium">New repository name</p>
+                            <div class="flex gap-2">
+                              <input
+                                type="text"
+                                value=${savedRepo || "CodeLedger-Sync"}
+                                placeholder="CodeLedger-Sync"
+                                class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
+                                onChange=${(e) => onChange("github_repo", e.target.value)}
+                              />
+                              <button
+                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))}
+                                class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
+                              >Save</button>
                             </div>
-                          `
-                        : repoSetup[f.provider] === "new"
-                          ? html`
-                              <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-                                <p class="text-[11px] text-cyan-300 font-medium">
-                                  New repository name
-                                </p>
-                                <div class="flex gap-2">
-                                  <input
-                                    type="text"
-                                    value=${values["github_repo"] ||
-                                    "dsa-solutions"}
-                                    placeholder="dsa-solutions"
-                                    class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
-                                    onChange=${(e) =>
-                                      onChange("github_repo", e.target.value)}
-                                  />
-                                  <button
-                                    onClick=${() =>
-                                      setRepoSetup((s) => ({
-                                        ...s,
-                                        [f.provider]: "done",
-                                      }))}
-                                    class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
-                                  >
-                                    Save
-                                  </button>
-                                </div>
-                                <p class="text-[10px] text-slate-500">
-                                  Will be created automatically on first commit.
-                                </p>
-                                <button
-                                  onClick=${() =>
-                                    setRepoSetup((s) => ({
-                                      ...s,
-                                      [f.provider]: null,
-                                    }))}
-                                  class="text-[10px] text-slate-500 underline self-start"
-                                >
-                                  ← Back
-                                </button>
-                              </div>
-                            `
-                          : repoSetup[f.provider] === "existing"
-                            ? html`
-                                <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-                                  <p class="text-[11px] text-cyan-300 font-medium">
-                                    Existing repository name
-                                  </p>
-                                  <div class="flex gap-2">
-                                    <input
-                                      type="text"
-                                      value=${values["github_repo"] || ""}
-                                      placeholder="owner/repo-name or just repo-name"
-                                      class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
-                                      onChange=${(e) =>
-                                        onChange(
-                                          "github_repo",
-                                          e.target.value.split("/").pop(),
-                                        )}
-                                    />
-                                    <button
-                                      onClick=${() =>
-                                        setRepoSetup((s) => ({
-                                          ...s,
-                                          [f.provider]: "done",
-                                        }))}
-                                      class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
-                                    >
-                                      Link
-                                    </button>
-                                  </div>
-                                  <p class="text-[10px] text-slate-500">
-                                    Enter the repository name (not the full URL).
-                                  </p>
-                                  <button
-                                    onClick=${() =>
-                                      setRepoSetup((s) => ({
-                                        ...s,
-                                        [f.provider]: null,
-                                      }))}
-                                    class="text-[10px] text-slate-500 underline self-start"
-                                  >
-                                    ← Back
-                                  </button>
-                                </div>
-                              `
-                            : html`
-                                <p class="text-[11px] text-emerald-400 mt-1">
-                                  Repository configured:
-                                  <strong>${values["github_repo"] || "dsa-solutions"}</strong>
-                                </p>
-                                <button
-                                  onClick=${() =>
-                                    setRepoSetup((s) => ({
-                                      ...s,
-                                      [f.provider]: null,
-                                    }))}
-                                  class="text-[10px] text-slate-500 underline"
-                                >
-                                  Change
-                                </button>
-                              `}
+                            <p class="text-[10px] text-slate-500">Created automatically on first commit.</p>
+                            <button onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))} class="text-[10px] text-slate-500 underline self-start">← Back</button>
+                          </div>
+                        `;
+
+                        // ── Edit: link existing repo ────────────────────
+                        if (rs === "existing") return html`
+                          <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
+                            <p class="text-[11px] text-cyan-300 font-medium">Existing repository name</p>
+                            <div class="flex gap-2">
+                              <input
+                                type="text"
+                                value=${savedRepo || ""}
+                                placeholder="repo-name (no owner prefix)"
+                                class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
+                                onChange=${(e) => onChange("github_repo", e.target.value.split("/").pop())}
+                              />
+                              <button
+                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))}
+                                class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
+                              >Link</button>
+                            </div>
+                            <p class="text-[10px] text-slate-500">Enter only the repository name, not the full URL.</p>
+                            <button onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))} class="text-[10px] text-slate-500 underline self-start">← Back</button>
+                          </div>
+                        `;
+
+                        // ── Configured ─────────────────────────────────
+                        if (savedRepo) {
+                          const owner = values["github_owner"]?.trim() || "";
+                          const repoUrl = owner
+                            ? `https://github.com/${owner}/${savedRepo}`
+                            : `https://github.com/search?q=${encodeURIComponent(savedRepo)}&type=repositories`;
+                          return html`
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                              <span class="text-[11px] text-emerald-400">
+                                ${owner ? html`<span class="text-slate-400">${owner}/</span>` : ""}<strong>${savedRepo}</strong>
+                              </span>
+                              <a
+                                href=${repoUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                class="text-[11px] text-cyan-400 underline hover:text-cyan-300"
+                              >View on GitHub ↗</a>
+                              <button
+                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "existing" }))}
+                                class="text-[10px] text-slate-500 underline ml-auto"
+                              >Change</button>
+                            </div>
+                          `;
+                        }
+
+                        // ── First-time setup prompt ─────────────────────
+                        return html`
+                          <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
+                            <p class="text-[11px] text-cyan-300 font-medium">Set up your repository</p>
+                            <div class="flex gap-2">
+                              <button
+                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "new" }))}
+                                class="flex-1 px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors"
+                              >Create new repo</button>
+                              <button
+                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "existing" }))}
+                                class="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors"
+                              >Link existing repo</button>
+                            </div>
+                          </div>
+                        `;
+                      })()}
                     `
                   : ""}
               </div>
@@ -630,17 +578,21 @@ export function SettingsSchema({ schema, values, onChange }) {
   `;
 
   const renderSection = (section) => {
-    const fields = (section.fields || []).filter((f) =>
-      shouldRenderField(section, f),
+    const allFields = (section.fields || []).filter((f) =>
+      shouldRenderField(section, f)
     );
-    if (!fields.length) return "";
+    if (!allFields.length) return "";
+
+    const normalFields = allFields.filter((f) => !f.advanced);
+    const advancedFields = allFields.filter((f) => f.advanced);
+    const showAdv = !!advancedMap[section.id];
 
     const isGitProvider = !!CONSTANTS.GIT_PROVIDERS?.[section.id];
     const enabledField = `${section.id}_enabled`;
     const gitEnabled = isGitProvider
-      ? (typeof values?.[enabledField] === "undefined"
-          ? true
-          : !!values[enabledField])
+      ? typeof values?.[enabledField] === "undefined"
+        ? true
+        : !!values[enabledField]
       : true;
 
     return html`
@@ -655,16 +607,6 @@ export function SettingsSchema({ schema, values, onChange }) {
           >
             ${section.icon ? html`<span>${section.icon}</span>` : ""}
             ${section.title || section.label}
-            <button
-              onClick=${() =>
-                setAdvancedMap((m) => ({
-                  ...m,
-                  [section.id]: !m[section.id],
-                }))}
-              class="ml-3 text-xs px-2 py-0.5 bg-white/5 rounded"
-            >
-              ${advancedMap[section.id] ? "Hide advanced" : "Show advanced"}
-            </button>
           </h3>
           ${isGitProvider
             ? html`
@@ -685,15 +627,53 @@ export function SettingsSchema({ schema, values, onChange }) {
 
         ${isGitProvider && section.id !== "github"
           ? html`
-              <div class="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
-                ⚠️ ${CONSTANTS.GIT_PROVIDERS[section.id]?.name || section.id} support is in testing — do not use in production yet.
+              <div
+                class="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2"
+              >
+                ⚠️ ${CONSTANTS.GIT_PROVIDERS[section.id]?.name || section.id}
+                support is in testing — do not use in production yet.
               </div>
             `
           : ""}
 
         <div class="space-y-4">
-          ${fields.map((f) => renderStandardField(section, f))}
+          ${normalFields.map((f) => renderStandardField(section, f))}
         </div>
+
+        ${advancedFields.length
+          ? html`
+              <div class="border-t border-white/5 pt-3">
+                <button
+                  onClick=${() =>
+                    setAdvancedMap((m) => ({
+                      ...m,
+                      [section.id]: !m[section.id],
+                    }))}
+                  class="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <svg
+                    class="w-3 h-3 transition-transform ${showAdv
+                      ? "rotate-90"
+                      : ""}"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                  Advanced
+                </button>
+                ${showAdv
+                  ? html`<div class="mt-3 space-y-4 pl-1 border-l border-white/5">
+                      ${advancedFields.map((f) =>
+                        renderStandardField(section, f)
+                      )}
+                    </div>`
+                  : ""}
+              </div>
+            `
+          : ""}
       </div>
     `;
   };
@@ -702,7 +682,7 @@ export function SettingsSchema({ schema, values, onChange }) {
     const primaryProvider = values.aiProvider || "";
     const secondaryProvider = values.aiSecondary || "";
     const selectableProviders = Object.keys(
-      CONSTANTS.AI_PROVIDERS || {},
+      CONSTANTS.AI_PROVIDERS || {}
     ).filter((pid) => isProviderEffectivelyEnabled(pid));
 
     return html`
@@ -773,7 +753,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                     (pid) =>
                       html`<option value=${pid}>
                         ${CONSTANTS.AI_PROVIDERS[pid].name}
-                      </option>`,
+                      </option>`
                   )}
                 </select>
 
@@ -785,7 +765,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                       onSelect=${(v) => onChange("aiPrimaryModel", v)}
                       endpoint=${values[`${primaryProvider}_endpoint`] || ""}
                       providerEnabled=${isProviderEffectivelyEnabled(
-                        primaryProvider,
+                        primaryProvider
                       )}
                       onToggleEnabled=${(val) =>
                         onChange(`${primaryProvider}_enabled`, val)}
@@ -818,7 +798,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                     (pid) =>
                       html`<option value=${pid}>
                         ${CONSTANTS.AI_PROVIDERS[pid].name}
-                      </option>`,
+                      </option>`
                   )}
                 </select>
 
@@ -830,7 +810,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                       onSelect=${(v) => onChange("aiSecondaryModel", v)}
                       endpoint=${values[`${secondaryProvider}_endpoint`] || ""}
                       providerEnabled=${isProviderEffectivelyEnabled(
-                        secondaryProvider,
+                        secondaryProvider
                       )}
                       onToggleEnabled=${(val) =>
                         onChange(`${secondaryProvider}_enabled`, val)}
@@ -915,7 +895,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                           handleProviderKeysChange(
                             pid,
                             keyField,
-                            e.target.value,
+                            e.target.value
                           )}
                         placeholder="Enter keys separated by commas or new lines"
                         class="w-full min-h-[90px] px-3 py-2 bg-black border border-white/10 rounded text-sm text-white"
@@ -955,7 +935,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                                       pid,
                                       k,
                                       `${keyField}:${idx}`,
-                                      endpoint,
+                                      endpoint
                                     )}
                                   class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                                 >
@@ -969,7 +949,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                                 >
                               </div>
                             </div>
-                          `,
+                          `
                         )}
                       </div>
 
@@ -988,7 +968,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                             (opt) =>
                               html`<option value=${opt.value}>
                                 ${opt.label}
-                              </option>`,
+                              </option>`
                           )}
                         </select>
                       </div>
@@ -1080,7 +1060,9 @@ export function SettingsSchema({ schema, values, onChange }) {
           Warning: changing prompts can reduce review quality. Restore with
           "Reset to defaults".
         </div>
-        <div class="text-[11px] text-slate-400 bg-black/30 border border-white/5 rounded px-3 py-2">
+        <div
+          class="text-[11px] text-slate-400 bg-black/30 border border-white/5 rounded px-3 py-2"
+        >
           Template variables:${" "}
           <code class="text-cyan-400">{"{title}"}</code>,${" "}
           <code class="text-cyan-400">{"{difficulty}"}</code>,${" "}
@@ -1107,7 +1089,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                 class="w-full px-3 py-2 bg-black border border-white/10 rounded text-sm text-white font-mono resize-y"
               ></textarea>
             </div>
-          `,
+          `
         )}
 
         <div class="flex items-center gap-2 pt-2">
@@ -1147,7 +1129,7 @@ export function SettingsSchema({ schema, values, onChange }) {
             >
               ${t.label}
             </button>
-          `,
+          `
         )}
       </div>
 

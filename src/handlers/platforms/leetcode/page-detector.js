@@ -20,12 +20,20 @@ export const PAGE_TYPES = {
 export function detectPage(pathname) {
   const clean = pathname.replace(/\/$/, '');
 
+  // Modern LeetCode URL: /problems/{slug}/submissions/{id}
+  // Must be checked before the generic problem match so the submission ID isn't lost.
+  const problemSubmissionMatch = clean.match(/^\/problems\/([^/]+)\/submissions\/(\d+)/);
+  if (problemSubmissionMatch) {
+    return { type: PAGE_TYPES.SUBMISSION, slug: problemSubmissionMatch[1], submissionId: problemSubmissionMatch[2] };
+  }
+
   const problemMatch = clean.match(/^\/problems\/([^/]+)/);
   if (problemMatch) {
     const slug = problemMatch[1];
     return { type: PAGE_TYPES.PROBLEM, slug };
   }
 
+  // Legacy LeetCode URL: /submissions/detail/{id}
   const submissionMatch = clean.match(/^\/submissions\/detail\/(\d+)/);
   if (submissionMatch) {
     return { type: PAGE_TYPES.SUBMISSION, submissionId: submissionMatch[1] };

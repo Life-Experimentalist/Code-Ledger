@@ -137,16 +137,48 @@ Be concise. Max 200 words.`;
     const page = detectPage(window.location.pathname);
     if (page.type !== PAGE_TYPES.PROBLEM && page.type !== PAGE_TYPES.SUBMISSION) return;
 
-    // Only fire when an "Accepted" banner is visible (problem pages)
+    // For submission detail pages we can always fetch — no banner check needed.
     if (page.type === PAGE_TYPES.PROBLEM) {
-      const accepted =
-        this.safeQuery(SELECTORS.submission.successIndicator) ||
-        [...document.querySelectorAll('[data-cy="submission-result"], .accepted, [class*="accepted"]')]
-          .find(el => /accepted/i.test(el.textContent || ""));
-      if (!accepted) return;
+      if (!this._isAcceptedVisible()) return;
     }
 
     await this._processSubmission(page, false);
+  }
+
+  /**
+   * Returns true when an "Accepted" result banner is visible on the current page.
+   * Uses a two-pass strategy:
+   *   1. CSS selector fast-path (data attributes + structural classes)
+   *   2. Text-content TreeWalker scan — works regardless of hashed class names
+   */
+  _isAcceptedVisible() {
+    // Fast path — check known/stable selectors first
+    const bySelector = this.safeQuery(SELECTORS.submission.successIndicator);
+    if (bySelector && /accepted/i.test(bySelector.textContent || "")) return true;
+
+    // Slow path — walk all visible leaf-ish text nodes looking for exactly "Accepted"
+    // Scoped to likely result containers to keep it fast on a large DOM.
+    const roots = [
+      document.querySelector('[data-e2e-locator="submission-result"]'),
+      document.querySelector('[class*="result"]'),
+      document.querySelector('[class*="verdict"]'),
+      document.querySelector('[class*="console"]'),
+      document.body,
+    ].filter(Boolean);
+
+    for (const root of roots) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (/^\s*accepted\s*$/i.test(node.textContent)) {
+          const el = node.parentElement;
+          if (el && el.offsetParent !== null) return true; // visible
+        }
+      }
+      if (root !== document.body) break; // only fall through to body as last resort
+    }
+
+    return false;
   }
 
   async _processSubmission(page, isManual) {

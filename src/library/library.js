@@ -25,6 +25,7 @@ function LibraryApp() {
   const [activeTab, setActiveTab] = useState("archive");
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [gitUser, setGitUser] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -33,6 +34,19 @@ function LibraryApp() {
         if (!mounted) return;
         setProblems(p || []);
         setSettings(s || {});
+
+        // Resolve GitHub user for header display
+        const token = s?.github_token;
+        Storage.getAuthToken("github").then((oauthToken) => {
+          const t = oauthToken || token;
+          if (!t || !mounted) return;
+          fetch("https://api.github.com/user", {
+            headers: { Authorization: `token ${t}` },
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((u) => { if (u?.login && mounted) setGitUser(u.login); })
+            .catch(() => {});
+        });
       })
       .finally(() => mounted && setLoading(false));
     return () => (mounted = false);
@@ -170,11 +184,26 @@ function LibraryApp() {
           </div>
           <div class="h-4 w-px bg-white/10"></div>
           <div class="flex items-center gap-3">
-            <a
-              class="text-xs text-slate-400 hover:text-cyan-400"
-              href="/api/auth/github"
-              >Connect</a
-            >
+            ${gitUser
+              ? html`
+                  <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                    <span class="text-xs font-mono text-emerald-500/80">${gitUser}</span>
+                    ${settings.gitRepo
+                      ? html`<a
+                          href=${"https://github.com/" + gitUser + "/" + settings.gitRepo}
+                          target="_blank"
+                          rel="noreferrer"
+                          class="text-xs text-slate-400 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 px-2 py-0.5 rounded transition-colors"
+                        >Repo ↗</a>`
+                      : ""}
+                  </div>
+                `
+              : html`<a
+                  onClick=${(e) => { e.preventDefault(); setActiveTab("settings"); }}
+                  href="#"
+                  class="text-xs text-slate-400 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 px-2 py-1 rounded transition-colors"
+                >Connect GitHub</a>`}
           </div>
         </div>
       </header>

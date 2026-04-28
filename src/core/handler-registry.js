@@ -55,6 +55,7 @@ class HandlerRegistry {
       order: 0,
       description: "Core configuration for CodeLedger.",
       fields: [
+        // ── Sync & Review ──────────────────────────────────────────────
         {
           key: "gitEnabled",
           label: "Enable Git Sync",
@@ -68,8 +69,33 @@ class HandlerRegistry {
           label: "Enable AI Review",
           type: "toggle",
           default: true,
-          description: "Automatically analyze code using AI upon completion.",
+          description: "Automatically analyze code with AI upon completion.",
         },
+        {
+          key: "notifications",
+          label: "Solve Notifications",
+          type: "toggle",
+          default: true,
+          description:
+            "Show a browser notification when a problem is committed.",
+        },
+        {
+          key: "autoSync",
+          label: "Sync on Startup",
+          type: "toggle",
+          default: true,
+          description:
+            "Re-sync your repository index when the extension loads.",
+        },
+        {
+          key: "telemetryOptIn",
+          label: "Anonymous Usage Stats",
+          type: "toggle",
+          default: true,
+          description:
+            "Send anonymous solve counts to help improve CodeLedger. No code or personal data is sent.",
+        },
+        // ── AI routing consumed by AI tab; filtered out of General view ──
         {
           key: "aiProvider",
           label: "Primary AI Provider",
@@ -100,11 +126,32 @@ class HandlerRegistry {
           description:
             "Optional model name to use across providers that support a global model.",
         },
+        // ── Advanced ───────────────────────────────────────────────────
+        {
+          key: "incognitoMode",
+          label: "Incognito Mode",
+          type: "toggle",
+          default: false,
+          advanced: true,
+          description:
+            "Skip storing problem descriptions and metadata locally. Only the commit goes to GitHub.",
+        },
+        {
+          key: "commitMessageTemplate",
+          label: "Commit Message Template",
+          type: "text",
+          default: CONSTANTS.COMMIT_MESSAGE_TEMPLATE,
+          advanced: true,
+          placeholder: "[{topic}] {title} — {difficulty} | {language}",
+          description:
+            "Variables: {title}, {topic}, {difficulty}, {language}, {platform}.",
+        },
         {
           key: "debugMode",
           label: "Debug Logging",
           type: "toggle",
           default: false,
+          advanced: true,
           description:
             "Show detailed console logs from all CodeLedger handlers. Reload the page after toggling.",
         },

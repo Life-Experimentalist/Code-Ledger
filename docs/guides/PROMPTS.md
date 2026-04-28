@@ -519,7 +519,7 @@ export const CONSTANTS = Object.freeze({
   KEY_POOL_RETRY_AFTER_MS: 60_000,
 
   // ── Git repo ──
-  DEFAULT_REPO_NAME: 'dsa-solutions',
+  DEFAULT_REPO_NAME: 'CodeLedger-Sync',
   REPO_BRANCH: 'main',
   COMMIT_MESSAGE_TEMPLATE: '[{topic}] {title} — {difficulty} | {language}',
   IMPORT_COMMIT_MESSAGE: 'chore: import {count} solutions from {platform} profile',
@@ -1102,7 +1102,7 @@ export async function getDSAStatsForPortfolio(githubToken, repoOwner, repoName) 
     "codeledger": {
       "enabled": true,
       "dsaRepoOwner": "vkrishna04",
-      "dsaRepoName": "dsa-solutions",
+      "dsaRepoName": "CodeLedger-Sync",
       "statsDisplaySection": "skills",
       "showInHero": true,
       "badgeStyle": "flat-square"
@@ -1346,5 +1346,74 @@ Generate files in this order. Complete each directory before moving to the next.
 - Portfolio integration documents exactly how `VKrishna04.github.io/src/settings.json` should reference the DSA repo.
 - Apache 2.0 license header on every file.
 - The `data/canonical-map.json` must contain all 150 NeetCode 150 problems with real slugs.
+
+---
+
+## Roadmap — Future Features (for AI generation guidance)
+
+The items below are planned enhancements. When generating or extending CodeLedger, implement these in the order listed. Each includes the files most likely to change.
+
+### R1 — Gamification Layer (opt-in toggle)
+
+Users can toggle a "Gamified Mode" in General settings (`gamificationEnabled`). When on:
+- Award XP for each solve: Easy = 10 XP, Medium = 25 XP, Hard = 50 XP. Bonus multipliers for streaks (1.2×) and first-time topic solves (1.5×).
+- Display a level badge in the library header (Level 1–50 based on total XP, with tier names: Apprentice → Coder → Engineer → Expert → Legend).
+- Weekly challenges: seeded from the canonical map, randomised per week, shown as a sidebar card in Analytics. Completing all 3 earns a bonus XP badge.
+- Trophy shelf: unlock badges for milestones (first solve, 10-day streak, 100 total, first Hard, all Blind 75, etc.). Rendered as a horizontal row on the Analytics page.
+- XP and badges are stored in `chrome.storage.local` under `cl.gamification`. The `Storage` module gets `getGamification()` / `setGamification()` helpers.
+- Files: `src/core/gamification.js` (XP engine), `src/ui/components/XPBadge.js`, `src/ui/components/TrophyShelf.js`, `src/library/views/AnalyticsView.js` (integrate), `src/core/constants.js` (add `GAMIFICATION` config block), `src/core/handler-registry.js` (add `gamificationEnabled` toggle to core schema).
+
+### R2 — AI Integration: Smart Code Evaluator + Guided Chatbot
+
+Two modes, both accessible from the ProblemCard detail view and the Library sidebar:
+
+**Mode A – Post-Submit Evaluator (default)**
+- Triggered automatically after a solve event is captured (already hooked in `service-worker.js`).
+- Sends code + problem title + difficulty + topic to the active AI provider.
+- Returns a structured review (already implemented as `ai.review()`). Render it inside `ProblemCard` as a collapsible "AI Review" panel with sections: Complexity, Correctness, Improvement, Pattern.
+- If the submission was WRONG (status != Accepted), the evaluator enters "Guide" mode: instead of reviewing, it identifies where the user went wrong using a different prompt template. The guide prompt must NOT reveal the full answer — only hint at the failing case or logical gap.
+- Prompt key: `ai_guide_prompt` (separate from `ai_review_prompt`). Default: `"Given that this {difficulty} {language} solution for '{title}' was incorrect, identify the most likely logical error without revealing the correct solution. Point to the specific case that would fail."`
+
+**Mode B – Contextual Chatbot (opt-in: `aiChatEnabled` toggle)**
+- A floating chat panel injected by the content script on LeetCode/GFG/CF problem pages.
+- The chatbot has context of: the current problem (title, difficulty, constraints, examples — from the DOM or cached metadata), the user's current code (read from the editor), and all previous solves of problems in the same topic (fetched from IndexedDB via a `chrome.runtime.sendMessage` round-trip).
+- It never auto-sends code; the user must click "Share my code" to attach it to a message.
+- Implemented as a shadow-DOM component injected by `src/content/ai-chat-injector.js` (new file). Uses the same AI provider chain as the review system.
+- Messages are NOT stored persistently; the chat resets on page navigation.
+- Files: `src/content/ai-chat-injector.js`, `src/ui/components/AIChatPanel.js`, `src/core/ai-prompts.js` (add guide prompt + chat system prompt), `src/core/constants.js` (add `aiChatEnabled` default), manifest `content_scripts` entry for `ai-chat-injector.js`.
+
+### R3 — Advanced Analytics Dashboard
+
+Additions to `src/library/views/AnalyticsView.js`:
+
+- **Time-of-day heatmap**: 7×24 grid (day × hour) showing when the user typically solves problems. Computed from `p.timestamp`.
+- **Topic progression timeline**: line chart showing cumulative topic coverage over time (new topics unlocked per week).
+- **Difficulty trend**: 30-day rolling window showing if the user is getting harder over time.
+- **Peer percentile estimate**: compare the user's solve velocity against a static distribution curve (e.g., top 10% of competitive programmers solve ~5 Hard/week). Show as a simple percentile badge.
+- **Acceptance rate vs. user solve rate correlation**: scatter plot across problems solved — x = problem AC rate, y = user's time-to-first-AC (approx from first timestamp). Requires storing `firstSeenAt` on each problem.
+- **Weakest topics radar**: same as Topic Depth but filtered to topics where Hard count = 0 and total < 3, highlighted in amber.
+- All new charts follow the existing `ChartWrapper` pattern. Colours match the dashboard palette.
+
+### R4 — Per-Platform Deep Stats
+
+Extend platform tracking in `AnalyticsView`:
+- Codeforces: parse contest rating if available (store in problem object when GFG/CF handlers capture it).
+- GeeksForGeeks: track problem difficulty using the canonical map (GFG uses School/Basic/Easy/Medium/Hard).
+- Cross-platform deduplication view: show problems solved on multiple platforms linked via canonical ID.
+- Platform "mastery score" combining solve count, difficulty weight, and recency.
+
+### R5 — Sync Engine Improvements
+
+- **Multi-device sync**: `src/background/sync-engine.js` already syncs via `index.json`. Extend to a proper two-way merge: fetch remote `index.json`, diff against local IndexedDB, pull missing remote problems into local store, push local problems missing from remote.
+- **Conflict resolution**: when same (titleSlug, lang) exists on both sides with different timestamps, keep the newer one. Surface a "Conflicts resolved: N" notification via `chrome.notifications`.
+- **Selective sync**: settings toggle `syncProblemsOnly` (do not push settings to repo, only solutions).
+
+### R6 — Portfolio Integration Automation
+
+`src/library/views/PortfolioView.js` (new):
+- Fetches the user's GitHub repo `index.json` via GitHub API (using the stored OAuth token).
+- Renders a preview of what their portfolio would show.
+- Provides a one-click "Update portfolio settings.json" that PATCHes `src/settings.json` in their portfolio repo to add/update the `dsaStats` data source pointing at their CodeLedger repo's `index.json`.
+- The data source schema in the portfolio's `settings.json`: `{ "type": "codeledger", "repo": "owner/repo", "label": "DSA Progress" }`.
 
 *End of prompt. Begin generation.*
