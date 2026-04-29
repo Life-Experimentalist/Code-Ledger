@@ -165,14 +165,13 @@ function PopupApp() {
       </div>
 
       <div
-        class="mt-auto pt-4 border-t border-white/5 flex gap-2 items-center justify-center"
+        class="mt-auto pt-4 border-t border-white/5 flex gap-2 items-center justify-between"
       >
-        <div
-          class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse"
-        ></div>
-        <span class="text-[10px] uppercase tracking-widest text-emerald-500/80"
-          >Tracker Active</span
-        >
+        <div class="flex items-center gap-1.5">
+          <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]"></div>
+          <span class="text-[9px] uppercase tracking-widest text-emerald-500/70">Ready</span>
+        </div>
+        <span class="text-[9px] text-slate-600">${stats.total} tracked</span>
       </div>
     </div>
   `;

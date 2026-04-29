@@ -97,6 +97,9 @@ export function fillPromptTemplate(template, ctx = {}) {
  * @returns {string}               Complete prompt ready to send to an AI provider
  */
 export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) {
+  // Raw mode: the caller has already built the full prompt — return it as-is.
+  if (problemContext._rawPrompt) return code;
+
   const platform = (problemContext.platform || "").toLowerCase() || "default";
 
   // Preference order: user stored override → registered platform default → registered default fallback

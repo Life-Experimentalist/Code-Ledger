@@ -11,6 +11,7 @@ import { Storage } from "../../../core/storage.js";
 import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
+import { createFloatingTimer } from "../../../ui/floating-timer.js";
 
 const dbg = createDebugger("GFG");
 
@@ -33,6 +34,7 @@ export class GFGHandler extends BasePlatformHandler {
     this.mutationObserver = null;
     this.lastDetectedId = null;
     this._processingLock = false;
+    this._timer = null;
     registerPlatformPrompt("geeksforgeeks", this.getDefaultPrompt());
   }
 
@@ -63,6 +65,15 @@ Be concise. Max 200 words.`;
   async init() {
     dbg.log("GFG handler active");
     this._setupMutationObserver();
+    // Inject timer on problem pages
+    const page = detectPage(window.location.pathname);
+    if (page.type === PAGE_TYPES.PROBLEM) {
+      Storage.getSettings().then((s) => {
+        if (s.gfg_timer !== false) {
+          this._timer = createFloatingTimer(page.slug || "gfg", { autoStart: true });
+        }
+      }).catch(() => {});
+    }
   }
 
   _setupMutationObserver() {
@@ -143,6 +154,9 @@ Be concise. Max 200 words.`;
       // Build file set
       const files = this._buildFileSet(meta, code, lang, settings, slug);
 
+      const elapsedMs = this._timer ? this._timer.getElapsed() : 0;
+      const elapsedSeconds = elapsedMs > 0 ? Math.round(elapsedMs / 1000) : null;
+
       eventBus.emit("problem:solved", {
         platform:   "geeksforgeeks",
         id:         meta.platformId || null,
@@ -158,6 +172,7 @@ Be concise. Max 200 words.`;
         runtime:    meta.runtime || null,
         memory:     meta.memory || null,
         timestamp:  Math.floor(Date.now() / 1000),
+        elapsedSeconds,
       });
 
       dbg.log("Solve emitted", { slug, lang: lang.name });

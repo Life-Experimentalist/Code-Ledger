@@ -130,11 +130,18 @@ class HandlerRegistry {
         {
           key: "incognitoMode",
           label: "Incognito Mode",
-          type: "toggle",
-          default: false,
+          type: "select",
+          default: "off",
           advanced: true,
+          options: [
+            { value: "off",     label: "Off" },
+            { value: "1h",      label: "1 hour" },
+            { value: "4h",      label: "4 hours" },
+            { value: "24h",     label: "24 hours" },
+            { value: "forever", label: "Indefinitely" },
+          ],
           description:
-            "Skip storing problem descriptions and metadata locally. Only the commit goes to GitHub.",
+            "Pause recording and committing for a set duration. Solves during this window are silently skipped.",
         },
         {
           key: "commitMessageTemplate",

@@ -108,6 +108,7 @@ export function AnalyticsView({ problems }) {
       longestStreak: 0,
       thisWeek: 0,
       thisMonth: 0,
+      avgSolveSeconds: 0,
     };
 
     // Pre-build last 12 weeks slots
@@ -142,7 +143,11 @@ export function AnalyticsView({ problems }) {
       else if (cat === "Medium") s.platforms[platform].medium++;
       else if (cat === "Hard") s.platforms[platform].hard++;
 
-      const lang = p.lang?.name || p.language || "Unknown";
+      let lang = p.lang?.name || p.language || "Unknown";
+      // Sanitise legacy entries where the slug (ext) is stored without a name
+      if (!lang || lang === "undefined" || lang === "null" || lang === "Solution") {
+        lang = p.lang?.ext ? p.lang.ext.toUpperCase() : "Unknown";
+      }
       s.langs[lang] = (s.langs[lang] || 0) + 1;
 
       const solvedDate = new Date((p.timestamp || 0) * 1000);
@@ -177,6 +182,12 @@ export function AnalyticsView({ problems }) {
     }
     s.currentStreak = streak;
     s.longestStreak = Math.max(maxStreak, tempStreak);
+
+    // Average solve time (only problems that have elapsedSeconds)
+    const timed = problems.filter(p => p.elapsedSeconds > 0);
+    if (timed.length > 0) {
+      s.avgSolveSeconds = Math.round(timed.reduce((acc, p) => acc + p.elapsedSeconds, 0) / timed.length);
+    }
 
     return s;
   }, [problems, userMap]);
@@ -289,7 +300,15 @@ export function AnalyticsView({ problems }) {
           { label: "Total Solved", value: stats.total, sub: `${stats.easy}E · ${stats.medium}M · ${stats.hard}H`, color: "#06b6d4" },
           { label: "Current Streak", value: `${stats.currentStreak}d`, sub: `Best: ${stats.longestStreak} days`, color: "#10b981" },
           { label: "This Week", value: stats.thisWeek, sub: `${stats.thisMonth} this month`, color: "#f59e0b" },
-          { label: "Languages", value: Object.keys(stats.langs).length, sub: Object.entries(stats.langs).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([l])=>l).join(", ") || "—", color: "#8b5cf6" },
+          stats.avgSolveSeconds > 0
+            ? (() => {
+                const h = Math.floor(stats.avgSolveSeconds / 3600);
+                const m = Math.floor((stats.avgSolveSeconds % 3600) / 60);
+                const s2 = stats.avgSolveSeconds % 60;
+                const val = h > 0 ? `${h}h${m}m` : m > 0 ? `${m}m${s2}s` : `${s2}s`;
+                return { label: "Avg Solve Time", value: val, sub: "avg across timed problems", color: "#ec4899" };
+              })()
+            : { label: "Languages", value: Object.keys(stats.langs).length, sub: Object.entries(stats.langs).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([l])=>l).join(", ") || "—", color: "#8b5cf6" },
         ].map(card => html`
           <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-1 relative overflow-hidden">
             <div class="absolute inset-0 opacity-5" style=${{ background: `radial-gradient(circle at 0% 0%, ${card.color}, transparent 60%)` }}></div>
@@ -334,22 +353,24 @@ export function AnalyticsView({ problems }) {
           <${HeatMap} problems=${problems} />
         </div>
 
-        <div class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4 relative overflow-hidden h-64">
+        <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 relative overflow-hidden">
           <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(6,182,212,0.05),transparent)] pointer-events-none"></div>
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest z-10">Difficulty Split</h3>
-          <div class="flex-1 flex justify-center items-center z-10 relative">
+          <div class="relative z-10" style="height:180px">
             <${ChartWrapper}
               type="doughnut"
               data=${chartData.difficultyDonut}
               options=${{
-                cutout: "75%",
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: "72%",
                 plugins: {
-                  legend: { position: "bottom", labels: { color: "#94a3b8", padding: 15, usePointStyle: true, boxWidth: 6 } },
+                  legend: { position: "bottom", labels: { color: "#94a3b8", padding: 12, usePointStyle: true, boxWidth: 6, font: { size: 10 } } },
                 },
               }}
             />
-            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-6">
-              <span class="text-3xl font-bold text-white">${stats.total}</span>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style="padding-bottom:36px">
+              <span class="text-2xl font-bold text-white">${stats.total}</span>
               <span class="text-[10px] text-slate-500 uppercase tracking-wider">Solved</span>
             </div>
           </div>
@@ -462,11 +483,11 @@ export function AnalyticsView({ problems }) {
               `)
             }
             <a
-              href="https://leetcode.com/studyplan/top-interview-150/"
+              href="https://neetcode.io/practice?tab=neetcode75"
               target="_blank"
               rel="noreferrer"
               class="text-[11px] text-slate-500 hover:text-cyan-400 text-center mt-1 transition-colors"
-            >View full study plan ↗</a>
+            >View full Blind 75 list ↗</a>
           </div>
         </div>
       </div>

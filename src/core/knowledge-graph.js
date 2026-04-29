@@ -13,7 +13,7 @@
  * Edge types:
  *   - "topic-problem" : problem belongs to this topic
  *   - "similar"       : two problems are marked as similar (from LeetCode metadata)
- *   - "canonical"     : two problems map to the same canonical problem
+ *   - "canonical"     : two problems map to the same canonical problem (cross-platform)
  */
 
 const DIFFICULTY_COLOR = {
@@ -22,10 +22,32 @@ const DIFFICULTY_COLOR = {
   Hard:   "#ef4444",
 };
 
+const PLATFORM_COLOR = {
+  leetcode:      "#FFA116",
+  geeksforgeeks: "#2F8D46",
+  codeforces:    "#1F8ACB",
+};
+
 const TOPIC_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#14b8a6",
   "#0ea5e9", "#84cc16", "#a16207", "#dc2626", "#7c3aed",
 ];
+
+/** Blend two hex colors by averaging their RGB channels. */
+function blendColors(colorsArr) {
+  if (!colorsArr || colorsArr.length === 0) return "#64748b";
+  if (colorsArr.length === 1) return colorsArr[0];
+  let r = 0, g = 0, b = 0;
+  for (const hex of colorsArr) {
+    const n = parseInt((hex || "#64748b").replace("#", ""), 16);
+    r += (n >> 16) & 0xff;
+    g += (n >> 8) & 0xff;
+    b += n & 0xff;
+  }
+  const n = colorsArr.length;
+  const toHex = (v) => Math.round(v / n).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
 
 export function buildKnowledgeGraph(problems) {
   const nodes = new Map(); // id → node
@@ -54,43 +76,61 @@ export function buildKnowledgeGraph(problems) {
     }
     const node = nodes.get(id);
     node.count++;
-    node.size = 16 + Math.min(node.count * 2, 32); // grow with problem count
+    node.size = 16 + Math.min(node.count * 2, 32);
     return id;
   }
 
-  const slugToId = new Map(); // titleSlug → node id
+  // Track slug → node IDs (supports same problem on multiple platforms)
+  const slugToIds = new Map(); // titleSlug → Set<nodeId>
   const canonicalGroups = new Map(); // canonicalId → [node ids]
 
+  // First pass: create problem nodes
   for (const p of problems) {
     const id = `problem:${p.platform}:${p.titleSlug || p.id}`;
-    const topic = p.topic || p.tags?.[0] || "Uncategorized";
-    const topicId = ensureTopic(topic);
+
+    // Use ALL tags for topic edges — this is the key fix (was only using first tag)
+    const allTopics =
+      Array.isArray(p.tags) && p.tags.length > 0
+        ? p.tags
+        : [p.topic || "Uncategorized"];
+    const primaryTopic = allTopics[0];
+
+    // Determine node color: difficulty-based, but blended if solved on multiple platforms
+    const slug = p.titleSlug || String(p.id);
+    if (!slugToIds.has(slug)) slugToIds.set(slug, new Set());
+    slugToIds.get(slug).add(id);
 
     nodes.set(id, {
       id,
       type: "problem",
       label: p.title || p.titleSlug || String(p.id),
+      // Color is difficulty-based; platform tint applied in GraphView rendering
       color: DIFFICULTY_COLOR[p.difficulty] || "#64748b",
+      platformColor: PLATFORM_COLOR[p.platform] || "#64748b",
       size: 10,
       platform: p.platform,
       difficulty: p.difficulty,
-      topic,
-      titleSlug: p.titleSlug,
+      topic: primaryTopic,
+      topics: allTopics,
+      titleSlug: slug,
       solved: true,
+      platforms: [p.platform],
       // Rich metadata for the info panel
       runtime: p.runtime || null,
       memory: p.memory || null,
       lang: p.lang?.name || p.language || null,
       timestamp: p.timestamp || null,
-      tags: Array.isArray(p.tags) ? p.tags : [],
+      tags: allTopics,
       acRate: p.acRate || null,
       runtimePct: p.runtimePct || null,
       memoryPct: p.memoryPct || null,
     });
 
-    if (p.titleSlug) slugToId.set(p.titleSlug, id);
-
-    edges.push({ source: topicId, target: id, type: "topic-problem" });
+    // Create edges for ALL topics (not just the first one)
+    for (const topic of allTopics) {
+      const topicId = ensureTopic(topic);
+      edges.push({ source: topicId, target: id, type: "topic-problem" });
+    }
 
     // Canonical grouping
     if (p.canonical?.id) {
@@ -105,29 +145,65 @@ export function buildKnowledgeGraph(problems) {
         if (!sim.titleSlug) continue;
         const simId = `problem:leetcode:${sim.titleSlug}`;
         if (!nodes.has(simId)) {
+          const simTopics =
+            Array.isArray(sim.topicTags) && sim.topicTags.length > 0
+              ? sim.topicTags.map((t) => t.name || t)
+              : [sim.topic || primaryTopic];
           nodes.set(simId, {
             id: simId,
             type: "problem",
             label: sim.title || sim.titleSlug,
             color: DIFFICULTY_COLOR[sim.difficulty] || "#64748b",
+            platformColor: PLATFORM_COLOR.leetcode,
             size: 8,
             platform: "leetcode",
             difficulty: sim.difficulty,
-            topic: sim.topic || topic,
+            topic: simTopics[0],
+            topics: simTopics,
             titleSlug: sim.titleSlug,
             solved: false,
+            platforms: [],
+            tags: simTopics,
           });
-          slugToId.set(sim.titleSlug, simId);
-          // Link to same topic
-          const simTopicId = ensureTopic(sim.topic || topic);
-          edges.push({ source: simTopicId, target: simId, type: "topic-problem" });
+          if (!slugToIds.has(sim.titleSlug)) slugToIds.set(sim.titleSlug, new Set());
+          slugToIds.get(sim.titleSlug).add(simId);
+          for (const t of simTopics) {
+            const tid = ensureTopic(t);
+            edges.push({ source: tid, target: simId, type: "topic-problem" });
+          }
         }
         edges.push({ source: id, target: simId, type: "similar" });
       }
     }
   }
 
-  // Canonical cross-platform edges
+  // Second pass: detect cross-platform duplicates (same titleSlug, different platforms)
+  // Merge their platform lists and blend colors to show multi-platform status
+  for (const [, idSet] of slugToIds) {
+    if (idSet.size <= 1) continue;
+    const ids = [...idSet];
+    const allPlatforms = ids
+      .map((id) => nodes.get(id)?.platform)
+      .filter(Boolean);
+    const blended = blendColors(allPlatforms.map((pl) => PLATFORM_COLOR[pl] || "#64748b"));
+
+    for (const id of ids) {
+      const node = nodes.get(id);
+      if (!node) continue;
+      node.platforms = allPlatforms;
+      node.isMultiPlatform = true;
+      // Use blended platform color as accent; difficulty color stays as base
+      node.platformColor = blended;
+      // Add canonical cross-platform edges
+      for (const other of ids) {
+        if (other !== id) {
+          edges.push({ source: id, target: other, type: "canonical" });
+        }
+      }
+    }
+  }
+
+  // Canonical cross-platform edges from metadata
   for (const [, group] of canonicalGroups) {
     for (let i = 0; i < group.length - 1; i++) {
       edges.push({ source: group[i], target: group[i + 1], type: "canonical" });
@@ -140,4 +216,4 @@ export function buildKnowledgeGraph(problems) {
   };
 }
 
-export { DIFFICULTY_COLOR, TOPIC_COLORS };
+export { DIFFICULTY_COLOR, TOPIC_COLORS, PLATFORM_COLOR };

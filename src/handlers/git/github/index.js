@@ -7,6 +7,7 @@
 import { BaseGitHandler } from "../../_base/BaseGitHandler.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
+import { getPagesHtml, getActionsWorkflow } from "./pages-template.js";
 
 export class GitHubHandler extends BaseGitHandler {
   constructor() {
@@ -46,15 +47,28 @@ export class GitHubHandler extends BaseGitHandler {
             "Leave blank to use your personal account. Set to an org login to commit to an org repo.",
           advanced: true,
         },
+        {
+          key: "github_pages",
+          label: "Enable GitHub Pages",
+          type: "toggle",
+          default: true,
+          description:
+            "Serve a public stats page at {owner}.github.io/{repo}/ — enabled automatically when creating a new repo.",
+          advanced: true,
+        },
       ],
     };
   }
 
   /**
    * Performs an atomic commit using the GitHub Trees API.
-   * Maintains index.json and automatically generates a dynamic README.
+   * @param {Array<{path: string, content: string}>} files
+   * @param {string} message
+   * @param {string} [repoName]
+   * @param {{ date?: string|number|Date }} [opts]  Optional commit options.
+   *   date — ISO string or timestamp for a backdated commit (uses author/committer date).
    */
-  async commit(files, message, repoName) {
+  async commit(files, message, repoName, opts = {}) {
     const token = await this.getToken();
     if (!token) throw new Error("Not authenticated with GitHub");
 
@@ -62,14 +76,14 @@ export class GitHubHandler extends BaseGitHandler {
     const settings = await Storage.getSettings();
     const userRes = await this.apiFetch("/user", token);
     const owner = settings["github_owner"]?.trim() || userRes.login;
-    const name =
-      repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME;
+    const name = (
+      repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME
+    ).replace(/\s+/g, "-");
     const branch = CONSTANTS.REPO_BRANCH || "main";
 
     // 2. Ensure repository exists and get the latest commit SHA.
-    //    Use the singular /git/ref/ endpoint — /git/refs/ (plural) returns an
-    //    array which has no .object property and silently breaks the commit.
     let latestCommitSha;
+    let isNewRepo = false;
     try {
       const refRes = await this.apiFetch(
         `/repos/${owner}/${name}/git/ref/heads/${branch}`,
@@ -78,7 +92,7 @@ export class GitHubHandler extends BaseGitHandler {
       latestCommitSha = refRes.object.sha;
     } catch (err) {
       if (err.status === 404) {
-        this.dbg.log("Repo/branch not found. Creating repository...");
+        this.dbg.log("Repo/branch not found. Creating repository…");
         try {
           await this.apiFetch("/user/repos", token, {
             method: "POST",
@@ -90,6 +104,7 @@ export class GitHubHandler extends BaseGitHandler {
               auto_init: true,
             }),
           });
+          isNewRepo = true;
           // Give GitHub time to initialize the default branch
           await new Promise((resolve) => setTimeout(resolve, 3000));
           const refRes = await this.apiFetch(
@@ -97,6 +112,13 @@ export class GitHubHandler extends BaseGitHandler {
             token,
           );
           latestCommitSha = refRes.object.sha;
+
+          // Enable GitHub Pages on new repos (best-effort; may fail on free private repos)
+          if (settings["github_pages"] !== false) {
+            this._enablePages(owner, name, branch, token).catch((e) =>
+              this.dbg.warn("GitHub Pages enable failed (non-fatal):", e.message),
+            );
+          }
         } catch (createErr) {
           throw new Error(`Failed to create repository: ${createErr.message}`);
         }
@@ -112,26 +134,7 @@ export class GitHubHandler extends BaseGitHandler {
     );
     const baseTreeSha = commitObj?.tree?.sha || null;
 
-    // 4. Optionally read existing index.json
-    let indexJson = null;
-    try {
-      const indexRes = await this.apiFetch(
-        `/repos/${owner}/${name}/contents/index.json?ref=${branch}`,
-        token,
-      );
-      if (indexRes && indexRes.content) {
-        try {
-          const decoded = atob(indexRes.content);
-          indexJson = JSON.parse(decoded);
-        } catch (e) {
-          this.dbg.warn("Failed to decode existing index.json");
-        }
-      }
-    } catch (e) {
-      this.dbg.log("No index.json found, starting fresh.");
-    }
-
-    // 5. Prepare tree items
+    // 4. Build tree items — include solution files + index.html on new repos
     const treeItems = files.map((f) => ({
       path: f.path,
       mode: "100644",
@@ -139,7 +142,23 @@ export class GitHubHandler extends BaseGitHandler {
       content: f.content,
     }));
 
-    // 6. Create tree using base_tree = baseTreeSha
+    if (isNewRepo) {
+      treeItems.push({
+        path: "index.html",
+        mode: "100644",
+        type: "blob",
+        content: getPagesHtml(),
+      });
+      // GitHub Actions workflow: updates README with stats on every push
+      treeItems.push({
+        path: ".github/workflows/update-stats.yml",
+        mode: "100644",
+        type: "blob",
+        content: getActionsWorkflow(),
+      });
+    }
+
+    // 5. Create tree
     const treeRes = await this.apiFetch(
       `/repos/${owner}/${name}/git/trees`,
       token,
@@ -149,31 +168,61 @@ export class GitHubHandler extends BaseGitHandler {
       },
     );
 
-    // 7. Create commit
+    // 6. Create commit — optionally backdated via opts.date
+    const commitPayload = {
+      message,
+      tree: treeRes.sha,
+      parents: [latestCommitSha],
+    };
+
+    if (opts.date) {
+      const iso = new Date(opts.date).toISOString();
+      const authorName = userRes.name || userRes.login;
+      const authorEmail =
+        userRes.email ||
+        `${userRes.login}@users.noreply.github.com`;
+      commitPayload.author = { name: authorName, email: authorEmail, date: iso };
+      commitPayload.committer = { ...commitPayload.author };
+    }
+
     const commitRes = await this.apiFetch(
       `/repos/${owner}/${name}/git/commits`,
       token,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          message,
-          tree: treeRes.sha,
-          parents: [latestCommitSha],
-        }),
-      },
+      { method: "POST", body: JSON.stringify(commitPayload) },
     );
 
-    // 8. Update branch ref to point to new commit
+    // 7. Update branch ref
     await this.apiFetch(
       `/repos/${owner}/${name}/git/refs/heads/${branch}`,
       token,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ sha: commitRes.sha }),
-      },
+      { method: "PATCH", body: JSON.stringify({ sha: commitRes.sha }) },
     );
 
     this.dbg.log("Atomic commit successful");
+  }
+
+  /**
+   * Commits multiple historical solves with individual backdated timestamps.
+   * Each problem gets its own commit ordered by solve date.
+   * @param {Array<{files: Array, message: string, date: string|number, repoName?: string}>} commits
+   */
+  async commitHistorical(commits) {
+    if (!commits || !commits.length) return;
+    const sorted = [...commits].sort((a, b) => new Date(a.date) - new Date(b.date));
+    for (const entry of sorted) {
+      await this.commit(entry.files, entry.message, entry.repoName, {
+        date: entry.date,
+      });
+    }
+  }
+
+  /** Enables GitHub Pages on the given repo (serves from branch root). */
+  async _enablePages(owner, name, branch, token) {
+    await this.apiFetch(`/repos/${owner}/${name}/pages`, token, {
+      method: "POST",
+      body: JSON.stringify({ source: { branch, path: "/" } }),
+    });
+    this.dbg.log("GitHub Pages enabled:", `https://${owner}.github.io/${name}/`);
   }
 
   async apiFetch(url, token, options = {}) {
@@ -182,12 +231,11 @@ export class GitHubHandler extends BaseGitHandler {
       : `${CONSTANTS.GIT_PROVIDERS.github.apiBase}${url}`;
     const method = (options.method || "GET").toUpperCase();
     const headers = {
-      Authorization: `token ${token}`,
+      Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github.v3+json",
       ...(options.headers || {}),
     };
 
-    // Ensure JSON Content-Type for requests with a body unless explicitly provided
     if (["POST", "PATCH", "PUT"].includes(method) && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json";
     }
@@ -203,7 +251,6 @@ export class GitHubHandler extends BaseGitHandler {
       throw err;
     }
 
-    // Some endpoints return empty body (204). Handle gracefully.
     const txt = await res.text();
     try {
       return txt ? JSON.parse(txt) : {};

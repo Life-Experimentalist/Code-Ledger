@@ -10,7 +10,7 @@ const dbg = createDebugger('GitEngine');
 
 export const GitEngine = {
   async commitSolve(problemContext, code, settings) {
-    if (!settings.gitEnabled) return;
+    if (settings.gitEnabled === false || settings.gitEnabled === 0) return;
     dbg.log('Processing atomic commit request via GitEngine');
 
     const providerId = settings.gitProvider || 'github';
@@ -29,8 +29,8 @@ export const GitEngine = {
 
       await gitHandler.commit([
         { path: filePath, content: code }
-      ], `[${topicFolder}] Solved ${problemContext.title}`, settings.gitRepo);
-      
+      ], `[${topicFolder}] Solved ${problemContext.title}`, settings.github_repo || settings.gitRepo);
+
       dbg.log('Commit completed via GitEngine');
     } catch (e) {
       dbg.error('Git engine commit failure', e);

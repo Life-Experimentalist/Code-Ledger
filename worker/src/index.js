@@ -35,11 +35,11 @@ app.options("*", (c) => new Response(null, { status: 204, headers: CORS_HEADERS 
 
 function env(c, key) {
   const aliases = {
-    GH_CLIENT_ID:     ["CODELEDGER_GH_APP_CLIENT_ID",     "GITHUB_CLIENT_ID"],
-    GH_CLIENT_SECRET: ["CODELEDGER_GH_APP_CLIENT_SECRET",  "GITHUB_CLIENT_SECRET"],
-    GH_APP_KEY:       ["CODELEDGER_GH_APP_PRIVATE_KEY",    "GITHUB_APP_PRIVATE_KEY"],
-    GH_APP_ID:        ["CODELEDGER_GH_APP_ID",             "GITHUB_APP_ID"],
-    GH_WEBHOOK_SECRET:["CODELEDGER_GH_APP_WEBHOOK_SECRET", "GITHUB_APP_WEBHOOK_SECRET"],
+    GH_CLIENT_ID: ["CODELEDGER_GH_APP_CLIENT_ID", "GITHUB_CLIENT_ID"],
+    GH_CLIENT_SECRET: ["CODELEDGER_GH_APP_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"],
+    GH_APP_KEY: ["CODELEDGER_GH_APP_PRIVATE_KEY", "GITHUB_APP_PRIVATE_KEY"],
+    GH_APP_ID: ["CODELEDGER_GH_APP_ID", "GITHUB_APP_ID"],
+    GH_WEBHOOK_SECRET: ["CODELEDGER_GH_APP_WEBHOOK_SECRET", "GITHUB_APP_WEBHOOK_SECRET"],
   };
   const names = aliases[key] || [key];
   for (const name of names) {
@@ -86,8 +86,8 @@ function pemToArrayBuffer(pem) {
   ]);
   const encLen = (n) =>
     n < 128 ? new Uint8Array([n])
-    : n < 256 ? new Uint8Array([0x81, n])
-    : new Uint8Array([0x82, (n >> 8) & 0xff, n & 0xff]);
+      : n < 256 ? new Uint8Array([0x81, n])
+        : new Uint8Array([0x82, (n >> 8) & 0xff, n & 0xff]);
   const concat = (...arrs) => {
     const out = new Uint8Array(arrs.reduce((s, a) => s + a.length, 0));
     let off = 0;
@@ -201,7 +201,11 @@ app.get("/api/auth/:provider", (c) => {
     const clientId = env(c, "GH_CLIENT_ID");
     if (!clientId) return c.text("GitHub OAuth not configured — set CODELEDGER_GH_APP_CLIENT_ID", 400);
     const redirectUri = `${origin}/api/auth/github/callback`;
-    const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo`;
+    // Scopes needed:
+    // - repo: Create repos, push commits, manage Pages
+    // - workflow: Create GitHub Actions workflows
+    // - user: Read user profile info
+    const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,workflow,user&allow_signup=true`;
     return c.redirect(url);
   }
 
@@ -273,7 +277,7 @@ app.get("/api/data/canonical-map.json", async (c) => {
       const v = await kv.get("canonical-map");
       if (v) return new Response(v, { status: 200, headers });
     }
-  } catch (_) {}
+  } catch (_) { }
   try {
     const res = await fetch(
       "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/data/canonical-map.json"
@@ -321,7 +325,7 @@ app.get("/*", async (c) => {
     try {
       const res = await c.env.ASSETS.fetch(c.req.raw);
       if (res.status !== 404) return res;
-    } catch (_) {}
+    } catch (_) { }
   }
   return c.notFound();
 });

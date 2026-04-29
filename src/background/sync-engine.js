@@ -12,7 +12,7 @@ export const SyncEngine = {
   async performSync() {
     dbg.log('Initiating periodic cross-browser sync');
     const settings = await Storage.getSettings();
-    if (!settings.gitEnabled) return;
+    if (settings.gitEnabled === false || settings.gitEnabled === 0) return;
 
     // The synchronization pulls `index.json` from the Git repository 
     // and converges it with local IndexedDB records to maintain state across browsers.

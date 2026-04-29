@@ -7,14 +7,15 @@ import { createDebugger } from '../../../lib/debug.js';
 const dbg = createDebugger('LeetCodePageDetector');
 
 export const PAGE_TYPES = {
-  PROBLEM:     'problem',
-  SUBMISSION:  'submission',
-  CONTEST:     'contest',
-  EXPLORE:     'explore',
-  DISCUSS:     'discuss',
-  PROFILE:     'profile',
-  HOME:        'home',
-  UNKNOWN:     'unknown',
+  PROBLEM:          'problem',
+  SUBMISSION:       'submission',
+  SUBMISSION_LIST:  'submission_list',  // /problems/{slug}/submissions/ (no specific ID)
+  CONTEST:          'contest',
+  EXPLORE:          'explore',
+  DISCUSS:          'discuss',
+  PROFILE:          'profile',
+  HOME:             'home',
+  UNKNOWN:          'unknown',
 };
 
 export function detectPage(pathname) {
@@ -25,6 +26,12 @@ export function detectPage(pathname) {
   const problemSubmissionMatch = clean.match(/^\/problems\/([^/]+)\/submissions\/(\d+)/);
   if (problemSubmissionMatch) {
     return { type: PAGE_TYPES.SUBMISSION, slug: problemSubmissionMatch[1], submissionId: problemSubmissionMatch[2] };
+  }
+
+  // Submission list: /problems/{slug}/submissions/ (no numeric ID)
+  const submissionListMatch = clean.match(/^\/problems\/([^/]+)\/submissions\/?$/);
+  if (submissionListMatch) {
+    return { type: PAGE_TYPES.SUBMISSION_LIST, slug: submissionListMatch[1] };
   }
 
   const problemMatch = clean.match(/^\/problems\/([^/]+)/);

@@ -6,7 +6,8 @@
 import { h, useState, useEffect, useRef, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
-import { buildKnowledgeGraph, DIFFICULTY_COLOR } from "../../core/knowledge-graph.js";
+import { buildKnowledgeGraph, DIFFICULTY_COLOR, PLATFORM_COLOR } from "../../core/knowledge-graph.js";
+import { ProblemModal } from "../components/ProblemModal.js";
 
 /* ── Force simulation constants ─────────────────────────────────────── */
 const REPULSION   = 3000;
@@ -107,7 +108,13 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     } else if (n.solved) {
       ctx.fillStyle = n.color;
       ctx.fill();
-      if (isSel) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
+      // Platform color ring — blended for multi-platform solves
+      const ringColor = n.platformColor || PLATFORM_COLOR[n.platform] || "#64748b";
+      ctx.strokeStyle = isSel ? "#fff" : ringColor;
+      ctx.lineWidth = isSel ? 2.5 : n.isMultiPlatform ? 2.5 : 1.5;
+      ctx.globalAlpha = isSel ? 1 : 0.85;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     } else {
       // Unsolved ghost node
       ctx.fillStyle = n.color + "22";
@@ -149,15 +156,24 @@ function hitTest(nodes, mx, my, transform) {
   return null;
 }
 
+/* ── Favicon map for hover tooltip ──────────────────────────────────── */
+const PLATFORM_FAVICON = {
+  leetcode:      "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+  geeksforgeeks: "https://www.geeksforgeeks.org/favicon.ico",
+  codeforces:    "https://codeforces.com/favicon.ico",
+};
+
 /* ── Component ───────────────────────────────────────────────────────── */
 export function GraphView({ problems }) {
-  const canvasRef   = useRef(null);
-  const simRef      = useRef({ nodes: [], edges: [], alpha: 1, raf: null });
+  const canvasRef    = useRef(null);
+  const simRef       = useRef({ nodes: [], edges: [], alpha: 1, raf: null });
   const transformRef = useRef({ tx: 0, ty: 0, scale: 1 });
-  const dragRef     = useRef(null);
-  const [hovered,  setHovered]  = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [filterSolved, setFilterSolved] = useState(false);
+  const dragRef      = useRef(null);
+  const [hovered,       setHovered]       = useState(null);
+  const [mousePos,      setMousePos]      = useState({ x: 0, y: 0 });
+  const [selected,      setSelected]      = useState(null);
+  const [modalProblem,  setModalProblem]  = useState(null);
+  const [filterSolved, setFilterSolved]   = useState(false);
 
   // Build graph whenever problems change
   useEffect(() => {
@@ -244,6 +260,7 @@ export function GraphView({ problems }) {
 
     const hit = hitTest(simRef.current.nodes, mx, my, transformRef.current);
     setHovered(hit);
+    setMousePos({ x: e.clientX, y: e.clientY });
     canvas.style.cursor = hit ? "pointer" : "grab";
   }, []);
 
@@ -291,6 +308,75 @@ export function GraphView({ problems }) {
   const solvedCount  = simRef.current.nodes.filter((n) => n.type === "problem" && n.solved).length;
   const similarCount = simRef.current.nodes.filter((n) => n.type === "problem" && !n.solved).length;
 
+  /* ── Problem URL helper ─────────────────────────────────── */
+  function problemUrl(node) {
+    if (!node?.titleSlug) return null;
+    if (node.platform === "geeksforgeeks") return `https://practice.geeksforgeeks.org/problems/${node.titleSlug}`;
+    if (node.platform === "codeforces")    return `https://codeforces.com/problemset/problem/${node.titleSlug}`;
+    return `https://leetcode.com/problems/${node.titleSlug}/`;
+  }
+
+  /* ── Shared node detail renderer (used by hover tooltip and selected panel) */
+  function NodeDetail({ node, compact = false }) {
+    if (!node) return null;
+    if (node.type === "topic") return html`
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-center gap-2 text-xs font-bold text-white">${node.label}</div>
+        <div class="text-[11px] text-slate-400">${node.count} problem${node.count !== 1 ? "s" : ""} solved</div>
+      </div>
+    `;
+    const url = problemUrl(node);
+    const favicon = PLATFORM_FAVICON[node.platform];
+    const diffClass = node.difficulty === "Easy" ? "bg-emerald-500/20 text-emerald-400"
+      : node.difficulty === "Medium" ? "bg-amber-500/20 text-amber-400"
+      : node.difficulty === "Hard" ? "bg-rose-500/20 text-rose-400"
+      : "bg-white/10 text-slate-400";
+    return html`
+      <div class="flex flex-col gap-2">
+        <!-- Title + platform -->
+        <div class="flex items-start gap-2">
+          ${favicon ? html`<img src=${favicon} class="w-3.5 h-3.5 mt-0.5 shrink-0 object-contain" alt="" onError=${(e) => { e.target.style.display='none'; }} />` : ""}
+          <span class="text-xs font-semibold text-white leading-snug">${node.label}</span>
+        </div>
+        <!-- Status + difficulty -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-medium ${diffClass}">${node.difficulty || "?"}</span>
+          <span class="text-[10px] ${node.solved ? "text-emerald-400" : "text-slate-600"}">${node.solved ? "✓ Solved" : "○ Suggested"}</span>
+          ${node.lang ? html`<span class="text-[10px] font-mono text-cyan-500/70">${node.lang}</span>` : ""}
+        </div>
+        ${!compact ? html`
+          <!-- Stats row -->
+          ${(node.runtime || node.memory || node.acRate) ? html`
+            <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+              ${node.runtime ? html`<span class="text-slate-500">Runtime</span><span class="text-slate-200 text-right">${node.runtime}${node.runtimePct ? html` <span class="text-cyan-500/60">· ${node.runtimePct.toFixed(0)}%</span>` : ""}</span>` : ""}
+              ${node.memory ? html`<span class="text-slate-500">Memory</span><span class="text-slate-200 text-right">${node.memory}${node.memoryPct ? html` <span class="text-cyan-500/60">· ${node.memoryPct.toFixed(0)}%</span>` : ""}</span>` : ""}
+              ${node.acRate ? html`<span class="text-slate-500">Accept rate</span><span class="text-slate-200 text-right">${node.acRate.toFixed(1)}%</span>` : ""}
+              ${node.timestamp ? html`<span class="text-slate-500">Solved</span><span class="text-slate-200 text-right">${new Date(node.timestamp * 1000).toLocaleDateString()}</span>` : ""}
+            </div>
+          ` : ""}
+          <!-- All topics/tags -->
+          ${node.tags?.length ? html`
+            <div class="flex flex-wrap gap-1 mt-0.5">
+              ${node.tags.map(t => html`
+                <span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] text-slate-400">${t}</span>
+              `)}
+            </div>
+          ` : ""}
+          <!-- Open link -->
+          ${url ? html`
+            <a href=${url} target="_blank" rel="noopener"
+               class="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 border-t border-white/5 pt-1.5 mt-0.5"
+               onClick=${(e) => e.stopPropagation()}
+            >
+              ${favicon ? html`<img src=${favicon} class="w-3 h-3 object-contain" alt="" onError=${(e) => { e.target.style.display='none'; }} />` : ""}
+              Open problem ↗
+            </a>
+          ` : ""}
+        ` : ""}
+      </div>
+    `;
+  }
+
   return html`
     <div class="flex flex-col gap-4 w-full h-full min-h-[600px]">
       <!-- Toolbar -->
@@ -323,10 +409,24 @@ export function GraphView({ problems }) {
 
         <!-- Legend -->
         <div class="absolute bottom-3 left-3 flex flex-col gap-1 text-[10px] text-slate-400 bg-black/60 backdrop-blur px-3 py-2 rounded-lg border border-white/5">
+          <div class="text-[9px] text-slate-600 uppercase tracking-wider mb-0.5">Difficulty</div>
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#22c55e] inline-block"></span>Easy</div>
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#f59e0b] inline-block"></span>Medium</div>
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#ef4444] inline-block"></span>Hard</div>
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full border border-dashed border-slate-400 inline-block"></span>Suggested</div>
+          <div class="text-[9px] text-slate-600 uppercase tracking-wider mt-1 mb-0.5">Platform (ring)</div>
+          <div class="flex items-center gap-2">
+            <img src="https://assets.leetcode.com/static_assets/public/icons/favicon.ico" class="w-3 h-3 object-contain" alt="" />
+            LeetCode
+          </div>
+          <div class="flex items-center gap-2">
+            <img src="https://www.geeksforgeeks.org/favicon.ico" class="w-3 h-3 object-contain" alt="" />
+            GFG
+          </div>
+          <div class="flex items-center gap-2">
+            <img src="https://codeforces.com/favicon.ico" class="w-3 h-3 object-contain" alt="" />
+            Codeforces
+          </div>
         </div>
 
         <!-- Empty state -->
@@ -336,84 +436,48 @@ export function GraphView({ problems }) {
           </div>
         `}
 
-        <!-- Selected node panel -->
+        <!-- Hover tooltip (follows cursor, shows brief info) — hidden when selected -->
+        ${hovered && !selected && html`
+          <div
+            class="pointer-events-none fixed z-50 bg-[#071018]/95 backdrop-blur border border-white/15 rounded-xl p-3 shadow-2xl w-52"
+            style=${{
+              left: `${mousePos.x + 14}px`,
+              top: `${mousePos.y - 10}px`,
+              transform: mousePos.x > window.innerWidth - 230 ? "translateX(-110%)" : "none",
+            }}
+          >
+            <${NodeDetail} node=${hovered} compact=${true} />
+            <p class="text-[9px] text-slate-600 mt-2">Click to pin details</p>
+          </div>
+        `}
+
+        <!-- Selected node panel (pinned, full details) -->
         ${selected && html`
-          <div class="absolute top-3 right-3 bg-[#071018]/95 backdrop-blur border border-white/10 rounded-xl p-4 text-sm w-56 shadow-2xl">
-            <button
-              onClick=${() => setSelected(null)}
-              class="absolute top-2 right-2 text-slate-500 hover:text-slate-300 text-xs leading-none"
-            >✕</button>
-            <div class="font-semibold text-white mb-2 pr-4 leading-snug">${selected.label}</div>
-            ${selected.type === "topic" ? html`
-              <div class="flex flex-col gap-1 text-xs text-slate-400">
-                <div class="flex items-center justify-between">
-                  <span>Problems solved</span>
-                  <span class="text-white font-mono">${selected.count}</span>
-                </div>
-              </div>
-            ` : html`
-              <div class="flex flex-col gap-1.5 text-[11px]">
-                <div class="flex items-center gap-2">
-                  <span class="px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                    selected.difficulty === "Easy" ? "bg-emerald-500/20 text-emerald-400"
-                    : selected.difficulty === "Medium" ? "bg-amber-500/20 text-amber-400"
-                    : selected.difficulty === "Hard" ? "bg-rose-500/20 text-rose-400"
-                    : "bg-white/10 text-slate-400"
-                  }">${selected.difficulty || "?"}</span>
-                  <span class="text-slate-500 capitalize">${selected.platform || "?"}</span>
-                  <span class="${selected.solved ? "text-emerald-400" : "text-slate-600"}">${selected.solved ? "✓ Solved" : "○ Unsolved"}</span>
-                </div>
-                ${selected.lang ? html`
-                  <div class="flex justify-between text-slate-400">
-                    <span>Language</span><span class="text-slate-200">${selected.lang}</span>
-                  </div>` : ""}
-                ${selected.runtime ? html`
-                  <div class="flex justify-between text-slate-400">
-                    <span>Runtime</span>
-                    <span class="text-slate-200">${selected.runtime}${selected.runtimePct ? html` <span class="text-cyan-500/70 text-[10px]">beats ${selected.runtimePct.toFixed(0)}%</span>` : ""}</span>
-                  </div>` : ""}
-                ${selected.memory ? html`
-                  <div class="flex justify-between text-slate-400">
-                    <span>Memory</span>
-                    <span class="text-slate-200">${selected.memory}${selected.memoryPct ? html` <span class="text-cyan-500/70 text-[10px]">beats ${selected.memoryPct.toFixed(0)}%</span>` : ""}</span>
-                  </div>` : ""}
-                ${selected.acRate ? html`
-                  <div class="flex justify-between text-slate-400">
-                    <span>Acceptance</span><span class="text-slate-200">${selected.acRate.toFixed(1)}%</span>
-                  </div>` : ""}
-                ${selected.timestamp ? html`
-                  <div class="flex justify-between text-slate-400">
-                    <span>Solved</span>
-                    <span class="text-slate-200">${new Date(selected.timestamp * 1000).toLocaleDateString()}</span>
-                  </div>` : ""}
-                ${selected.tags?.length ? html`
-                  <div class="flex flex-wrap gap-1 mt-1">
-                    ${selected.tags.slice(0, 4).map(t => html`
-                      <span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] text-slate-400">${t}</span>
-                    `)}
-                    ${selected.tags.length > 4 ? html`<span class="text-[9px] text-slate-600">+${selected.tags.length - 4}</span>` : ""}
-                  </div>` : ""}
-                ${selected.titleSlug ? html`
-                  <a
-                    href=${
-                      selected.platform === "geeksforgeeks"
-                        ? "https://practice.geeksforgeeks.org/problems/" + selected.titleSlug
-                        : selected.platform === "codeforces"
-                          ? "https://codeforces.com/problemset/problem/" + selected.titleSlug
-                          : "https://leetcode.com/problems/" + selected.titleSlug + "/"
-                    }
-                    target="_blank"
-                    rel="noopener"
-                    class="text-cyan-400 hover:text-cyan-300 text-[11px] mt-1 block border-t border-white/5 pt-1.5"
-                  >Open problem ↗</a>
-                ` : ""}
-              </div>
-            `}
+          <div class="absolute top-3 right-3 bg-[#071018]/97 backdrop-blur border border-cyan-500/20 rounded-xl p-4 w-64 shadow-2xl max-h-[80%] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3">
+              ${selected.type === "problem" && selected.solved ? html`
+                <button
+                  onClick=${() => setModalProblem(selected)}
+                  class="text-[10px] px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                >Expand ↗</button>
+              ` : html`<span></span>`}
+              <button
+                onClick=${() => setSelected(null)}
+                class="text-slate-500 hover:text-slate-300 text-xs leading-none px-1"
+              >✕</button>
+            </div>
+            <${NodeDetail} node=${selected} compact=${false} />
           </div>
         `}
       </div>
 
-      <p class="text-[10px] text-slate-600 text-center">Drag nodes · scroll to zoom · click to inspect · ↺ to re-layout</p>
+      <p class="text-[10px] text-slate-600 text-center">Drag nodes · scroll to zoom · hover to preview · click to pin · Expand for full details · ↺ to re-layout</p>
+
+      <!-- Full problem modal triggered from graph -->
+      <${ProblemModal}
+        problem=${modalProblem}
+        onClose=${() => setModalProblem(null)}
+      />
     </div>
   `;
 }

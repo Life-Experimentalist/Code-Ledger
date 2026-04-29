@@ -85,6 +85,7 @@
                 "ui/*",
                 "popup/*",
                 "sidebar/*",
+                "welcome/*",
                 "assets/*",
                 "content/*"
             ],

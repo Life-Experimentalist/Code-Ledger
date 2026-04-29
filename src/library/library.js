@@ -9,12 +9,16 @@ import { htm } from "../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "../core/storage.js";
+import { CONSTANTS } from "../core/constants.js";
 import { getQueryParam, updateQueryParams } from "../core/url-state.js";
 import { initializeHandlers } from "../handlers/init.js";
 import { ProblemsView } from "./views/ProblemsView.js";
 import { AnalyticsView } from "./views/AnalyticsView.js";
 import { GraphView } from "./views/GraphView.js";
 import { SettingsView } from "./views/SettingsView.js";
+import { CanonicalView } from "./views/CanonicalView.js";
+import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
+import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js";
 
 initializeHandlers();
 
@@ -22,10 +26,12 @@ function LibraryApp() {
   const [problems, setProblems] = useState([]);
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("archive");
+  const [activeTab, setActiveTab] = useState("solutions");
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [gitUser, setGitUser] = useState(null);
+  const [showGitHubOnboarding, setShowGitHubOnboarding] = useState(false);
+  const [onboardingData, setOnboardingData] = useState({ username: "", token: "" });
 
   useEffect(() => {
     let mounted = true;
@@ -36,16 +42,22 @@ function LibraryApp() {
         setSettings(s || {});
 
         // Resolve GitHub user for header display
-        const token = s?.github_token;
+        // Priority 1: OAuth token from auth.tokens (correct path after Connect)
+        // Priority 2: Manual PAT from settings (legacy support)
         Storage.getAuthToken("github").then((oauthToken) => {
-          const t = oauthToken || token;
-          if (!t || !mounted) return;
+          const token = oauthToken || s?.github_token;
+          if (!token || !mounted) return;
+          // Hydrate settings display with the OAuth token so SettingsSchema shows "Connected"
+          // (OAuth tokens are never persisted to settings storage — they live in auth.tokens)
+          if (oauthToken && !s?.github_token) {
+            setSettings((prev) => ({ ...prev, github_token: oauthToken }));
+          }
           fetch("https://api.github.com/user", {
-            headers: { Authorization: `token ${t}` },
+            headers: { Authorization: `Bearer ${token}` },
           })
             .then((r) => (r.ok ? r.json() : null))
             .then((u) => { if (u?.login && mounted) setGitUser(u.login); })
-            .catch(() => {});
+            .catch(() => { });
         });
       })
       .finally(() => mounted && setLoading(false));
@@ -56,13 +68,14 @@ function LibraryApp() {
     const tab = getQueryParam("tab", "");
     const q = getQueryParam("q", "");
     const allowed = new Set([
-      "archive",
+      "solutions", "archive",   // "archive" kept as alias for old URLs
       "analytics",
       "graph",
+      "canonical",
       "settings",
       "search",
     ]);
-    if (allowed.has(tab)) setActiveTab(tab);
+    if (allowed.has(tab)) setActiveTab(tab === "archive" ? "solutions" : tab);
     if (q) setSearchQuery(q);
   }, []);
 
@@ -73,23 +86,107 @@ function LibraryApp() {
     });
   }, [activeTab, searchQuery]);
 
+  // Listen for OAuth messages from Worker
+  useEffect(() => {
+    const handleOAuthMessage = async (event) => {
+      // Validate origin
+      const allowedOrigins = [
+        new URL(CONSTANTS.URLS.AUTH_WORKER).origin,
+        window.location.origin,
+      ];
+      if (event.origin !== "null" && !allowedOrigins.includes(event.origin)) {
+        return;
+      }
+
+      const data = event.data;
+      if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") {
+        return;
+      }
+
+      if (!data.token) {
+        console.error("[CodeLedger] OAuth error:", data.error);
+        return;
+      }
+
+      // Save token and get user info
+      try {
+        await Storage.setAuthToken("github", data.token);
+
+        const userRes = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `Bearer ${data.token}` },
+        });
+
+        if (!userRes.ok) throw new Error("Failed to fetch user");
+        const user = await userRes.json();
+
+        // Check if repo is already configured
+        const currentSettings = await Storage.getSettings();
+        const hasRepo = !!(currentSettings?.github_repo || currentSettings?.gitRepo);
+
+        // Show onboarding if no repo is configured
+        if (!hasRepo) {
+          setOnboardingData({ username: user.login, token: data.token });
+          setShowGitHubOnboarding(true);
+        }
+
+        // Update user display
+        setGitUser(user.login);
+        setSettings({ ...currentSettings });
+      } catch (e) {
+        console.error("[CodeLedger] OAuth handler error:", e);
+      }
+    };
+
+    window.addEventListener("message", handleOAuthMessage);
+    return () => window.removeEventListener("message", handleOAuthMessage);
+  }, []);
+
+  const handleOnboardingComplete = async () => {
+    setShowGitHubOnboarding(false);
+    // Refresh settings to reflect repo setup
+    const updated = await Storage.getSettings();
+    setSettings(updated || {});
+  };
+
   const navItems = [
-    { id: "archive", label: "Archive", icon: "📚" },
+    { id: "solutions", label: "Solutions", icon: "💡" },
     { id: "analytics", label: "Analytics", icon: "📈" },
     { id: "graph", label: "Graph", icon: "🔗" },
+    { id: "canonical", label: "Canonical", icon: "🔀" },
     { id: "settings", label: "Settings", icon: "⚙️" },
   ];
 
   const handleSettingsChange = async (key, value) => {
     const next = { ...(settings || {}), [key]: value };
-    setSettings(next);
-    try {
-      await Storage.setSettings(next);
-      if (key === "debugMode") {
-        await Storage.setDebugEnabled(value);
+
+    if (key === "incognitoMode") {
+      const durations = { "1h": 3600000, "4h": 14400000, "24h": 86400000 };
+      if (value === "off") {
+        next.incognitoExpiry = 0;
+      } else if (value === "forever") {
+        next.incognitoExpiry = -1;
+      } else if (durations[value]) {
+        next.incognitoExpiry = Date.now() + durations[value];
       }
-    } catch (e) {
-      // noop
+    }
+
+    // GitHub OAuth tokens should NOT be stored in settings — they belong in auth.tokens.
+    // Only update state locally for OAuth fields; actual token was saved by handleOAuth in SettingsSchema.
+    const isOAuthField = ["github_token", "gitlab_token", "bitbucket_token"].includes(key);
+
+    setSettings(next);
+
+    // Skip persisting OAuth tokens to settings (they live in auth.tokens).
+    // For other fields, save normally.
+    if (!isOAuthField) {
+      try {
+        await Storage.setSettings(next);
+        if (key === "debugMode") {
+          await Storage.setDebugEnabled(value);
+        }
+      } catch (e) {
+        // noop
+      }
     }
   };
 
@@ -102,22 +199,18 @@ function LibraryApp() {
       </p>`;
 
     if (activeTab === "search")
-      return html`<${ProblemsView}
-        problems=${problems}
-        searchQuery=${searchQuery}
-      />`;
+      return html`<${ProblemsView} problems=${problems} searchQuery=${searchQuery} />`;
 
-    if (activeTab === "archive")
+    if (activeTab === "solutions")
       return html`<${ProblemsView} problems=${problems} />`;
     if (activeTab === "analytics")
       return html`<${AnalyticsView} problems=${problems} />`;
     if (activeTab === "graph")
       return html`<${GraphView} problems=${problems} />`;
+    if (activeTab === "canonical")
+      return html`<${CanonicalView} problems=${problems} />`;
     if (activeTab === "settings")
-      return html`<${SettingsView}
-        settings=${settings}
-        onSettingsChange=${handleSettingsChange}
-      />`;
+      return html`<${SettingsView} settings=${settings} onSettingsChange=${handleSettingsChange} />`;
 
     return html`<p class="text-slate-400">Unknown view</p>`;
   };
@@ -175,31 +268,35 @@ function LibraryApp() {
         <div class="flex items-center gap-6">
           <div class="flex items-center gap-2">
             <div
-              class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+              class="w-2 h-2 rounded-full ${typeof chrome !== "undefined" && chrome.runtime?.id ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-slate-600"}"
             ></div>
             <span
-              class="text-xs font-mono uppercase tracking-widest text-emerald-500/80"
-              >Worker: Active</span
+              class="text-xs font-mono uppercase tracking-widest ${typeof chrome !== "undefined" && chrome.runtime?.id ? "text-emerald-500/80" : "text-slate-500"}"
+              >${typeof chrome !== "undefined" && chrome.runtime?.id ? "Extension" : "Web"}</span
             >
           </div>
           <div class="h-4 w-px bg-white/10"></div>
           <div class="flex items-center gap-3">
             ${gitUser
-              ? html`
+      ? html`
                   <div class="flex items-center gap-2">
                     <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
                     <span class="text-xs font-mono text-emerald-500/80">${gitUser}</span>
-                    ${settings.gitRepo
-                      ? html`<a
-                          href=${"https://github.com/" + gitUser + "/" + settings.gitRepo}
-                          target="_blank"
-                          rel="noreferrer"
-                          class="text-xs text-slate-400 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 px-2 py-0.5 rounded transition-colors"
-                        >Repo ↗</a>`
-                      : ""}
+                    ${(settings.github_repo || settings.gitRepo)
+          ? (() => {
+            const owner = settings.github_owner?.trim() || settings.github_username || gitUser;
+            const repoUrl = owner ? `https://github.com/${owner}/${settings.github_repo || settings.gitRepo}` : null;
+            return repoUrl ? html`<a
+                            href=${repoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            class="text-xs text-slate-400 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 px-2 py-0.5 rounded transition-colors"
+                          >Repo ↗</a>` : "";
+          })()
+          : ""}
                   </div>
                 `
-              : html`<a
+      : html`<a
                   onClick=${(e) => { e.preventDefault(); setActiveTab("settings"); }}
                   href="#"
                   class="text-xs text-slate-400 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 px-2 py-1 rounded transition-colors"
@@ -221,29 +318,29 @@ function LibraryApp() {
             </p>
             <nav class="space-y-1">
               ${navItems.map(
-                (item) => html`
+        (item) => html`
                   <a
                     href="#"
                     onClick=${(e) => {
-                      e.preventDefault();
-                      setActiveTab(item.id);
-                    }}
+            e.preventDefault();
+            setActiveTab(item.id);
+          }}
                     class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab ===
-                    item.id
-                      ? "bg-cyan-500/5 text-cyan-400 border border-cyan-500/20"
-                      : "hover:bg-white/5 text-slate-400 border border-transparent"}"
+            item.id
+            ? "bg-cyan-500/5 text-cyan-400 border border-cyan-500/20"
+            : "hover:bg-white/5 text-slate-400 border border-transparent"}"
                   >
                     <span class="text-sm font-medium w-6 text-center"
                       >${item.icon}</span
                     >
                     ${!sidebarCollapsed
-                      ? html`<span class="text-sm font-medium"
+            ? html`<span class="text-sm font-medium"
                           >${item.label}</span
                         >`
-                      : ""}
+            : ""}
                   </a>
                 `,
-              )}
+      )}
             </nav>
           </div>
 
@@ -252,7 +349,7 @@ function LibraryApp() {
               class="p-3 rounded-xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5"
             >
               ${!sidebarCollapsed
-                ? html`
+      ? html`
                     <div class="flex items-center justify-between mb-2">
                       <span
                         class="text-[10px] uppercase tracking-wider text-slate-500"
@@ -268,8 +365,8 @@ function LibraryApp() {
                       <div
                         class="h-full bg-cyan-500"
                         style=${{
-                          width: `${Math.min(100, Math.max(5, (problems.length / 200) * 100))}%`,
-                        }}
+          width: `${Math.min(100, Math.max(5, (problems.length / 200) * 100))}%`,
+        }}
                       ></div>
                     </div>
                     <p
@@ -278,7 +375,7 @@ function LibraryApp() {
                       Local IndexedDB Vault
                     </p>
                   `
-                : html`<div class="text-center text-[10px] text-slate-400">
+      : html`<div class="text-center text-[10px] text-slate-400">
                     ${problems.length}
                   </div>`}
             </div>
@@ -286,9 +383,26 @@ function LibraryApp() {
         </aside>
 
         <div class="flex-1 bg-[#050508] p-6 overflow-y-auto">
+          ${(() => {
+      const mode = settings.incognitoMode;
+      const expiry = settings.incognitoExpiry ?? 0;
+      const active = mode && mode !== "off" && mode !== false &&
+        (mode === "forever" || mode === true || expiry === -1 || (expiry > 0 && Date.now() < expiry));
+      return active ? html`<${IncognitoBanner}
+              settings=${settings}
+              onDisable=${() => handleSettingsChange("incognitoMode", "off")}
+            />` : "";
+    })()}
           ${renderActiveView()}
         </div>
       </main>
+
+      <${GitHubOnboardingModal}
+        isOpen=${showGitHubOnboarding}
+        onComplete=${handleOnboardingComplete}
+        username=${onboardingData.username}
+        token=${onboardingData.token}
+      />
     </div>
   `;
 }

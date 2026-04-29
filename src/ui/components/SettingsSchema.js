@@ -27,6 +27,169 @@ import {
 } from "../../core/ai-prompts.js";
 const html = htm.bind(h);
 
+// ── Backup / Restore helpers (rendered at bottom of git tab) ──────────────────
+
+async function _exportData() {
+  const [problems, settings] = await Promise.all([
+    Storage.getAllProblems(),
+    Storage.getSettings(),
+  ]);
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    problems: problems || [],
+    settings: settings || {},
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `codeledger-backup-${new Date().toISOString().split("T")[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  return (problems || []).length;
+}
+
+async function _importData(file) {
+  const text = await file.text();
+  const data = JSON.parse(text);
+  if (!data.problems || !Array.isArray(data.problems)) {
+    throw new Error("Invalid backup file: missing problems array");
+  }
+  for (const p of data.problems) await Storage.saveProblem(p);
+  return data.problems.length;
+}
+
+function BackupRestorePanel() {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const doExport = async () => {
+    setBusy(true);
+    setStatus("");
+    try {
+      const count = await _exportData();
+      setStatus(`Exported ${count} problems successfully.`);
+    } catch (e) {
+      setStatus(`Export failed: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const count = await _importData(file);
+      setStatus(`Imported ${count} problems. Reload to see them.`);
+    } catch (err) {
+      setStatus(`Import failed: ${err.message}`);
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+
+  return html`
+    <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5">
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Backup &amp; Restore</h3>
+      <p class="text-[11px] text-slate-500 mb-4">Export all solved problems and settings to a JSON file, or restore from a previous backup.</p>
+      <div class="flex flex-wrap gap-3 items-center">
+        <button
+          onClick=${doExport}
+          disabled=${busy}
+          class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >${busy ? "Working…" : "Export backup"}</button>
+        <label class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg cursor-pointer transition-colors ${busy ? "opacity-50 pointer-events-none" : ""}">
+          Import backup
+          <input type="file" accept=".json,application/json" class="sr-only" onChange=${doImport} disabled=${busy} />
+        </label>
+      </div>
+      ${status ? html`<p class="mt-3 text-xs ${status.includes("failed") ? "text-rose-400" : "text-emerald-400"}">${status}</p>` : ""}
+    </div>
+  `;
+}
+
+function LeetCodeImportPanel({ username }) {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+
+  const doImport = async () => {
+    if (!username) {
+      setStatus("Enter your LeetCode username above first.");
+      return;
+    }
+    setBusy(true);
+    setStatus("Fetching recent accepted submissions…");
+    try {
+      const query = `query recentAcSubmissions($username: String!, $limit: Int!) {
+        recentAcSubmissionList(username: $username, limit: $limit) {
+          id title titleSlug timestamp lang
+        }
+      }`;
+      const res = await fetch("https://leetcode.com/graphql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables: { username, limit: 20 } }),
+      });
+      if (!res.ok) throw new Error("LeetCode API returned " + res.status);
+      const data = await res.json();
+      const submissions = data?.data?.recentAcSubmissionList || [];
+      let imported = 0;
+      for (const sub of submissions) {
+        const existing = await Storage.getProblem?.(sub.titleSlug).catch(() => null);
+        if (existing) continue;
+        const slug = (sub.lang || "").toLowerCase().replace(/\s+/g, "");
+        await Storage.saveProblem({
+          id: sub.titleSlug,
+          title: sub.title,
+          titleSlug: sub.titleSlug,
+          platform: "leetcode",
+          difficulty: "Unknown",
+          lang: { name: slug, ext: slug, slug },
+          tags: [],
+          timestamp: Number(sub.timestamp) * 1000,
+          code: "",
+          url: "https://leetcode.com/problems/" + sub.titleSlug + "/",
+        });
+        imported++;
+      }
+      setStatus(
+        imported > 0
+          ? "Imported " + imported + " new problem" + (imported !== 1 ? "s" : "") + " (of " + submissions.length + " recent solves). Reload to see them."
+          : "No new problems to import (" + submissions.length + " recent solves already tracked)."
+      );
+    } catch (e) {
+      setStatus("Import failed: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return html`
+    <div class="mt-4 p-4 bg-orange-950/20 rounded-xl border border-orange-500/15">
+      <p class="text-[11px] text-slate-400 mb-3">
+        Import your last 20 accepted submissions from LeetCode's public API.
+        For full history, visit your profile page on LeetCode and use the in-page import button.
+      </p>
+      <div class="flex items-center gap-3 flex-wrap">
+        ${username
+      ? html`<span class="text-xs text-slate-400">Username: <strong class="text-white">${username}</strong></span>`
+      : html`<span class="text-xs text-slate-500 italic">Set username above to enable</span>`}
+        <button
+          onClick=${doImport}
+          disabled=${busy || !username}
+          class="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >${busy ? "Importing…" : "Import recent solves"}</button>
+      </div>
+      ${status ? html`<p class="mt-2 text-xs ${status.includes("failed") || status.includes("Error") ? "text-rose-400" : status.includes("No new") ? "text-slate-400" : "text-emerald-400"}">${status}</p>` : ""}
+    </div>
+  `;
+}
+
 const KEY_STRATEGY_OPTIONS = [
   { value: "round-robin", label: "Round Robin" },
   { value: "random", label: "Random" },
@@ -58,8 +221,15 @@ export function SettingsSchema({ schema, values, onChange }) {
   const [promptBusy, setPromptBusy] = useState(false);
   // Repo setup: tracks "new" | "existing" | null per provider
   const [repoSetup, setRepoSetup] = useState({});
+  // Repo validation result per provider: { status: "ok"|"empty"|"warn"|"error", msg: string }
+  const [repoValidation, setRepoValidation] = useState({});
+  const [repoValidating, setRepoValidating] = useState({});
+  // Repo sync state per provider
+  const [repoSyncing, setRepoSyncing] = useState({});
+  const [repoSyncStatus, setRepoSyncStatus] = useState({});
   const initializedFromQueryRef = useRef(false);
   const scrolledFromQueryRef = useRef(false);
+  const prevRepoRef = useRef(values?.["github_repo"] || null);
 
   useEffect(() => {
     let mounted = true;
@@ -76,6 +246,51 @@ export function SettingsSchema({ schema, values, onChange }) {
       mounted = false;
     };
   }, []);
+
+  const validateRepo = async (provider, repoName, token) => {
+    if (!repoName || !token) {
+      setRepoValidation((v) => ({ ...v, [provider]: { status: "error", msg: "Repo name and auth token are required." } }));
+      return;
+    }
+    setRepoValidating((v) => ({ ...v, [provider]: true }));
+    setRepoValidation((v) => ({ ...v, [provider]: null }));
+    try {
+      const name = repoName.trim().replace(/\s+/g, "-").split("/").pop();
+      // Get user first
+      const userRes = await fetch("https://api.github.com/user", {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" },
+      });
+      if (!userRes.ok) throw new Error("Could not verify GitHub token");
+      const user = await userRes.json();
+      const owner = values["github_owner"]?.trim() || user.login;
+      const repoRes = await fetch(`https://api.github.com/repos/${owner}/${name}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" },
+      });
+      if (repoRes.status === 404) {
+        setRepoValidation((v) => ({ ...v, [provider]: { status: "warn", msg: `Repo "${owner}/${name}" not found — it will be created on first commit.` } }));
+        return;
+      }
+      if (!repoRes.ok) throw new Error("GitHub API error: " + repoRes.status);
+      const repo = await repoRes.json();
+      // Check if it's a valid CodeLedger repo (has index.json) or empty
+      if (repo.size === 0) {
+        setRepoValidation((v) => ({ ...v, [provider]: { status: "ok", msg: `Empty repo — CodeLedger will initialise it on first commit.` } }));
+        return;
+      }
+      const indexRes = await fetch(`https://api.github.com/repos/${owner}/${name}/contents/index.json`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" },
+      });
+      if (indexRes.ok) {
+        setRepoValidation((v) => ({ ...v, [provider]: { status: "ok", msg: `Valid CodeLedger repo (index.json found). Ready to sync.` } }));
+      } else {
+        setRepoValidation((v) => ({ ...v, [provider]: { status: "warn", msg: `Repo exists but is not a CodeLedger repo (no index.json). Linking will overwrite files.` } }));
+      }
+    } catch (e) {
+      setRepoValidation((v) => ({ ...v, [provider]: { status: "error", msg: `Validation failed: ${e.message}` } }));
+    } finally {
+      setRepoValidating((v) => ({ ...v, [provider]: false }));
+    }
+  };
 
   const providerFromField = (key) => {
     const k = (key || "").toLowerCase();
@@ -159,6 +374,23 @@ export function SettingsSchema({ schema, values, onChange }) {
       }
     });
   }, [values?.aiProvider, values?.aiSecondary, onChange]);
+
+  // Open welcome tab the first time a repo is linked
+  useEffect(() => {
+    const prev = prevRepoRef.current;
+    const curr = values?.["github_repo"] || null;
+    prevRepoRef.current = curr;
+    if (!prev && curr) {
+      // First-time repo link — open welcome if not already shown
+      Storage.getSettings().then((s) => {
+        if (s.welcomeShown) return;
+        Storage.setSettings({ ...s, welcomeShown: true }).catch(() => { });
+        if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ type: "OPEN_WELCOME" });
+        }
+      }).catch(() => { });
+    }
+  }, [values?.["github_repo"]]);
 
   const persistProviderKeys = async (providerId, rawVal) => {
     const all = await Storage.getAIKeys();
@@ -269,15 +501,23 @@ export function SettingsSchema({ schema, values, onChange }) {
           await Storage.setAuthToken(provider, data.token);
           onChange(key, data.token);
           setTestResults((s) => ({ ...s, [key]: "OK" }));
+
+          // For GitHub: fetch the authenticated user's login
+          if (provider === "github") {
+            try {
+              const u = await fetch("https://api.github.com/user", {
+                headers: { Authorization: `Bearer ${data.token}` },
+              }).then((r) => (r.ok ? r.json() : null));
+              if (u?.login) onChange("github_username", u.login);
+            } catch (_) { /* ignore */ }
+            // Repo setup wizard is handled by GitHubOnboardingModal in library.js
+            // — no inline wizard trigger here to avoid duplicate UI
+          }
         } catch (e) {
           // ignore
         } finally {
           window.removeEventListener("message", receiveMessage);
-          try {
-            popup.close();
-          } catch (e) {
-            // ignore
-          }
+          try { popup.close(); } catch (_) { }
         }
       };
 
@@ -289,19 +529,46 @@ export function SettingsSchema({ schema, values, onChange }) {
         }
       }, 500);
     },
-    [onChange]
+    [onChange, validateRepo]
   );
 
   const handleDisconnect = useCallback(
     async (provider, key) => {
       try {
         await Storage.clearAuthToken(provider);
-      } catch (_) {}
+      } catch (_) { }
       onChange(key, "");
       setTestResults((s) => ({ ...s, [key]: "" }));
     },
     [onChange]
   );
+
+  const handleResyncAll = useCallback(async (provider) => {
+    if (typeof chrome === "undefined" || !chrome.runtime?.id) return;
+    setRepoSyncing((s) => ({ ...s, [provider]: true }));
+    setRepoSyncStatus((s) => ({ ...s, [provider]: "" }));
+    try {
+      const result = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: "RESYNC_ALL" }, (resp) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (resp?.ok) {
+            resolve(resp);
+          } else {
+            reject(new Error(resp?.error || "Sync failed"));
+          }
+        });
+      });
+      const msg = result.committed === 0
+        ? "Already in sync — no missing problems found."
+        : `Synced ${result.committed} problem(s) to GitHub.`;
+      setRepoSyncStatus((s) => ({ ...s, [provider]: msg }));
+    } catch (e) {
+      setRepoSyncStatus((s) => ({ ...s, [provider]: `Sync failed: ${e.message}` }));
+    } finally {
+      setRepoSyncing((s) => ({ ...s, [provider]: false }));
+    }
+  }, []);
 
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
@@ -351,15 +618,15 @@ export function SettingsSchema({ schema, values, onChange }) {
       <div class="flex flex-col gap-1 w-2/3 pr-4">
         <span class="text-sm font-medium text-slate-300">${f.label}</span>
         ${f.description
-          ? html`<span class="text-[10px] text-slate-500 leading-tight"
+      ? html`<span class="text-[10px] text-slate-500 leading-tight"
               >${f.description}</span
             >`
-          : ""}
+      : ""}
       </div>
 
       <div class="w-1/3 flex flex-col items-end gap-2">
         ${f.type === "toggle"
-          ? html`
+      ? html`
               <label class="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -372,9 +639,9 @@ export function SettingsSchema({ schema, values, onChange }) {
                 ></div>
               </label>
             `
-          : ""}
+      : ""}
         ${f.type === "url" || f.type === "text" || f.type === "password"
-          ? html`
+      ? html`
               <div class="flex items-center gap-2 w-full">
                 <input
                   type=${f.type}
@@ -384,46 +651,46 @@ export function SettingsSchema({ schema, values, onChange }) {
                   onChange=${(e) => onChange(f.key, e.target.value)}
                 />
                 ${(() => {
-                  const prov = providerFromField(f.key);
-                  if (!prov) return "";
-                  const isEndpoint = String(f.key || "")
-                    .toLowerCase()
-                    .includes("_endpoint");
-                  return html`
+          const prov = providerFromField(f.key);
+          if (!prov) return "";
+          const isEndpoint = String(f.key || "")
+            .toLowerCase()
+            .includes("_endpoint");
+          return html`
                     <button
                       onClick=${() =>
-                        isEndpoint
-                          ? handleTestEndpoint(
-                              prov,
-                              values[f.key] ?? "",
-                              f.key
-                            )
-                          : handleTestKey(
-                              prov,
-                              parseKeys(values[f.key] ?? "")[0] || "",
-                              f.key,
-                              values?.[`${prov}_endpoint`] || ""
-                            )}
+              isEndpoint
+                ? handleTestEndpoint(
+                  prov,
+                  values[f.key] ?? "",
+                  f.key
+                )
+                : handleTestKey(
+                  prov,
+                  parseKeys(values[f.key] ?? "")[0] || "",
+                  f.key,
+                  values?.[`${prov}_endpoint`] || ""
+                )}
                       class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                     >
                       ${testing[f.key]
-                        ? "Testing..."
-                        : isEndpoint
-                          ? "Check"
-                          : "Test"}
+              ? "Testing..."
+              : isEndpoint
+                ? "Check"
+                : "Test"}
                     </button>
                   `;
-                })()}
+        })()}
               </div>
               ${testResults[f.key]
-                ? html`<div class="text-[11px] mt-1 text-slate-400">
+          ? html`<div class="text-[11px] mt-1 text-slate-400">
                     ${testResults[f.key]}
                   </div>`
-                : ""}
-            `
           : ""}
+            `
+      : ""}
         ${f.type === "select"
-          ? html`
+      ? html`
               <div class="flex items-center gap-2 w-full">
                 <select
                   class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
@@ -431,28 +698,29 @@ export function SettingsSchema({ schema, values, onChange }) {
                   onChange=${(e) => onChange(f.key, e.target.value)}
                 >
                   ${f.options && f.options.length === 0
-                    ? html`<option disabled value="">No options</option>`
-                    : ""}
+          ? html`<option disabled value="">No options</option>`
+          : ""}
                   ${f.options
-                    ? f.options.map(
-                        (opt) =>
-                          html`<option value=${opt.value}>${opt.label}</option>`
-                      )
-                    : ""}
+          ? f.options.map(
+            (opt) =>
+              html`<option value=${opt.value}>${opt.label}</option>`
+          )
+          : ""}
                 </select>
               </div>
             `
-          : ""}
+      : ""}
         ${f.type === "oauth"
-          ? html`
+      ? html`
               <div class="flex flex-col gap-2 items-end">
                 <div class="flex items-center gap-2">
                   ${values[f.key]
-                    ? html`
+          ? html`
                         <span
                           title="Connected"
                           class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
                         ></span>
+                        <span class="text-xs text-emerald-400 font-medium">Connected</span>
                         <button
                           onClick=${() => handleOAuth(f.provider, f.key)}
                           class="px-3 py-1.5 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg transition-colors"
@@ -466,7 +734,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                           Disconnect
                         </button>
                       `
-                    : html`
+          : html`
                         <button
                           onClick=${() => handleOAuth(f.provider, f.key)}
                           class="px-4 py-2 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg flex items-center gap-2 transition-colors"
@@ -477,13 +745,13 @@ export function SettingsSchema({ schema, values, onChange }) {
                 </div>
 
                 ${values[f.key] && f.provider === "github"
-                  ? html`
+          ? html`
                       ${(() => {
-                        const rs = repoSetup[f.provider];
-                        const savedRepo = values["github_repo"];
+              const rs = repoSetup[f.provider];
+              const savedRepo = values["github_repo"];
 
-                        // ── Edit: create new repo ──────────────────────
-                        if (rs === "new") return html`
+              // ── Edit: create new repo ──────────────────────
+              if (rs === "new") return html`
                           <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
                             <p class="text-[11px] text-cyan-300 font-medium">New repository name</p>
                             <div class="flex gap-2">
@@ -492,7 +760,7 @@ export function SettingsSchema({ schema, values, onChange }) {
                                 value=${savedRepo || "CodeLedger-Sync"}
                                 placeholder="CodeLedger-Sync"
                                 class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
-                                onChange=${(e) => onChange("github_repo", e.target.value)}
+                                onChange=${(e) => onChange("github_repo", e.target.value.replace(/\s+/g, "-"))}
                               />
                               <button
                                 onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))}
@@ -504,55 +772,91 @@ export function SettingsSchema({ schema, values, onChange }) {
                           </div>
                         `;
 
-                        // ── Edit: link existing repo ────────────────────
-                        if (rs === "existing") return html`
+              // ── Edit: link existing repo ────────────────────
+              if (rs === "existing") {
+                const vr = repoValidation[f.provider];
+                const validating = repoValidating[f.provider];
+                return html`
                           <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-                            <p class="text-[11px] text-cyan-300 font-medium">Existing repository name</p>
+                            <p class="text-[11px] text-cyan-300 font-medium">Link existing repository</p>
                             <div class="flex gap-2">
                               <input
                                 type="text"
                                 value=${savedRepo || ""}
                                 placeholder="repo-name (no owner prefix)"
                                 class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
-                                onChange=${(e) => onChange("github_repo", e.target.value.split("/").pop())}
+                                onInput=${(e) => {
+                    onChange("github_repo", e.target.value.split("/").pop().replace(/\s+/g, "-"));
+                    setRepoValidation((v) => ({ ...v, [f.provider]: null }));
+                  }}
                               />
                               <button
-                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))}
+                                disabled=${validating}
+                                onClick=${() => validateRepo(f.provider, savedRepo, values[f.key])}
+                                class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 text-xs rounded transition-colors disabled:opacity-50"
+                              >${validating ? "…" : "Validate"}</button>
+                              <button
+                                onClick=${() => {
+                    setRepoSetup((s) => ({ ...s, [f.provider]: null }));
+                    setRepoValidation((v) => ({ ...v, [f.provider]: null }));
+                  }}
                                 class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
                               >Link</button>
                             </div>
-                            <p class="text-[10px] text-slate-500">Enter only the repository name, not the full URL.</p>
+                            ${vr ? html`
+                              <div class="text-[11px] px-2 py-1.5 rounded ${vr.status === "ok" ? "bg-emerald-500/10 text-emerald-300"
+                      : vr.status === "warn" ? "bg-amber-500/10 text-amber-300"
+                        : "bg-rose-500/10 text-rose-300"
+                    }">${vr.status === "ok" ? "✓ " : vr.status === "warn" ? "⚠ " : "✗ "}${vr.msg}</div>
+                            ` : ""}
+                            <p class="text-[10px] text-slate-500">Must be an empty repo or an existing CodeLedger repo (contains index.json).</p>
                             <button onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))} class="text-[10px] text-slate-500 underline self-start">← Back</button>
                           </div>
                         `;
+              };
 
-                        // ── Configured ─────────────────────────────────
-                        if (savedRepo) {
-                          const owner = values["github_owner"]?.trim() || "";
-                          const repoUrl = owner
-                            ? `https://github.com/${owner}/${savedRepo}`
-                            : `https://github.com/search?q=${encodeURIComponent(savedRepo)}&type=repositories`;
-                          return html`
-                            <div class="flex items-center gap-2 mt-1 flex-wrap">
-                              <span class="text-[11px] text-emerald-400">
-                                ${owner ? html`<span class="text-slate-400">${owner}/</span>` : ""}<strong>${savedRepo}</strong>
-                              </span>
-                              <a
-                                href=${repoUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                class="text-[11px] text-cyan-400 underline hover:text-cyan-300"
-                              >View on GitHub ↗</a>
-                              <button
-                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "existing" }))}
-                                class="text-[10px] text-slate-500 underline ml-auto"
-                              >Change</button>
+              // ── Configured ─────────────────────────────────
+              if (savedRepo) {
+                // github_owner = org override; github_username = auto-detected personal login
+                const owner = values["github_owner"]?.trim() || values["github_username"] || "";
+                const repoUrl = owner
+                  ? `https://github.com/${owner}/${savedRepo}`
+                  : null; // no owner yet — will be set after first OAuth
+                const isSyncing = repoSyncing[f.provider];
+                const syncMsg = repoSyncStatus[f.provider];
+                const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+                return html`
+                            <div class="flex flex-col gap-1.5 mt-1">
+                              <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-[11px] text-emerald-400">
+                                  ${owner ? html`<span class="text-slate-400">${owner}/</span>` : ""}<strong>${savedRepo}</strong>
+                                </span>
+                                ${repoUrl ? html`<a
+                                  href=${repoUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  class="text-[11px] text-cyan-400 underline hover:text-cyan-300"
+                                >View on GitHub ↗</a>` : html`<span class="text-[11px] text-slate-500">Reconnect to get repo link</span>`}
+                                ${isExtension ? html`
+                                  <button
+                                    onClick=${() => handleResyncAll(f.provider)}
+                                    disabled=${isSyncing}
+                                    class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 text-[10px] rounded transition-colors disabled:opacity-50"
+                                    title="Find problems saved locally that are missing from your repo and commit them all at once"
+                                  >${isSyncing ? "Syncing…" : "⟳ Sync"}</button>
+                                ` : ""}
+                                <button
+                                  onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "existing" }))}
+                                  class="text-[10px] text-slate-500 underline ml-auto"
+                                >Change</button>
+                              </div>
+                              ${syncMsg ? html`<p class="text-[10px] ${syncMsg.includes("failed") || syncMsg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">${syncMsg}</p>` : ""}
                             </div>
                           `;
-                        }
+              }
 
-                        // ── First-time setup prompt ─────────────────────
-                        return html`
+              // ── First-time setup prompt ─────────────────────
+              return html`
                           <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
                             <p class="text-[11px] text-cyan-300 font-medium">Set up your repository</p>
                             <div class="flex gap-2">
@@ -567,12 +871,12 @@ export function SettingsSchema({ schema, values, onChange }) {
                             </div>
                           </div>
                         `;
-                      })()}
+            })()}
                     `
-                  : ""}
+          : ""}
               </div>
             `
-          : ""}
+      : ""}
       </div>
     </div>
   `;
@@ -609,7 +913,7 @@ export function SettingsSchema({ schema, values, onChange }) {
             ${section.title || section.label}
           </h3>
           ${isGitProvider
-            ? html`
+        ? html`
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -622,11 +926,35 @@ export function SettingsSchema({ schema, values, onChange }) {
                   ></div>
                 </label>
               `
-            : ""}
+        : ""}
         </div>
 
+        ${section.id === "github" && values?.["github_token"] && !values?.["github_repo"] ? html`
+          <div class="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300">
+            <span class="text-base shrink-0">⚠️</span>
+            <div class="flex-1">
+              <strong>Setup incomplete</strong> — GitHub is connected but no repository is linked.
+            </div>
+            <button
+              onClick=${() => {
+          setRepoSetup((s) => ({ ...s, github: "choose" }));
+          document.getElementById("settings-section-github")
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }}
+              class="shrink-0 px-2 py-1 bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30 rounded text-amber-200 transition-colors"
+            >Setup repo →</button>
+          </div>
+        ` : ""}
+
+        ${section.id === "github" && values?.["github_token"] && values?.["github_repo"] ? html`
+          <div class="flex items-center gap-2 text-[11px] text-emerald-400">
+            <span>✓</span>
+            <span>Connected &amp; repository linked — syncing is active.</span>
+          </div>
+        ` : ""}
+
         ${isGitProvider && section.id !== "github"
-          ? html`
+        ? html`
               <div
                 class="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2"
               >
@@ -634,27 +962,27 @@ export function SettingsSchema({ schema, values, onChange }) {
                 support is in testing — do not use in production yet.
               </div>
             `
-          : ""}
+        : ""}
 
         <div class="space-y-4">
           ${normalFields.map((f) => renderStandardField(section, f))}
         </div>
 
         ${advancedFields.length
-          ? html`
+        ? html`
               <div class="border-t border-white/5 pt-3">
                 <button
                   onClick=${() =>
-                    setAdvancedMap((m) => ({
-                      ...m,
-                      [section.id]: !m[section.id],
-                    }))}
+            setAdvancedMap((m) => ({
+              ...m,
+              [section.id]: !m[section.id],
+            }))}
                   class="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
                 >
                   <svg
                     class="w-3 h-3 transition-transform ${showAdv
-                      ? "rotate-90"
-                      : ""}"
+            ? "rotate-90"
+            : ""}"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -665,15 +993,18 @@ export function SettingsSchema({ schema, values, onChange }) {
                   Advanced
                 </button>
                 ${showAdv
-                  ? html`<div class="mt-3 space-y-4 pl-1 border-l border-white/5">
+            ? html`<div class="mt-3 space-y-4 pl-1 border-l border-white/5">
                       ${advancedFields.map((f) =>
-                        renderStandardField(section, f)
-                      )}
+              renderStandardField(section, f)
+            )}
+                      ${section.id === "leetcode"
+                ? html`<${LeetCodeImportPanel} username=${values?.leetcode_username || ""} />`
+                : ""}
                     </div>`
-                  : ""}
+            : ""}
               </div>
             `
-          : ""}
+        : ""}
       </div>
     `;
   };
@@ -698,8 +1029,8 @@ export function SettingsSchema({ schema, values, onChange }) {
             class="text-xs px-2 py-1 bg-white/5 rounded border border-white/10 text-slate-300"
           >
             ${showAdvancedProviders
-              ? "Hide advanced provider settings"
-              : "Show advanced provider settings"}
+        ? "Hide advanced provider settings"
+        : "Show advanced provider settings"}
           </button>
         </div>
 
@@ -750,27 +1081,27 @@ export function SettingsSchema({ schema, values, onChange }) {
                 >
                   <option value="">None</option>
                   ${selectableProviders.map(
-                    (pid) =>
-                      html`<option value=${pid}>
+          (pid) =>
+            html`<option value=${pid}>
                         ${CONSTANTS.AI_PROVIDERS[pid].name}
                       </option>`
-                  )}
+        )}
                 </select>
 
                 ${primaryProvider
-                  ? html`<${ModelSelector}
+        ? html`<${ModelSelector}
                       providerId=${primaryProvider}
                       apiKey=${values[`${primaryProvider}_keys`] || ""}
                       selectedModel=${values.aiPrimaryModel || ""}
                       onSelect=${(v) => onChange("aiPrimaryModel", v)}
                       endpoint=${values[`${primaryProvider}_endpoint`] || ""}
                       providerEnabled=${isProviderEffectivelyEnabled(
-                        primaryProvider
-                      )}
+          primaryProvider
+        )}
                       onToggleEnabled=${(val) =>
-                        onChange(`${primaryProvider}_enabled`, val)}
+            onChange(`${primaryProvider}_enabled`, val)}
                     />`
-                  : ""}
+        : ""}
               </div>
             </div>
           </div>
@@ -795,27 +1126,27 @@ export function SettingsSchema({ schema, values, onChange }) {
                 >
                   <option value="">None</option>
                   ${selectableProviders.map(
-                    (pid) =>
-                      html`<option value=${pid}>
+          (pid) =>
+            html`<option value=${pid}>
                         ${CONSTANTS.AI_PROVIDERS[pid].name}
                       </option>`
-                  )}
+        )}
                 </select>
 
                 ${secondaryProvider
-                  ? html`<${ModelSelector}
+        ? html`<${ModelSelector}
                       providerId=${secondaryProvider}
                       apiKey=${values[`${secondaryProvider}_keys`] || ""}
                       selectedModel=${values.aiSecondaryModel || ""}
                       onSelect=${(v) => onChange("aiSecondaryModel", v)}
                       endpoint=${values[`${secondaryProvider}_endpoint`] || ""}
                       providerEnabled=${isProviderEffectivelyEnabled(
-                        secondaryProvider
-                      )}
+          secondaryProvider
+        )}
                       onToggleEnabled=${(val) =>
-                        onChange(`${secondaryProvider}_enabled`, val)}
+            onChange(`${secondaryProvider}_enabled`, val)}
                     />`
-                  : ""}
+        : ""}
               </div>
             </div>
           </div>
@@ -829,23 +1160,23 @@ export function SettingsSchema({ schema, values, onChange }) {
     return html`
       <div class="space-y-6">
         ${providerIds.map((pid) => {
-          const p = CONSTANTS.AI_PROVIDERS[pid];
-          const keyField = `${pid}_keys`;
-          const endpointField = `${pid}_endpoint`;
-          const modelField = `${pid}_model`;
-          const enabledField = `${pid}_enabled`;
-          const strategyField = `${pid}_keyStrategy`;
-          const rawKeys = values[keyField] || "";
-          const keyList = parseKeys(rawKeys);
-          const endpoint = values[endpointField] || p.endpoint || "";
-          const providerEnabled =
-            typeof values[enabledField] === "undefined"
-              ? true
-              : !!values[enabledField];
-          const isPinned =
-            values?.aiProvider === pid || values?.aiSecondary === pid;
+      const p = CONSTANTS.AI_PROVIDERS[pid];
+      const keyField = `${pid}_keys`;
+      const endpointField = `${pid}_endpoint`;
+      const modelField = `${pid}_model`;
+      const enabledField = `${pid}_enabled`;
+      const strategyField = `${pid}_keyStrategy`;
+      const rawKeys = values[keyField] || "";
+      const keyList = parseKeys(rawKeys);
+      const endpoint = values[endpointField] || p.endpoint || "";
+      const providerEnabled =
+        typeof values[enabledField] === "undefined"
+          ? true
+          : !!values[enabledField];
+      const isPinned =
+        values?.aiProvider === pid || values?.aiSecondary === pid;
 
-          return html`
+      return html`
             <div
               id=${`settings-provider-${pid}`}
               key=${pid}
@@ -876,14 +1207,14 @@ export function SettingsSchema({ schema, values, onChange }) {
                 </label>
               </div>
               ${isPinned
-                ? html`<p class="text-[11px] text-amber-400">
+          ? html`<p class="text-[11px] text-amber-400">
                     This provider is active as
                     ${values?.aiProvider === pid ? "primary" : "secondary"} and
                     cannot be disabled.
                   </p>`
-                : ""}
+          : ""}
               ${p.keyRequired
-                ? html`
+          ? html`
                     <div class="space-y-3">
                       <label
                         class="text-xs uppercase tracking-wider text-slate-400"
@@ -892,11 +1223,11 @@ export function SettingsSchema({ schema, values, onChange }) {
                       <textarea
                         value=${rawKeys}
                         onInput=${(e) =>
-                          handleProviderKeysChange(
-                            pid,
-                            keyField,
-                            e.target.value
-                          )}
+              handleProviderKeysChange(
+                pid,
+                keyField,
+                e.target.value
+              )}
                         placeholder="Enter keys separated by commas or new lines"
                         class="w-full min-h-[90px] px-3 py-2 bg-black border border-white/10 rounded text-sm text-white"
                       ></textarea>
@@ -906,21 +1237,21 @@ export function SettingsSchema({ schema, values, onChange }) {
                         >
                         <button
                           onClick=${() =>
-                            handleTestAllKeys(pid, rawKeys, keyField)}
+              handleTestAllKeys(pid, rawKeys, keyField)}
                           class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                         >
                           Test All
                         </button>
                       </div>
                       ${testResults[`${keyField}:all`]
-                        ? html`<div class="text-[11px] text-slate-400">
+              ? html`<div class="text-[11px] text-slate-400">
                             ${testResults[`${keyField}:all`]}
                           </div>`
-                        : ""}
+              : ""}
 
                       <div class="space-y-2">
                         ${keyList.map(
-                          (k, idx) => html`
+                (k, idx) => html`
                             <div
                               key=${`${pid}-${idx}`}
                               class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
@@ -931,26 +1262,26 @@ export function SettingsSchema({ schema, values, onChange }) {
                               <div class="flex items-center gap-2">
                                 <button
                                   onClick=${() =>
-                                    handleTestKey(
-                                      pid,
-                                      k,
-                                      `${keyField}:${idx}`,
-                                      endpoint
-                                    )}
+                    handleTestKey(
+                      pid,
+                      k,
+                      `${keyField}:${idx}`,
+                      endpoint
+                    )}
                                   class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                                 >
                                   ${testing[`${keyField}:${idx}`]
-                                    ? "Testing..."
-                                    : "Test"}
+                    ? "Testing..."
+                    : "Test"}
                                 </button>
                                 <span class="text-[11px] text-slate-400"
                                   >${testResults[`${keyField}:${idx}`] ||
-                                  ""}</span
+                  ""}</span
                                 >
                               </div>
                             </div>
                           `
-                        )}
+              )}
                       </div>
 
                       <div class="flex items-center gap-2">
@@ -962,23 +1293,23 @@ export function SettingsSchema({ schema, values, onChange }) {
                           class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
                           value=${values[strategyField] || "round-robin"}
                           onChange=${(e) =>
-                            onChange(strategyField, e.target.value)}
+              onChange(strategyField, e.target.value)}
                         >
                           ${KEY_STRATEGY_OPTIONS.map(
-                            (opt) =>
-                              html`<option value=${opt.value}>
+                (opt) =>
+                  html`<option value=${opt.value}>
                                 ${opt.label}
                               </option>`
-                          )}
+              )}
                         </select>
                       </div>
                     </div>
                   `
-                : html`<div class="text-xs text-slate-500">
+          : html`<div class="text-xs text-slate-500">
                     No API key required for this provider.
                   </div>`}
               ${showAdvancedProviders
-                ? html`<div class="space-y-2">
+          ? html`<div class="space-y-2">
                     <label
                       class="text-xs uppercase tracking-wider text-slate-400"
                       >Endpoint</label
@@ -988,24 +1319,24 @@ export function SettingsSchema({ schema, values, onChange }) {
                         type="text"
                         value=${endpoint}
                         onChange=${(e) =>
-                          onChange(endpointField, e.target.value)}
+              onChange(endpointField, e.target.value)}
                         class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
                       />
                       <button
                         onClick=${() =>
-                          handleTestEndpoint(pid, endpoint, endpointField)}
+              handleTestEndpoint(pid, endpoint, endpointField)}
                         class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                       >
                         ${testing[endpointField] ? "Checking..." : "Check"}
                       </button>
                     </div>
                     ${testResults[endpointField]
-                      ? html`<div class="text-[11px] text-slate-400">
+              ? html`<div class="text-[11px] text-slate-400">
                           ${testResults[endpointField]}
                         </div>`
-                      : ""}
+              : ""}
                   </div>`
-                : ""}
+          : ""}
 
               <div class="space-y-2">
                 <label class="text-xs uppercase tracking-wider text-slate-400"
@@ -1023,7 +1354,7 @@ export function SettingsSchema({ schema, values, onChange }) {
               </div>
             </div>
           `;
-        })}
+    })}
       </div>
     `;
   };
@@ -1071,26 +1402,26 @@ export function SettingsSchema({ schema, values, onChange }) {
         </div>
 
         ${allPlatformKeys.map(
-          (platform) => html`
+      (platform) => html`
             <div key=${platform} class="flex flex-col gap-2">
               <label class="text-xs uppercase tracking-wider text-slate-400">
                 ${platform === "default"
-                  ? "Default (all other platforms)"
-                  : platform.charAt(0).toUpperCase() + platform.slice(1)}
+          ? "Default (all other platforms)"
+          : platform.charAt(0).toUpperCase() + platform.slice(1)}
               </label>
               <textarea
                 value=${promptDraft[platform] || ""}
                 onInput=${(e) =>
-                  setPromptDraft((s) => ({
-                    ...s,
-                    [platform]: e.target.value,
-                  }))}
+          setPromptDraft((s) => ({
+            ...s,
+            [platform]: e.target.value,
+          }))}
                 rows="6"
                 class="w-full px-3 py-2 bg-black border border-white/10 rounded text-sm text-white font-mono resize-y"
               ></textarea>
             </div>
           `
-        )}
+    )}
 
         <div class="flex items-center gap-2 pt-2">
           <button
@@ -1108,8 +1439,8 @@ export function SettingsSchema({ schema, values, onChange }) {
           </button>
         </div>
         ${promptStatus
-          ? html`<div class="text-[11px] text-slate-400">${promptStatus}</div>`
-          : ""}
+        ? html`<div class="text-[11px] text-slate-400">${promptStatus}</div>`
+        : ""}
       </div>
     `;
   };
@@ -1118,28 +1449,29 @@ export function SettingsSchema({ schema, values, onChange }) {
     <div class="space-y-6">
       <div class="flex flex-wrap gap-2">
         ${tabs.map(
-          (t) => html`
+    (t) => html`
             <button
               key=${t.id}
               onClick=${() => setActiveTab(t.id)}
               class="px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider border ${activeTab ===
-              t.id
-                ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
-                : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"}"
+        t.id
+        ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
+        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"}"
             >
               ${t.label}
             </button>
           `
-        )}
+  )}
       </div>
 
       ${activeTab === "ai"
-        ? html` ${renderAIRouting()} ${renderAIProviderCards()} `
-        : activeTab === "prompts"
-          ? html`${renderPromptsTab()}`
-          : html`
+      ? html` ${renderAIRouting()} ${renderAIProviderCards()} `
+      : activeTab === "prompts"
+        ? html`${renderPromptsTab()}`
+        : html`
               <div class="space-y-6">
                 ${standardSections.map((section) => renderSection(section))}
+                ${activeTab === "git" ? html`<${BackupRestorePanel} />` : ""}
               </div>
             `}
     </div>
