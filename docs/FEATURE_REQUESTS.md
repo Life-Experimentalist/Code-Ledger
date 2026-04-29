@@ -6,44 +6,46 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 
 ## Completed ✅
 
-| Feature                                   | Notes                                                                                                                                                                                 |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language detection fix (py/undefined)     | `resolveLang()` in LeetCode handler; lang stored as `{ name, ext, slug }`                                                                                                             |
-| Analytics overhaul                        | Heatmap, difficulty donut, topic bars, platform bars, streaks                                                                                                                         |
-| Heatmap tooltip stays on click            | Click pins tooltip; click elsewhere dismisses                                                                                                                                         |
-| Graph multi-topic edges                   | `knowledge-graph.js` builds edges for ALL tags, not just first                                                                                                                        |
-| Graph platform color rings                | Problem nodes have colored stroke rings per platform; blended for multi-platform                                                                                                      |
-| Blind 75 link fix                         | Points to neetcode.io/practice?tab=neetcode75                                                                                                                                         |
-| Backup & Restore                          | Export/import JSON; in Git settings tab                                                                                                                                               |
-| Org repo support                          | `github_owner` advanced field in GitHub settings                                                                                                                                      |
-| View Repo link                            | Library header links to connected GitHub repo                                                                                                                                         |
-| GitHub Pages auto-setup                   | Creates `index.html` stats page on new repo creation                                                                                                                                  |
-| Retroactive/backdated commits             | `commit(files, msg, repo, { date })` sets author/committer dates                                                                                                                      |
-| Cloudflare Worker secrets deployed        | All 7 secrets uploaded via `wrangler secret put`                                                                                                                                      |
-| LeetCode sync always injected             | Sync button not behind QoL toggle                                                                                                                                                     |
-| Sync button on submission history list    | Per-row Sync on `/problems/{slug}/submissions/`                                                                                                                                       |
-| Profile page import button                | "Import All Solves" on `leetcode.com/u/{username}/`                                                                                                                                   |
-| Paginated profile import                  | Loops over all pages with 1200ms delay via authenticated GraphQL                                                                                                                      |
-| QoL copy/paste buttons fixed              | `findEditorToolbar()` with 5 selector strategies + 800ms retry loop                                                                                                                   |
-| GitHub repo name whitespace fix           | `.replace(/\s+/g, '-')` on repo name before API calls                                                                                                                                 |
-| LeetCode import message port fix          | Settings panel calls LeetCode GraphQL directly (no background relay)                                                                                                                  |
-| Import panel in LeetCode Advanced         | `LeetCodeImportPanel` inside LeetCode section's Advanced block                                                                                                                        |
-| Analytics difficulty donut height fix     | `maintainAspectRatio: false` + explicit `height:180px` wrapper                                                                                                                        |
-| Archive → Solutions rename                | Nav tab renamed; old `?tab=archive` URLs redirect to `?tab=solutions`                                                                                                                 |
-| Problem cards show all topics             | `ProblemCard` renders all `tags[]` as pill badges                                                                                                                                     |
-| Problem cards clickable → modal           | `ProblemCard` onClick opens `ProblemModal`; ↗ still navigates directly                                                                                                                |
-| ProblemModal                              | Full-screen modal with tabs: Overview, Code, AI Review, Similar; Escape to close; backdrop click to close                                                                             |
-| ProblemModal in GraphView                 | "Expand ↗" button on selected node panel opens full modal                                                                                                                             |
-| Platform favicons                         | Real favicons in ProblemsView hub cards, ProblemCard, and ProblemModal                                                                                                                |
-| LeetCode favicon fixed                    | `https://assets.leetcode.com/static_assets/public/icons/favicon.ico`                                                                                                                  |
-| Graph hover tooltip                       | HTML overlay near cursor; click to pin full panel; platform favicons in tooltip                                                                                                       |
-| gitEnabled defaults to true for new users | service-worker, git-engine, sync-engine treat `undefined` as enabled                                                                                                                  |
-| Repo validation before linking            | "Validate" button calls GitHub API; checks empty repo or CodeLedger `index.json`                                                                                                      |
-| GitHub flow: post-auth auto-setup         | After OAuth success, if no repo configured → auto-expands setup wizard and scrolls to it                                                                                              |
-| GitHub flow: setup-incomplete banner      | Yellow warning + "Setup repo →" button shown in GitHub section when connected but no repo linked                                                                                      |
-| GitHub flow: connected & ready indicator  | Green "✓ Connected & repository linked" shown once both token and repo are set                                                                                                        |
-| Canonical linking pipeline                | `CanonicalView`: search canonical-map, submit GitHub Issues, vote with 👍, progress bar per issue                                                                                      |
-| Timer integration                         | `src/ui/floating-timer.js`: draggable overlay on LeetCode/GFG problem pages; elapsed time stored in problem record, shown in README and ProblemModal; Avg Solve Time KPI in Analytics |
+| Feature                                   | Notes                                                                                                                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language detection fix (py/undefined)     | `resolveLang()` in LeetCode handler; lang stored as `{ name, ext, slug }`                                                                                                                                            |
+| Analytics overhaul                        | Heatmap, difficulty donut, topic bars, platform bars, streaks                                                                                                                                                        |
+| Heatmap tooltip stays on click            | Click pins tooltip; click elsewhere dismisses                                                                                                                                                                        |
+| Graph multi-topic edges                   | `knowledge-graph.js` builds edges for ALL tags, not just first                                                                                                                                                       |
+| Graph platform color rings                | Problem nodes have colored stroke rings per platform; blended for multi-platform                                                                                                                                     |
+| Blind 75 link fix                         | Points to neetcode.io/practice?tab=neetcode75                                                                                                                                                                        |
+| Backup & Restore                          | Export/import JSON; in Git settings tab                                                                                                                                                                              |
+| Org repo support                          | `github_owner` advanced field in GitHub settings                                                                                                                                                                     |
+| View Repo link                            | Library header links to connected GitHub repo                                                                                                                                                                        |
+| GitHub Pages auto-setup                   | Creates `index.html` stats page on new repo creation                                                                                                                                                                 |
+| Retroactive/backdated commits             | `commit(files, msg, repo, { date })` sets author/committer dates                                                                                                                                                     |
+| Cloudflare Worker secrets deployed        | All 7 secrets uploaded via `wrangler secret put`                                                                                                                                                                     |
+| LeetCode sync always injected             | Sync button not behind QoL toggle                                                                                                                                                                                    |
+| Sync button on submission history list    | Per-row Sync on `/problems/{slug}/submissions/`                                                                                                                                                                      |
+| Profile page import button                | "Import All Solves" on `leetcode.com/u/{username}/`                                                                                                                                                                  |
+| Paginated profile import                  | Loops over all pages with 1200ms delay via authenticated GraphQL                                                                                                                                                     |
+| QoL copy/paste buttons fixed              | `findEditorToolbar()` with 5 selector strategies + 800ms retry loop                                                                                                                                                  |
+| GitHub repo name whitespace fix           | `.replace(/\s+/g, '-')` on repo name before API calls                                                                                                                                                                |
+| LeetCode import message port fix          | Settings panel calls LeetCode GraphQL directly (no background relay)                                                                                                                                                 |
+| Import panel in LeetCode Advanced         | `LeetCodeImportPanel` inside LeetCode section's Advanced block                                                                                                                                                       |
+| Analytics difficulty donut height fix     | `maintainAspectRatio: false` + explicit `height:180px` wrapper                                                                                                                                                       |
+| Archive → Solutions rename                | Nav tab renamed; old `?tab=archive` URLs redirect to `?tab=solutions`                                                                                                                                                |
+| Problem cards show all topics             | `ProblemCard` renders all `tags[]` as pill badges                                                                                                                                                                    |
+| Problem cards clickable → modal           | `ProblemCard` onClick opens `ProblemModal`; ↗ still navigates directly                                                                                                                                               |
+| ProblemModal                              | Full-screen modal with tabs: Overview, Code, AI Review, Similar; Escape to close; backdrop click to close                                                                                                            |
+| ProblemModal in GraphView                 | "Expand ↗" button on selected node panel opens full modal                                                                                                                                                            |
+| Platform favicons                         | Real favicons in ProblemsView hub cards, ProblemCard, and ProblemModal                                                                                                                                               |
+| LeetCode favicon fixed                    | `https://assets.leetcode.com/static_assets/public/icons/favicon.ico`                                                                                                                                                 |
+| Graph hover tooltip                       | HTML overlay near cursor; click to pin full panel; platform favicons in tooltip                                                                                                                                      |
+| gitEnabled defaults to true for new users | service-worker, git-engine, sync-engine treat `undefined` as enabled                                                                                                                                                 |
+| Repo validation before linking            | "Validate" button calls GitHub API; checks empty repo or CodeLedger `index.json`                                                                                                                                     |
+| GitHub flow: post-auth auto-setup         | After OAuth success, if no repo configured → auto-expands setup wizard and scrolls to it                                                                                                                             |
+| GitHub flow: setup-incomplete banner      | Yellow warning + "Setup repo →" button shown in GitHub section when connected but no repo linked                                                                                                                     |
+| GitHub flow: connected & ready indicator  | Green "✓ Connected & repository linked" shown once both token and repo are set                                                                                                                                       |
+| Canonical linking pipeline                | `CanonicalView`: search canonical-map, submit GitHub Issues, vote with 👍, progress bar per issue                                                                                                                     |
+| Timer integration                         | `src/ui/floating-timer.js`: draggable overlay on LeetCode/GFG problem pages; elapsed time stored in problem record, shown in README and ProblemModal; Avg Solve Time KPI in Analytics                                |
+| Onboarding welcome page                   | `src/welcome/welcome.{html,js}`: 5-step checklist (installed → GitHub → repo → solve → commit); auto-opened on first repo link via `OPEN_WELCOME` message from SettingsSchema; platforms grid; "Open Library" button |
+| GitHub flow end-to-end fix                | `auto_init: true`; Trees API for atomic repo init (no btoa, no emoji crash); OAuth-only token path; removed duplicate onboarding trigger from SettingsSchema; `github_repo` key used consistently                    |
 
 ---
 
@@ -58,16 +60,15 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 
 ## Pending 📋
 
-| Feature                                      | Priority    | Notes                                                                                          |
-| -------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------- |
-| Onboarding welcome page                      | high        | After first GitHub auth + repo link: open welcome.html tab (like LeetHub) with setup checklist |
-| AI chat in library                           | medium      | API-key powered chat; conversation saved to git repo alongside solution                        |
-| AI system on LeetCode/platform pages         | medium      | Floating panel with question + editor code context; calls configured AI handler                |
-| Incognito mode timer + "indefinitely" option | medium      | Time selector on incognito toggle; options: 1h, 4h, 24h, indefinitely                          |
-| Enhanced recommendation system               | low         | Beyond Blind 75 — personalized from weak topics / recent solves                                |
-| Full multi-platform analytics                | low         | GFG + Codeforces in heatmap, difficulty chart, topic breakdown                                 |
-| Submission auto-detect investigation         | investigate | LeetCode handler MutationObserver may miss accepted results in some layouts                    |
-| GitHub Action: auto-merge canonical issues   | low         | GH Action on main repo: when issue gets ≥5 👍 → append to canonical-map.json and close issue    |
+| Feature                                      | Priority    | Notes                                                                                       |
+| -------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| AI chat in library                           | medium      | API-key powered chat; conversation saved to git repo alongside solution                     |
+| AI system on LeetCode/platform pages         | medium      | Floating panel with question + editor code context; calls configured AI handler             |
+| Incognito mode timer + "indefinitely" option | medium      | Time selector on incognito toggle; options: 1h, 4h, 24h, indefinitely                       |
+| Enhanced recommendation system               | low         | Beyond Blind 75 — personalized from weak topics / recent solves                             |
+| Full multi-platform analytics                | low         | GFG + Codeforces in heatmap, difficulty chart, topic breakdown                              |
+| Submission auto-detect investigation         | investigate | LeetCode handler MutationObserver may miss accepted results in some layouts                 |
+| GitHub Action: auto-merge canonical issues   | low         | GH Action on main repo: when issue gets ≥5 👍 → append to canonical-map.json and close issue |
 
 ---
 
@@ -78,10 +79,12 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 | Full history via Settings import (unlimited) | LeetCode public API caps at 20; full import must use profile page button or CLI importer |
 | Real-time leaderboard                        | Requires server-side infra; out of scope for client-only extension                       |
 
-Import your last 20 accepted submissions from LeetCode's public API. For full history, visit your profile page on LeetCode and use the in-page import button.
+the leetcode import is not correctly done the difficulty level is not there and it says unknown so fix that and the calender heatmap is also not updated correctly and all the other things as well can you do that properly
 
-Username: VKrishna04
-Import recent solves
-Import failed: Failed to execute 'put' on 'IDBObjectStore': Evaluating the object store's key path did not yield a value.
+in the languages Python3 and python3 are treated differently fix that as well
 
-even after the oauth of github it shows connect button and the states are not updated correctly fix this properly without any issues and such
+the analytics are not updated to include the rest of the imported problems solved and such
+
+the questions line section graph treats unknown as easy which is correct bu these questions are not unknown and i want a edit option in the modals to edit the meta data of the questions and such as well
+
+the library will rely on the canonical and if any questions can be linked with questions from other platforms then it will also be automatically linked and such work properly and correctly

@@ -49,6 +49,23 @@ Use `CONSTANTS.SK.*` from `src/core/constants.js`. Storage shape:
 
 `Storage.getAuthToken("github")` (OAuth) first, then `settings["github_token"]` (PAT) — order matters.
 
+### Settings key for GitHub repo name
+
+The canonical key is `settings.github_repo`. When **reading** anywhere in the codebase, always fall back for legacy compat:
+
+```js
+const repo = settings.github_repo || settings.gitRepo;
+```
+
+Never write `settings.gitRepo` in new code. Never save an OAuth token to settings — use `Storage.setAuthToken("github", token)`.
+
+### GitHub repo init — always use Trees API
+
+When creating/initialising a repo (e.g., `GitHubOnboardingModal`):
+- Create repo with `auto_init: true` (ensures a base branch + commit SHA exists)
+- Use `POST /git/trees` + `POST /git/commits` + `PATCH /git/refs/heads/main` for all file creation
+- Never use `PUT /contents/{path}` for initial setup — it creates one commit per file and requires `btoa()` which breaks on non-ASCII content
+
 ### OAuth message contract
 
 Worker posts: `{ type: "CODELEDGER_AUTH", provider: "github", token: "..." }`
@@ -72,7 +89,10 @@ src/
 │   └── ai-prompts.js    ← prompt templates
 ├── library/             ← web app (extension sidebar + GitHub Pages)
 │   └── views/{ProblemsView,AnalyticsView,GraphView,SettingsView}.js
-└── ui/components/       ← shared Preact components (SettingsSchema, HeatMap, etc.)
+├── ui/
+│   ├── components/      ← shared Preact components (SettingsSchema, GitHubOnboardingModal, etc.)
+│   └── floating-timer.js ← draggable solve-time stopwatch (content-script safe, plain JS)
+└── welcome/             ← onboarding checklist page (auto-opened on first repo link)
 ```
 
 ## Problem Solve Flow
@@ -96,6 +116,8 @@ src/
   topic: string,      // first tag (for folder path)
   aiReview: string,
   runtime: string, memory: string, runtimePct: number, memoryPct: number,
+  elapsedSeconds: number,   // solve time from floating timer; 0 if not used
+  files: [{ path: string, content: string }],  // pre-built by handler; SW appends index.json
 }
 ```
 

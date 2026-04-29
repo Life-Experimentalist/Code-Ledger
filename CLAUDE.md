@@ -82,7 +82,12 @@ manifest.json
 ├── lib/
 │   ├── browser-compat.js             — THE ONLY FILE that uses chrome.* or browser.*
 │   └── debug.js                      — createDebugger() with console.bind() trick
-└── ui/components/SettingsSchema.js   — schema-driven settings renderer (Preact + htm)
+├── ui/
+│   ├── components/SettingsSchema.js  — schema-driven settings renderer (Preact + htm)
+│   ├── components/GitHubOnboardingModal.js — first-time repo setup wizard (Trees API)
+│   └── floating-timer.js             — draggable solve-time stopwatch (content-script safe, no framework)
+└── welcome/
+    └── welcome.js                    — onboarding checklist page (auto-opened on first repo link)
 ```
 
 ### Data flow for a solve event
@@ -161,20 +166,21 @@ Extension listens for exactly `data.type === 'CODELEDGER_AUTH'`. Any mismatch si
 
 ---
 
-## Current State (as of CODELEDGER_EXECUTION_GUIDE.md)
+## Settings Keys — Canonical Conventions
 
-The execution guide defines 5 modules of fixes needed. Status of each:
+These conventions apply across all files. Inconsistency here causes silent commit failures.
 
-| Module | Problem                                                                                                              | Files                                                                                                         |
-| ------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| M0     | vendor bundles need CDN re-export shims                                                                              | `src/vendor/preact-bundle.js`, `src/vendor/chart-bundle.js`                                                   |
-| M1     | Worker: PKCS#1 key bug, wrong postMessage type, missing /api/health                                                  | `worker/src/index.js`                                                                                         |
-| M2     | `src/core/ai-prompts.js` does not exist → settings page crashes                                                      | CREATE `src/core/ai-prompts.js`                                                                               |
-| M3     | handleOAuth saves to wrong storage; getToken() checks wrong order                                                    | `src/ui/components/SettingsSchema.js`, `src/handlers/git/github/index.js`, `src/background/service-worker.js` |
-| M4     | LeetCode: no debounce, double commits; manifest run_at wrong, WAR too narrow, handler-loader has extra `src/` prefix | `src/handlers/platforms/leetcode/index.js`, `src/manifest.json`, `src/content/handler-loader.js`              |
-| M5     | `worker/public/config.json` has placeholder GitHub App slug                                                          | `worker/public/config.json`                                                                                   |
+| Key | Where stored | Canonical name | Notes |
+| --- | ------------ | -------------- | ----- |
+| GitHub repo name | `chrome.storage.local` (via `Storage.setSettings`) | `github_repo` | Do NOT use `gitRepo` (legacy camelCase) — always use `settings.github_repo \|\| settings.gitRepo` when reading for backwards compat |
+| GitHub repo owner | `chrome.storage.local` | `github_owner` | Falls back to `github_username` then `gitUser` from API |
+| GitHub PAT (manual) | `chrome.storage.local` | `github_token` | Only for legacy PAT — OAuth tokens go in `auth.tokens` |
+| OAuth token | `auth.tokens` (via `Storage.setAuthToken`) | accessed via `Storage.getAuthToken("github")` | Never save OAuth tokens to settings |
 
-Apply modules in order M0 → M5. Each has a VERIFY section that must pass before proceeding.
+**When reading the repo name anywhere in the codebase, always use:**
+```js
+const repo = settings.github_repo || settings.gitRepo;
+```
 
 ---
 
@@ -211,14 +217,35 @@ Apply modules in order M0 → M5. Each has a VERIFY section that must pass befor
 
 ---
 
-## Branch Strategy
+## GitHub Onboarding Flow
 
-Use feature branches off `main`:
-- `fix/m0-vendor-bundles` — Module 0 vendor shims
-- `fix/m1-worker` — Worker OAuth + health endpoint
-- `fix/m2-ai-prompts` — Create ai-prompts.js
-- `fix/m3-oauth-wiring` — Token storage + getToken priority
-- `fix/m4-leetcode-dedup` — Debounce + manifest + handler-loader
-- `fix/m5-config` — Worker config.json slug
+The `GitHubOnboardingModal` (`src/ui/components/GitHubOnboardingModal.js`) handles first-time repo setup:
 
-Merge each back to `main` after its VERIFY section passes.
+- **Create new repo**: Uses `auto_init: true` so GitHub creates an initial commit and default branch. Required for the Trees API to work (needs a base SHA).
+- **Repo init**: Uses the **Trees API** (`POST /git/trees` → `POST /git/commits` → `PATCH /git/refs/heads/main`) for atomic multi-file creation. Never use the Contents API (`PUT /contents/`) — it creates one commit per file and requires `btoa()` which breaks on non-ASCII (emoji).
+- **Token flow**: OAuth token is already saved to `auth.tokens` by the time the modal opens (saved by `library.js` handleOAuthMessage). The modal should NOT re-save the token to settings.
+- **Trigger**: Only `library.js` shows the modal (via `showGitHubOnboarding` state). `SettingsSchema.js` does NOT trigger onboarding — it only stores the token and fetches the username.
+
+## Problem Solve Data Shape
+
+The `problem:solved` event payload (emitted by platform handlers, consumed by service-worker):
+
+```js
+{
+  title: string,
+  titleSlug: string,
+  platform: string,           // "leetcode" | "geeksforgeeks" | "codeforces"
+  difficulty: "Easy" | "Medium" | "Hard",
+  lang: { name: string, ext: string, slug: string },
+  tags: string[],
+  topic: string,              // first tag, used as folder path
+  timestamp: number,          // Unix ms
+  code: string,
+  files: [{ path: string, content: string }],  // pre-built by handler
+  aiReview: string,           // populated by SW after AI review
+  runtime: string, memory: string, runtimePct: number, memoryPct: number,
+  elapsedSeconds: number,     // solve time from floating timer (0 if timer unused)
+}
+```
+
+The `files` array drives the git commit. If absent, SW builds a fallback single-file path: `topics/{topic}/{titleSlug}/{lang}.{ext}`. The SW always appends `index.json` as the last file in the commit.
