@@ -346,78 +346,163 @@ Be concise. Max 200 words.`;
   }
 
   /* ── Profile page import ───────────────────────────────────────────── */
+
+  /**
+   * Inject the "Import All Solves" button on a LeetCode profile page.
+   * Uses a retry loop (MutationObserver fallback) so the button appears even
+   * after React finishes rendering the profile header.
+   */
   async _injectProfileImportBtn(pageUsername) {
     if (!pageUsername) return;
 
+    // Honour explicit username filter — only skip if we KNOW it's a different user
     const settings = await Storage.getSettings().catch(() => ({}));
     const savedUsername = (settings.leetcode_username || "").toLowerCase();
-
-    // Hide on other users' profiles only when a username IS configured and it doesn't match
     if (savedUsername && savedUsername !== pageUsername.toLowerCase()) return;
 
-    // When no saved username, verify the viewer IS the profile owner via LeetCode session
+    // If no explicit username saved, verify with a lightweight userStatus query.
+    // On any failure (CSRF, network, not-signed-in) we still show the button;
+    // the import itself will surface any auth error clearly.
     if (!savedUsername) {
       try {
-        const res = await this._gql(`{ userStatus { username isSignedIn } }`, {});
+        const res = await this._gql(QUERIES.GLOBAL_DATA, {});
         const status = res?.data?.userStatus;
-        if (!status?.isSignedIn) return; // not logged in
-        if (status.username?.toLowerCase() !== pageUsername.toLowerCase()) return; // not owner
+        if (status?.isSignedIn === false) return; // definitely not logged in — no button
+        if (status?.username && status.username.toLowerCase() !== pageUsername.toLowerCase()) return;
+        // else: signed in as this user, or could not determine → show button
       } catch (_) {
-        return; // can't verify — hide button to be safe
+        // Network / auth error — still show the button; import will explain the issue
       }
     }
 
-    // Wait for the profile header to render
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Retry injecting the DOM element for up to 8 seconds (React renders lazily)
+    const MAX_ATTEMPTS = 16;
+    const RETRY_MS     = 500;
 
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (document.getElementById("cl-profile-import")) return; // already injected
+
+      const anchor = this._findProfileAnchor(pageUsername);
+      if (anchor) {
+        this._mountProfileImportBtn(pageUsername, anchor);
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+    }
+
+    // Last resort: floating fixed button at bottom-right so the import is always accessible
+    if (!document.getElementById("cl-profile-import")) {
+      const floater = document.createElement("div");
+      floater.style.cssText =
+        "position:fixed;bottom:80px;right:20px;z-index:9999;" +
+        "display:flex;flex-direction:column;gap:6px;align-items:flex-end;";
+
+      const btn = this._createImportBtn(pageUsername);
+      btn.style.boxShadow = "0 4px 24px rgba(6,182,212,0.25)";
+
+      const progress = document.createElement("div");
+      progress.id = "cl-import-progress";
+      progress.style.cssText =
+        "font-size:11px;color:#94a3b8;background:#0a0a0f;border:1px solid #1e293b;" +
+        "padding:4px 8px;border-radius:6px;max-width:240px;text-align:right;display:none;";
+
+      floater.appendChild(progress);
+      floater.appendChild(btn);
+      document.body.appendChild(floater);
+    }
+  }
+
+  /** Find a stable DOM anchor near the profile username heading. */
+  _findProfileAnchor(pageUsername) {
+    const lower = pageUsername.toLowerCase();
+
+    // 1. Look for a heading that contains exactly this username
+    const headings = [...document.querySelectorAll("h1, h2, [class*='username'], [class*='realname']")];
+    for (const el of headings) {
+      if (el.textContent.trim().toLowerCase() === lower) {
+        return el.closest("div") || el.parentElement;
+      }
+    }
+
+    // 2. Look for canonical profile selectors LeetCode has used historically
+    const byClass =
+      document.querySelector("[class*='profile-info']") ||
+      document.querySelector("[class*='profile-header']") ||
+      document.querySelector("[class*='user-info']") ||
+      document.querySelector("[class*='userInfo']");
+    if (byClass) return byClass;
+
+    // 3. Find the avatar + heading container
+    const avatar = document.querySelector("img[class*='avatar'], img[alt*='avatar'], img[class*='user']");
+    if (avatar) return avatar.closest("div[class]") || avatar.parentElement;
+
+    return null;
+  }
+
+  /** Build and mount the import button + progress div onto a DOM anchor. */
+  _mountProfileImportBtn(pageUsername, anchor) {
     if (document.getElementById("cl-profile-import")) return;
 
-    // Find the profile header area
-    const profileHeader =
-      document.querySelector("[class*='profile-header']") ||
-      document.querySelector("div[class*='flex'][class*='items-center'] h1")?.closest("div") ||
-      document.querySelector("h1")?.parentElement;
-
-    if (!profileHeader) return;
-
-    const btn = document.createElement("button");
-    btn.id = "cl-profile-import";
-    btn.className =
-      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-cyan-500/40 text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors mt-3";
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm1 14H11v-4H8l4-4 4 4h-3v4z"/></svg> Import All Solves to CodeLedger`;
-
-    btn.addEventListener("click", () => this._runProfileImport(pageUsername, btn));
-
     const container = document.createElement("div");
-    container.style.cssText = "margin-top:12px;display:flex;flex-direction:column;gap:8px;";
-    container.appendChild(btn);
+    container.style.cssText = "margin-top:12px;display:flex;flex-direction:column;gap:6px;";
 
+    const btn = this._createImportBtn(pageUsername);
     const progress = document.createElement("div");
     progress.id = "cl-import-progress";
     progress.style.cssText = "font-size:12px;color:#94a3b8;display:none;";
-    container.appendChild(progress);
 
-    profileHeader.appendChild(container);
+    container.appendChild(btn);
+    container.appendChild(progress);
+    anchor.appendChild(container);
   }
 
-  async _runProfileImport(username, btn) {
-    btn.disabled = true;
-    const progress = document.getElementById("cl-import-progress");
-    const show = (msg) => { if (progress) { progress.textContent = msg; progress.style.display = "block"; } };
+  /** Create the styled import button element. */
+  _createImportBtn(pageUsername) {
+    const btn = document.createElement("button");
+    btn.id = "cl-profile-import";
+    btn.style.cssText =
+      "display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;" +
+      "font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;" +
+      "border:1px solid rgba(6,182,212,0.4);color:#67e8f9;" +
+      "background:rgba(6,182,212,0.08);transition:background 0.2s;";
+    btn.onmouseenter = () => { btn.style.background = "rgba(6,182,212,0.18)"; };
+    btn.onmouseleave = () => { btn.style.background = "rgba(6,182,212,0.08)"; };
+    btn.innerHTML =
+      `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">` +
+      `<path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm1 14H11v-4H8l4-4 4 4h-3v4z"/>` +
+      `</svg> Import All Solves to CodeLedger`;
+    btn.addEventListener("click", () => this._runProfileImport(pageUsername, btn));
+    return btn;
+  }
 
-    const AC_QUERY = `query submissionList($offset:Int!,$limit:Int!,$status:Int){
-      submissionList(offset:$offset,limit:$limit,status:$status){
-        lastKey hasNext
-        submissions{id title titleSlug lang langName runtime timestamp status statusDisplay}
+  async _runProfileImport(pageUsername, btn) {
+    btn.disabled = true;
+    const progressEl = document.getElementById("cl-import-progress");
+    const show = (msg) => {
+      dbg.log("[import]", msg);
+      if (progressEl) { progressEl.textContent = msg; progressEl.style.display = "block"; }
+    };
+
+    // Global accepted-submissions query (cross-problem, paginated)
+    const AC_QUERY = `
+      query submissionList($offset: Int!, $limit: Int!, $status: Int) {
+        submissionList(offset: $offset, limit: $limit, status: $status) {
+          lastKey
+          hasNext
+          submissions {
+            id title titleSlug lang langName runtime timestamp status statusDisplay
+          }
+        }
       }
-    }`;
+    `;
 
     try {
-      // Phase 1: Build difficulty + title map via the problems REST API (one fast request)
+      // ── Phase 1: Bulk problem index (difficulty + title from REST API) ──
       show("Building problem index…");
-      const diffMap  = {}; // titleSlug → "Easy" | "Medium" | "Hard"
-      const titleMap = {}; // titleSlug → display title
-      const tagsMap  = {}; // titleSlug → string[]
+      const diffMap  = {}; // slug → "Easy"|"Medium"|"Hard"
+      const titleMap = {}; // slug → display title
+      const tagsMap  = {}; // slug → string[]
 
       try {
         const apiRes = await fetch("https://leetcode.com/api/problems/all/", { credentials: "include" });
@@ -426,45 +511,55 @@ Be concise. Max 200 words.`;
           const LEVEL = { 1: "Easy", 2: "Medium", 3: "Hard" };
           for (const pair of (apiData.stat_status_pairs || [])) {
             const slug  = pair.stat?.question__title_slug;
-            const title = pair.stat?.question__title;
             const level = pair.difficulty?.level;
+            const title = pair.stat?.question__title;
             if (slug) {
-              if (level)  diffMap[slug]  = LEVEL[level];
-              if (title)  titleMap[slug] = title;
+              if (level) diffMap[slug]  = LEVEL[level];
+              if (title) titleMap[slug] = title;
             }
           }
-          show(`Problem index ready (${Object.keys(diffMap).length} entries).`);
+          show(`Problem index: ${Object.keys(diffMap).length} entries.`);
+        } else {
+          show("Problem index unavailable — will fetch per-problem.");
         }
-      } catch (_) { /* bulk fetch failed — will fall back per-problem below */ }
+      } catch (_) {
+        show("Problem index fetch failed — will fetch per-problem.");
+      }
 
-      // Phase 2: Collect all accepted submissions (paginated)
+      // ── Phase 2: Paginate all accepted submissions ──
       show("Fetching submission history…");
-      let offset = 0;
-      const pageLimit = 20;
+      let offset  = 0;
+      const PAGE  = 20;
       let hasNext = true;
       let pageNum = 0;
       const allSubs = [];
 
       while (hasNext) {
         show(`Fetching submissions page ${++pageNum}…`);
-        const res = await fetch("https://leetcode.com/graphql/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-csrftoken": this._getCsrf() },
-          body: JSON.stringify({ query: AC_QUERY, variables: { offset, limit: pageLimit, status: 10 } }),
-          credentials: "include",
-        });
-        if (!res.ok) throw new Error("GraphQL request failed: " + res.status);
-        const json = await res.json();
+        let json;
+        try {
+          json = await this._gql(AC_QUERY, { offset, limit: PAGE, status: 10 });
+        } catch (e) {
+          throw new Error(`Submission fetch failed (page ${pageNum}): ${e.message}. Make sure you are logged in to LeetCode.`);
+        }
+
         const list = json?.data?.submissionList;
-        if (!list) throw new Error("Unexpected API response");
-        const subs = (list.submissions || []).filter((s) => s.statusDisplay === "Accepted");
-        allSubs.push(...subs);
+        if (!list) throw new Error("Unexpected API response — submissionList was null. LeetCode may have changed their API.");
+
+        const accepted = (list.submissions || []).filter((s) => s.statusDisplay === "Accepted");
+        allSubs.push(...accepted);
         hasNext = list.hasNext;
-        offset += pageLimit;
-        if (hasNext) await new Promise((r) => setTimeout(r, 800));
+        offset += PAGE;
+        if (hasNext) await new Promise((r) => setTimeout(r, 600));
       }
 
-      // Phase 3: Deduplicate by (titleSlug, lang) — keep most recent accepted per pair
+      if (allSubs.length === 0) {
+        show("No accepted submissions found. Make sure you are logged in.");
+        btn.disabled = false;
+        return;
+      }
+
+      // ── Phase 3: Dedup — keep newest accepted per (titleSlug, lang) ──
       const dedupMap = new Map();
       for (const s of allSubs) {
         const key = `${s.titleSlug}::${s.lang}`;
@@ -473,15 +568,14 @@ Be concise. Max 200 words.`;
         if (!cur || ts > Number(cur.timestamp || 0)) dedupMap.set(key, s);
       }
       const picks = Array.from(dedupMap.values());
-      show(`Found ${picks.length} unique submissions.`);
+      show(`Found ${picks.length} unique accepted submissions.`);
 
-      // Phase 4: Per-problem metadata fetch for slugs still missing difficulty or tags
-      // No hard cap — 200ms delay between calls keeps us well under LeetCode rate limits
-      const missingDiff = [...new Set(picks.filter(s => !diffMap[s.titleSlug]).map(s => s.titleSlug))];
-      if (missingDiff.length > 0) {
-        show(`Fetching metadata for ${missingDiff.length} problems…`);
-        for (let i = 0; i < missingDiff.length; i++) {
-          const slug = missingDiff[i];
+      // ── Phase 4: Fetch metadata for slugs missing difficulty / tags ──
+      const needMeta = [...new Set(picks.filter(s => !diffMap[s.titleSlug]).map(s => s.titleSlug))];
+      if (needMeta.length > 0) {
+        show(`Fetching metadata for ${needMeta.length} problems…`);
+        for (let i = 0; i < needMeta.length; i++) {
+          const slug = needMeta[i];
           try {
             const meta = await this._fetchMetadata(slug);
             if (meta) {
@@ -490,23 +584,23 @@ Be concise. Max 200 words.`;
               if (meta.topicTags?.length) tagsMap[slug]  = meta.topicTags.map(t => t.name);
             }
           } catch (_) {}
-          if (i < missingDiff.length - 1) await new Promise((r) => setTimeout(r, 200));
-          if ((i + 1) % 20 === 0) show(`Fetching metadata… ${i + 1}/${missingDiff.length}`);
+          if (i < needMeta.length - 1) await new Promise((r) => setTimeout(r, 250));
+          if ((i + 1) % 10 === 0) show(`Metadata… ${i + 1}/${needMeta.length}`);
         }
       }
 
-      // Phase 5: Emit problem:solved events
-      // skipCommit=true avoids triggering 200+ individual git commits during bulk import
+      // ── Phase 5: Emit problem:solved (skipCommit=true — no git commits) ──
       show(`Importing ${picks.length} submissions…`);
       let imported = 0;
+
       for (const sub of picks) {
-        const lang  = resolveLang(sub.lang);
-        const ts    = Number(sub.timestamp || 0) * 1000; // LeetCode API returns seconds → convert to ms
+        const lang  = resolveLang(sub.lang || sub.langName);
+        const ts    = Number(sub.timestamp || 0) * 1000; // seconds → ms
         const tags  = tagsMap[sub.titleSlug] || [];
         const topic = tags[0] || "Uncategorized";
 
         eventBus.emit("problem:solved", {
-          id:         `${sub.titleSlug}::${lang.slug}`, // unique per (problem, language)
+          id:         `${sub.titleSlug}::${lang.slug}`,
           platform:   "leetcode",
           title:      titleMap[sub.titleSlug] || sub.title || sub.titleSlug,
           titleSlug:  sub.titleSlug,
@@ -523,17 +617,19 @@ Be concise. Max 200 words.`;
         imported++;
         if (imported % 10 === 0) {
           show(`Importing… ${imported}/${picks.length}`);
-          await new Promise((r) => setTimeout(r, 30));
+          await new Promise((r) => setTimeout(r, 25)); // yield to SW message queue
         }
       }
 
       show(`Done! Imported ${imported} submissions.`);
       btn.textContent = `✓ Imported ${imported} solves`;
+      btn.style.color = "#34d399";
+      btn.style.borderColor = "rgba(52,211,153,0.4)";
     } catch (e) {
       dbg.error("Profile import failed", e);
       show(`Import failed: ${e.message}`);
       btn.disabled = false;
-      btn.textContent = "Retry Import";
+      btn.textContent = "↺ Retry Import";
     }
   }
 
@@ -797,17 +893,20 @@ Be concise. Max 200 words.`;
   }
 
   async _gql(query, variables) {
-    const res = await fetch(`${window.location.origin}/graphql`, {
+    const csrf = this._getCsrf();
+    const res = await fetch("https://leetcode.com/graphql/", {
       method:      "POST",
       credentials: "include",
       headers: {
-        "Content-Type":    "application/json",
-        "X-Requested-With":"XMLHttpRequest",
+        "Content-Type":     "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        ...(csrf ? { "x-csrftoken": csrf } : {}),
       },
       body: JSON.stringify({ query, variables }),
     });
+    if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`);
     const json = await res.json();
-    if (json.errors) throw new Error(json.errors[0]?.message || "GraphQL error");
+    if (json.errors?.length) throw new Error(json.errors[0]?.message || "GraphQL error");
     return json;
   }
 
