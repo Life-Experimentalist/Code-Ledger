@@ -10,7 +10,7 @@ const html = htm.bind(h);
 import { SettingsSchema } from "../../ui/components/SettingsSchema.js";
 import { registry } from "../../core/handler-registry.js";
 
-export function SettingsView({ settings, onSettingsChange }) {
+export function SettingsView({ settings, onSettingsChange, onSetupRepo }) {
   const schemas = registry.getAllSettingsSchemas();
 
   return html`
@@ -24,6 +24,7 @@ export function SettingsView({ settings, onSettingsChange }) {
           schema=${schemas}
           values=${settings}
           onChange=${onSettingsChange}
+          onSetupRepo=${onSetupRepo}
         />
       </div>
     </div>

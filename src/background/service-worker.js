@@ -105,6 +105,10 @@ async function handleSolved(data) {
   // 4. Git Commit — only auto-commit first time per (slug, language)
   // gitEnabled defaults to true when never explicitly set (matches schema default: true)
   const gitEnabled = settings.gitEnabled !== false && settings.gitEnabled !== 0;
+  if (data.skipCommit) {
+    coreDebug.log("skipCommit flag set — skipping git commit for bulk import", titleSlug);
+    return;
+  }
   if (gitEnabled && !isFirstCommit) {
     coreDebug.log("Already committed slug+lang before — skipping auto-commit. Use manual sync.", titleSlug, langName);
   }

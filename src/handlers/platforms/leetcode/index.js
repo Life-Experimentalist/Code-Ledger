@@ -252,11 +252,19 @@ Be concise. Max 200 words.`;
   }
 
   _injectDetailSyncBtn(page) {
-    // Try multiple toolbar selectors for submission detail page
+    // Try multiple toolbar selectors — LeetCode changes class names frequently
     const toolbar =
+      document.querySelector("[class*='action-bar']") ||
       document.querySelector(".flex.flex-none.gap-2:not(.justify-center):not(.justify-between)") ||
-      document.querySelector("[class*='submission'] .flex.gap-2") ||
-      document.querySelector("div[class*='flex'][class*='gap'] > div.flex.items-center");
+      document.querySelector("[class*='submission-detail'] .flex.gap-2") ||
+      document.querySelector("div[class*='flex'][class*='gap-2']:has(button)") ||
+      (() => {
+        // Find any container near a "Copy" or "Definition" button — that's the toolbar
+        const copy = Array.from(document.querySelectorAll("button")).find(
+          b => /^copy$/i.test(b.textContent.trim())
+        );
+        return copy?.closest("div.flex, div[class*='gap']") || null;
+      })();
     if (!toolbar) return;
 
     const btn = document.createElement("button");
@@ -270,23 +278,36 @@ Be concise. Max 200 words.`;
   }
 
   _injectListSyncBtns(page) {
-    // Add a "Sync" button to each submission row in the list
-    const rows = document.querySelectorAll("div[class*='submission-list'] tr:not(.cl-synced), table tr[class*='ac']:not(.cl-synced)");
-    for (const row of rows) {
-      if (row.querySelector(".cl-row-sync")) continue;
-      const statusCell = row.querySelector("td:nth-child(1), [class*='status']");
-      if (!statusCell || !/accepted/i.test(statusCell.textContent || "")) continue;
+    // LeetCode renders submissions as both table rows and div-based rows — handle both
+    const rowCandidates = [
+      ...document.querySelectorAll("table tbody tr:not(.cl-synced)"),
+      ...document.querySelectorAll("div[class*='submission'] [class*='row']:not(.cl-synced)"),
+      // New LeetCode UI: each submission is a div with a link to /submissions/<id>
+      ...Array.from(document.querySelectorAll("div[class*='flex']:not(.cl-synced)")).filter(
+        el => el.querySelector("a[href*='/submissions/']") && el.textContent
+      ),
+    ];
 
-      const submissionId = row.getAttribute("data-submission-id") ||
+    for (const row of rowCandidates) {
+      if (row.querySelector(".cl-row-sync")) continue;
+
+      // Only process Accepted submissions
+      const rowText = row.textContent || "";
+      if (!/accepted/i.test(rowText)) continue;
+
+      const submissionId =
+        row.getAttribute("data-submission-id") ||
         row.querySelector("a[href*='/submissions/']")?.href?.match(/\/submissions\/(\d+)/)?.[1];
 
       if (!submissionId) continue;
 
       const btn = document.createElement("button");
-      btn.className = "cl-row-sync text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors ml-2";
-      btn.textContent = "Sync";
+      btn.className = "cl-row-sync text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors ml-2 shrink-0";
+      btn.textContent = "Add to Ledger";
+      btn.style.cssText = "font-family:inherit;cursor:pointer;white-space:nowrap;";
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
+        e.preventDefault();
         btn.textContent = "⏳";
         btn.disabled = true;
         try {
@@ -294,17 +315,19 @@ Be concise. Max 200 words.`;
             { type: PAGE_TYPES.SUBMISSION, slug: page.slug, submissionId },
             true,
           );
-          btn.textContent = "✓";
-          btn.className = btn.className.replace("text-cyan-400", "text-emerald-400");
+          btn.textContent = "✓ Added";
+          btn.style.color = "#34d399";
+          btn.style.borderColor = "rgba(52,211,153,0.3)";
           row.classList.add("cl-synced");
         } catch {
-          btn.textContent = "✗";
+          btn.textContent = "✗ Failed";
           btn.disabled = false;
         }
       });
 
-      const lastCell = row.querySelector("td:last-child");
-      if (lastCell) lastCell.appendChild(btn);
+      // Append to the last cell / end of row
+      const anchor = row.querySelector("td:last-child") || row;
+      anchor.appendChild(btn);
     }
   }
 
@@ -331,6 +354,18 @@ Be concise. Max 200 words.`;
 
     // Hide on other users' profiles only when a username IS configured and it doesn't match
     if (savedUsername && savedUsername !== pageUsername.toLowerCase()) return;
+
+    // When no saved username, verify the viewer IS the profile owner via LeetCode session
+    if (!savedUsername) {
+      try {
+        const res = await this._gql(`{ userStatus { username isSignedIn } }`, {});
+        const status = res?.data?.userStatus;
+        if (!status?.isSignedIn) return; // not logged in
+        if (status.username?.toLowerCase() !== pageUsername.toLowerCase()) return; // not owner
+      } catch (_) {
+        return; // can't verify — hide button to be safe
+      }
+    }
 
     // Wait for the profile header to render
     await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -370,69 +405,130 @@ Be concise. Max 200 words.`;
     const progress = document.getElementById("cl-import-progress");
     const show = (msg) => { if (progress) { progress.textContent = msg; progress.style.display = "block"; } };
 
-    const AC_QUERY = `query submissionList($offset:Int!,$limit:Int!,$questionSlug:String,$lang:Int,$status:Int){
-      submissionList(offset:$offset,limit:$limit,questionSlug:$questionSlug,lang:$lang,status:$status){
+    const AC_QUERY = `query submissionList($offset:Int!,$limit:Int!,$status:Int){
+      submissionList(offset:$offset,limit:$limit,status:$status){
         lastKey hasNext
         submissions{id title titleSlug lang langName runtime timestamp status statusDisplay}
       }
     }`;
 
     try {
+      // Phase 1: Build difficulty + title map via the problems REST API (one fast request)
+      show("Building problem index…");
+      const diffMap  = {}; // titleSlug → "Easy" | "Medium" | "Hard"
+      const titleMap = {}; // titleSlug → display title
+      const tagsMap  = {}; // titleSlug → string[]
+
+      try {
+        const apiRes = await fetch("https://leetcode.com/api/problems/all/", { credentials: "include" });
+        if (apiRes.ok) {
+          const apiData = await apiRes.json();
+          const LEVEL = { 1: "Easy", 2: "Medium", 3: "Hard" };
+          for (const pair of (apiData.stat_status_pairs || [])) {
+            const slug  = pair.stat?.question__title_slug;
+            const title = pair.stat?.question__title;
+            const level = pair.difficulty?.level;
+            if (slug) {
+              if (level)  diffMap[slug]  = LEVEL[level];
+              if (title)  titleMap[slug] = title;
+            }
+          }
+          show(`Problem index ready (${Object.keys(diffMap).length} entries).`);
+        }
+      } catch (_) { /* bulk fetch failed — will fall back per-problem below */ }
+
+      // Phase 2: Collect all accepted submissions (paginated)
+      show("Fetching submission history…");
       let offset = 0;
-      const limit = 20;
-      let totalImported = 0;
+      const pageLimit = 20;
       let hasNext = true;
-      let page = 0;
+      let pageNum = 0;
+      const allSubs = [];
 
       while (hasNext) {
-        show(`Fetching page ${++page} (offset ${offset})…`);
-
+        show(`Fetching submissions page ${++pageNum}…`);
         const res = await fetch("https://leetcode.com/graphql/", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-csrftoken": this._getCsrf() },
-          body: JSON.stringify({
-            query: AC_QUERY,
-            variables: { offset, limit, status: 10 }, // status 10 = Accepted
-          }),
+          body: JSON.stringify({ query: AC_QUERY, variables: { offset, limit: pageLimit, status: 10 } }),
           credentials: "include",
         });
-
         if (!res.ok) throw new Error("GraphQL request failed: " + res.status);
         const json = await res.json();
         const list = json?.data?.submissionList;
         if (!list) throw new Error("Unexpected API response");
-
         const subs = (list.submissions || []).filter((s) => s.statusDisplay === "Accepted");
-
-        for (const sub of subs) {
-          const ts = Number(sub.timestamp || 0);
-          eventBus.emit("problem:solved", {
-            id: sub.titleSlug,
-            platform: "leetcode",
-            title: sub.title,
-            titleSlug: sub.titleSlug,
-            difficulty: "Unknown",
-            lang: { name: sub.langName || sub.lang, ext: sub.lang },
-            tags: [],
-            topic: "Uncategorized",
-            code: "",
-            files: [],
-            timestamp: ts,
-          });
-          totalImported++;
-        }
-
+        allSubs.push(...subs);
         hasNext = list.hasNext;
-        offset += limit;
-
-        show(`Imported ${totalImported} so far (page ${page})…`);
-
-        // Polite delay between pages to avoid rate limiting
-        if (hasNext) await new Promise((r) => setTimeout(r, 1200));
+        offset += pageLimit;
+        if (hasNext) await new Promise((r) => setTimeout(r, 800));
       }
 
-      show(`Done! Imported ${totalImported} accepted submissions.`);
-      btn.textContent = `✓ Imported ${totalImported} solves`;
+      // Phase 3: Deduplicate by (titleSlug, lang) — keep most recent accepted per pair
+      const dedupMap = new Map();
+      for (const s of allSubs) {
+        const key = `${s.titleSlug}::${s.lang}`;
+        const ts  = Number(s.timestamp || 0);
+        const cur = dedupMap.get(key);
+        if (!cur || ts > Number(cur.timestamp || 0)) dedupMap.set(key, s);
+      }
+      const picks = Array.from(dedupMap.values());
+      show(`Found ${picks.length} unique submissions.`);
+
+      // Phase 4: Per-problem metadata fetch for slugs still missing difficulty or tags
+      // No hard cap — 200ms delay between calls keeps us well under LeetCode rate limits
+      const missingDiff = [...new Set(picks.filter(s => !diffMap[s.titleSlug]).map(s => s.titleSlug))];
+      if (missingDiff.length > 0) {
+        show(`Fetching metadata for ${missingDiff.length} problems…`);
+        for (let i = 0; i < missingDiff.length; i++) {
+          const slug = missingDiff[i];
+          try {
+            const meta = await this._fetchMetadata(slug);
+            if (meta) {
+              if (meta.difficulty)        diffMap[slug]  = meta.difficulty;
+              if (meta.title)             titleMap[slug] = meta.title;
+              if (meta.topicTags?.length) tagsMap[slug]  = meta.topicTags.map(t => t.name);
+            }
+          } catch (_) {}
+          if (i < missingDiff.length - 1) await new Promise((r) => setTimeout(r, 200));
+          if ((i + 1) % 20 === 0) show(`Fetching metadata… ${i + 1}/${missingDiff.length}`);
+        }
+      }
+
+      // Phase 5: Emit problem:solved events
+      // skipCommit=true avoids triggering 200+ individual git commits during bulk import
+      show(`Importing ${picks.length} submissions…`);
+      let imported = 0;
+      for (const sub of picks) {
+        const lang  = resolveLang(sub.lang);
+        const ts    = Number(sub.timestamp || 0) * 1000; // LeetCode API returns seconds → convert to ms
+        const tags  = tagsMap[sub.titleSlug] || [];
+        const topic = tags[0] || "Uncategorized";
+
+        eventBus.emit("problem:solved", {
+          id:         `${sub.titleSlug}::${lang.slug}`, // unique per (problem, language)
+          platform:   "leetcode",
+          title:      titleMap[sub.titleSlug] || sub.title || sub.titleSlug,
+          titleSlug:  sub.titleSlug,
+          difficulty: diffMap[sub.titleSlug] || "Unknown",
+          lang:       { name: lang.verbose, ext: lang.ext, slug: lang.slug },
+          tags,
+          topic,
+          code:       "",
+          files:      [],
+          timestamp:  ts,
+          skipCommit: true,
+        });
+
+        imported++;
+        if (imported % 10 === 0) {
+          show(`Importing… ${imported}/${picks.length}`);
+          await new Promise((r) => setTimeout(r, 30));
+        }
+      }
+
+      show(`Done! Imported ${imported} submissions.`);
+      btn.textContent = `✓ Imported ${imported} solves`;
     } catch (e) {
       dbg.error("Profile import failed", e);
       show(`Import failed: ${e.message}`);
@@ -548,16 +644,20 @@ Be concise. Max 200 words.`;
       // Fetch rich metadata
       const meta = await this._fetchMetadata(slug);
 
-      // Build file list for the single atomic commit
-      const files = this._buildFileSet(submission, meta, settings, slug, elapsedSeconds);
-
       // Canonical mapping
       try { await canonicalMapper.loadMap(); } catch (_) {}
       const canonical = canonicalMapper.resolve("leetcode", slug);
 
       const lang = resolveLang(submission.lang);
-
       const elapsedSeconds = this._getElapsedSeconds();
+
+      // Build file list for the single atomic commit
+      const files = this._buildFileSet(submission, meta, settings, slug, elapsedSeconds);
+
+      // Normalize timestamp to ms — LeetCode API returns Unix seconds
+      const tsMs = submission.timestamp
+        ? Number(submission.timestamp) * 1000
+        : Date.now();
 
       eventBus.emit("problem:solved", {
         platform:   "leetcode",
@@ -575,7 +675,7 @@ Be concise. Max 200 words.`;
         memory:     submission.memoryDisplay  || submission.memory  || null,
         runtimePct: submission.runtimePercentile || null,
         memoryPct:  submission.memoryPercentile  || null,
-        timestamp:  submission.timestamp || Math.floor(Date.now() / 1000),
+        timestamp:  tsMs,
         acRate:     meta?.acRate || null,
         likes:      meta?.likes  || null,
         dislikes:   meta?.dislikes || null,

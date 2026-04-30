@@ -50,12 +50,22 @@ const SORT_OPTIONS = [
 ];
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
 
-export function ProblemsView({ problems, searchQuery }) {
+export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblemDelete }) {
   const [filterDifficulty, setFilterDifficulty] = useState("All");
   const [filterPlatform, setFilterPlatform]     = useState("All");
   const [query, setQuery]                       = useState(searchQuery || "");
   const [sortBy, setSortBy]                     = useState("newest");
   const [selectedProblem, setSelectedProblem]   = useState(null);
+
+  const handleProblemUpdate = (updated) => {
+    setSelectedProblem(updated);
+    if (onProblemUpdate) onProblemUpdate(updated);
+  };
+
+  const handleProblemDelete = (id) => {
+    setSelectedProblem(null);
+    if (onProblemDelete) onProblemDelete(id);
+  };
 
   useEffect(() => { setQuery(searchQuery || ""); }, [searchQuery]);
 
@@ -200,6 +210,8 @@ export function ProblemsView({ problems, searchQuery }) {
       <${ProblemModal}
         problem=${selectedProblem}
         onClose=${() => setSelectedProblem(null)}
+        onUpdate=${handleProblemUpdate}
+        onDelete=${handleProblemDelete}
       />
     </div>
   `;

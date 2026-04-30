@@ -174,6 +174,10 @@ export function GraphView({ problems }) {
   const [selected,      setSelected]      = useState(null);
   const [modalProblem,  setModalProblem]  = useState(null);
   const [filterSolved, setFilterSolved]   = useState(false);
+  const filterSolvedRef = useRef(false);
+  // Refs so the animation loop can read current hovered/selected without restarting
+  const hoveredRef  = useRef(null);
+  const selectedRef = useRef(null);
 
   // Build graph whenever problems change
   useEffect(() => {
@@ -193,7 +197,12 @@ export function GraphView({ problems }) {
     simRef.current.alpha = 1;
   }, [problems]);
 
-  // Animation loop
+  // Keep all refs in sync so the animation loop reads current values without restarting
+  useEffect(() => { filterSolvedRef.current = filterSolved; }, [filterSolved]);
+  useEffect(() => { hoveredRef.current  = hovered;  }, [hovered]);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+
+  // Animation loop — deps are empty; reads all mutable state via refs
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -210,16 +219,23 @@ export function GraphView({ problems }) {
         simRef.current.alpha = Math.max(0, alpha - ALPHA_DECAY);
       }
 
+      const drawNodes = filterSolvedRef.current
+        ? nodes.filter((n) => n.type === "topic" || n.solved)
+        : nodes;
+      const drawEdges = filterSolvedRef.current
+        ? edges.filter((e) => drawNodes.some((n) => n.id === e.source) && drawNodes.some((n) => n.id === e.target))
+        : edges;
+
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = "#0a0a0f";
       ctx.fillRect(0, 0, w, h);
-      drawGraph(ctx, nodes, edges, transformRef.current, hovered, selected);
+      drawGraph(ctx, drawNodes, drawEdges, transformRef.current, hoveredRef.current, selectedRef.current);
       simRef.current.raf = requestAnimationFrame(loop);
     }
 
     simRef.current.raf = requestAnimationFrame(loop);
     return () => { running = false; cancelAnimationFrame(simRef.current.raf); };
-  }, [hovered, selected]);
+  }, []);
 
   // Resize observer
   useEffect(() => {
@@ -258,7 +274,10 @@ export function GraphView({ problems }) {
       return;
     }
 
-    const hit = hitTest(simRef.current.nodes, mx, my, transformRef.current);
+    const testNodes = filterSolvedRef.current
+      ? simRef.current.nodes.filter((n) => n.type === "topic" || n.solved)
+      : simRef.current.nodes;
+    const hit = hitTest(testNodes, mx, my, transformRef.current);
     setHovered(hit);
     setMousePos({ x: e.clientX, y: e.clientY });
     canvas.style.cursor = hit ? "pointer" : "grab";
@@ -267,7 +286,10 @@ export function GraphView({ problems }) {
   const onMouseDown = useCallback((e) => {
     const canvas = canvasRef.current;
     const rect   = canvas.getBoundingClientRect();
-    const hit = hitTest(simRef.current.nodes, e.clientX - rect.left, e.clientY - rect.top, transformRef.current);
+    const testNodes = filterSolvedRef.current
+      ? simRef.current.nodes.filter((n) => n.type === "topic" || n.solved)
+      : simRef.current.nodes;
+    const hit = hitTest(testNodes, e.clientX - rect.left, e.clientY - rect.top, transformRef.current);
     if (hit) {
       dragRef.current = { type: "node", node: hit };
     } else {
@@ -297,6 +319,14 @@ export function GraphView({ problems }) {
     t.ty = my + (t.ty - my) * delta;
     t.scale = Math.min(Math.max(t.scale * delta, 0.2), 5);
   }, []);
+
+  // Attach wheel listener as non-passive so e.preventDefault() works
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, [onWheel]);
 
   const reheat = useCallback(() => { simRef.current.alpha = 1; }, []);
 
@@ -351,7 +381,7 @@ export function GraphView({ problems }) {
               ${node.runtime ? html`<span class="text-slate-500">Runtime</span><span class="text-slate-200 text-right">${node.runtime}${node.runtimePct ? html` <span class="text-cyan-500/60">· ${node.runtimePct.toFixed(0)}%</span>` : ""}</span>` : ""}
               ${node.memory ? html`<span class="text-slate-500">Memory</span><span class="text-slate-200 text-right">${node.memory}${node.memoryPct ? html` <span class="text-cyan-500/60">· ${node.memoryPct.toFixed(0)}%</span>` : ""}</span>` : ""}
               ${node.acRate ? html`<span class="text-slate-500">Accept rate</span><span class="text-slate-200 text-right">${node.acRate.toFixed(1)}%</span>` : ""}
-              ${node.timestamp ? html`<span class="text-slate-500">Solved</span><span class="text-slate-200 text-right">${new Date(node.timestamp * 1000).toLocaleDateString()}</span>` : ""}
+              ${node.timestamp ? html`<span class="text-slate-500">Solved</span><span class="text-slate-200 text-right">${new Date(node.timestamp < 1e10 ? node.timestamp * 1000 : node.timestamp).toLocaleDateString()}</span>` : ""}
             </div>
           ` : ""}
           <!-- All topics/tags -->
@@ -404,7 +434,6 @@ export function GraphView({ problems }) {
           onMouseMove=${onMouseMove}
           onMouseDown=${onMouseDown}
           onMouseUp=${onMouseUp}
-          onWheel=${onWheel}
         ></canvas>
 
         <!-- Legend -->

@@ -4,463 +4,503 @@
  */
 
 import { h } from "../../vendor/preact-bundle.js";
-import { useState } from "../../vendor/preact-bundle.js";
+import { useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
 const html = htm.bind(h);
 const dbg = createDebugger("GitHubOnboarding");
 
+const DEFAULT_REPO_NAME = "CodeLedger-Sync";
+const DEFAULT_REPO_DESC =
+  "My LeetCode & DSA problem solutions tracked via CodeLedger https://codeledger.vkrishna04.me/";
+
 /**
- * GitHub Onboarding Modal - Step 1: Auth Success → Step 2: Repo Choice → Step 3: Setup
+ * GitHub Onboarding Modal
+ *
+ * Steps:
+ *   "check"    – initial state, resolves which step to show
+ *   "choice"   – pick Create or Link
+ *   "new"      – confirm new repo creation (name pre-filled, editable)
+ *   "existing" – pick from user's existing repos (dropdown)
+ *   "done"     – success screen
+ *
+ * Props:
+ *   isOpen      – boolean
+ *   onComplete  – called when modal should close (repo configured or dismissed)
+ *   username    – GitHub login
+ *   token       – GitHub OAuth/PAT token
  */
 export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
-    const [step, setStep] = useState("choice");
-    const [repoName, setRepoName] = useState("CodeLedger-Sync");
-    const [repoDesc, setRepoDesc] = useState(
-        "My LeetCode & DSA problem solutions tracked via CodeLedger https://codeledger.vkrishna04.me/ | https://github.com/Life-Experimentalist/Code-Ledger"
-    );
-    const [repoTags, setRepoTags] = useState("leetcode,dsa,problems,codeledger");
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState("");
-    const [progress, setProgress] = useState("");
+  const [step,         setStep]         = useState("check");
+  const [repoName,     setRepoName]     = useState(DEFAULT_REPO_NAME);
+  const [repoDesc,     setRepoDesc]     = useState(DEFAULT_REPO_DESC);
+  const [busy,         setBusy]         = useState(false);
+  const [error,        setError]        = useState("");
+  const [progress,     setProgress]     = useState("");
+  const [finalRepo,    setFinalRepo]    = useState(""); // actual created/linked repo name
+  // For "existing" picker
+  const [userRepos,    setUserRepos]    = useState([]);
+  const [reposLoading, setReposLoading] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState("");
 
-    // Sanitize repo name: replace whitespace with hyphens, lowercase
-    const sanitizeRepoName = (name) => {
-        return name
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, "-") // Replace whitespace with hyphens
-            .replace(/[^a-z0-9-]/g, "") // Remove invalid characters
-            .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
-    };
+  // On every open, decide which step to start from
+  useEffect(() => {
+    if (!isOpen) return;
+    setError("");
+    setProgress("");
+    setBusy(false);
+    setStep("check");
 
-    // Debounce handler to prevent click violation
-    const debounce = (fn, delay = 300) => {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => fn(...args), delay);
-        };
-    };
+    Storage.getSettings().then((s) => {
+      const hasRepo = !!(s?.github_repo || s?.gitRepo);
+      if (hasRepo) {
+        // Already fully configured — nothing to do, jump straight to done
+        setFinalRepo(s.github_repo || s.gitRepo || "");
+        setStep("already");
+      } else {
+        setStep("choice");
+      }
+    }).catch(() => setStep("choice"));
+  }, [isOpen]);
 
-    if (!isOpen) return null;
+  if (!isOpen) return null;
 
-    const createNewRepo = async () => {
-        setBusy(true);
-        setError("");
-        setProgress("Creating repository…");
+  // ── Helpers ────────────────────────────────────────────────────────────
 
-        try {
-            // Validate token
-            if (!token) {
-                throw new Error("Authentication token missing. Please reconnect to GitHub.");
-            }
+  const sanitize = (name) =>
+    name.trim().toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/^-+|-+$/g, "");
 
-            // Sanitize repo name
-            const cleanName = sanitizeRepoName(repoName);
-            if (!cleanName) {
-                throw new Error("Invalid repository name. Use only letters, numbers, and hyphens.");
-            }
+  const ghHeaders = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    Accept: "application/vnd.github.v3+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
 
-            // Validate token has repo scope by fetching user repos
-            dbg.log("Verifying token scope by fetching user repos...");
-            const scopeCheck = await fetch("https://api.github.com/user/repos?per_page=1", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (scopeCheck.status === 403) {
-                const errorData = await scopeCheck.json();
-                throw new Error(
-                    `❌ GitHub token missing 'repo' scope. \n\n` +
-                    `Current error: ${errorData.message || "Permission denied"}\n\n` +
-                    `Fix: \n` +
-                    `1. Click "Reconnect" in Settings\n` +
-                    `2. APPROVE all permissions when GitHub asks\n` +
-                    `3. Ensure scopes include: repo, workflow, user\n\n` +
-                    `If using Personal Access Token (PAT):\n` +
-                    `• Ensure these scopes are selected: repo, workflow, user:email\n` +
-                    `• If editing existing token, GitHub may require regeneration\n` +
-                    `• Create a NEW token with full repo + workflow scopes`
-                );
-            }
-            if (!scopeCheck.ok) {
-                const err = await scopeCheck.json();
-                throw new Error(`Token validation failed: ${err.message || scopeCheck.statusText}`);
-            }
+  const ghFetch = async (path, opts = {}) => {
+    const url = path.startsWith("http") ? path : `https://api.github.com${path}`;
+    const res = await fetch(url, { ...opts, headers: { ...ghHeaders, ...(opts.headers || {}) } });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(e.message || `GitHub API ${res.status}`), { status: res.status, body: e });
+    }
+    return res.json();
+  };
 
-            setProgress("Creating repository…");
+  const saveRepoConfig = async (owner, repo) => {
+    const settings = await Storage.getSettings();
+    settings.github_repo   = repo;
+    settings.github_owner  = owner;
+    await Storage.setSettings(settings);
+  };
 
-            // 2. Create repository
-            const createRes = await fetch("https://api.github.com/user/repos", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    Accept: "application/vnd.github.v3+json",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-                body: JSON.stringify({
-                    name: cleanName,
-                    description: repoDesc,
-                    private: false,
-                    auto_init: true,
-                    has_wiki: false,
-                    has_issues: true,
-                    has_downloads: false,
-                }),
-            });
+  // ── Load existing repos for the picker ────────────────────────────────
 
-            if (!createRes.ok) {
-                const err = await createRes.json().catch(() => ({}));
-                const statusText =
-                    createRes.status === 403
-                        ? "Forbidden: " + (err.message || "Token missing 'repo' or 'workflow' scope")
-                        : createRes.status === 422
-                            ? "Invalid: " + (err.message || "Repository name invalid or already exists")
-                            : createRes.status === 401
-                                ? "Unauthorized: " + (err.message || "Token invalid or expired")
-                                : `HTTP ${createRes.status}: ${err.message || "Unknown error"}`;
-                throw new Error(
-                    err.message || `Failed to create repo: ${statusText}`
-                );
-            }
+  const loadUserRepos = async () => {
+    setReposLoading(true);
+    setError("");
+    try {
+      const repos = [];
+      let page = 1;
+      while (repos.length < 200) {
+        const batch = await ghFetch(`/user/repos?per_page=100&page=${page}&sort=updated&type=owner`);
+        repos.push(...batch);
+        if (batch.length < 100) break;
+        page++;
+      }
+      setUserRepos(repos);
+      if (repos.length > 0) setSelectedRepo(repos[0].name);
+    } catch (e) {
+      setError("Could not load your repositories: " + e.message);
+    } finally {
+      setReposLoading(false);
+    }
+  };
 
-            setProgress("Setting up initial files…");
+  // ── Create new repo ────────────────────────────────────────────────────
 
-            // 2. Parse repo data from response
-            const repoData = await createRes.json().catch(() => ({}));
-            const owner = repoData.owner?.login;
-            const createdRepoName = repoData.name;
+  const createNewRepo = async () => {
+    setBusy(true);
+    setError("");
+    setProgress("Checking permissions…");
+    try {
+      if (!token) throw new Error("Authentication token missing. Please reconnect to GitHub.");
 
-            // Push initial files
-            await initializeRepository(owner, createdRepoName, token);
+      const cleanName = sanitize(repoName);
+      if (!cleanName) throw new Error("Invalid repository name. Use letters, numbers, and hyphens.");
 
-            setProgress("Configuring GitHub Pages…");
+      // Verify token scope
+      const scopeCheck = await fetch("https://api.github.com/user/repos?per_page=1", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (scopeCheck.status === 403) {
+        throw new Error(
+          "GitHub token missing 'repo' scope.\n\n" +
+          "Fix: Click 'Reconnect' in Settings and approve all permissions when GitHub asks."
+        );
+      }
+      if (!scopeCheck.ok) {
+        const err = await scopeCheck.json().catch(() => ({}));
+        throw new Error(`Token validation failed: ${err.message || scopeCheck.statusText}`);
+      }
 
-            // 3. Enable GitHub Pages
-            await enableGitHubPages(owner, createdRepoName, token);
-
-            // Save repo config (do NOT save github_token — it lives in auth.tokens)
-            const settings = await Storage.getSettings();
-            settings.github_repo = createdRepoName;
-            settings.github_owner = owner;
-            await Storage.setSettings(settings);
-
-            setProgress("Setup complete!");
-            setStep("done");
-        } catch (e) {
-            dbg.error("Create repo failed", e);
-            setError(e.message || "Failed to create repository");
-        } finally {
-            setBusy(false);
+      setProgress("Creating repository…");
+      let repoData;
+      try {
+        repoData = await ghFetch("/user/repos", {
+          method: "POST",
+          body: JSON.stringify({
+            name: cleanName,
+            description: repoDesc,
+            private: false,
+            auto_init: true,
+            has_wiki: false,
+            has_issues: true,
+          }),
+        });
+      } catch (e) {
+        if (e.status === 403) {
+          throw new Error(
+            "GitHub App tokens cannot create repositories directly.\n\n" +
+            "Please create a repository on GitHub.com first, then use\n" +
+            "\"Link Existing Repository\" to connect it here."
+          );
         }
-    };
-
-    const linkExistingRepo = async () => {
-        setBusy(true);
-        setError("");
-        setProgress("Validating repository…");
-
-        try {
-            // Sanitize repo name
-            const cleanName = sanitizeRepoName(repoName);
-            if (!cleanName) {
-                throw new Error("Invalid repository name. Use only letters, numbers, and hyphens.");
-            }
-
-            const validateRes = await fetch(
-                `https://api.github.com/repos/${username}/${cleanName}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
-
-            if (validateRes.status === 404) {
-                throw new Error("Repository not found");
-            }
-
-            if (!validateRes.ok) {
-                throw new Error(`Failed to access repository (${validateRes.status})`);
-            }
-
-            const repoData = await validateRes.json();
-
-            // Check if empty or has CodeLedger structure
-            const contentsRes = await fetch(
-                `https://api.github.com/repos/${username}/${cleanName}/contents`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
-
-            if (contentsRes.ok) {
-                const contents = await contentsRes.json();
-                const hasIndex = contents.some((f) => f.name === "index.json");
-                if (contents.length > 0 && !hasIndex) {
-                    throw new Error(
-                        "Repository is not empty and doesn't contain index.json"
-                    );
-                }
-            }
-
-            // Save repo config (do NOT save github_token — it lives in auth.tokens)
-            const settings = await Storage.getSettings();
-            settings.github_repo = cleanName;
-            settings.github_owner = username;
-            await Storage.setSettings(settings);
-
-            setProgress("Repository linked successfully!");
-            setStep("done");
-        } catch (e) {
-            dbg.error("Link repo failed", e);
-            setError(e.message || "Failed to link repository");
-        } finally {
-            setBusy(false);
+        if (e.status === 422) {
+          const msg = e.body?.errors?.[0]?.message || e.message;
+          throw new Error(`Repository creation failed: ${msg}`);
         }
-    };
+        throw e;
+      }
 
-    return html`
+      setProgress("Setting up initial files…");
+      await initializeRepository(repoData.owner.login, repoData.name, token);
+
+      setProgress("Enabling GitHub Pages…");
+      await enableGitHubPages(repoData.owner.login, repoData.name, token);
+
+      await saveRepoConfig(repoData.owner.login, repoData.name);
+      setFinalRepo(repoData.name);
+      setProgress("Setup complete!");
+      setStep("done");
+    } catch (e) {
+      dbg.error("Create repo failed", e);
+      setError(e.message || "Failed to create repository");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Link existing repo ─────────────────────────────────────────────────
+
+  const linkExistingRepo = async () => {
+    const repoToLink = selectedRepo;
+    if (!repoToLink) { setError("Please select a repository."); return; }
+    setBusy(true);
+    setError("");
+    setProgress("Validating repository…");
+    try {
+      const repoData = await ghFetch(`/repos/${username}/${repoToLink}`).catch((e) => {
+        if (e.status === 404) throw new Error("Repository not found.");
+        throw e;
+      });
+
+      // Check contents: must be empty or have index.json
+      const contents = await ghFetch(`/repos/${username}/${repoToLink}/contents`).catch(() => []);
+      if (Array.isArray(contents) && contents.length > 0 && !contents.some(f => f.name === "index.json")) {
+        throw new Error(
+          "Repository is not empty and doesn't contain CodeLedger's index.json.\n" +
+          "Use an empty repo or an existing CodeLedger repo."
+        );
+      }
+
+      // If empty, initialize it
+      if (!Array.isArray(contents) || contents.length === 0) {
+        setProgress("Initializing repository structure…");
+        await initializeRepository(repoData.owner.login, repoData.name, token);
+      }
+
+      await saveRepoConfig(repoData.owner.login, repoData.name);
+      setFinalRepo(repoData.name);
+      setProgress("Repository linked!");
+      setStep("done");
+    } catch (e) {
+      dbg.error("Link repo failed", e);
+      setError(e.message || "Failed to link repository");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────
+
+  const stepLabel = {
+    check:    "",
+    already:  "",
+    choice:   "Step 1 of 2",
+    new:      "Step 2 of 2",
+    existing: "Step 2 of 2",
+    done:     "Setup complete",
+  }[step] || "";
+
+  const stepTitle = {
+    check:    "Loading…",
+    already:  "Already Connected",
+    choice:   "Set Up GitHub",
+    new:      "Create Repository",
+    existing: "Link Existing Repository",
+    done:     "All Set! 🎉",
+  }[step] || "";
+
+  const canClose = !busy && step !== "check";
+
+  return html`
     <div
       class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick=${(e) => e.target === e.currentTarget && onComplete()}
+      onClick=${(e) => e.target === e.currentTarget && canClose && onComplete()}
     >
-      <div class="bg-[#0a0a0f] border border-cyan-500/20 rounded-2xl w-full max-w-2xl shadow-2xl">
+      <div class="bg-[#0a0a0f] border border-cyan-500/20 rounded-2xl w-full max-w-lg shadow-2xl">
+
         <!-- Header -->
         <div class="px-8 py-6 border-b border-white/5 flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-bold text-white">
-              ${step === "choice"
-            ? "Set Up GitHub"
-            : step === "new"
-                ? "Create New Repository"
-                : step === "existing"
-                    ? "Link Existing Repository"
-                    : step === "setup"
-                        ? "Initializing…"
-                        : "All Set! 🎉"}
-            </h2>
-            <p class="text-xs text-slate-500 mt-1">
-              ${step === "done"
-            ? "Your CodeLedger repository is ready"
-            : `Step ${step === "choice"
-                ? "1"
-                : step === "new" || step === "existing"
-                    ? "2"
-                    : "3"
-            } of 3`}
-            </p>
+            <h2 class="text-xl font-bold text-white">${stepTitle}</h2>
+            ${stepLabel ? html`<p class="text-xs text-slate-500 mt-1">${stepLabel}</p>` : ""}
           </div>
-          ${step !== "setup" && step !== "done"
-            ? html`
-                <button
-                  onClick=${onComplete}
-                  class="p-2 hover:bg-white/5 rounded-lg transition-colors"
-                >
-                  ✕
-                </button>
-              `
-            : ""}
+          ${canClose ? html`
+            <button
+              onClick=${onComplete}
+              class="p-2 hover:bg-white/5 rounded-lg transition-colors text-slate-500 hover:text-slate-300"
+            >✕</button>
+          ` : ""}
         </div>
 
-        <!-- Content -->
+        <!-- Body -->
         <div class="px-8 py-8">
-          ${step === "choice"
-            ? html`
-                <div class="space-y-4">
-                  <p class="text-sm text-slate-400 mb-6">
-                    Welcome, <span class="text-emerald-400 font-medium">${username}</span>!
-                    Let's set up your CodeLedger repository.
-                  </p>
 
-                  <button
-                    onClick=${() => setStep("new")}
-                    class="w-full p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors text-left group"
-                  >
-                    <div class="flex items-start justify-between">
-                      <div>
-                        <h3 class="font-semibold text-white group-hover:text-cyan-300 transition-colors">
-                          ✨ Create New Repository
-                        </h3>
-                        <p class="text-xs text-slate-400 mt-1">
-                          Set up a fresh repo with initial structure and GitHub Pages
-                        </p>
-                      </div>
-                      <span class="text-lg">→</span>
-                    </div>
-                  </button>
+          ${step === "check" ? html`
+            <div class="flex items-center justify-center py-8">
+              <div class="w-8 h-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-500 animate-spin"></div>
+            </div>
+          ` : ""}
 
-                  <button
-                    onClick=${() => setStep("existing")}
-                    class="w-full p-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-left group"
-                  >
-                    <div class="flex items-start justify-between">
-                      <div>
-                        <h3 class="font-semibold text-white group-hover:text-slate-200 transition-colors">
-                          🔗 Link Existing Repository
-                        </h3>
-                        <p class="text-xs text-slate-400 mt-1">
-                          Connect to an existing GitHub repository
-                        </p>
-                      </div>
-                      <span class="text-lg">→</span>
-                    </div>
-                  </button>
-                </div>
-              `
-            : step === "new"
-                ? html`
-                  <div class="space-y-4">
-                    <div>
-                      <label class="block text-xs font-medium text-slate-300 mb-2">
-                        Repository Name
-                      </label>
-                      <input
-                        type="text"
-                        value=${repoName}
-                        onInput=${(e) => setRepoName(e.target.value)}
-                        disabled=${busy}
-                        class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm placeholder-slate-600 disabled:opacity-50"
-                        placeholder="CodeLedger-Sync"
-                      />
-                      <p class="text-[10px] text-slate-500 mt-1">
-                        Must start with a letter, contain only alphanumerics and hyphens
-                      </p>
-                    </div>
+          ${step === "already" ? html`
+            <div class="space-y-4 text-center">
+              <div class="text-4xl">✅</div>
+              <div>
+                <h3 class="text-base font-semibold text-white">Repository already configured</h3>
+                <p class="text-sm text-slate-400 mt-2">
+                  Connected as <span class="text-emerald-400 font-medium">${username}</span><br/>
+                  Repo: <span class="text-cyan-300 font-mono">${username}/${finalRepo}</span>
+                </p>
+              </div>
+              <div class="flex flex-col gap-2 pt-2">
+                <button
+                  onClick=${() => setStep("choice")}
+                  class="w-full px-4 py-2 border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+                >Switch repository</button>
+                <button
+                  onClick=${onComplete}
+                  class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >Continue</button>
+              </div>
+            </div>
+          ` : ""}
 
-                    <div>
-                      <label class="block text-xs font-medium text-slate-300 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        value=${repoDesc}
-                        onInput=${(e) => setRepoDesc(e.target.value)}
-                        disabled=${busy}
-                        class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm placeholder-slate-600 disabled:opacity-50 resize-none h-20"
-                        placeholder="My LeetCode & DSA solutions"
-                      ></textarea>
-                    </div>
+          ${step === "choice" ? html`
+            <div class="space-y-4">
+              <p class="text-sm text-slate-400 mb-6">
+                Welcome, <span class="text-emerald-400 font-medium">${username}</span>!
+                Choose how to set up your CodeLedger repository.
+              </p>
 
-                    <div>
-                      <label class="block text-xs font-medium text-slate-300 mb-2">
-                        Tags (comma-separated)
-                      </label>
-                      <input
-                        type="text"
-                        value=${repoTags}
-                        onInput=${(e) => setRepoTags(e.target.value)}
-                        disabled=${busy}
-                        class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm placeholder-slate-600 disabled:opacity-50"
-                        placeholder="leetcode,dsa,problems"
-                      />
-                    </div>
-
-                    ${error
-                        ? html`
-                          <div class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-                            ${error}
-                          </div>
-                        `
-                        : ""}
-
-                    <div class="flex gap-3 pt-4">
-                      <button
-                        onClick=${debounce(() => setStep("choice"), 0)}
-                        disabled=${busy}
-                        class="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                      >
-                        Back
-                      </button>
-                      <button
-                        onClick=${debounce(createNewRepo, 0)}
-                        disabled=${busy || !repoName.trim()}
-                        class="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                      >
-                        ${busy ? "Creating…" : "Create Repository"}
-                      </button>
-                    </div>
+              <button
+                onClick=${() => setStep("new")}
+                class="w-full p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors text-left group"
+              >
+                <div class="flex items-start justify-between">
+                  <div>
+                    <h3 class="font-semibold text-white group-hover:text-cyan-300 transition-colors">
+                      ✨ Create New Repository
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">
+                      Fresh repo with CodeLedger structure and GitHub Pages
+                    </p>
                   </div>
-                `
-                : step === "existing"
-                    ? html`
-                    <div class="space-y-4">
-                      <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-2">
-                          Repository Name
-                        </label>
-                        <input
-                          type="text"
-                          value=${repoName}
-                          onInput=${(e) => setRepoName(e.target.value)}
-                          disabled=${busy}
-                          class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm placeholder-slate-600 disabled:opacity-50"
-                          placeholder="my-repo"
-                        />
-                        <p class="text-[10px] text-slate-500 mt-1">
-                          Must be empty or contain CodeLedger's index.json
-                        </p>
-                      </div>
+                  <span class="text-slate-500 group-hover:text-cyan-400 transition-colors mt-0.5">→</span>
+                </div>
+              </button>
 
-                      ${error
-                            ? html`
-                            <div class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-                              ${error}
-                            </div>
-                          `
-                            : ""}
+              <button
+                onClick=${() => { setStep("existing"); loadUserRepos(); }}
+                class="w-full p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-left group"
+              >
+                <div class="flex items-start justify-between">
+                  <div>
+                    <h3 class="font-semibold text-white group-hover:text-slate-200 transition-colors">
+                      🔗 Link Existing Repository
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">
+                      Connect an existing GitHub repo (empty or existing CodeLedger repo)
+                    </p>
+                  </div>
+                  <span class="text-slate-500 group-hover:text-slate-300 transition-colors mt-0.5">→</span>
+                </div>
+              </button>
+            </div>
+          ` : ""}
 
-                      <div class="flex gap-3 pt-4">
-                        <button
-                          onClick=${debounce(() => setStep("choice"), 0)}
-                          disabled=${busy}
-                          class="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                        >
-                          Back
-                        </button>
-                        <button
-                          onClick=${debounce(linkExistingRepo, 0)}
-                          disabled=${busy || !repoName.trim()}
-                          class="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                        >
-                          ${busy ? "Validating…" : "Link Repository"}
-                        </button>
-                      </div>
-                    </div>
-                  `
-                    : step === "setup"
-                        ? html`
-                      <div class="space-y-4 text-center">
-                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/30 animate-spin">
-                          <div class="w-8 h-8 rounded-full border-2 border-cyan-500/20 border-t-cyan-500"></div>
-                        </div>
-                        <p class="text-sm text-slate-300 font-medium">${progress}</p>
-                        <p class="text-xs text-slate-500">This may take a few moments…</p>
-                      </div>
-                    `
-                        : html`
-                      <div class="space-y-4 text-center">
-                        <div class="text-5xl">✅</div>
-                        <div>
-                          <h3 class="text-lg font-semibold text-white">GitHub Setup Complete!</h3>
-                          <p class="text-sm text-slate-400 mt-2">
-                            Your repository is ready. Problems you solve will be automatically
-                            synced to GitHub.
-                          </p>
-                        </div>
+          ${step === "new" ? html`
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-2">
+                  Repository Name
+                </label>
+                <input
+                  type="text"
+                  value=${repoName}
+                  onInput=${(e) => setRepoName(e.target.value)}
+                  disabled=${busy}
+                  class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                  placeholder=${DEFAULT_REPO_NAME}
+                />
+                <p class="text-[10px] text-slate-500 mt-1">
+                  Letters, numbers, and hyphens only. Will be created under your account.
+                </p>
+              </div>
 
-                        <div class="p-4 rounded-lg bg-cyan-500/5 border border-cyan-500/20 mt-4">
-                          <p class="text-xs text-slate-300 font-mono">
-                            Repository: <span class="text-cyan-300">${username}/${repoName}</span>
-                          </p>
-                        </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-2">
+                  Description <span class="text-slate-600 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value=${repoDesc}
+                  onInput=${(e) => setRepoDesc(e.target.value)}
+                  disabled=${busy}
+                  class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                />
+              </div>
 
-                        <button
-                          onClick=${onComplete}
-                          class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors mt-4"
-                        >
-                          Start Coding 🚀
-                        </button>
-                      </div>
-                    `}
+              ${error ? html`
+                <div class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs whitespace-pre-wrap">${error}</div>
+              ` : ""}
+
+              ${progress && !error ? html`
+                <div class="flex items-center gap-2 text-xs text-cyan-400">
+                  <div class="w-3 h-3 rounded-full border border-cyan-500/50 border-t-cyan-500 animate-spin shrink-0"></div>
+                  ${progress}
+                </div>
+              ` : ""}
+
+              <div class="flex gap-3 pt-2">
+                <button
+                  onClick=${() => { setStep("choice"); setError(""); }}
+                  disabled=${busy}
+                  class="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >Back</button>
+                <button
+                  onClick=${createNewRepo}
+                  disabled=${busy || !repoName.trim()}
+                  class="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >${busy ? "Creating…" : "Create Repository"}</button>
+              </div>
+            </div>
+          ` : ""}
+
+          ${step === "existing" ? html`
+            <div class="space-y-4">
+              <p class="text-xs text-slate-400">
+                Select a repository to connect. It must be empty or already contain CodeLedger's
+                <code class="text-cyan-400">index.json</code>.
+              </p>
+
+              ${reposLoading ? html`
+                <div class="flex items-center gap-2 text-xs text-slate-400 py-4">
+                  <div class="w-4 h-4 rounded-full border border-slate-600 border-t-slate-300 animate-spin"></div>
+                  Loading your repositories…
+                </div>
+              ` : html`
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-2">Repository</label>
+                  ${userRepos.length === 0 ? html`
+                    <p class="text-xs text-slate-500">No repositories found. Create one first.</p>
+                  ` : html`
+                    <select
+                      value=${selectedRepo}
+                      onChange=${(e) => setSelectedRepo(e.target.value)}
+                      disabled=${busy}
+                      class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
+                    >
+                      ${userRepos.map(r => html`
+                        <option value=${r.name} key=${r.name}>${r.name}${r.private ? " 🔒" : ""}</option>
+                      `)}
+                    </select>
+                    ${selectedRepo ? html`
+                      <p class="text-[10px] text-slate-500 mt-1">
+                        ${username}/${selectedRepo}
+                      </p>
+                    ` : ""}
+                  `}
+                </div>
+              `}
+
+              ${error ? html`
+                <div class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs whitespace-pre-wrap">${error}</div>
+              ` : ""}
+
+              ${progress && !error ? html`
+                <div class="flex items-center gap-2 text-xs text-cyan-400">
+                  <div class="w-3 h-3 rounded-full border border-cyan-500/50 border-t-cyan-500 animate-spin shrink-0"></div>
+                  ${progress}
+                </div>
+              ` : ""}
+
+              <div class="flex gap-3 pt-2">
+                <button
+                  onClick=${() => { setStep("choice"); setError(""); }}
+                  disabled=${busy}
+                  class="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >Back</button>
+                <button
+                  onClick=${linkExistingRepo}
+                  disabled=${busy || !selectedRepo || reposLoading}
+                  class="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >${busy ? "Linking…" : "Link Repository"}</button>
+              </div>
+            </div>
+          ` : ""}
+
+          ${step === "done" ? html`
+            <div class="space-y-4 text-center">
+              <div class="text-5xl">✅</div>
+              <div>
+                <h3 class="text-base font-semibold text-white">GitHub Setup Complete!</h3>
+                <p class="text-sm text-slate-400 mt-2">
+                  Every accepted solution will be automatically committed.
+                </p>
+              </div>
+              <div class="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
+                <p class="text-xs text-slate-400 mb-1">Repository</p>
+                <p class="text-sm font-mono text-cyan-300">${username}/${finalRepo}</p>
+                <a
+                  href="https://github.com/${username}/${finalRepo}"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="text-[11px] text-cyan-500 hover:text-cyan-300 underline mt-1 inline-block"
+                >View on GitHub ↗</a>
+              </div>
+              <button
+                onClick=${onComplete}
+                class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors mt-2"
+              >Start Coding 🚀</button>
+            </div>
+          ` : ""}
+
         </div>
       </div>
     </div>
@@ -469,62 +509,60 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
 /**
  * Initialize repository with index.json, README, .gitignore, and GitHub Actions.
- * Uses GitHub Trees API for a single atomic commit (no btoa / encoding issues).
- * Assumes the repo was created with auto_init:true so the default branch exists.
+ * Uses GitHub Trees API for a single atomic commit.
+ * Requires the repo to already have an initial commit (auto_init: true or non-empty).
  */
 async function initializeRepository(owner, repo, token) {
-    const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/vnd.github.v3+json",
-    };
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    Accept: "application/vnd.github.v3+json",
+  };
 
-    const ghFetch = async (url, opts = {}) => {
-        const res = await fetch(url.startsWith("http") ? url : `https://api.github.com${url}`, {
-            ...opts,
-            headers: { ...headers, ...(opts.headers || {}) },
-        });
-        if (!res.ok) {
-            const e = await res.json().catch(() => ({}));
-            throw new Error(e.message || `GitHub API ${res.status}`);
-        }
-        return res.json();
-    };
-
-    // 1. Get the latest commit SHA on the default branch (created by auto_init)
-    let latestSha, baseTreeSha;
-    // Retry up to 5 times — GitHub needs a moment after creation
-    for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-            const ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/main`);
-            latestSha = ref.object.sha;
-            const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
-            baseTreeSha = commit.tree.sha;
-            break;
-        } catch (_) {
-            if (attempt === 4) throw new Error("Repository branch not ready after waiting. Please try again.");
-            await new Promise(r => setTimeout(r, 1500));
-        }
+  const ghFetch = async (path, opts = {}) => {
+    const url = path.startsWith("http") ? path : `https://api.github.com${path}`;
+    const res = await fetch(url, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub API ${res.status}`);
     }
+    return res.json();
+  };
 
-    const now = new Date().toISOString();
-    const indexJson = {
-        version: 1,
-        owner,
-        repo,
-        createdAt: now,
-        problems: [],
-        stats: { total: 0, easy: 0, medium: 0, hard: 0 },
-    };
+  // Get latest commit SHA — retry up to 6× since GitHub needs a moment after creation
+  let latestSha, baseTreeSha;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      // Try main first, then master
+      let ref;
+      try {
+        ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/main`);
+      } catch (_) {
+        ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/master`);
+      }
+      latestSha = ref.object.sha;
+      const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
+      baseTreeSha = commit.tree.sha;
+      break;
+    } catch (_) {
+      if (attempt === 5) throw new Error("Repository branch not ready. Please try again.");
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
 
-    const readme =
+  const now = new Date().toISOString();
+  const indexJson = {
+    version: 1, owner, repo, createdAt: now,
+    problems: [],
+    stats: { total: 0, easy: 0, medium: 0, hard: 0 },
+  };
+
+  const readme =
 `# ${repo}
 
 Automatically synced LeetCode & DSA problem solutions via [CodeLedger](https://codeledger.vkrishna04.me).
 
 ## Organization
-
-Problems are organized by topic under \`topics/{topic}/{slug}/\`:
 
 \`\`\`
 topics/
@@ -532,8 +570,6 @@ topics/
     two-sum/
       Python3.py
       README.md
-  Arrays/
-    ...
 \`\`\`
 
 ## Links
@@ -542,20 +578,49 @@ topics/
 - [Life-Experimentalist/Code-Ledger](https://github.com/Life-Experimentalist/Code-Ledger)
 
 ---
-
 _Last updated: ${now}_
 `;
 
-    const gitignore = `node_modules/\n.env\n*.log\n.DS_Store\n`;
+  const treeRes = await ghFetch(`/repos/${owner}/${repo}/git/trees`, {
+    method: "POST",
+    body: JSON.stringify({
+      base_tree: baseTreeSha,
+      tree: [
+        { path: "index.json",                       mode: "100644", type: "blob", content: JSON.stringify(indexJson, null, 2) },
+        { path: "README.md",                        mode: "100644", type: "blob", content: readme },
+        { path: ".gitignore",                       mode: "100644", type: "blob", content: "node_modules/\n.env\n*.log\n.DS_Store\n" },
+        { path: ".github/workflows/sync-stats.yml", mode: "100644", type: "blob", content: WORKFLOW_YAML },
+      ],
+    }),
+  });
 
-    const workflow =
+  const commitRes = await ghFetch(`/repos/${owner}/${repo}/git/commits`, {
+    method: "POST",
+    body: JSON.stringify({
+      message: "chore: initialize CodeLedger structure",
+      tree: treeRes.sha,
+      parents: [latestSha],
+    }),
+  });
+
+  // Try both main and master for the ref update
+  for (const branch of ["main", "master"]) {
+    try {
+      await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
+        method: "PATCH",
+        body: JSON.stringify({ sha: commitRes.sha, force: false }),
+      });
+      break;
+    } catch (_) { /* try next branch */ }
+  }
+}
+
+const WORKFLOW_YAML =
 `name: Sync Stats
-
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths: ["index.json"]
-
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -565,57 +630,18 @@ jobs:
         run: echo "index.json updated"
 `;
 
-    // 2. Create tree with all files (raw content — no btoa needed)
-    const treeRes = await ghFetch(`/repos/${owner}/${repo}/git/trees`, {
-        method: "POST",
-        body: JSON.stringify({
-            base_tree: baseTreeSha,
-            tree: [
-                { path: "index.json",                      mode: "100644", type: "blob", content: JSON.stringify(indexJson, null, 2) },
-                { path: "README.md",                       mode: "100644", type: "blob", content: readme },
-                { path: ".gitignore",                      mode: "100644", type: "blob", content: gitignore },
-                { path: ".github/workflows/sync-stats.yml", mode: "100644", type: "blob", content: workflow },
-            ],
-        }),
-    });
-
-    // 3. Create commit
-    const commitRes = await ghFetch(`/repos/${owner}/${repo}/git/commits`, {
-        method: "POST",
-        body: JSON.stringify({
-            message: "chore: initialize CodeLedger structure",
-            tree: treeRes.sha,
-            parents: [latestSha],
-        }),
-    });
-
-    // 4. Update branch ref
-    await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/main`, {
-        method: "PATCH",
-        body: JSON.stringify({ sha: commitRes.sha, force: false }),
-    });
-}
-
-/**
- * Enable GitHub Pages for the repository
- */
 async function enableGitHubPages(owner, repo, token) {
-    try {
-        await fetch(
-            `https://api.github.com/repos/${owner}/${repo}/pages`,
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    Accept: "application/vnd.github.switcheroo-preview+json",
-                },
-                body: JSON.stringify({
-                    source: { branch: "main", path: "/" },
-                }),
-            }
-        );
-    } catch (e) {
-        // GitHub Pages might already be enabled, ignore
-    }
+  try {
+    await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github.v3+json",
+      },
+      body: JSON.stringify({ source: { branch: "main", path: "/" } }),
+    });
+  } catch (_) {
+    // Pages may already be enabled or not available — non-fatal
+  }
 }

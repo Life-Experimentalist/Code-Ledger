@@ -153,6 +153,15 @@ export const Storage = {
     });
   },
 
+  async deleteProblem(id) {
+    const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS, "readwrite");
+    return new Promise((resolve, reject) => {
+      const request = store.delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  },
+
   // ── First-commit tracking ──────────────────────────────────────────────
   // Stores which (titleSlug, langName) pairs have been auto-committed so the
   // extension never double-pushes the same problem+language combination.

@@ -95,7 +95,7 @@ function BackupRestorePanel() {
 
   return html`
     <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5">
-      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Backup &amp; Restore</h3>
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Backup & Restore</h3>
       <p class="text-[11px] text-slate-500 mb-4">Export all solved problems and settings to a JSON file, or restore from a previous backup.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <button
@@ -210,7 +210,7 @@ function maskKey(k) {
   return `${s.slice(0, 4)}...${s.slice(-4)}`;
 }
 
-export function SettingsSchema({ schema, values, onChange }) {
+export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
   const [advancedMap, setAdvancedMap] = useState({});
@@ -219,11 +219,7 @@ export function SettingsSchema({ schema, values, onChange }) {
   const [promptDraft, setPromptDraft] = useState(getDefaultAIPrompts());
   const [promptStatus, setPromptStatus] = useState("");
   const [promptBusy, setPromptBusy] = useState(false);
-  // Repo setup: tracks "new" | "existing" | null per provider
-  const [repoSetup, setRepoSetup] = useState({});
-  // Repo validation result per provider: { status: "ok"|"empty"|"warn"|"error", msg: string }
-  const [repoValidation, setRepoValidation] = useState({});
-  const [repoValidating, setRepoValidating] = useState({});
+  // Repo sync state per provider (repoSetup/repoValidation removed — handled by GitHubOnboardingModal)
   // Repo sync state per provider
   const [repoSyncing, setRepoSyncing] = useState({});
   const [repoSyncStatus, setRepoSyncStatus] = useState({});
@@ -246,51 +242,6 @@ export function SettingsSchema({ schema, values, onChange }) {
       mounted = false;
     };
   }, []);
-
-  const validateRepo = async (provider, repoName, token) => {
-    if (!repoName || !token) {
-      setRepoValidation((v) => ({ ...v, [provider]: { status: "error", msg: "Repo name and auth token are required." } }));
-      return;
-    }
-    setRepoValidating((v) => ({ ...v, [provider]: true }));
-    setRepoValidation((v) => ({ ...v, [provider]: null }));
-    try {
-      const name = repoName.trim().replace(/\s+/g, "-").split("/").pop();
-      // Get user first
-      const userRes = await fetch("https://api.github.com/user", {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" },
-      });
-      if (!userRes.ok) throw new Error("Could not verify GitHub token");
-      const user = await userRes.json();
-      const owner = values["github_owner"]?.trim() || user.login;
-      const repoRes = await fetch(`https://api.github.com/repos/${owner}/${name}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" },
-      });
-      if (repoRes.status === 404) {
-        setRepoValidation((v) => ({ ...v, [provider]: { status: "warn", msg: `Repo "${owner}/${name}" not found — it will be created on first commit.` } }));
-        return;
-      }
-      if (!repoRes.ok) throw new Error("GitHub API error: " + repoRes.status);
-      const repo = await repoRes.json();
-      // Check if it's a valid CodeLedger repo (has index.json) or empty
-      if (repo.size === 0) {
-        setRepoValidation((v) => ({ ...v, [provider]: { status: "ok", msg: `Empty repo — CodeLedger will initialise it on first commit.` } }));
-        return;
-      }
-      const indexRes = await fetch(`https://api.github.com/repos/${owner}/${name}/contents/index.json`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" },
-      });
-      if (indexRes.ok) {
-        setRepoValidation((v) => ({ ...v, [provider]: { status: "ok", msg: `Valid CodeLedger repo (index.json found). Ready to sync.` } }));
-      } else {
-        setRepoValidation((v) => ({ ...v, [provider]: { status: "warn", msg: `Repo exists but is not a CodeLedger repo (no index.json). Linking will overwrite files.` } }));
-      }
-    } catch (e) {
-      setRepoValidation((v) => ({ ...v, [provider]: { status: "error", msg: `Validation failed: ${e.message}` } }));
-    } finally {
-      setRepoValidating((v) => ({ ...v, [provider]: false }));
-    }
-  };
 
   const providerFromField = (key) => {
     const k = (key || "").toLowerCase();
@@ -529,7 +480,7 @@ export function SettingsSchema({ schema, values, onChange }) {
         }
       }, 500);
     },
-    [onChange, validateRepo]
+    [onChange]
   );
 
   const handleDisconnect = useCallback(
@@ -747,130 +698,58 @@ export function SettingsSchema({ schema, values, onChange }) {
                 ${values[f.key] && f.provider === "github"
           ? html`
                       ${(() => {
-              const rs = repoSetup[f.provider];
               const savedRepo = values["github_repo"];
+              const owner = values["github_owner"]?.trim() || values["github_username"] || "";
+              const repoUrl = savedRepo && owner ? `https://github.com/${owner}/${savedRepo}` : null;
+              const isSyncing = repoSyncing[f.provider];
+              const syncMsg = repoSyncStatus[f.provider];
+              const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
 
-              // ── Edit: create new repo ──────────────────────
-              if (rs === "new") return html`
-                          <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-                            <p class="text-[11px] text-cyan-300 font-medium">New repository name</p>
-                            <div class="flex gap-2">
-                              <input
-                                type="text"
-                                value=${savedRepo || "CodeLedger-Sync"}
-                                placeholder="CodeLedger-Sync"
-                                class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
-                                onChange=${(e) => onChange("github_repo", e.target.value.replace(/\s+/g, "-"))}
-                              />
-                              <button
-                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))}
-                                class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
-                              >Save</button>
-                            </div>
-                            <p class="text-[10px] text-slate-500">Created automatically on first commit.</p>
-                            <button onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))} class="text-[10px] text-slate-500 underline self-start">← Back</button>
-                          </div>
-                        `;
-
-              // ── Edit: link existing repo ────────────────────
-              if (rs === "existing") {
-                const vr = repoValidation[f.provider];
-                const validating = repoValidating[f.provider];
-                return html`
-                          <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-                            <p class="text-[11px] text-cyan-300 font-medium">Link existing repository</p>
-                            <div class="flex gap-2">
-                              <input
-                                type="text"
-                                value=${savedRepo || ""}
-                                placeholder="repo-name (no owner prefix)"
-                                class="flex-1 px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white"
-                                onInput=${(e) => {
-                    onChange("github_repo", e.target.value.split("/").pop().replace(/\s+/g, "-"));
-                    setRepoValidation((v) => ({ ...v, [f.provider]: null }));
-                  }}
-                              />
-                              <button
-                                disabled=${validating}
-                                onClick=${() => validateRepo(f.provider, savedRepo, values[f.key])}
-                                class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 text-xs rounded transition-colors disabled:opacity-50"
-                              >${validating ? "…" : "Validate"}</button>
-                              <button
-                                onClick=${() => {
-                    setRepoSetup((s) => ({ ...s, [f.provider]: null }));
-                    setRepoValidation((v) => ({ ...v, [f.provider]: null }));
-                  }}
-                                class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded"
-                              >Link</button>
-                            </div>
-                            ${vr ? html`
-                              <div class="text-[11px] px-2 py-1.5 rounded ${vr.status === "ok" ? "bg-emerald-500/10 text-emerald-300"
-                      : vr.status === "warn" ? "bg-amber-500/10 text-amber-300"
-                        : "bg-rose-500/10 text-rose-300"
-                    }">${vr.status === "ok" ? "✓ " : vr.status === "warn" ? "⚠ " : "✗ "}${vr.msg}</div>
-                            ` : ""}
-                            <p class="text-[10px] text-slate-500">Must be an empty repo or an existing CodeLedger repo (contains index.json).</p>
-                            <button onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: null }))} class="text-[10px] text-slate-500 underline self-start">← Back</button>
-                          </div>
-                        `;
-              };
-
-              // ── Configured ─────────────────────────────────
               if (savedRepo) {
-                // github_owner = org override; github_username = auto-detected personal login
-                const owner = values["github_owner"]?.trim() || values["github_username"] || "";
-                const repoUrl = owner
-                  ? `https://github.com/${owner}/${savedRepo}`
-                  : null; // no owner yet — will be set after first OAuth
-                const isSyncing = repoSyncing[f.provider];
-                const syncMsg = repoSyncStatus[f.provider];
-                const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+                // ── Repository configured ──────────────────────
                 return html`
-                            <div class="flex flex-col gap-1.5 mt-1">
-                              <div class="flex items-center gap-2 flex-wrap">
-                                <span class="text-[11px] text-emerald-400">
-                                  ${owner ? html`<span class="text-slate-400">${owner}/</span>` : ""}<strong>${savedRepo}</strong>
-                                </span>
-                                ${repoUrl ? html`<a
-                                  href=${repoUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  class="text-[11px] text-cyan-400 underline hover:text-cyan-300"
-                                >View on GitHub ↗</a>` : html`<span class="text-[11px] text-slate-500">Reconnect to get repo link</span>`}
-                                ${isExtension ? html`
-                                  <button
-                                    onClick=${() => handleResyncAll(f.provider)}
-                                    disabled=${isSyncing}
-                                    class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 text-[10px] rounded transition-colors disabled:opacity-50"
-                                    title="Find problems saved locally that are missing from your repo and commit them all at once"
-                                  >${isSyncing ? "Syncing…" : "⟳ Sync"}</button>
-                                ` : ""}
-                                <button
-                                  onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "existing" }))}
-                                  class="text-[10px] text-slate-500 underline ml-auto"
-                                >Change</button>
-                              </div>
-                              ${syncMsg ? html`<p class="text-[10px] ${syncMsg.includes("failed") || syncMsg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">${syncMsg}</p>` : ""}
-                            </div>
-                          `;
+                  <div class="flex flex-col gap-1.5 mt-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-[11px] text-emerald-400">
+                        ${owner ? html`<span class="text-slate-400">${owner}/</span>` : ""}<strong>${savedRepo}</strong>
+                      </span>
+                      ${repoUrl ? html`<a
+                        href=${repoUrl} target="_blank" rel="noreferrer"
+                        class="text-[11px] text-cyan-400 underline hover:text-cyan-300"
+                      >View on GitHub ↗</a>` : ""}
+                      ${isExtension ? html`
+                        <button
+                          onClick=${() => handleResyncAll(f.provider)}
+                          disabled=${isSyncing}
+                          class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 text-[10px] rounded transition-colors disabled:opacity-50"
+                          title="Commit any locally-saved problems that are missing from your repo"
+                        >${isSyncing ? "Syncing…" : "⟳ Sync"}</button>
+                      ` : ""}
+                      ${onSetupRepo ? html`
+                        <button
+                          onClick=${() => onSetupRepo(values[f.key], owner)}
+                          class="text-[10px] text-slate-500 hover:text-slate-300 underline ml-auto transition-colors"
+                        >Change repo</button>
+                      ` : ""}
+                    </div>
+                    ${syncMsg ? html`<p class="text-[10px] ${syncMsg.includes("failed") || syncMsg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">${syncMsg}</p>` : ""}
+                  </div>
+                `;
               }
 
-              // ── First-time setup prompt ─────────────────────
+              // ── No repo configured yet ─────────────────────
               return html`
-                          <div class="flex flex-col gap-2 w-full mt-1 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-                            <p class="text-[11px] text-cyan-300 font-medium">Set up your repository</p>
-                            <div class="flex gap-2">
-                              <button
-                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "new" }))}
-                                class="flex-1 px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors"
-                              >Create new repo</button>
-                              <button
-                                onClick=${() => setRepoSetup((s) => ({ ...s, [f.provider]: "existing" }))}
-                                class="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors"
-                              >Link existing repo</button>
-                            </div>
-                          </div>
-                        `;
+                <div class="flex flex-col gap-2 w-full mt-2 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
+                  <p class="text-[11px] text-cyan-300 font-medium">Repository not configured</p>
+                  <p class="text-[10px] text-slate-500">Set up a repository to automatically commit your solutions to GitHub.</p>
+                  ${onSetupRepo ? html`
+                    <button
+                      onClick=${() => onSetupRepo(values[f.key], owner)}
+                      class="self-start px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors"
+                    >Set up repository →</button>
+                  ` : html`<p class="text-[10px] text-amber-400">Open the Library page to set up your repository.</p>`}
+                </div>
+              `;
             })()}
                     `
           : ""}
@@ -949,7 +828,7 @@ export function SettingsSchema({ schema, values, onChange }) {
         ${section.id === "github" && values?.["github_token"] && values?.["github_repo"] ? html`
           <div class="flex items-center gap-2 text-[11px] text-emerald-400">
             <span>✓</span>
-            <span>Connected &amp; repository linked — syncing is active.</span>
+            <span>Connected & repository linked — syncing is active.</span>
           </div>
         ` : ""}
 

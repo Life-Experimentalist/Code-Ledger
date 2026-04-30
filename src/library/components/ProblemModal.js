@@ -3,9 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { h, useState, useEffect } from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
+
+import { Storage } from "../../core/storage.js";
 
 export const PLATFORM_META = {
   leetcode: {
@@ -56,7 +58,7 @@ function saveChatHistory(slug, msgs) {
   try { localStorage.setItem(CHAT_KEY(slug), JSON.stringify(msgs)); } catch (_) {}
 }
 
-export function ProblemModal({ problem, onClose }) {
+export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [copied, setCopied] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
@@ -64,15 +66,34 @@ export function ProblemModal({ problem, onClose }) {
   const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState("");
 
+  // Edit state
+  const [editTitle, setEditTitle] = useState("");
+  const [editDifficulty, setEditDifficulty] = useState("Unknown");
+  const [editTags, setEditTags] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSaved, setEditSaved] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Reset tab and load chat history when problem changes
   useEffect(() => {
     setActiveTab("overview");
-    if (problem?.titleSlug) {
-      setChatMessages(loadChatHistory(problem.titleSlug));
+    if (problem) {
+      setChatMessages(problem.titleSlug ? loadChatHistory(problem.titleSlug) : []);
       setChatInput("");
       setChatError("");
+      // Seed edit fields
+      setEditTitle(problem.title || "");
+      setEditDifficulty(problem.difficulty || "Unknown");
+      const existingTags = Array.isArray(problem.tags) && problem.tags.length > 0
+        ? problem.tags.join(", ")
+        : problem.topic && problem.topic !== "Uncategorized" ? problem.topic : "";
+      setEditTags(existingTags);
+      setEditSaved(false);
+      setEditError("");
     }
-  }, [problem?.titleSlug]);
+  }, [problem?.titleSlug, problem?.id]);
 
   // Escape to close
   useEffect(() => {
@@ -107,6 +128,43 @@ export function ProblemModal({ problem, onClose }) {
   };
 
   const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+
+  const handleDelete = useCallback(async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setDeleting(true);
+    try {
+      await Storage.deleteProblem(problem.id);
+      if (onDelete) onDelete(problem.id);
+      onClose();
+    } catch (e) {
+      setEditError("Delete failed: " + (e.message || e));
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }, [confirmDelete, problem, onDelete, onClose]);
+
+  const handleSaveEdit = useCallback(async () => {
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const newTags = editTags.split(",").map(t => t.trim()).filter(Boolean);
+      const updated = {
+        ...problem,
+        title:      editTitle.trim() || problem.title,
+        difficulty: editDifficulty,
+        tags:       newTags,
+        topic:      newTags[0] || problem.topic || "Uncategorized",
+      };
+      await Storage.saveProblem(updated);
+      setEditSaved(true);
+      setTimeout(() => setEditSaved(false), 2500);
+      if (onUpdate) onUpdate(updated);
+    } catch (e) {
+      setEditError("Save failed: " + (e.message || e));
+    } finally {
+      setEditSaving(false);
+    }
+  }, [problem, editTitle, editDifficulty, editTags, onUpdate]);
 
   const sendChat = async () => {
     const text = chatInput.trim();
@@ -155,6 +213,7 @@ export function ProblemModal({ problem, onClose }) {
     ...(problem.aiReview ? [{ id: "review", label: "AI Review" }] : []),
     ...((problem.similar?.length) ? [{ id: "similar", label: `Similar (${problem.similar.length})` }] : []),
     ...(isExtension ? [{ id: "chat", label: "Ask AI" }] : []),
+    { id: "edit", label: "Edit" },
   ];
 
   return html`
@@ -177,7 +236,7 @@ export function ProblemModal({ problem, onClose }) {
               <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${diffClass}">${problem.difficulty || "?"}</span>
               <span class="text-[10px] text-slate-500">${meta.label}</span>
               ${langName ? html`<span class="text-[10px] font-mono text-cyan-500/70">${langName}</span>` : ""}
-              ${problem.timestamp ? html`<span class="text-[10px] text-slate-600">${new Date(problem.timestamp * 1000).toLocaleDateString()}</span>` : ""}
+              ${problem.timestamp ? html`<span class="text-[10px] text-slate-600">${new Date(problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp).toLocaleDateString()}</span>` : ""}
             </div>
           </div>
           <button
@@ -369,6 +428,83 @@ export function ProblemModal({ problem, onClose }) {
                   </a>
                 `;
               })}
+            </div>
+          ` : ""}
+
+          ${activeTab === "edit" ? html`
+            <div class="flex flex-col gap-5">
+              <p class="text-[11px] text-slate-500">Update metadata for this problem. Changes are saved locally to your browser database.</p>
+
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-slate-500">Title</label>
+                <input
+                  type="text"
+                  value=${editTitle}
+                  onInput=${(e) => setEditTitle(e.target.value)}
+                  class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-slate-500">Difficulty</label>
+                <select
+                  value=${editDifficulty}
+                  onChange=${(e) => setEditDifficulty(e.target.value)}
+                  class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                  <option value="Unknown">Unknown</option>
+                </select>
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[11px] uppercase tracking-wider text-slate-500">Tags / Topics <span class="text-slate-600 normal-case">(comma-separated)</span></label>
+                <input
+                  type="text"
+                  value=${editTags}
+                  onInput=${(e) => setEditTags(e.target.value)}
+                  placeholder="Array, Dynamic Programming, Two Pointers…"
+                  class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+                />
+                <p class="text-[10px] text-slate-600">First tag becomes the primary topic used in analytics and the graph.</p>
+              </div>
+
+              <div class="flex items-center justify-between mt-1">
+                <div>
+                  ${editSaved ? html`<span class="text-xs text-emerald-400">✓ Saved successfully</span>` : ""}
+                  ${editError ? html`<span class="text-xs text-rose-400">${editError}</span>` : ""}
+                </div>
+                <button
+                  onClick=${handleSaveEdit}
+                  disabled=${editSaving}
+                  class="px-4 py-2 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg transition-colors disabled:opacity-40"
+                >${editSaving ? "Saving…" : "Save changes"}</button>
+              </div>
+
+              <div class="border-t border-white/5 pt-4 mt-2">
+                <p class="text-[10px] text-slate-600 mb-2">Danger zone — this removes the problem from your local database permanently.</p>
+                ${confirmDelete ? html`
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-rose-400">Are you sure?</span>
+                    <button
+                      onClick=${handleDelete}
+                      disabled=${deleting}
+                      class="px-3 py-1.5 bg-rose-600/40 hover:bg-rose-600/60 border border-rose-500/30 text-rose-300 text-xs rounded-lg transition-colors disabled:opacity-40"
+                    >${deleting ? "Deleting…" : "Yes, delete"}</button>
+                    <button
+                      onClick=${() => setConfirmDelete(false)}
+                      class="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 text-xs rounded-lg transition-colors"
+                    >Cancel</button>
+                  </div>
+                ` : html`
+                  <button
+                    onClick=${() => setConfirmDelete(true)}
+                    class="px-3 py-1.5 bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/20 text-rose-400 text-xs rounded-lg transition-colors"
+                  >Delete problem</button>
+                `}
+              </div>
             </div>
           ` : ""}
         </div>

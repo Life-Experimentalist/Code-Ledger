@@ -4,7 +4,7 @@
  */
 
 import { h, render } from "../vendor/preact-bundle.js";
-import { useState, useEffect } from "../vendor/preact-bundle.js";
+import { useState, useEffect, useMemo, useCallback } from "../vendor/preact-bundle.js";
 import { htm } from "../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -28,10 +28,72 @@ function LibraryApp() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("solutions");
   const [searchQuery, setSearchQuery] = useState("");
+  const [canonicalLookup, setCanonicalLookup] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [gitUser, setGitUser] = useState(null);
   const [showGitHubOnboarding, setShowGitHubOnboarding] = useState(false);
   const [onboardingData, setOnboardingData] = useState({ username: "", token: "" });
+
+  // Reload problems from IndexedDB (used after import or external change)
+  const reloadProblems = useCallback(() => {
+    setLoading(true);
+    Storage.getAllProblems()
+      .then((p) => setProblems(p || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Update a single problem in state (called after modal edit saves to IndexedDB)
+  const handleProblemUpdate = useCallback((updated) => {
+    setProblems((prev) => prev.map((p) => p.id === updated.id ? updated : p));
+  }, []);
+
+  // Remove a problem from state (called after modal delete removes from IndexedDB)
+  const handleProblemDelete = useCallback((id) => {
+    setProblems((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  // Load canonical map and build a fast lookup (tolerates multiple JSON shapes)
+  useEffect(() => {
+    fetch(CONSTANTS.URLS.CANONICAL_MAP_RAW, { cache: "default" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const lookup = new Map(); // "platform:slug" → { id, title }
+        const entries = Array.isArray(data) ? data : (data.entries || []);
+        for (const e of entries) {
+          const id    = e.canonicalId || e.slug;
+          const title = e.canonicalTitle || e.title || id;
+          if (!id) continue;
+          // aliases as array [{ platform, slug }]
+          if (Array.isArray(e.aliases)) {
+            for (const a of e.aliases) {
+              if (a.platform && a.slug) lookup.set(`${a.platform}:${a.slug}`, { id, title });
+            }
+          }
+          // aliases / platforms as object { platform: slug }
+          const obj = e.aliases ?? e.platforms;
+          if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+            for (const [plat, slug] of Object.entries(obj)) {
+              if (slug) lookup.set(`${plat}:${slug}`, { id, title });
+            }
+          }
+        }
+        setCanonicalLookup(lookup);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Enrich raw problems with canonical data (computed, not persisted)
+  const enrichedProblems = useMemo(() => {
+    if (!canonicalLookup || !problems.length) return problems;
+    return problems.map((p) => {
+      const key = `${p.platform}:${p.titleSlug || p.id}`;
+      const canon = canonicalLookup.get(key);
+      if (!canon || p.canonical?.id === canon.id) return p;
+      return { ...p, canonical: canon };
+    });
+  }, [problems, canonicalLookup]);
 
   useEffect(() => {
     let mounted = true;
@@ -148,6 +210,21 @@ function LibraryApp() {
     setSettings(updated || {});
   };
 
+  // Called from SettingsSchema "Set up repository" / "Change repo" button
+  const handleSetupRepo = useCallback(async (token, _owner) => {
+    const t = token || (await Storage.getAuthToken("github").catch(() => null));
+    if (!t) return;
+    let uName = gitUser;
+    if (!uName) {
+      const u = await fetch("https://api.github.com/user", {
+        headers: { Authorization: `Bearer ${t}` },
+      }).then(r => r.ok ? r.json() : null).catch(() => null);
+      uName = u?.login || "";
+    }
+    setOnboardingData({ username: uName, token: t });
+    setShowGitHubOnboarding(true);
+  }, [gitUser]);
+
   const navItems = [
     { id: "solutions", label: "Solutions", icon: "💡" },
     { id: "analytics", label: "Analytics", icon: "📈" },
@@ -199,18 +276,18 @@ function LibraryApp() {
       </p>`;
 
     if (activeTab === "search")
-      return html`<${ProblemsView} problems=${problems} searchQuery=${searchQuery} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} searchQuery=${searchQuery} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} />`;
 
     if (activeTab === "solutions")
-      return html`<${ProblemsView} problems=${problems} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} />`;
     if (activeTab === "analytics")
-      return html`<${AnalyticsView} problems=${problems} />`;
+      return html`<${AnalyticsView} problems=${enrichedProblems} />`;
     if (activeTab === "graph")
-      return html`<${GraphView} problems=${problems} />`;
+      return html`<${GraphView} problems=${enrichedProblems} />`;
     if (activeTab === "canonical")
-      return html`<${CanonicalView} problems=${problems} />`;
+      return html`<${CanonicalView} problems=${enrichedProblems} />`;
     if (activeTab === "settings")
-      return html`<${SettingsView} settings=${settings} onSettingsChange=${handleSettingsChange} />`;
+      return html`<${SettingsView} settings=${settings} onSettingsChange=${handleSettingsChange} onSetupRepo=${handleSetupRepo} />`;
 
     return html`<p class="text-slate-400">Unknown view</p>`;
   };
@@ -275,6 +352,16 @@ function LibraryApp() {
               >${typeof chrome !== "undefined" && chrome.runtime?.id ? "Extension" : "Web"}</span
             >
           </div>
+          <button
+            onClick=${reloadProblems}
+            title="Reload problems from local database"
+            class="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
           <div class="h-4 w-px bg-white/10"></div>
           <div class="flex items-center gap-3">
             ${gitUser

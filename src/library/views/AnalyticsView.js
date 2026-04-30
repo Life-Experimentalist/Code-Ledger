@@ -82,8 +82,30 @@ const PLATFORM_META = {
   codeforces:    { name: "Codeforces",   color: "#1F8ACB", bg: "rgba(31,138,203,0.10)" },
 };
 
+// Normalize lang display names so "python3" / "Python3" / "Python 3" all map to "Python3"
+const LANG_NORM = {
+  python: "Python", python3: "Python3", "python3": "Python3",
+  cpp: "C++", "c++": "C++", c: "C", java: "Java",
+  javascript: "JavaScript", js: "JavaScript", typescript: "TypeScript", ts: "TypeScript",
+  ruby: "Ruby", golang: "Go", go: "Go", swift: "Swift", kotlin: "Kotlin",
+  scala: "Scala", rust: "Rust", php: "PHP", csharp: "C#", "c#": "C#",
+  dart: "Dart", racket: "Racket", erlang: "Erlang", elixir: "Elixir",
+  mysql: "MySQL", postgresql: "PostgreSQL", bash: "Bash",
+};
+function normalizeLang(raw) {
+  if (!raw) return "Unknown";
+  const key = String(raw).toLowerCase().replace(/\s+/g, "");
+  return LANG_NORM[key] || raw;
+}
+
 function dateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Normalise timestamps that may be in seconds (old imports/API) or milliseconds (Date.now())
+function toMs(ts) {
+  const n = Number(ts) || 0;
+  return n < 1e10 ? n * 1000 : n; // < year 2286 in seconds → treat as seconds
 }
 
 export function AnalyticsView({ problems }) {
@@ -148,9 +170,10 @@ export function AnalyticsView({ problems }) {
       if (!lang || lang === "undefined" || lang === "null" || lang === "Solution") {
         lang = p.lang?.ext ? p.lang.ext.toUpperCase() : "Unknown";
       }
+      lang = normalizeLang(lang);
       s.langs[lang] = (s.langs[lang] || 0) + 1;
 
-      const solvedDate = new Date((p.timestamp || 0) * 1000);
+      const solvedDate = new Date(toMs(p.timestamp));
       const wStr = `${solvedDate.getFullYear()}-W${String(Math.ceil((solvedDate.getDate() - solvedDate.getDay() + 1) / 7)).padStart(2, "0")}`;
       if (s.weeks[wStr] !== undefined) s.weeks[wStr]++;
 

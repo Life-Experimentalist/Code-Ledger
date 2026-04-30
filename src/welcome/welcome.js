@@ -4,7 +4,7 @@
  */
 
 import { h, render } from "../vendor/preact-bundle.js";
-import { useState, useEffect } from "../vendor/preact-bundle.js";
+import { useState, useEffect, useCallback } from "../vendor/preact-bundle.js";
 import { htm } from "../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -16,110 +16,97 @@ const STEPS = [
     icon: "🧩",
     label: "Extension installed",
     desc: "CodeLedger is running in your browser.",
-    alwaysDone: true,
   },
   {
     id: "github",
     icon: "🔗",
     label: "GitHub connected",
     desc: "Authorized with GitHub so commits can be made on your behalf.",
-    settingKey: (s) => !!(s.github_token || false),
-    asyncCheck: async () => {
-      try {
-        const t = await Storage.getAuthToken("github");
-        return !!t;
-      } catch { return false; }
-    },
   },
   {
     id: "repo",
     icon: "📁",
     label: "Repository linked",
     desc: "A GitHub repo is configured to receive your solutions.",
-    settingKey: (s) => !!(s.gitRepo),
   },
   {
     id: "solve",
     icon: "✅",
     label: "First problem solved",
     desc: "Solve any accepted problem on LeetCode, GeeksForGeeks, or Codeforces.",
-    asyncCheck: async () => {
-      try {
-        const problems = await Storage.getAllProblems();
-        return (problems || []).length > 0;
-      } catch { return false; }
-    },
   },
   {
     id: "commit",
     icon: "💾",
     label: "First commit to GitHub",
     desc: "Your solution was automatically committed to your repository.",
-    asyncCheck: async () => {
-      try {
-        const problems = await Storage.getAllProblems();
-        // If there's at least one problem it was likely committed (the SW marks it)
-        // Better: check if any problem has a committed slug in storage
-        const anyCommitted = (problems || []).length > 0;
-        return anyCommitted;
-      } catch { return false; }
-    },
   },
 ];
 
 const PLATFORMS = [
-  { name: "LeetCode", url: "https://leetcode.com/", color: "#FFA116", favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico" },
-  { name: "GeeksForGeeks", url: "https://practice.geeksforgeeks.org/", color: "#2F8D46", favicon: "https://www.geeksforgeeks.org/favicon.ico" },
-  { name: "Codeforces", url: "https://codeforces.com/problemset/", color: "#1F8ACB", favicon: "https://codeforces.com/favicon.ico" },
+  { name: "LeetCode",      url: "https://leetcode.com/",                           color: "#FFA116", favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico" },
+  { name: "GeeksForGeeks", url: "https://practice.geeksforgeeks.org/",             color: "#2F8D46", favicon: "https://www.geeksforgeeks.org/favicon.ico" },
+  { name: "Codeforces",    url: "https://codeforces.com/problemset/",              color: "#1F8ACB", favicon: "https://codeforces.com/favicon.ico" },
 ];
 
 function WelcomeApp() {
   const [settings, setSettings] = useState({});
-  const [checks, setChecks] = useState({});
-  const [gitUser, setGitUser] = useState(null);
+  const [checks,   setChecks]   = useState({});
+  const [gitUser,  setGitUser]  = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const load = useCallback(async () => {
+    const [s, problems] = await Promise.all([
+      Storage.getSettings().catch(() => ({})),
+      Storage.getAllProblems().catch(() => []),
+    ]);
+    setSettings(s || {});
+
+    const newChecks = { installed: true };
+
+    // GitHub auth check — check both OAuth tokens and legacy PAT
+    const oauthToken = await Storage.getAuthToken("github").catch(() => null);
+    const token = oauthToken || s?.github_token;
+    newChecks.github = !!token;
+
+    // Repo check — canonical key AND legacy fallback
+    newChecks.repo = !!(s?.github_repo || s?.gitRepo);
+
+    // Solve check
+    newChecks.solve = (problems || []).length > 0;
+
+    // Commit check — uses the committed slug-langs map written by the SW after every push
+    try {
+      const committed = await Storage.getCommittedSlugLangs();
+      newChecks.commit = Object.keys(committed || {}).length > 0;
+    } catch (_) {
+      // Fall back to checking if any problem exists (better than always false)
+      newChecks.commit = newChecks.solve;
+    }
+
+    setChecks(newChecks);
+
+    // Fetch GitHub username for display
+    if (token) {
+      fetch("https://api.github.com/user", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(u => { if (u?.login) setGitUser(u.login); })
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
-
-    async function load() {
-      const [s, problems] = await Promise.all([
-        Storage.getSettings().catch(() => ({})),
-        Storage.getAllProblems().catch(() => []),
-      ]);
-      if (!mounted) return;
-      setSettings(s || {});
-
-      const newChecks = { installed: true };
-
-      // GitHub auth check
-      const oauthToken = await Storage.getAuthToken("github").catch(() => null);
-      const token = oauthToken || s?.github_token;
-      newChecks.github = !!token;
-
-      // Repo check
-      newChecks.repo = !!(s?.github_repo || s?.gitRepo);
-
-      // Solve check
-      newChecks.solve = (problems || []).length > 0;
-      newChecks.commit = newChecks.solve;
-
-      setChecks(newChecks);
-
-      // Fetch GitHub username
-      if (token) {
-        fetch("https://api.github.com/user", { headers: { Authorization: `Bearer ${token}` } })
-          .then(r => r.ok ? r.json() : null)
-          .then(u => { if (u?.login && mounted) setGitUser(u.login); })
-          .catch(() => { });
-      }
-    }
-
-    load();
-    return () => { mounted = false; };
-  }, []);
+    load().catch(() => {});
+    // Listen for storage changes so the checklist updates if the user connects
+    // GitHub or finishes repo setup in another tab/popup
+    const onStorage = () => { if (mounted) load().catch(() => {}); };
+    window.addEventListener("storage", onStorage);
+    return () => { mounted = false; window.removeEventListener("storage", onStorage); };
+  }, [load, refreshKey]);
 
   const doneCount = STEPS.filter(s => checks[s.id]).length;
-  const allDone = doneCount === STEPS.length;
+  const allDone   = doneCount === STEPS.length;
 
   const openLibrary = () => {
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
@@ -129,16 +116,23 @@ function WelcomeApp() {
 
   const openSettings = () => {
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-      chrome.tabs.create({ url: chrome.runtime.getURL("library/library.html") + "?tab=settings" });
+      chrome.tabs.create({ url: chrome.runtime.getURL("library/library.html") + "?tab=settings&settingsTab=git" });
     }
   };
 
   const repoUrl = (() => {
-    const repo = settings.github_repo || settings.gitRepo;
+    const repo  = settings.github_repo || settings.gitRepo;
     if (!repo) return null;
     const owner = settings.github_owner?.trim() || settings.github_username || gitUser;
     return owner ? `https://github.com/${owner}/${repo}` : null;
   })();
+
+  // Action button hint per incomplete step
+  const stepAction = (stepId) => {
+    if (stepId === "github" || stepId === "repo") return { label: "Set up →", onClick: openSettings };
+    if (stepId === "solve") return { label: "Start solving →", onClick: () => window.open("https://leetcode.com/", "_blank") };
+    return null;
+  };
 
   return html`
     <div class="min-h-screen bg-[#050508] flex flex-col items-center px-4 py-16">
@@ -154,9 +148,7 @@ function WelcomeApp() {
           <h1 class="text-4xl font-bold tracking-tight text-white">
             Welcome to <span class="text-cyan-400">CodeLedger</span>
           </h1>
-          <p class="mt-2 text-slate-400 text-base">
-            Your DSA journey, automatically committed.
-          </p>
+          <p class="mt-2 text-slate-400 text-base">Your DSA journey, automatically committed.</p>
           ${gitUser ? html`
             <div class="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/5">
               <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]"></div>
@@ -170,7 +162,14 @@ function WelcomeApp() {
       <div class="w-full max-w-lg mb-10">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest">Setup checklist</h2>
-          <span class="text-xs text-cyan-400 font-mono">${doneCount} / ${STEPS.length}</span>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-cyan-400 font-mono">${doneCount} / ${STEPS.length}</span>
+            <button
+              onClick=${() => setRefreshKey(k => k + 1)}
+              title="Refresh status"
+              class="text-slate-600 hover:text-slate-300 transition-colors text-sm"
+            >↺</button>
+          </div>
         </div>
 
         <!-- Progress bar -->
@@ -184,16 +183,16 @@ function WelcomeApp() {
         <!-- Steps -->
         <div class="flex flex-col gap-3">
           ${STEPS.map((step) => {
-    const done = !!checks[step.id];
+    const done   = !!checks[step.id];
+    const action = !done ? stepAction(step.id) : null;
     return html`
               <div class="flex items-start gap-4 p-4 rounded-xl border transition-colors ${done
         ? "border-emerald-500/20 bg-emerald-500/5"
         : "border-white/5 bg-white/[0.02]"
       }">
-                <div class="mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${done ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-slate-600"
-      }">
+                <div class="mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${done ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-slate-600"}">
                   ${done
-        ? html`<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M1 6l3.5 3.5L11 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`
+        ? html`<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6l3.5 3.5L11 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
         : html`<span class="w-2 h-2 rounded-full bg-current block"></span>`
       }
                 </div>
@@ -204,13 +203,11 @@ function WelcomeApp() {
                   </div>
                   <p class="text-[11px] text-slate-600 mt-0.5">${step.desc}</p>
                 </div>
-                ${!done && (step.id === "github" || step.id === "repo") ? html`
+                ${action ? html`
                   <button
-                    onClick=${openSettings}
+                    onClick=${action.onClick}
                     class="shrink-0 text-[10px] text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors"
-                  >
-                    ${step.id === "github" ? "Connect →" : "Link →"}
-                  </button>
+                  >${action.label}</button>
                 ` : ""}
               </div>
             `;
@@ -232,26 +229,22 @@ function WelcomeApp() {
         <button
           onClick=${openLibrary}
           class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-sm transition-colors"
-        >
-          Open Library →
-        </button>
+        >Open Library →</button>
+
         ${repoUrl ? html`
           <a
             href=${repoUrl}
             target="_blank"
             rel="noreferrer"
             class="px-5 py-2.5 rounded-xl border border-white/10 hover:border-cyan-500/30 hover:bg-white/5 text-slate-300 text-sm transition-colors"
-          >
-            View Repo ↗
-          </a>
+          >View Repo ↗</a>
         ` : ""}
+
         ${!checks.github || !checks.repo ? html`
           <button
             onClick=${openSettings}
             class="px-5 py-2.5 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-400 text-sm transition-colors"
-          >
-            Finish Setup →
-          </button>
+          >Finish Setup →</button>
         ` : ""}
       </div>
 
