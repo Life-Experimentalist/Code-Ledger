@@ -78,13 +78,3 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Full history via Settings import (unlimited) | LeetCode public API caps at 20; full import must use profile page button or CLI importer |
 | Real-time leaderboard                        | Requires server-side infra; out of scope for client-only extension                       |
-
-the leetcode import is not correctly done the difficulty level is not there and it says unknown so fix that and the calender heatmap is also not updated correctly and all the other things as well can you do that properly
-
-in the languages Python3 and python3 are treated differently fix that as well
-
-the analytics are not updated to include the rest of the imported problems solved and such
-
-the questions line section graph treats unknown as easy which is correct bu these questions are not unknown and i want a edit option in the modals to edit the meta data of the questions and such as well
-
-the library will rely on the canonical and if any questions can be linked with questions from other platforms then it will also be automatically linked and such work properly and correctly
