@@ -815,11 +815,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               <strong>Setup incomplete</strong> — GitHub is connected but no repository is linked.
             </div>
             <button
-              onClick=${() => {
-          setRepoSetup((s) => ({ ...s, github: "choose" }));
-          document.getElementById("settings-section-github")
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }}
+              onClick=${() => onSetupRepo?.()}
               class="shrink-0 px-2 py-1 bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/30 rounded text-amber-200 transition-colors"
             >Setup repo →</button>
           </div>

@@ -133,21 +133,6 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       const cleanName = sanitize(repoName);
       if (!cleanName) throw new Error("Invalid repository name. Use letters, numbers, and hyphens.");
 
-      // Verify token scope
-      const scopeCheck = await fetch("https://api.github.com/user/repos?per_page=1", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (scopeCheck.status === 403) {
-        throw new Error(
-          "GitHub token missing 'repo' scope.\n\n" +
-          "Fix: Click 'Reconnect' in Settings and approve all permissions when GitHub asks."
-        );
-      }
-      if (!scopeCheck.ok) {
-        const err = await scopeCheck.json().catch(() => ({}));
-        throw new Error(`Token validation failed: ${err.message || scopeCheck.statusText}`);
-      }
-
       setProgress("Creating repository…");
       let repoData;
       try {
@@ -163,11 +148,10 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
           }),
         });
       } catch (e) {
-        if (e.status === 403) {
+        if (e.status === 403 || e.status === 401) {
           throw new Error(
-            "GitHub App tokens cannot create repositories directly.\n\n" +
-            "Please create a repository on GitHub.com first, then use\n" +
-            "\"Link Existing Repository\" to connect it here."
+            "Permission denied. Your current session doesn't have repository creation rights.\n\n" +
+            "Fix: Disconnect and reconnect GitHub in Settings — GitHub will prompt you to approve the new permissions."
           );
         }
         if (e.status === 422) {
