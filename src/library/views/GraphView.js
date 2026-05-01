@@ -11,9 +11,9 @@ import { ProblemModal } from "../components/ProblemModal.js";
 
 /* ── Force simulation constants ─────────────────────────────────────── */
 const REPULSION   = 3000;
-const LINK_DIST   = { "topic-problem": 120, similar: 90, canonical: 60 };
-const LINK_STR    = { "topic-problem": 0.4,  similar: 0.1, canonical: 0.6 };
-const CENTER_PULL = 0.015;
+const LINK_DIST   = { "topic-problem": 120, similar: 90, canonical: 60, "topic-topic": 200 };
+const LINK_STR    = { "topic-problem": 0.4,  similar: 0.1, canonical: 0.6, "topic-topic": 0.25 };
+const CENTER_PULL = 0.03;
 const DAMPING     = 0.85;
 const ALPHA_DECAY = 0.015;
 
@@ -66,7 +66,7 @@ function simulationStep(nodes, edges, alpha, cx, cy) {
 }
 
 /* ── Drawing ─────────────────────────────────────────────────────────── */
-const EDGE_COLOR = { "topic-problem": "#334155", similar: "#1e3a5f", canonical: "#713f12" };
+const EDGE_COLOR = { "topic-problem": "#334155", similar: "#1e3a5f", canonical: "#713f12", "topic-topic": "#1e293b" };
 
 function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
   const { tx, ty, scale } = transform;
@@ -179,22 +179,44 @@ export function GraphView({ problems }) {
   const hoveredRef  = useRef(null);
   const selectedRef = useRef(null);
 
-  // Build graph whenever problems change
+  // Build graph whenever problems change — incremental: preserve positions of existing nodes.
   useEffect(() => {
     if (!problems?.length) return;
-    const { nodes, edges } = buildKnowledgeGraph(problems);
+    const { nodes: newNodes, edges: newEdges } = buildKnowledgeGraph(problems);
     const canvas = canvasRef.current;
-    const w = canvas?.width ?? 800, h = canvas?.height ?? 600;
+    const parent = canvas?.parentElement;
+    const w = parent?.clientWidth  || canvas?.width  || 800;
+    const h = parent?.clientHeight || canvas?.height || 600;
+    const cx = w / 2, cy = h / 2;
 
-    // Random initial positions
-    for (const n of nodes) {
-      n.x  = w / 2 + (Math.random() - 0.5) * 400;
-      n.y  = h / 2 + (Math.random() - 0.5) * 400;
-      n.vx = 0; n.vy = 0; n.fx = 0; n.fy = 0;
+    // Build a map of existing node positions so we can re-use them
+    const existingMap = new Map(simRef.current.nodes.map((n) => [n.id, n]));
+    let hasNew = false;
+
+    for (const n of newNodes) {
+      const prev = existingMap.get(n.id);
+      if (prev) {
+        // Carry over physics state so the node doesn't teleport
+        n.x = prev.x; n.y = prev.y;
+        n.vx = prev.vx; n.vy = prev.vy;
+        n.fx = 0; n.fy = 0;
+      } else {
+        // Brand-new node: spawn near the canvas centre
+        n.x  = cx + (Math.random() - 0.5) * Math.min(w * 0.4, 300);
+        n.y  = cy + (Math.random() - 0.5) * Math.min(h * 0.4, 300);
+        n.vx = 0; n.vy = 0; n.fx = 0; n.fy = 0;
+        hasNew = true;
+      }
     }
-    simRef.current.nodes = nodes;
-    simRef.current.edges = edges;
-    simRef.current.alpha = 1;
+
+    simRef.current.nodes = newNodes;
+    simRef.current.edges = newEdges;
+    // Full reheat only on first load; gentle reheat when new nodes arrive
+    if (existingMap.size === 0) {
+      simRef.current.alpha = 1;
+    } else if (hasNew) {
+      simRef.current.alpha = Math.max(simRef.current.alpha, 0.4);
+    }
   }, [problems]);
 
   // Keep all refs in sync so the animation loop reads current values without restarting
@@ -237,16 +259,37 @@ export function GraphView({ problems }) {
     return () => { running = false; cancelAnimationFrame(simRef.current.raf); };
   }, []);
 
-  // Resize observer
+  // Resize observer — keep the world-centre visible as the container resizes
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
+      const prevW = canvas.width  || 0;
+      const prevH = canvas.height || 0;
       canvas.width  = width;
       canvas.height = height;
-      transformRef.current.tx = 0;
-      transformRef.current.ty = 0;
+      if (prevW > 0 && prevH > 0) {
+        // Shift pan so the same world-centre stays on screen
+        transformRef.current.tx += (width  - prevW) / 2;
+        transformRef.current.ty += (height - prevH) / 2;
+      } else {
+        // First resize: fit all existing nodes into view
+        const nodes = simRef.current.nodes.filter((n) => !isNaN(n.x) && !isNaN(n.y));
+        if (nodes.length) {
+          const pad = 80;
+          const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+          const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
+          const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+          const gW = maxX - minX || 1, gH = maxY - minY || 1;
+          const scale = Math.min(Math.max(Math.min(width / gW, height / gH), 0.1), 2);
+          const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+          transformRef.current.scale = scale;
+          transformRef.current.tx = width  / 2 - cx * scale;
+          transformRef.current.ty = height / 2 - cy * scale;
+        }
+      }
+      simRef.current.alpha = Math.max(simRef.current.alpha, 0.15);
     });
     ro.observe(canvas.parentElement);
     return () => ro.disconnect();
@@ -301,7 +344,12 @@ export function GraphView({ problems }) {
     if (dragRef.current?.type === "node") {
       const canvas = canvasRef.current;
       const rect   = canvas.getBoundingClientRect();
-      const hit = hitTest(simRef.current.nodes, e.clientX - rect.left, e.clientY - rect.top, transformRef.current);
+      // Must use the same filtered set as mouseMove/mouseDown so a hidden unsolved
+      // node cannot be selected when the "Solved only" filter is active.
+      const testNodes = filterSolvedRef.current
+        ? simRef.current.nodes.filter((n) => n.type === "topic" || n.solved)
+        : simRef.current.nodes;
+      const hit = hitTest(testNodes, e.clientX - rect.left, e.clientY - rect.top, transformRef.current);
       if (hit) setSelected((prev) => (prev?.id === hit.id ? null : hit));
     }
     dragRef.current = null;
@@ -328,7 +376,26 @@ export function GraphView({ problems }) {
     return () => canvas.removeEventListener("wheel", onWheel);
   }, [onWheel]);
 
-  const reheat = useCallback(() => { simRef.current.alpha = 1; }, []);
+  const fitView = useCallback(() => {
+    const nodes = simRef.current.nodes.filter((n) => !isNaN(n.x) && !isNaN(n.y));
+    const canvas = canvasRef.current;
+    if (!canvas || !nodes.length) return;
+    const pad = 80;
+    const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+    const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
+    const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+    const gW = maxX - minX || 1, gH = maxY - minY || 1;
+    const scale = Math.min(Math.max(Math.min(canvas.width / gW, canvas.height / gH), 0.1), 2);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    transformRef.current.scale = scale;
+    transformRef.current.tx = canvas.width  / 2 - cx * scale;
+    transformRef.current.ty = canvas.height / 2 - cy * scale;
+  }, []);
+
+  const reheat = useCallback(() => {
+    simRef.current.alpha = 1;
+    fitView();
+  }, [fitView]);
 
   const visibleNodes = filterSolved
     ? simRef.current.nodes.filter((n) => n.type === "topic" || n.solved)
@@ -357,10 +424,10 @@ export function GraphView({ problems }) {
     `;
     const url = problemUrl(node);
     const favicon = PLATFORM_FAVICON[node.platform];
-    const diffClass = node.difficulty === "Easy" ? "bg-emerald-500/20 text-emerald-400"
+    const diffClass = node.difficulty === "Easy"   ? "bg-emerald-500/20 text-emerald-400"
       : node.difficulty === "Medium" ? "bg-amber-500/20 text-amber-400"
-      : node.difficulty === "Hard" ? "bg-rose-500/20 text-rose-400"
-      : "bg-white/10 text-slate-400";
+      : node.difficulty === "Hard"   ? "bg-rose-500/20 text-rose-400"
+      : "bg-slate-500/20 text-slate-400";  // Unknown / missing
     return html`
       <div class="flex flex-col gap-2">
         <!-- Title + platform -->
@@ -442,6 +509,7 @@ export function GraphView({ problems }) {
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#22c55e] inline-block"></span>Easy</div>
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#f59e0b] inline-block"></span>Medium</div>
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#ef4444] inline-block"></span>Hard</div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-[#64748b] inline-block"></span>Unknown</div>
           <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full border border-dashed border-slate-400 inline-block"></span>Suggested</div>
           <div class="text-[9px] text-slate-600 uppercase tracking-wider mt-1 mb-0.5">Platform (ring)</div>
           <div class="flex items-center gap-2">

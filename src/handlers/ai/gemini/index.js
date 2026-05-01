@@ -23,6 +23,13 @@ export class GeminiHandler extends BaseAIHandler {
       description: "Use Gemini 1.5 Flash for automated code reviews.",
       fields: [
         {
+          key: "gemini_enabled",
+          label: "Enable Gemini",
+          type: "toggle",
+          default: false,
+          description: "Enable Google Gemini for AI code reviews.",
+        },
+        {
           key: "gemini_keys",
           label: "API Keys",
           type: "text",

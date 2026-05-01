@@ -15,6 +15,23 @@ export class DeepSeekHandler extends BaseAIHandler {
     this.keyPool = new APIKeyPool("deepseek");
   }
 
+  getSettingsSchema() {
+    return {
+      id: this.id,
+      title: "DeepSeek (AI)",
+      order: 6,
+      fields: [
+        { key: "deepseek_enabled", label: "Enable DeepSeek", type: "toggle", default: false,
+          description: "Enable DeepSeek for AI code reviews." },
+        { key: "deepseek_keys", label: "API Keys", type: "text", default: "",
+          description: "Comma-separated API keys." },
+        { key: "deepseek_model", label: "Model", type: "text", default: "", advanced: true,
+          placeholder: "deepseek-coder" },
+        { key: "deepseek_endpoint", label: "Endpoint", type: "text", default: "", advanced: true },
+      ],
+    };
+  }
+
   async review(code, problemContext) {
     const settings = await Storage.getSettings();
     const model =

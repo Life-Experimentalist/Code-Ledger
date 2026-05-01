@@ -14,7 +14,7 @@ function normalizeRaw(raw) {
 
 export function guessCategory(raw) {
   const s = normalizeRaw(raw).toLowerCase();
-  if (!s) return "Easy";
+  if (!s || s === "unknown") return "Unknown";
   if (
     s.includes("hard") ||
     s.includes("extra") ||
@@ -25,8 +25,7 @@ export function guessCategory(raw) {
   if (s.includes("med") || s.includes("intermediate")) return "Medium";
   if (s.includes("easy") || s.includes("simple") || s.includes("beginner"))
     return "Easy";
-  // fallback for unknown labels: default to Easy as user requested
-  return "Easy";
+  return "Unknown";
 }
 
 export async function loadUserDifficultyMap() {
@@ -40,7 +39,7 @@ export async function loadUserDifficultyMap() {
 
 export function mapDifficulty(raw, userMap = {}) {
   const r = normalizeRaw(raw);
-  if (!r) return "Easy";
+  if (!r || r === "Unknown") return "Unknown";
   // exact-match lookup first
   if (userMap && Object.prototype.hasOwnProperty.call(userMap, r)) {
     return userMap[r];

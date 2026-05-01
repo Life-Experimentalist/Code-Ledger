@@ -24,7 +24,7 @@ export class OllamaHandler extends BaseAIHandler {
           key: "ollama_enabled",
           label: "Enable Ollama",
           type: "toggle",
-          default: true,
+          default: false,
           description: "Enable using the local Ollama instance for AI reviews.",
         },
         {

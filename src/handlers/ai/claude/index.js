@@ -15,6 +15,24 @@ export class ClaudeHandler extends BaseAIHandler {
     this.keyPool = new APIKeyPool("claude");
   }
 
+  getSettingsSchema() {
+    return {
+      id: this.id,
+      title: "Anthropic Claude (AI)",
+      order: 5,
+      fields: [
+        { key: "claude_enabled", label: "Enable Claude", type: "toggle", default: false,
+          description: "Enable Anthropic Claude for AI code reviews." },
+        { key: "claude_keys", label: "API Keys", type: "text", default: "",
+          description: "Comma-separated API keys." },
+        { key: "claude_model", label: "Model", type: "text", default: "", advanced: true,
+          placeholder: "claude-haiku-4-5-20251001" },
+        { key: "claude_endpoint", label: "Endpoint", type: "text", default: "", advanced: true,
+          placeholder: "https://api.anthropic.com/v1" },
+      ],
+    };
+  }
+
   async review(code, problemContext) {
     const settings = await Storage.getSettings();
     const model =

@@ -15,6 +15,23 @@ export class OpenRouterHandler extends BaseAIHandler {
     this.keyPool = new APIKeyPool("openrouter");
   }
 
+  getSettingsSchema() {
+    return {
+      id: this.id,
+      title: "OpenRouter (AI)",
+      order: 7,
+      fields: [
+        { key: "openrouter_enabled", label: "Enable OpenRouter", type: "toggle", default: false,
+          description: "Enable OpenRouter for AI code reviews." },
+        { key: "openrouter_keys", label: "API Keys", type: "text", default: "",
+          description: "Comma-separated API keys." },
+        { key: "openrouter_model", label: "Model", type: "text", default: "", advanced: true,
+          placeholder: "meta-llama/llama-3.1-8b-instruct:free" },
+        { key: "openrouter_endpoint", label: "Endpoint", type: "text", default: "", advanced: true },
+      ],
+    };
+  }
+
   async review(code, problemContext) {
     const settings = await Storage.getSettings();
     const model =

@@ -15,6 +15,24 @@ export class OpenAIHandler extends BaseAIHandler {
     this.keyPool = new APIKeyPool("openai");
   }
 
+  getSettingsSchema() {
+    return {
+      id: this.id,
+      title: "OpenAI (AI)",
+      order: 4,
+      fields: [
+        { key: "openai_enabled", label: "Enable OpenAI", type: "toggle", default: false,
+          description: "Enable OpenAI (GPT) for AI code reviews." },
+        { key: "openai_keys", label: "API Keys", type: "text", default: "",
+          description: "Comma-separated API keys for rate-limit pooling." },
+        { key: "openai_model", label: "Model", type: "text", default: "", advanced: true,
+          placeholder: "gpt-4o" },
+        { key: "openai_endpoint", label: "Endpoint", type: "text", default: "", advanced: true,
+          placeholder: "https://api.openai.com/v1" },
+      ],
+    };
+  }
+
   async review(code, problemContext) {
     const settings = await Storage.getSettings();
     const model =

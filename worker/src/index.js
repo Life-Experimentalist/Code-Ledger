@@ -280,7 +280,7 @@ app.get("/api/data/canonical-map.json", async (c) => {
   } catch (_) { }
   try {
     const res = await fetch(
-      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/data/canonical-map.json"
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/data/canonical-map.json"
     );
     return new Response(await res.text(), { status: 200, headers });
   } catch (e) {

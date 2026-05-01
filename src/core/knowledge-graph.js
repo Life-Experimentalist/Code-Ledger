@@ -17,9 +17,10 @@
  */
 
 const DIFFICULTY_COLOR = {
-  Easy:   "#22c55e",
-  Medium: "#f59e0b",
-  Hard:   "#ef4444",
+  Easy:    "#22c55e",
+  Medium:  "#f59e0b",
+  Hard:    "#ef4444",
+  Unknown: "#64748b",
 };
 
 const PLATFORM_COLOR = {
@@ -92,7 +93,7 @@ export function buildKnowledgeGraph(problems) {
     const allTopics =
       Array.isArray(p.tags) && p.tags.length > 0
         ? p.tags
-        : [p.topic || "Uncategorized"];
+        : [p.topic || "Untagged"];
     const primaryTopic = allTopics[0];
 
     // Determine node color: difficulty-based, but blended if solved on multiple platforms
@@ -175,6 +176,20 @@ export function buildKnowledgeGraph(problems) {
         edges.push({ source: id, target: simId, type: "similar" });
       }
     }
+  }
+
+  // Backbone: connect all topic nodes in a ring so no cluster can fully detach.
+  // Use a sparse ring (O(n) edges) — enough to keep the graph connected without
+  // over-constraining the layout.
+  const topicNodeIds = [...nodes.values()]
+    .filter((n) => n.type === "topic")
+    .map((n) => n.id);
+  for (let i = 0; i < topicNodeIds.length; i++) {
+    edges.push({
+      source: topicNodeIds[i],
+      target: topicNodeIds[(i + 1) % topicNodeIds.length],
+      type: "topic-topic",
+    });
   }
 
   // Second pass: detect cross-platform duplicates (same titleSlug, different platforms)

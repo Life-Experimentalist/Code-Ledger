@@ -138,7 +138,7 @@ Be concise. Max 200 words.`;
       const meta   = this._extractMetadata(slug);
       const code   = this._extractCode();
       const lang   = this._extractLanguage();
-      const topic  = meta.tags?.[0] || "Uncategorized";
+      const topic  = meta.tags?.[0] || "Untagged";
 
       if (!code || code.includes("extraction failed")) {
         dbg.warn("Code extraction failed, skipping commit");
@@ -279,7 +279,7 @@ Be concise. Max 200 words.`;
 
   /* ── File set builder ────────────────────────────────────────────── */
   _buildFileSet(meta, code, lang, settings, slug) {
-    const topic = meta.tags?.[0] || "Uncategorized";
+    const topic = meta.tags?.[0] || "Untagged";
     const base  = `topics/${topic}/${slug}/`;
     const files = [];
 

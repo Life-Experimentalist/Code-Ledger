@@ -22,7 +22,7 @@ export const GitEngine = {
     }
 
     try {
-      const topicFolder = problemContext.topic || 'Uncategorized';
+      const topicFolder = problemContext.topic || 'Untagged';
       const cleanTitle = (problemContext.titleSlug || problemContext.title || 'unknown').replace(/[^a-zA-Z0-9-]/g, '-');
       const langExt = problemContext.lang?.ext || 'txt';
       const filePath = `topics/${topicFolder}/${cleanTitle}/solution.${langExt}`;

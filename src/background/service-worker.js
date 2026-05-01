@@ -51,7 +51,14 @@ async function handleSolved(data) {
   const langName = data.lang?.name || "";
   const isFirstCommit = !(await Storage.isSlugLangCommitted(titleSlug, langName).catch(() => false));
 
-  // 2. Save locally
+  // 2. Save locally — for bulk imports, skip if the user has manually edited this record.
+  if (data.skipCommit) {
+    const existing = await Storage.getProblem(data.id).catch(() => null);
+    if (existing?.manuallyEdited) {
+      coreDebug.log("Skipping import overwrite — problem was manually edited", titleSlug);
+      return;
+    }
+  }
   await Storage.saveProblem(data);
 
   // 3. AI Review (if enabled)
@@ -122,7 +129,7 @@ async function handleSolved(data) {
       } else {
         const fallbackLang = data.lang?.name || "Solution";
         const fallbackExt = data.lang?.ext || "txt";
-        const filePath = `topics/${data.topic || "Uncategorized"}/${data.titleSlug}/${fallbackLang}.${fallbackExt}`;
+        const filePath = `topics/${data.topic || "Untagged"}/${data.titleSlug}/${fallbackLang}.${fallbackExt}`;
         filesToCommit.push({ path: filePath, content: data.code });
       }
 
@@ -252,7 +259,7 @@ async function handleResyncAll() {
     } else if (problem.code) {
       const langName = problem.lang?.name || "Solution";
       const langExt = problem.lang?.ext || "txt";
-      const filePath = `topics/${problem.topic || "Uncategorized"}/${problem.titleSlug}/${langName}.${langExt}`;
+      const filePath = `topics/${problem.topic || "Untagged"}/${problem.titleSlug}/${langName}.${langExt}`;
       filesToCommit.push({ path: filePath, content: problem.code });
     }
   }
@@ -278,6 +285,22 @@ async function handleResyncAll() {
 async function handleAIChat(messages, context = {}) {
   const settings = await Storage.getSettings();
 
+  // Prepend a system-context message so the AI knows which problem we're discussing
+  const contextParts = [];
+  if (context.title) contextParts.push(`Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`);
+  if (context.problemStatement) {
+    // Strip HTML tags for a cleaner context prompt
+    const plain = context.problemStatement.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+    if (plain) contextParts.push(`Description:\n${plain.slice(0, 2000)}`);
+  }
+  if (context.code && context.lang?.name) contextParts.push(`My ${context.lang.name} solution:\n\`\`\`${context.lang.name}\n${context.code.slice(0, 3000)}\n\`\`\``);
+  else if (context.code) contextParts.push(`My solution:\n\`\`\`\n${context.code.slice(0, 3000)}\n\`\`\``);
+  if (context.aiReview) contextParts.push(`Prior AI review:\n${context.aiReview.slice(0, 1000)}`);
+
+  const messagesWithContext = contextParts.length > 0
+    ? [{ role: "user", content: `Context for this conversation:\n\n${contextParts.join("\n\n")}` }, { role: "assistant", content: "Understood, I have the problem and solution context. How can I help?" }, ...messages]
+    : messages;
+
   const seen = new Set();
   const providers = [
     { id: settings.aiProvider || "gemini", model: settings.aiPrimaryModel || "" },
@@ -294,7 +317,7 @@ async function handleAIChat(messages, context = {}) {
     const ai = registry.getAIProvider(provider.id);
     if (!ai) continue;
     try {
-      const response = await ai.chat(messages, { ...context, aiModelOverride: provider.model });
+      const response = await ai.chat(messagesWithContext, { ...context, aiModelOverride: provider.model });
       return response;
     } catch (e) {
       coreDebug.warn(`AI Chat failed with ${provider.id}:`, e.message);

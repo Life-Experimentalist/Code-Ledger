@@ -10,6 +10,7 @@ import {
   useMemo,
   useEffect,
   useRef,
+  useCallback,
 } from "../../vendor/preact-bundle.js";
 import {
   mapDifficulty,
@@ -59,7 +60,9 @@ export function HeatMap({ problems = [] }) {
   const availableYears = useMemo(() => {
     const years = new Set();
     problems.forEach((p) => {
-      years.add(new Date((p.timestamp || Date.now() / 1000) * 1000).getFullYear());
+      const ts = p.timestamp || 0;
+      const tsMs = ts > 1e10 ? ts : ts * 1000;
+      years.add(new Date(tsMs || Date.now()).getFullYear());
     });
     years.add(new Date().getFullYear());
     return Array.from(years).sort((a, b) => b - a);
@@ -95,7 +98,8 @@ export function HeatMap({ problems = [] }) {
     };
 
     for (const p of problems) {
-      const d = new Date((p.timestamp || Date.now() / 1000) * 1000);
+      const ts = p.timestamp || 0;
+      const d = new Date(ts > 1e10 ? ts : ts * 1000 || Date.now());
       const ds = toDateStr(d);
       const raw = p.difficulty || "";
       const category = mapDifficulty(raw, userMap);
@@ -170,18 +174,16 @@ export function HeatMap({ problems = [] }) {
   };
 
   const onDayEnter = (ev, day) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    const x = ev.clientX - (rect ? rect.left : 0) + 8;
-    const y = ev.clientY - (rect ? rect.top : 0) + 8;
+    const x = ev.clientX + 12;
+    const y = ev.clientY - 8;
     setHover({ pos: { x, y }, day });
   };
   const onDayLeave = () => setHover(null);
 
   const onDayClick = (ev, day) => {
     ev.stopPropagation();
-    const rect = containerRef.current?.getBoundingClientRect();
-    const x = ev.clientX - (rect ? rect.left : 0) + 8;
-    const y = ev.clientY - (rect ? rect.top : 0) + 8;
+    const x = ev.clientX + 12;
+    const y = ev.clientY - 8;
     setPinned((prev) => (prev?.day.date === day.date ? null : { pos: { x, y }, day }));
   };
 
@@ -198,118 +200,181 @@ export function HeatMap({ problems = [] }) {
 
   const active = pinned || hover;
 
+  // Auto-fit cell size: measure container, divide by number of week columns
+  const [cellPx, setCellPx] = useState(11);
+  const gridRef = useRef(null);
+  useEffect(() => {
+    if (!gridRef.current) return;
+    const ro = new ResizeObserver(() => {
+      const w = gridRef.current?.clientWidth || 600;
+      const numWeeks = grid.length || 53;
+      // 28px for day-label col + 2px gap between each column
+      const usable = w - 28 - numWeeks * 2;
+      const cs = Math.max(7, Math.floor(usable / numWeeks));
+      setCellPx(Math.min(cs, 14));
+    });
+    ro.observe(gridRef.current);
+    return () => ro.disconnect();
+  }, [grid.length]);
+
+  // Compute month label positions from the week grid
+  const monthLabels = useMemo(() => {
+    const labels = [];
+    let lastMonth = null;
+    for (let wi = 0; wi < grid.length; wi++) {
+      const week = grid[wi];
+      const firstDay = week.find((d) => d !== null);
+      if (!firstDay) continue;
+      const m = firstDay.date.slice(5, 7); // "MM"
+      if (m !== lastMonth) {
+        const name = new Date(firstDay.date + "T00:00:00Z").toLocaleString("default", { month: "short" });
+        labels.push({ colIndex: wi, name });
+        lastMonth = m;
+      }
+    }
+    return labels;
+  }, [grid]);
+
+  const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
   return html`
     <div
-      class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4 overflow-hidden relative"
+      class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 relative"
       ref=${containerRef}
       onClick=${() => setPinned(null)}
     >
+      <!-- Header row -->
       <div class="flex justify-between items-center">
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
-          Consistency Map
-        </h3>
-        <select
-          class="bg-[#0d1117] border border-white/10 rounded-lg text-xs text-slate-300 px-3 py-1.5 outline-none hover:border-white/20 transition-colors"
-          value=${selectedPeriod}
-          onChange=${(e) => { setSelectedPeriod(e.target.value); setPinned(null); }}
-          onClick=${(e) => e.stopPropagation()}
-        >
-          <option value="past_year">Past 1 Year</option>
-          ${availableYears.map((y) => html`<option value="${y}">${y}</option>`)}
-        </select>
-      </div>
-
-      <div
-        ref=${scrollRef}
-        class="overflow-x-auto"
-        style=${{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        onClick=${(e) => e.stopPropagation()}
-      >
-        <div class="flex gap-1 min-w-max pb-1">
-          ${grid.map(
-            (week) =>
-              html`<div class="flex flex-col gap-1">
-                ${week.map(
-                  (day) => day === null
-                    ? html`<div class="w-4 h-4 rounded-sm bg-transparent"></div>`
-                    : html`
-                      <div
-                        class="w-4 h-4 rounded-sm ${getColor(day.total)} transition-colors duration-200 hover:ring-1 ring-cyan-300 cursor-pointer ${pinned?.day.date === day.date ? "ring-2 ring-cyan-400" : ""}"
-                        onMouseEnter=${(e) => onDayEnter(e, day)}
-                        onMouseLeave=${onDayLeave}
-                        onClick=${(e) => onDayClick(e, day)}
-                        title="${day.date}: ${day.total} solves"
-                      ></div>
-                    `,
-                )}
-              </div>`,
-          )}
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Consistency Map</h3>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-slate-600">Current: <b class="text-cyan-400">${currentStreak}d</b></span>
+          <span class="text-[10px] text-slate-600">Best: <b class="text-cyan-400">${maxStreak}d</b></span>
+          <select
+            class="bg-[#0d1117] border border-white/10 rounded-lg text-xs text-slate-300 px-2 py-1 outline-none hover:border-white/20 transition-colors"
+            value=${selectedPeriod}
+            onChange=${(e) => { setSelectedPeriod(e.target.value); setPinned(null); }}
+            onClick=${(e) => e.stopPropagation()}
+          >
+            <option value="past_year">Past Year</option>
+            ${availableYears.map((y) => html`<option value="${y}">${y}</option>`)}
+          </select>
         </div>
       </div>
 
-      <div class="flex justify-between items-center text-xs text-slate-500 mt-2 font-mono">
-        <span>Current Streak:
-          ${currentStreak > 0 ? html`<b class="text-cyan-400">${currentStreak}</b>` : currentStreak}
-          Days</span>
-        <span>Longest:
-          ${maxStreak > 0 ? html`<b class="text-cyan-400">${maxStreak}</b>` : maxStreak}
-          Days</span>
+      <!-- Grid -->
+      <div ref=${gridRef} class="w-full" onClick=${(e) => e.stopPropagation()}>
+        <!-- Month labels row -->
+        <div class="flex mb-1" style="padding-left: 28px;">
+          ${grid.map((_, wi) => {
+            const label = monthLabels.find((l) => l.colIndex === wi);
+            return html`<div
+              key=${wi}
+              style=${{ width: `${cellPx + 2}px`, flexShrink: 0, overflow: "visible" }}
+              class="text-[9px] text-slate-500 whitespace-nowrap"
+            >${label ? label.name : ""}</div>`;
+          })}
+        </div>
+
+        <!-- Day labels + cell columns -->
+        <div class="flex" style="gap: 0;">
+          <!-- Day labels column (every other label for space) -->
+          <div class="flex flex-col shrink-0" style="width:28px; gap:2px; padding-top: 0;">
+            ${DAY_LABELS.map((d, i) => html`
+              <div
+                key=${d}
+                class="text-[9px] text-slate-600 flex items-center"
+                style=${{ height: `${cellPx}px`, visibility: (i % 2 === 1) ? "visible" : "hidden" }}
+              >${d}</div>
+            `)}
+          </div>
+
+          <!-- Week columns -->
+          <div class="flex" style="gap: 2px; flex: 1; overflow: hidden;">
+            ${grid.map((week, wi) => html`
+              <div key=${wi} class="flex flex-col" style="gap: 2px; flex: 1;">
+                ${week.map((day, di) => day === null
+                  ? html`<div key=${di} style=${{ width: "100%", height: `${cellPx}px` }} class="rounded-sm bg-transparent"></div>`
+                  : html`<div
+                      key=${di}
+                      style=${{ width: "100%", height: `${cellPx}px` }}
+                      class="rounded-sm ${getColor(day.total)} cursor-pointer transition-colors duration-150 ${pinned?.day.date === day.date ? "ring-1 ring-cyan-400" : ""}"
+                      onMouseEnter=${(e) => onDayEnter(e, day)}
+                      onMouseLeave=${onDayLeave}
+                      onClick=${(e) => onDayClick(e, day)}
+                    ></div>`
+                )}
+              </div>
+            `)}
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex items-center gap-1.5 mt-2 justify-end">
+          <span class="text-[9px] text-slate-600">Less</span>
+          ${[0, 1, 2, 3, 4].map((i) => html`
+            <div class="w-3 h-3 rounded-sm ${["bg-white/5","bg-cyan-900/60","bg-cyan-700","bg-cyan-600","bg-cyan-400"][i]}"></div>
+          `)}
+          <span class="text-[9px] text-slate-600">More</span>
+        </div>
       </div>
 
-      ${active
-        ? html`<div
-            style=${{
-              position: "absolute",
-              left: `${Math.min(active.pos.x, (containerRef.current?.offsetWidth || 999) - 270)}px`,
-              top: `${active.pos.y}px`,
-              zIndex: 60,
-            }}
-            class="p-3 w-64 bg-[#071018] border ${pinned ? "border-cyan-500/30" : "border-white/5"} rounded-xl text-sm text-slate-200 shadow-2xl"
-            onClick=${(e) => e.stopPropagation()}
-          >
-            <div class="flex items-center justify-between mb-1">
-              <div class="text-xs text-slate-400">${fmtDateLabel(active.day.date)}</div>
-              ${pinned ? html`<button
-                onClick=${() => setPinned(null)}
-                class="text-slate-500 hover:text-slate-300 text-[10px] leading-none px-1"
-              >✕</button>` : html`<span class="text-[9px] text-slate-600">click to pin</span>`}
+      <!-- Hover / pinned tooltip -->
+      ${active ? html`
+        <div
+          style=${{
+            position: "fixed",
+            left: `${Math.min(active.pos.x, (typeof window !== "undefined" ? window.innerWidth : 1200) - 280)}px`,
+            top: `${active.pos.y}px`,
+            zIndex: 99999,
+            pointerEvents: pinned ? "auto" : "none",
+          }}
+          class="p-3 w-60 bg-[#071018] border ${pinned ? "border-cyan-500/30" : "border-white/10"} rounded-xl text-sm text-slate-200 shadow-2xl"
+          onClick=${(e) => e.stopPropagation()}
+        >
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs text-slate-400">${fmtDateLabel(active.day.date)}</div>
+            ${pinned
+              ? html`<button onClick=${() => setPinned(null)} class="text-slate-500 hover:text-slate-300 text-[10px] px-1">✕</button>`
+              : html`<span class="text-[9px] text-slate-600">click to pin</span>`}
+          </div>
+          <div class="flex gap-3 mb-2">
+            <div class="text-center">
+              <div class="text-[11px] text-emerald-400 font-medium">Easy</div>
+              <div class="text-xs text-slate-300">${active.day.data.easy || 0}</div>
             </div>
-            <div class="flex gap-2 mb-2">
-              <div class="flex-1 text-[12px]">
-                <span class="font-medium text-emerald-400">Easy</span>
-                <div class="text-xs text-slate-400">${active.day.data.easy || 0}</div>
-              </div>
-              <div class="flex-1 text-[12px]">
-                <span class="font-medium text-amber-400">Medium</span>
-                <div class="text-xs text-slate-400">${active.day.data.medium || 0}</div>
-              </div>
-              <div class="flex-1 text-[12px]">
-                <span class="font-medium text-rose-400">Hard</span>
-                <div class="text-xs text-slate-400">${active.day.data.hard || 0}</div>
-              </div>
+            <div class="text-center">
+              <div class="text-[11px] text-amber-400 font-medium">Med</div>
+              <div class="text-xs text-slate-300">${active.day.data.medium || 0}</div>
             </div>
-            ${Object.keys(active.day.data.raw || {}).length > 0 ? html`
-              <div class="text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Raw types</div>
-              ${Object.entries(active.day.data.raw).map(
-                ([rawLabel, cnt]) => html`
-                  <div class="flex items-center justify-between gap-2 mb-1">
-                    <div class="text-[12px] truncate">
-                      ${rawLabel} <span class="text-xs text-slate-500">(${cnt})</span>
-                    </div>
-                    <select
-                      class="bg-[#0d1117] border border-white/10 text-xs text-slate-300 px-1.5 py-0.5 rounded"
-                      onChange=${(e) => saveMapping(rawLabel, e.target.value)}
-                    >
-                      <option value="Easy">Easy</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Hard">Hard</option>
-                    </select>
-                  </div>
-                `,
-              )}
-            ` : html`<div class="text-[12px] text-slate-600">No solves this day</div>`}
-          </div>`
-        : ""}
+            <div class="text-center">
+              <div class="text-[11px] text-rose-400 font-medium">Hard</div>
+              <div class="text-xs text-slate-300">${active.day.data.hard || 0}</div>
+            </div>
+            <div class="text-center ml-auto">
+              <div class="text-[11px] text-slate-500">Total</div>
+              <div class="text-xs font-bold text-white">${active.day.total || 0}</div>
+            </div>
+          </div>
+          ${active.day.total === 0
+            ? html`<div class="text-[11px] text-slate-600">No solves</div>`
+            : Object.keys(active.day.data.raw || {}).length > 0 ? html`
+              <div class="text-[9px] text-slate-600 uppercase tracking-wider mb-1">Remap difficulty</div>
+              ${Object.entries(active.day.data.raw).map(([rawLabel, cnt]) => html`
+                <div class="flex items-center justify-between gap-2 mb-1">
+                  <span class="text-[11px] truncate text-slate-400">${rawLabel} <span class="text-slate-600">(${cnt})</span></span>
+                  <select
+                    class="bg-[#0d1117] border border-white/10 text-xs text-slate-300 px-1.5 py-0.5 rounded"
+                    onChange=${(e) => saveMapping(rawLabel, e.target.value)}
+                  >
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+              `)}
+            ` : ""}
+        </div>
+      ` : ""}
     </div>
   `;
 }

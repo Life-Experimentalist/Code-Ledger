@@ -120,7 +120,7 @@ export function AnalyticsView({ problems }) {
 
   const stats = useMemo(() => {
     const s = {
-      easy: 0, medium: 0, hard: 0,
+      easy: 0, medium: 0, hard: 0, unknown: 0,
       total: problems.length,
       topics: {},
       platforms: {},
@@ -148,6 +148,7 @@ export function AnalyticsView({ problems }) {
       if (cat === "Easy") s.easy++;
       else if (cat === "Medium") s.medium++;
       else if (cat === "Hard") s.hard++;
+      else s.unknown++;
 
       const tags = Array.isArray(p.tags) ? p.tags : [];
       tags.forEach((t) => {
@@ -234,10 +235,14 @@ export function AnalyticsView({ problems }) {
         }],
       },
       difficultyDonut: {
-        labels: ["Easy", "Medium", "Hard"],
+        labels: stats.unknown > 0 ? ["Easy", "Medium", "Hard", "Unknown"] : ["Easy", "Medium", "Hard"],
         datasets: [{
-          data: [stats.easy, stats.medium, stats.hard],
-          backgroundColor: ["#10b981", "#f59e0b", "#ef4444"],
+          data: stats.unknown > 0
+            ? [stats.easy, stats.medium, stats.hard, stats.unknown]
+            : [stats.easy, stats.medium, stats.hard],
+          backgroundColor: stats.unknown > 0
+            ? ["#10b981", "#f59e0b", "#ef4444", "#64748b"]
+            : ["#10b981", "#f59e0b", "#ef4444"],
           borderWidth: 0,
         }],
       },

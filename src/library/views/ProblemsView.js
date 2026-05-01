@@ -13,31 +13,35 @@ import { ProblemModal } from "../components/ProblemModal.js";
 
 const PLATFORMS = [
   {
-    id:      "leetcode",
-    name:    "LeetCode",
-    url:     "https://leetcode.com/problemset/",
-    color:   "#FFA116",
-    bg:      "rgba(255,161,22,0.08)",
-    border:  "rgba(255,161,22,0.25)",
-    favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    id:         "leetcode",
+    name:       "LeetCode",
+    url:        "https://leetcode.com/problemset/",
+    profileUrl: (s) => s?.leetcode_username ? `https://leetcode.com/u/${s.leetcode_username}/` : null,
+    progressUrl: () => "https://leetcode.com/progress",
+    color:      "#FFA116",
+    bg:         "rgba(255,161,22,0.08)",
+    border:     "rgba(255,161,22,0.25)",
+    favicon:    "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
   },
   {
-    id:      "geeksforgeeks",
-    name:    "GeeksForGeeks",
-    url:     "https://practice.geeksforgeeks.org/explore",
-    color:   "#2F8D46",
-    bg:      "rgba(47,141,70,0.08)",
-    border:  "rgba(47,141,70,0.25)",
-    favicon: "https://www.geeksforgeeks.org/favicon.ico",
+    id:         "geeksforgeeks",
+    name:       "GeeksForGeeks",
+    url:        "https://practice.geeksforgeeks.org/explore",
+    profileUrl: (s) => s?.gfg_username ? `https://auth.geeksforgeeks.org/user/${s.gfg_username}/` : null,
+    color:      "#2F8D46",
+    bg:         "rgba(47,141,70,0.08)",
+    border:     "rgba(47,141,70,0.25)",
+    favicon:    "https://www.geeksforgeeks.org/favicon.ico",
   },
   {
-    id:      "codeforces",
-    name:    "Codeforces",
-    url:     "https://codeforces.com/problemset",
-    color:   "#1F8ACB",
-    bg:      "rgba(31,138,203,0.08)",
-    border:  "rgba(31,138,203,0.25)",
-    favicon: "https://codeforces.com/favicon.ico",
+    id:         "codeforces",
+    name:       "Codeforces",
+    url:        "https://codeforces.com/problemset",
+    profileUrl: (s) => s?.cf_username ? `https://codeforces.com/profile/${s.cf_username}` : null,
+    color:      "#1F8ACB",
+    bg:         "rgba(31,138,203,0.08)",
+    border:     "rgba(31,138,203,0.25)",
+    favicon:    "https://codeforces.com/favicon.ico",
   },
 ];
 
@@ -50,7 +54,7 @@ const SORT_OPTIONS = [
 ];
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
 
-export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblemDelete }) {
+export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblemDelete, settings }) {
   const [filterDifficulty, setFilterDifficulty] = useState("All");
   const [filterPlatform, setFilterPlatform]     = useState("All");
   const [query, setQuery]                       = useState(searchQuery || "");
@@ -134,11 +138,28 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
                 <span class="text-sm font-semibold" style=${{ color: active ? plat.color : "#94a3b8" }}>${plat.name}</span>
                 <span class="text-[11px] text-slate-500">${count} solved</span>
               </div>
-              <a
-                href=${plat.url} target="_blank" rel="noreferrer"
-                onClick=${(e) => e.stopPropagation()}
-                class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-slate-400 hover:text-cyan-400 px-1.5 py-0.5 rounded bg-white/5 border border-white/10"
-              >Practice ↗</a>
+              <!-- Top-right action links: Practice + Profile -->
+              <div class="absolute top-2 right-2 flex flex-col gap-1 items-end opacity-0 group-hover:opacity-100 transition-opacity">
+                <a
+                  href=${plat.url} target="_blank" rel="noreferrer"
+                  onClick=${(e) => e.stopPropagation()}
+                  class="text-[10px] text-slate-400 hover:text-cyan-400 px-1.5 py-0.5 rounded bg-white/5 border border-white/10"
+                >Practice ↗</a>
+                ${plat.profileUrl?.(settings) ? html`
+                  <a
+                    href=${plat.profileUrl(settings)} target="_blank" rel="noreferrer"
+                    onClick=${(e) => e.stopPropagation()}
+                    class="text-[10px] text-slate-400 hover:text-cyan-400 px-1.5 py-0.5 rounded bg-white/5 border border-white/10"
+                  >Profile ↗</a>
+                ` : ""}
+                ${plat.progressUrl ? html`
+                  <a
+                    href=${plat.progressUrl()} target="_blank" rel="noreferrer"
+                    onClick=${(e) => e.stopPropagation()}
+                    class="text-[10px] text-slate-400 hover:text-cyan-400 px-1.5 py-0.5 rounded bg-white/5 border border-white/10"
+                  >Progress ↗</a>
+                ` : ""}
+              </div>
             </div>
           `;
         })}

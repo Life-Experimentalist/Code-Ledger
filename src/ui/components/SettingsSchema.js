@@ -317,10 +317,11 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [activeTab, schema]);
 
+  // When a provider is selected as primary/secondary, auto-enable it
   useEffect(() => {
     const selected = [values?.aiProvider, values?.aiSecondary].filter(Boolean);
     selected.forEach((pid) => {
-      if (values?.[`${pid}_enabled`] === false) {
+      if (values?.[`${pid}_enabled`] !== true) {
         onChange(`${pid}_enabled`, true);
       }
     });
@@ -407,6 +408,23 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       ...s,
       [`${baseResultKey}:all`]: `Tested ${keys.length} key(s)`,
     }));
+  };
+
+  const handleRemoveFailedKeys = (providerId, keyField, rawVal) => {
+    const keys = parseKeys(rawVal);
+    const validKeys = keys.filter((_, idx) => {
+      const result = testResults[`${keyField}:${idx}`];
+      // Keep keys that haven't been tested yet, or that passed
+      return !result || result === "OK";
+    });
+    const newVal = validKeys.join(", ");
+    handleProviderKeysChange(providerId, keyField, newVal);
+    setTestResults((s) => {
+      const updated = { ...s };
+      keys.forEach((_, idx) => delete updated[`${keyField}:${idx}`]);
+      delete updated[`${keyField}:all`];
+      return updated;
+    });
   };
 
   const handleTestEndpoint = async (providerId, endpointVal, fieldKey) => {
@@ -523,13 +541,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
 
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
-    if (
-      values?.aiProvider === providerId ||
-      values?.aiSecondary === providerId
-    ) {
-      return true;
-    }
-    return values?.[`${providerId}_enabled`] !== false;
+    if (values?.aiProvider === providerId || values?.aiSecondary === providerId) return true;
+    return values?.[`${providerId}_enabled`] === true;
   };
 
   const savePromptDraft = async () => {
@@ -721,9 +734,14 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                         <button
                           onClick=${() => handleResyncAll(f.provider)}
                           disabled=${isSyncing}
-                          class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 text-[10px] rounded transition-colors disabled:opacity-50"
-                          title="Commit any locally-saved problems that are missing from your repo"
-                        >${isSyncing ? "Syncing…" : "⟳ Sync"}</button>
+                          class="px-2.5 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                          title="Push all locally-saved problems to your GitHub repo — commits any that are missing from the repo"
+                        >
+                          ${isSyncing
+                      ? html`<svg class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 018-8v8z" fill="currentColor" stroke="none"/></svg> Syncing…`
+                      : html`↑ Push to GitHub`
+                    }
+                        </button>
                       ` : ""}
                       ${onSetupRepo ? html`
                         <button
@@ -1084,7 +1102,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               ${isPinned
           ? html`<p class="text-[11px] text-amber-400">
                     This provider is active as
-                    ${values?.aiProvider === pid ? "primary" : "secondary"} and
+                    ${values?.aiProvider === pid ? " primary " : " secondary "}and
                     cannot be disabled.
                   </p>`
           : ""}
@@ -1149,15 +1167,30 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                     ? "Testing..."
                     : "Test"}
                                 </button>
-                                <span class="text-[11px] text-slate-400"
-                                  >${testResults[`${keyField}:${idx}`] ||
-                  ""}</span
-                                >
+                                ${(() => {
+                    const r = testResults[`${keyField}:${idx}`];
+                    if (!r) return "";
+                    const ok = r === "OK";
+                    return html`<span class="text-[11px] ${ok ? "text-emerald-400" : "text-rose-400"}">${r}</span>`;
+                  })()}
                               </div>
                             </div>
                           `
               )}
                       </div>
+
+                      ${(() => {
+              const hasFailed = keyList.some((_, idx) => {
+                const r = testResults[`${keyField}:${idx}`];
+                return r && r !== "OK";
+              });
+              return hasFailed ? html`
+                <button
+                  onClick=${() => handleRemoveFailedKeys(pid, keyField, rawKeys)}
+                  class="self-start px-3 py-1.5 bg-rose-600/15 hover:bg-rose-600/30 border border-rose-500/30 text-rose-400 text-xs rounded transition-colors"
+                >Remove failed keys</button>
+              ` : "";
+            })()}
 
                       <div class="flex items-center gap-2">
                         <label

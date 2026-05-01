@@ -48,7 +48,7 @@ export const CONSTANTS = Object.freeze({
     AUTH_WORKER: "https://codeledger.vkrishna04.me/api",
     TELEMETRY: "https://counter.vkrishna04.me",
     CANONICAL_MAP_RAW:
-      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/data/canonical-map.json",
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/data/canonical-map.json",
     CANONICAL_MAP_SCHEMA:
       "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/data/schema/canonical-map.schema.json",
     GITHUB_OAUTH_BASE: "https://github.com/login/oauth",

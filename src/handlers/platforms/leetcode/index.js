@@ -143,6 +143,11 @@ Be concise. Max 200 words.`;
     if (page.type === PAGE_TYPES.PROFILE) {
       this._injectProfileImportBtn(page.username).catch(() => {});
     }
+
+    // /progress page import button
+    if (page.type === PAGE_TYPES.PROGRESS) {
+      this._injectProgressImportBtn().catch(() => {});
+    }
   }
 
   _startTimer(slug) {
@@ -232,6 +237,11 @@ Be concise. Max 200 words.`;
     // Profile page import button
     if (page.type === PAGE_TYPES.PROFILE) {
       this._injectProfileImportBtn(page.username).catch(() => {});
+    }
+
+    // /progress page — inject the same import button (no username check needed)
+    if (page.type === PAGE_TYPES.PROGRESS) {
+      this._injectProgressImportBtn().catch(() => {});
     }
   }
 
@@ -457,6 +467,63 @@ Be concise. Max 200 words.`;
     anchor.appendChild(container);
   }
 
+  /**
+   * Inject the import button on leetcode.com/progress (stable URL; always the logged-in user).
+   * The progress page is preferred over /u/{username} because it's a fixed URL with no
+   * username-check ambiguity.
+   */
+  async _injectProgressImportBtn() {
+    if (document.getElementById("cl-profile-import")) return;
+
+    const MAX_ATTEMPTS = 16;
+    const RETRY_MS     = 500;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (document.getElementById("cl-profile-import")) return;
+
+      // /progress shows a top summary card — look for the calendar or user-name heading
+      const anchor =
+        document.querySelector("[class*='progress-header']") ||
+        document.querySelector("[class*='userProfile'], [class*='user-profile']") ||
+        document.querySelector("h1, h2") ||
+        document.querySelector("main");
+
+      if (anchor) {
+        const username = null; // no per-user check needed on /progress
+        const container = document.createElement("div");
+        container.style.cssText = "margin:12px 0;display:flex;flex-direction:column;gap:6px;";
+
+        const btn = this._createImportBtn(username);
+        const prog = document.createElement("div");
+        prog.id = "cl-import-progress";
+        prog.style.cssText = "font-size:12px;color:#94a3b8;display:none;";
+
+        container.appendChild(btn);
+        container.appendChild(prog);
+        anchor.parentElement?.insertBefore(container, anchor) || document.body.appendChild(container);
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+    }
+
+    // Fallback: floating button at bottom-right
+    if (!document.getElementById("cl-profile-import")) {
+      const floater = document.createElement("div");
+      floater.style.cssText =
+        "position:fixed;bottom:80px;right:20px;z-index:9999;" +
+        "display:flex;flex-direction:column;gap:6px;align-items:flex-end;";
+      const btn = this._createImportBtn(null);
+      btn.style.boxShadow = "0 4px 24px rgba(6,182,212,0.25)";
+      const prog = document.createElement("div");
+      prog.id = "cl-import-progress";
+      prog.style.cssText = "font-size:11px;color:#94a3b8;background:#0a0a0f;border:1px solid #1e293b;padding:4px 8px;border-radius:6px;max-width:240px;text-align:right;display:none;";
+      floater.appendChild(prog);
+      floater.appendChild(btn);
+      document.body.appendChild(floater);
+    }
+  }
+
   /** Create the styled import button element. */
   _createImportBtn(pageUsername) {
     const btn = document.createElement("button");
@@ -484,25 +551,16 @@ Be concise. Max 200 words.`;
       if (progressEl) { progressEl.textContent = msg; progressEl.style.display = "block"; }
     };
 
-    // Global accepted-submissions query (cross-problem, paginated)
-    const AC_QUERY = `
-      query submissionList($offset: Int!, $limit: Int!, $status: Int) {
-        submissionList(offset: $offset, limit: $limit, status: $status) {
-          lastKey
-          hasNext
-          submissions {
-            id title titleSlug lang langName runtime timestamp status statusDisplay
-          }
-        }
-      }
-    `;
-
     try {
       // ── Phase 1: Bulk problem index (difficulty + title from REST API) ──
       show("Building problem index…");
-      const diffMap  = {}; // slug → "Easy"|"Medium"|"Hard"
-      const titleMap = {}; // slug → display title
-      const tagsMap  = {}; // slug → string[]
+      const diffMap    = {}; // slug → "Easy"|"Medium"|"Hard"
+      const titleMap   = {}; // slug → display title
+      const tagsMap    = {}; // slug → string[]
+      const descMap    = {}; // slug → HTML content string
+      const hintsMap   = {}; // slug → string[]
+      const acRateMap  = {}; // slug → number
+      const similarMap = {}; // slug → array
 
       try {
         const apiRes = await fetch("https://leetcode.com/api/problems/all/", { credentials: "include" });
@@ -526,35 +584,58 @@ Be concise. Max 200 words.`;
         show("Problem index fetch failed — will fetch per-problem.");
       }
 
-      // ── Phase 2: Paginate all accepted submissions ──
+      // ── Phase 2: Paginate accepted submissions via REST API (more stable than GraphQL) ──
       show("Fetching submission history…");
+      const allSubs = [];
       let offset  = 0;
       const PAGE  = 20;
-      let hasNext = true;
       let pageNum = 0;
-      const allSubs = [];
 
-      while (hasNext) {
+      while (true) {
         show(`Fetching submissions page ${++pageNum}…`);
-        let json;
+        let pageData;
         try {
-          json = await this._gql(AC_QUERY, { offset, limit: PAGE, status: 10 });
+          const res = await fetch(
+            `https://leetcode.com/api/submissions/?offset=${offset}&limit=${PAGE}`,
+            { credentials: "include" }
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          pageData = await res.json();
         } catch (e) {
           throw new Error(`Submission fetch failed (page ${pageNum}): ${e.message}. Make sure you are logged in to LeetCode.`);
         }
 
-        const list = json?.data?.submissionList;
-        if (!list) throw new Error("Unexpected API response — submissionList was null. LeetCode may have changed their API.");
+        // LeetCode REST returns submissions_dump (snake_case); normalise to camelCase
+        const raw = pageData.submissions_dump || pageData.submissions || [];
+        for (const s of raw) {
+          const titleSlug = s.title_slug || s.titleSlug || "";
+          const langSlug  = (s.lang || "").toLowerCase().replace(/\s+/g, "");
+          const statusOk  = s.status_display === "Accepted" || s.statusDisplay === "Accepted";
+          if (!statusOk || !titleSlug) continue;
+          // Timestamps: REST API returns Unix seconds (always); normalise here
+          const tsRaw = Number(s.timestamp || s.time || 0);
+          // Guard: if LeetCode ever returns ms (> year 2100 in seconds = 4102444800),
+          // treat it as already-ms; otherwise multiply.
+          const ts = tsRaw > 4_102_444_800 ? tsRaw : tsRaw * 1000;
+          allSubs.push({
+            titleSlug,
+            title:     s.title || titleSlug,
+            lang:      langSlug,
+            langName:  s.lang_name || s.langName || langSlug,
+            runtime:   s.runtime   || "",
+            memory:    s.memory    || "",
+            timestamp: ts,           // stored as ms
+            id:        s.id,
+          });
+        }
 
-        const accepted = (list.submissions || []).filter((s) => s.statusDisplay === "Accepted");
-        allSubs.push(...accepted);
-        hasNext = list.hasNext;
+        if (!pageData.has_next) break;
         offset += PAGE;
-        if (hasNext) await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 600));
       }
 
       if (allSubs.length === 0) {
-        show("No accepted submissions found. Make sure you are logged in.");
+        show("No accepted submissions found. Make sure you are logged in to LeetCode.");
         btn.disabled = false;
         return;
       }
@@ -563,55 +644,105 @@ Be concise. Max 200 words.`;
       const dedupMap = new Map();
       for (const s of allSubs) {
         const key = `${s.titleSlug}::${s.lang}`;
-        const ts  = Number(s.timestamp || 0);
         const cur = dedupMap.get(key);
-        if (!cur || ts > Number(cur.timestamp || 0)) dedupMap.set(key, s);
+        if (!cur || s.timestamp > cur.timestamp) dedupMap.set(key, s);
       }
       const picks = Array.from(dedupMap.values());
       show(`Found ${picks.length} unique accepted submissions.`);
 
-      // ── Phase 4: Fetch metadata for slugs missing difficulty / tags ──
-      const needMeta = [...new Set(picks.filter(s => !diffMap[s.titleSlug]).map(s => s.titleSlug))];
+      // ── Phase 4: Fetch metadata (difficulty + tags + description) via QUESTION query ──
+      // The REST API gives difficulty but NOT topic tags or descriptions.
+      const needMeta = [...new Set(
+        picks
+          .filter(s => !diffMap[s.titleSlug] || !tagsMap[s.titleSlug])
+          .map(s => s.titleSlug)
+      )];
+
       if (needMeta.length > 0) {
-        show(`Fetching metadata for ${needMeta.length} problems…`);
+        show(`Fetching tags & descriptions for ${needMeta.length} problems…`);
         for (let i = 0; i < needMeta.length; i++) {
           const slug = needMeta[i];
           try {
             const meta = await this._fetchMetadata(slug);
             if (meta) {
-              if (meta.difficulty)        diffMap[slug]  = meta.difficulty;
-              if (meta.title)             titleMap[slug] = meta.title;
-              if (meta.topicTags?.length) tagsMap[slug]  = meta.topicTags.map(t => t.name);
+              if (meta.difficulty)               diffMap[slug]    = meta.difficulty;
+              if (meta.title)                    titleMap[slug]   = meta.title;
+              if (meta.topicTags?.length)        tagsMap[slug]    = meta.topicTags.map(t => t.name);
+              if (meta.content)                  descMap[slug]    = meta.content;
+              if (meta.hints?.length)            hintsMap[slug]   = meta.hints;
+              if (meta.acRate != null)           acRateMap[slug]  = meta.acRate;
+              if (meta.similarQuestionList?.length) similarMap[slug] = meta.similarQuestionList;
             }
           } catch (_) {}
-          if (i < needMeta.length - 1) await new Promise((r) => setTimeout(r, 250));
-          if ((i + 1) % 10 === 0) show(`Metadata… ${i + 1}/${needMeta.length}`);
+          if (i < needMeta.length - 1) await new Promise((r) => setTimeout(r, 200));
+          if ((i + 1) % 10 === 0) show(`Tags… ${i + 1}/${needMeta.length}`);
         }
       }
 
-      // ── Phase 5: Emit problem:solved (skipCommit=true — no git commits) ──
+      // ── Phase 4b: Fetch submission code via GraphQL submissionDetails ──
+      // Three concurrent requests with a 400ms gap between batches.
+      const BATCH = 3;
+      show(`Fetching code for ${picks.length} submissions…`);
+      for (let i = 0; i < picks.length; i += BATCH) {
+        const batch = picks.slice(i, i + BATCH);
+        await Promise.all(batch.map(async (sub) => {
+          if (!sub.id) return;
+          try {
+            const res = await this._gql(QUERIES.SUBMISSION_DETAIL, { submissionId: +sub.id });
+            const d = res.data?.submissionDetails;
+            if (d) {
+              if (d.code)              sub.code       = d.code;
+              if (d.runtimeDisplay)   sub.runtime    = d.runtimeDisplay;
+              if (d.memoryDisplay)    sub.memory     = d.memoryDisplay;
+              if (d.runtimePercentile) sub.runtimePct = d.runtimePercentile;
+              if (d.memoryPercentile)  sub.memoryPct  = d.memoryPercentile;
+            }
+          } catch (_) { /* leave code empty — non-fatal */ }
+        }));
+        if (i + BATCH < picks.length) await new Promise((r) => setTimeout(r, 400));
+        if ((i / BATCH) % 5 === 0 || i + BATCH >= picks.length) {
+          show(`Code ${Math.min(i + BATCH, picks.length)}/${picks.length}…`);
+        }
+      }
+
+      // ── Phase 5: Emit problem:solved (skipCommit=true — saved to IndexedDB, no git) ──
       show(`Importing ${picks.length} submissions…`);
       let imported = 0;
 
       for (const sub of picks) {
         const lang  = resolveLang(sub.lang || sub.langName);
-        const ts    = Number(sub.timestamp || 0) * 1000; // seconds → ms
         const tags  = tagsMap[sub.titleSlug] || [];
-        const topic = tags[0] || "Uncategorized";
+        const topic = tags[0] || "Untagged";
+        const title = titleMap[sub.titleSlug] || sub.title || sub.titleSlug;
+
+        // Build file list when code is available so the record is commit-ready
+        const files = [];
+        if (sub.code) {
+          const base = `topics/${topic}/${sub.titleSlug}/`;
+          files.push({ path: `${base}${lang.verbose.replace(/\s+/g, "_")}.${lang.ext}`, content: sub.code });
+        }
 
         eventBus.emit("problem:solved", {
-          id:         `${sub.titleSlug}::${lang.slug}`,
-          platform:   "leetcode",
-          title:      titleMap[sub.titleSlug] || sub.title || sub.titleSlug,
-          titleSlug:  sub.titleSlug,
-          difficulty: diffMap[sub.titleSlug] || "Unknown",
-          lang:       { name: lang.verbose, ext: lang.ext, slug: lang.slug },
+          id:               `${sub.titleSlug}::${lang.slug}`,
+          platform:         "leetcode",
+          title,
+          titleSlug:        sub.titleSlug,
+          difficulty:       diffMap[sub.titleSlug] || "Unknown",
+          lang:             { name: lang.verbose, ext: lang.ext, slug: lang.slug },
           tags,
           topic,
-          code:       "",
-          files:      [],
-          timestamp:  ts,
-          skipCommit: true,
+          code:             sub.code || "",
+          files,
+          timestamp:        sub.timestamp,
+          runtime:          sub.runtime    || null,
+          memory:           sub.memory     || null,
+          runtimePct:       sub.runtimePct || null,
+          memoryPct:        sub.memoryPct  || null,
+          problemStatement: descMap[sub.titleSlug]    || null,
+          hints:            hintsMap[sub.titleSlug]   || null,
+          acRate:           acRateMap[sub.titleSlug]  ?? null,
+          similar:          similarMap[sub.titleSlug] || null,
+          skipCommit:       true,
         });
 
         imported++;
@@ -621,7 +752,7 @@ Be concise. Max 200 words.`;
         }
       }
 
-      show(`Done! Imported ${imported} submissions.`);
+      show(`Done! Imported ${imported} submissions. Use "Sync to GitHub" to commit them.`);
       btn.textContent = `✓ Imported ${imported} solves`;
       btn.style.color = "#34d399";
       btn.style.borderColor = "rgba(52,211,153,0.4)";
@@ -761,7 +892,7 @@ Be concise. Max 200 words.`;
         title:      meta?.title || submission.question?.title || slug,
         titleSlug:  slug,
         difficulty: meta?.difficulty || submission.question?.difficulty || null,
-        topic:      meta?.topicTags?.[0]?.name || "Uncategorized",
+        topic:      meta?.topicTags?.[0]?.name || "Untagged",
         tags:       meta?.topicTags?.map(t => t.name) || [],
         canonical:  canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
         code:       submission.code || "",
@@ -790,7 +921,7 @@ Be concise. Max 200 words.`;
   /* ── File set builder ────────────────────────────────────────────── */
   _buildFileSet(submission, meta, settings, slug, elapsedSeconds = null) {
     const { verbose: langVerbose, ext } = resolveLang(submission.lang);
-    const topic      = meta?.topicTags?.[0]?.name || "Uncategorized";
+    const topic      = meta?.topicTags?.[0]?.name || "Untagged";
     const title      = meta?.title || slug;
     const base       = `topics/${topic}/${slug}/`;
 

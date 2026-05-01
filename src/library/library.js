@@ -276,10 +276,10 @@ function LibraryApp() {
       </p>`;
 
     if (activeTab === "search")
-      return html`<${ProblemsView} problems=${enrichedProblems} searchQuery=${searchQuery} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} searchQuery=${searchQuery} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} />`;
 
     if (activeTab === "solutions")
-      return html`<${ProblemsView} problems=${enrichedProblems} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} />`;
     if (activeTab === "analytics")
       return html`<${AnalyticsView} problems=${enrichedProblems} />`;
     if (activeTab === "graph")

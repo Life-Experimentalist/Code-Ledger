@@ -48,3 +48,17 @@ body {
   font-weight: bold;
   padding: 0 0.5rem;
 }
+
+/* LeetCode HTML content styling (problem statements) */
+.lc-content p { margin-bottom: 0.75rem; color: #cbd5e1; line-height: 1.6; }
+.lc-content ul { margin: 0.5rem 0 0.75rem 1.25rem; list-style: disc; }
+.lc-content ol { margin: 0.5rem 0 0.75rem 1.25rem; list-style: decimal; }
+.lc-content li { margin-bottom: 0.25rem; color: #94a3b8; }
+.lc-content pre, .lc-content code { font-family: ui-monospace, monospace; }
+.lc-content pre { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.75rem 0; font-size: 0.8125rem; color: #e2e8f0; }
+.lc-content code { background: rgba(255,255,255,0.08); padding: 0.1em 0.35em; border-radius: 0.25rem; font-size: 0.85em; color: #67e8f9; }
+.lc-content pre code { background: none; padding: 0; color: inherit; }
+.lc-content strong, .lc-content b { color: #f1f5f9; font-weight: 600; }
+.lc-content em { color: #94a3b8; }
+.lc-content img { max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0; }
+.lc-content a { color: #22d3ee; text-decoration: underline; }

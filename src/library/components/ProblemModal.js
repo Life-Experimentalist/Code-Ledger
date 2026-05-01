@@ -9,6 +9,44 @@ const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
 
+function renderMarkdown(md) {
+  if (!md) return "";
+  let html = String(md)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    // fenced code blocks
+    .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) =>
+      `<pre class="my-3 p-3 bg-black/60 rounded-lg border border-white/10 overflow-x-auto text-xs font-mono text-slate-200 leading-relaxed">${code.trimEnd()}</pre>`)
+    // inline code
+    .replace(/`([^`\n]+)`/g, '<code class="px-1 py-0.5 rounded bg-white/10 text-cyan-300 text-[0.85em] font-mono">$1</code>')
+    // bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+    // italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // headings
+    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-white mt-4 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-sm font-bold text-slate-100 mt-4 mb-1 uppercase tracking-wide">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="text-base font-bold text-white mt-4 mb-2">$1</h1>')
+    // unordered lists: accumulate items into <ul>
+    .replace(/((?:^[*\-] .+\n?)+)/gm, (block) => {
+      const items = block.trim().split("\n")
+        .map(l => `<li class="ml-4 list-disc">${l.replace(/^[*\-] /, "").trim()}</li>`)
+        .join("");
+      return `<ul class="my-2 space-y-0.5 text-slate-300">${items}</ul>`;
+    })
+    // ordered lists
+    .replace(/((?:^\d+\. .+\n?)+)/gm, (block) => {
+      const items = block.trim().split("\n")
+        .map(l => `<li class="ml-4 list-decimal">${l.replace(/^\d+\. /, "").trim()}</li>`)
+        .join("");
+      return `<ol class="my-2 space-y-0.5 text-slate-300">${items}</ol>`;
+    })
+    // horizontal rule
+    .replace(/^---+$/gm, '<hr class="my-3 border-white/10"/>')
+    // paragraphs: wrap consecutive non-empty lines not already in a block tag
+    .replace(/^(?!<[houpl]|<hr|<pre)(.+)$/gm, '<p class="mb-1">$1</p>');
+  return html;
+}
+
 export const PLATFORM_META = {
   leetcode: {
     favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
@@ -88,10 +126,12 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
       setEditDifficulty(problem.difficulty || "Unknown");
       const existingTags = Array.isArray(problem.tags) && problem.tags.length > 0
         ? problem.tags.join(", ")
-        : problem.topic && problem.topic !== "Uncategorized" ? problem.topic : "";
+        : problem.topic && problem.topic !== "Untagged" ? problem.topic : "";
       setEditTags(existingTags);
       setEditSaved(false);
       setEditError("");
+      setConfirmDelete(false);
+      setDeleting(false);
     }
   }, [problem?.titleSlug, problem?.id]);
 
@@ -112,9 +152,10 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
     favicon: null,
   };
   const problemUrl = meta.url(problem.titleSlug || problem.id || "");
-  const topics = Array.isArray(problem.tags) && problem.tags.length > 0
+  const topics = (Array.isArray(problem.tags) && problem.tags.length > 0
     ? problem.tags
-    : problem.topic ? [problem.topic] : [];
+    : problem.topic ? [problem.topic] : []
+  ).filter(t => t && t !== "Untagged");
   const diffClass = DIFF_CLASS[problem.difficulty] || "bg-white/5 text-slate-400 border-white/10";
   const langName = problem.lang?.name || problem.language || null;
 
@@ -153,7 +194,8 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
         title:      editTitle.trim() || problem.title,
         difficulty: editDifficulty,
         tags:       newTags,
-        topic:      newTags[0] || problem.topic || "Uncategorized",
+        topic:      newTags[0] || problem.topic || "Untagged",
+        manuallyEdited: true,
       };
       await Storage.saveProblem(updated);
       setEditSaved(true);
@@ -188,6 +230,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
             code: problem.code || "",
             lang: problem.lang,
             aiReview: problem.aiReview || "",
+            problemStatement: problem.problemStatement || "",
           },
         }, (resp) => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
@@ -310,7 +353,10 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
           ${activeTab === "overview" ? html`
             <div class="flex flex-col gap-4">
               ${problem.problemStatement ? html`
-                <div class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">${problem.problemStatement}</div>
+                <div
+                  class="text-sm text-slate-300 leading-relaxed lc-content"
+                  dangerouslySetInnerHTML=${{ __html: problem.problemStatement }}
+                ></div>
               ` : html`
                 <div class="flex flex-col items-center justify-center py-8 gap-3 text-center">
                   <span class="text-2xl">📄</span>
@@ -346,9 +392,10 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
           ` : ""}
 
           ${activeTab === "review" ? html`
-            <div class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
-              ${problem.aiReview || "No AI review available."}
-            </div>
+            <div
+              class="text-sm text-slate-300 leading-relaxed prose-sm"
+              dangerouslySetInnerHTML=${{ __html: renderMarkdown(problem.aiReview) || "<p class='text-slate-500'>No AI review available.</p>" }}
+            ></div>
           ` : ""}
 
           ${activeTab === "chat" ? html`
@@ -363,11 +410,14 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
                   </div>
                 ` : chatMessages.map((msg) => html`
                   <div class="flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}">
-                    <div class="max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-cyan-600/20 border border-cyan-500/30 text-cyan-100"
-                        : "bg-white/5 border border-white/10 text-slate-200"
-                    } whitespace-pre-wrap">${msg.content}</div>
+                    ${msg.role === "user" ? html`
+                    <div class="max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed bg-cyan-600/20 border border-cyan-500/30 text-cyan-100 whitespace-pre-wrap">${msg.content}</div>
+                  ` : html`
+                    <div
+                      class="max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed bg-white/5 border border-white/10 text-slate-200"
+                      dangerouslySetInnerHTML=${{ __html: renderMarkdown(msg.content) }}
+                    ></div>
+                  `}
                     <span class="text-[9px] text-slate-700">${msg.role === "user" ? "You" : "AI"}</span>
                   </div>
                 `)}

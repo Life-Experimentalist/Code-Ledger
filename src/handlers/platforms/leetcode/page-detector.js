@@ -14,6 +14,7 @@ export const PAGE_TYPES = {
   EXPLORE:          'explore',
   DISCUSS:          'discuss',
   PROFILE:          'profile',
+  PROGRESS:         'progress',         // /progress — user stats & calendar
   HOME:             'home',
   UNKNOWN:          'unknown',
 };
@@ -46,6 +47,7 @@ export function detectPage(pathname) {
     return { type: PAGE_TYPES.SUBMISSION, submissionId: submissionMatch[1] };
   }
 
+  if (clean === '/progress')           return { type: PAGE_TYPES.PROGRESS };
   if (clean.startsWith('/contest'))   return { type: PAGE_TYPES.CONTEST };
   if (clean.startsWith('/explore'))   return { type: PAGE_TYPES.EXPLORE };
   if (clean.startsWith('/discuss'))   return { type: PAGE_TYPES.DISCUSS };
