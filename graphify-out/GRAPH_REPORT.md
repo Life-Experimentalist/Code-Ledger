@@ -1,7 +1,7 @@
 # Graph Report - V:\Code\ProjectCode\CodeLedger  (2026-05-01)
 
 ## Corpus Check
-- 117 files · ~388,924 words
+- 117 files · ~390,393 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -116,15 +116,15 @@
 
 ## Surprising Connections (you probably didn't know these)
 - `slugifyCanonicalId()` --calls--> `normalize()`  [INFERRED]
-  V:\Code\ProjectCode\CodeLedger\src\library\views\CanonicalView.js → src\vendor\chart-bundle.js
+  V:\Code\ProjectCode\CodeLedger\src\library\views\CanonicalView.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
 - `ThumbsBar()` --calls--> `round()`  [INFERRED]
-  V:\Code\ProjectCode\CodeLedger\src\library\views\CanonicalView.js → src\vendor\chart-bundle.js
+  V:\Code\ProjectCode\CodeLedger\src\library\views\CanonicalView.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
 - `normalizeEntries()` --calls--> `isArray()`  [INFERRED]
-  V:\Code\ProjectCode\CodeLedger\dev\build-canonical-map.js → src\vendor\chart-bundle.js
+  V:\Code\ProjectCode\CodeLedger\dev\build-canonical-map.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
 - `normalizeAliases()` --calls--> `isArray()`  [INFERRED]
-  V:\Code\ProjectCode\CodeLedger\dev\build-canonical-map.js → src\vendor\chart-bundle.js
+  V:\Code\ProjectCode\CodeLedger\dev\build-canonical-map.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
 - `extractWorkerRoutes()` --calls--> `add()`  [INFERRED]
-  dev\validate-openapi.js → src\vendor\chart-bundle.js
+  V:\Code\ProjectCode\CodeLedger\dev\validate-openapi.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
 
 ## Communities
 
@@ -497,13 +497,13 @@ Nodes (1): Manifest V3 Standard
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `Community 29`** (2 nodes): `checkFiles()`, `debug-imports.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 30`** (2 nodes): `fix-htm.js`, `fixHtmImports()`
+- **Thin community `Community 30`** (2 nodes): `fixHtmImports()`, `fix-htm.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 31`** (2 nodes): `package.js`, `getVersion()`
+- **Thin community `Community 31`** (2 nodes): `getVersion()`, `package.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 32`** (2 nodes): `scanFile()`, `scan-paths.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 33`** (2 nodes): `gfg-importer.js`, `main()`
+- **Thin community `Community 33`** (2 nodes): `main()`, `gfg-importer.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 34`** (2 nodes): `fetchClaudeModels()`, `model-fetcher.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -537,9 +537,9 @@ Nodes (1): Manifest V3 Standard
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 49`** (2 nodes): `ProviderBadge()`, `ProviderBadge.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 50`** (2 nodes): `StatsRing.js`, `StatsRing()`
+- **Thin community `Community 50`** (2 nodes): `StatsRing()`, `StatsRing.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 51`** (2 nodes): `TelemetryPrompt.js`, `TelemetryPrompt()`
+- **Thin community `Community 51`** (2 nodes): `TelemetryPrompt()`, `TelemetryPrompt.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 52`** (2 nodes): `welcome.js`, `WelcomeApp()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -624,10 +624,10 @@ Nodes (1): Manifest V3 Standard
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `isArray()` connect `Community 6` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 11`, `Community 14`?**
-  _High betweenness centrality (0.087) - this node is a cross-community bridge._
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **Why does `get()` connect `Community 1` to `Community 0`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 13`?**
-  _High betweenness centrality (0.074) - this node is a cross-community bridge._
-- **Why does `parse()` connect `Community 8` to `Community 0`, `Community 1`, `Community 3`, `Community 5`, `Community 6`, `Community 7`, `Community 9`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 16`?**
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
+- **Why does `set()` connect `Community 1` to `Community 0`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 9`, `Community 13`?**
   _High betweenness centrality (0.066) - this node is a cross-community bridge._
 - **Are the 16 inferred relationships involving `isArray()` (e.g. with `normalizeEntries()` and `normalizeAliases()`) actually correct?**
   _`isArray()` has 16 INFERRED edges - model-reasoned connections that need verification._
