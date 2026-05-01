@@ -25,6 +25,8 @@ import {
   normalizeAIPrompts,
   getRegisteredPlatforms,
 } from "../../core/ai-prompts.js";
+import { DifficultyMapPanel } from "./DifficultyMapPanel.js";
+import { MirrorsPanel } from "./MirrorsPanel.js";
 const html = htm.bind(h);
 
 // ── Backup / Restore helpers (rendered at bottom of git tab) ──────────────────
@@ -1403,7 +1405,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
         : html`
               <div class="space-y-6">
                 ${standardSections.map((section) => renderSection(section))}
-                ${activeTab === "git" ? html`<${BackupRestorePanel} />` : ""}
+                ${activeTab === "git"     ? html`<${BackupRestorePanel} /><${MirrorsPanel} />` : ""}
+                ${activeTab === "general" ? html`<${DifficultyMapPanel} />`  : ""}
               </div>
             `}
 

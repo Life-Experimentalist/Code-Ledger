@@ -138,22 +138,53 @@ async function handleSolved(data) {
         content: await buildIndexJson(),
       });
 
+      const commitMsg  = `[${data.topic}] ${data.title} solved`;
       const commitOpts = data.timestamp ? { date: new Date(data.timestamp) } : {};
       await git.commit(
         filesToCommit,
-        `[${data.topic}] ${data.title} solved`,
+        commitMsg,
         settings.github_repo || settings.gitRepo,
         commitOpts,
       );
       // Mark committed so subsequent solves of the same slug+lang don't auto-push
       await Storage.markSlugLangCommitted(titleSlug, langName).catch(() => { });
       coreDebug.log("Git commit successful", titleSlug, langName);
+
+      // Push to any configured mirrors (fire-and-forget; failures are non-fatal)
+      await pushToMirrors(filesToCommit, commitMsg, commitOpts, settings);
     } catch (err) {
       coreDebug.error("Git commit failed", err);
     }
   }
 
   Telemetry.track("solve", { platform: data.platform });
+}
+
+/**
+ * Pushes the same files+message to all mirrors listed in settings.git_mirrors.
+ * Each mirror entry: { provider: "github"|"gitlab", repo: string, owner?: string }
+ * Failures are logged but never thrown — mirrors are best-effort.
+ */
+async function pushToMirrors(files, message, commitOpts, settings) {
+  const mirrors = settings.git_mirrors;
+  if (!Array.isArray(mirrors) || mirrors.length === 0) return;
+  await Promise.allSettled(
+    mirrors.map(async (mirror) => {
+      if (!mirror?.repo) return;
+      const handler = registry.getGitProvider(mirror.provider || "github");
+      if (!handler) return;
+      try {
+        await handler.commit(files, message, mirror.repo, {
+          ...commitOpts,
+          ownerOverride: mirror.owner || undefined,
+          isMirror: true,
+        });
+        coreDebug.log(`Mirror commit OK → ${mirror.provider}/${mirror.repo}`);
+      } catch (e) {
+        coreDebug.warn(`Mirror commit failed → ${mirror.provider}/${mirror.repo}:`, e.message);
+      }
+    }),
+  );
 }
 
 async function buildIndexJson() {
@@ -319,6 +350,12 @@ async function handleResyncAll(mode = "bulk") {
   for (const p of missing) {
     await Storage.markSlugLangCommitted(p.titleSlug, p.lang?.name || "").catch(() => {});
   }
+
+  // Mirror the bulk sync
+  const allFiles = [];
+  for (const p of missing) for (const f of problemFiles(p)) allFiles.push(f);
+  allFiles.push({ path: "index.json", content: await buildIndexJson() });
+  await pushToMirrors(allFiles, `chore: sync ${missing.length} problem(s) [CodeLedger]`, {}, settings);
 
   return { committed: missing.length };
 }

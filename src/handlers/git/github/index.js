@@ -75,7 +75,7 @@ export class GitHubHandler extends BaseGitHandler {
     // 1. Resolve owner, repo and branch
     const settings = await Storage.getSettings();
     const userRes = await this.apiFetch("/user", token);
-    const owner = settings["github_owner"]?.trim() || userRes.login;
+    const owner = opts.ownerOverride?.trim() || settings["github_owner"]?.trim() || userRes.login;
     const name = (
       repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME
     ).replace(/\s+/g, "-");
@@ -134,7 +134,7 @@ export class GitHubHandler extends BaseGitHandler {
     );
     const baseTreeSha = commitObj?.tree?.sha || null;
 
-    // 4. Build tree items — include solution files + index.html on new repos
+    // 4. Build tree items — include solution files
     const treeItems = files.map((f) => ({
       path: f.path,
       mode: "100644",
@@ -142,20 +142,11 @@ export class GitHubHandler extends BaseGitHandler {
       content: f.content,
     }));
 
-    if (isNewRepo) {
-      treeItems.push({
-        path: "index.html",
-        mode: "100644",
-        type: "blob",
-        content: getPagesHtml(),
-      });
-      // GitHub Actions workflow: updates README with stats on every push
-      treeItems.push({
-        path: ".github/workflows/update-stats.yml",
-        mode: "100644",
-        type: "blob",
-        content: getActionsWorkflow(),
-      });
+    // Always recover missing infrastructure files so accidental deletions are self-healing.
+    // Skip the check on mirror commits (opts.isMirror) to avoid redundant API calls.
+    if (!opts.isMirror) {
+      const recovered = await this._getMissingInfraFiles(owner, name, branch, token, settings);
+      treeItems.push(...recovered);
     }
 
     // 5. Create tree
@@ -214,6 +205,35 @@ export class GitHubHandler extends BaseGitHandler {
         date: entry.date,
       });
     }
+  }
+
+  /**
+   * Returns tree items for any infrastructure files missing from the repo.
+   * Called on every commit so the repo is self-healing after accidental deletes.
+   */
+  async _getMissingInfraFiles(owner, name, branch, token, settings) {
+    const candidates = [
+      { path: "index.html",                            content: () => getPagesHtml(),        skip: settings?.github_pages === false },
+      { path: ".github/workflows/update-stats.yml",   content: () => getActionsWorkflow(),  skip: false },
+    ];
+
+    const results = await Promise.all(
+      candidates.map(async ({ path, content, skip }) => {
+        if (skip) return null;
+        // If this path is already in our commit, no need to check
+        try {
+          await this.apiFetch(`/repos/${owner}/${name}/contents/${encodeURIComponent(path)}?ref=${branch}`, token);
+          return null; // file exists
+        } catch (e) {
+          if (e.status === 404) {
+            this.dbg.log(`Recovering missing infra file: ${path}`);
+            return { path, mode: "100644", type: "blob", content: content() };
+          }
+          return null; // other error — skip silently
+        }
+      }),
+    );
+    return results.filter(Boolean);
   }
 
   /** Enables GitHub Pages on the given repo (serves from branch root). */

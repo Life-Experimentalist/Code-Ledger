@@ -16,7 +16,6 @@ import {
   mapDifficulty,
   loadUserDifficultyMap,
 } from "../../core/difficulty-map.js";
-import { Storage } from "../../core/storage.js";
 const html = htm.bind(h);
 
 function fmtDateLabel(dateStr) {
@@ -187,17 +186,6 @@ export function HeatMap({ problems = [] }) {
     setPinned((prev) => (prev?.day.date === day.date ? null : { pos: { x, y }, day }));
   };
 
-  const saveMapping = async (rawLabel, mappedTo) => {
-    try {
-      const settings = await Storage.getSettings();
-      const m = settings?.difficultyMap ? settings.difficultyMap : {};
-      m[rawLabel] = mappedTo;
-      settings.difficultyMap = m;
-      await Storage.setSettings(settings);
-      setUserMap(m);
-    } catch (e) { /* ignore */ }
-  };
-
   const active = pinned || hover;
 
   // Auto-fit cell size: measure container, divide by number of week columns
@@ -357,22 +345,7 @@ export function HeatMap({ problems = [] }) {
           </div>
           ${active.day.total === 0
             ? html`<div class="text-[11px] text-slate-600">No solves</div>`
-            : Object.keys(active.day.data.raw || {}).length > 0 ? html`
-              <div class="text-[9px] text-slate-600 uppercase tracking-wider mb-1">Remap difficulty</div>
-              ${Object.entries(active.day.data.raw).map(([rawLabel, cnt]) => html`
-                <div class="flex items-center justify-between gap-2 mb-1">
-                  <span class="text-[11px] truncate text-slate-400">${rawLabel} <span class="text-slate-600">(${cnt})</span></span>
-                  <select
-                    class="bg-[#0d1117] border border-white/10 text-xs text-slate-300 px-1.5 py-0.5 rounded"
-                    onChange=${(e) => saveMapping(rawLabel, e.target.value)}
-                  >
-                    <option value="Easy">Easy</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Hard">Hard</option>
-                  </select>
-                </div>
-              `)}
-            ` : ""}
+            : ""}
         </div>
       ` : ""}
     </div>

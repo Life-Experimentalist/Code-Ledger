@@ -12,6 +12,7 @@ import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { createFloatingTimer } from "../../../ui/floating-timer.js";
+import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 
 const dbg = createDebugger("GFG");
 
@@ -197,7 +198,7 @@ Be concise. Max 200 words.`;
 
     return {
       title:      titleEl ? titleEl.textContent.trim() : slug,
-      difficulty: diffEl  ? this._normalizeDifficulty(diffEl.textContent.trim()) : null,
+      difficulty: diffEl  ? normalizeDifficulty(diffEl.textContent.trim()) : null,
       tags,
       runtime:    runtime ? runtime.textContent.trim() : null,
       memory:     memory  ? memory.textContent.trim()  : null,
@@ -257,15 +258,6 @@ Be concise. Max 200 words.`;
     const name = raw || "C++";
     const ext  = langExt(name);
     return { name, ext };
-  }
-
-  _normalizeDifficulty(raw = "") {
-    const lower = raw.toLowerCase();
-    if (lower.includes("school") || lower.includes("basic")) return "Easy";
-    if (lower.includes("easy"))   return "Easy";
-    if (lower.includes("medium")) return "Medium";
-    if (lower.includes("hard"))   return "Hard";
-    return raw;
   }
 
   _queryFirst(selectors) {

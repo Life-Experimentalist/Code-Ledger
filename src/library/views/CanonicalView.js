@@ -234,10 +234,10 @@ ${aliasLines}
 - [ ] The canonical title is descriptive and platform-agnostic
 - [ ] All slugs are correct and publicly accessible
 
-<!-- codeledger-canonical-request -->
-```json
-${ JSON.stringify(requestPayload, null, 2) }
-    ```
+    <!-- codeledger-canonical-request -->
+    \`\`\`json
+    ${JSON.stringify(requestPayload, null, 2)}
+    \`\`\`
 
 ---
 *This issue was submitted via CodeLedger library. It needs ${VOTES_REQUIRED} 👍 reactions to be merged into the canonical map.*`;
