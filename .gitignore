@@ -22,3 +22,6 @@ settings.local.json
 .env
 env
 codeledger.zip
+
+# Graphify cache
+graphify-out/cache/*

@@ -1,12 +1,12 @@
 # Graph Report - V:\Code\ProjectCode\CodeLedger  (2026-05-01)
 
 ## Corpus Check
-- 110 files · ~379,749 words
+- 117 files · ~388,924 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1264 nodes · 2940 edges · 86 communities detected
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 188 edges (avg confidence: 0.8)
+- 1308 nodes · 3020 edges · 91 communities detected
+- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 212 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -96,147 +96,152 @@
 - [[_COMMUNITY_Community 83|Community 83]]
 - [[_COMMUNITY_Community 84|Community 84]]
 - [[_COMMUNITY_Community 85|Community 85]]
+- [[_COMMUNITY_Community 86|Community 86]]
+- [[_COMMUNITY_Community 87|Community 87]]
+- [[_COMMUNITY_Community 88|Community 88]]
+- [[_COMMUNITY_Community 89|Community 89]]
+- [[_COMMUNITY_Community 90|Community 90]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `_update()` - 90 edges
 2. `draw()` - 48 edges
-3. `parse()` - 36 edges
-4. `LeetCodeHandler` - 35 edges
-5. `get()` - 35 edges
-6. `set()` - 32 edges
-7. `isArray()` - 31 edges
+3. `isArray()` - 39 edges
+4. `parse()` - 38 edges
+5. `get()` - 36 edges
+6. `LeetCodeHandler` - 35 edges
+7. `set()` - 33 edges
 8. `updateElements()` - 30 edges
 9. `getContext()` - 26 edges
 10. `isHorizontal()` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `handleLeetCodeImport()` --calls--> `number()`  [INFERRED]
-  V:\Code\ProjectCode\CodeLedger\src\background\service-worker.js → src\vendor\chart-bundle.js
+- `slugifyCanonicalId()` --calls--> `normalize()`  [INFERRED]
+  V:\Code\ProjectCode\CodeLedger\src\library\views\CanonicalView.js → src\vendor\chart-bundle.js
 - `ThumbsBar()` --calls--> `round()`  [INFERRED]
   V:\Code\ProjectCode\CodeLedger\src\library\views\CanonicalView.js → src\vendor\chart-bundle.js
-- `compare()` --calls--> `_boundSegment()`  [INFERRED]
+- `normalizeEntries()` --calls--> `isArray()`  [INFERRED]
+  V:\Code\ProjectCode\CodeLedger\dev\build-canonical-map.js → src\vendor\chart-bundle.js
+- `normalizeAliases()` --calls--> `isArray()`  [INFERRED]
+  V:\Code\ProjectCode\CodeLedger\dev\build-canonical-map.js → src\vendor\chart-bundle.js
+- `extractWorkerRoutes()` --calls--> `add()`  [INFERRED]
   dev\validate-openapi.js → src\vendor\chart-bundle.js
-- `run()` --calls--> `values()`  [INFERRED]
-  V:\Code\ProjectCode\CodeLedger\dev\import-profile\leetcode-importer.js → src\vendor\chart-bundle.js
-- `run()` --calls--> `number()`  [INFERRED]
-  V:\Code\ProjectCode\CodeLedger\dev\import-profile\leetcode-importer.js → src\vendor\chart-bundle.js
 
 ## Communities
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (236): active(), addElements(), addPointsBelow(), allPlugins(), alpha(), _angleBetween(), _animateOptions(), average() (+228 more)
+Nodes (224): acquireContext(), active(), addElements(), addPointsBelow(), afterAutoSkip(), afterDraw(), almostEquals(), almostWhole() (+216 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.03
-Nodes (69): CanonicalMap, CanonicalMapper, add(), addListener(), addScopes(), addScopesFromKey(), applyAnimationsDefaults(), applyLayoutsDefaults() (+61 more)
+Nodes (85): CanonicalMapper, normalizeAliases(), normalizeCanonicalEntries(), add(), addScopes(), addScopesFromKey(), allPlugins(), applyAnimationsDefaults() (+77 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.04
-Nodes (100): acquireContext(), addBox(), _addGrace(), afterBuildTicks(), afterCalculateLabelRotation(), afterDataLimits(), afterDatasetsUpdate(), afterFit() (+92 more)
+Nodes (101): addRoundedRectPath(), adjustHitBoxes(), alignX(), alignY(), beforeDatasetDraw(), beforeDatasetsDraw(), beforeDraw(), _bezierCurveTo() (+93 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.04
-Nodes (89): addRoundedRectPath(), adjustHitBoxes(), afterDraw(), alignX(), alignY(), beforeDatasetDraw(), beforeDatasetsDraw(), beforeDraw() (+81 more)
+Nodes (97): addTick(), _alignPixel(), barSign(), buildTicks(), _calculateBarIndexPixels(), _calculateBarValuePixels(), calculateCircumference(), calculateLabelRotation() (+89 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.05
-Nodes (12): registerPlatformPrompt(), toMs(), BasePlatformHandler, number(), resolve(), CodeforcesHandler, GFGHandler, langExt() (+4 more)
+Cohesion: 0.04
+Nodes (17): registerPlatformPrompt(), BasePlatformHandler, addListener(), resolve(), guessCategory(), mapDifficulty(), normalizeDifficulty(), normalizeRaw() (+9 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
-Nodes (76): afterAutoSkip(), _alignPixel(), almostEquals(), almostWhole(), aspectRatio(), autoSkip(), buildLookupTable(), _calculateBarIndexPixels() (+68 more)
+Nodes (85): addBox(), _addGrace(), afterBuildTicks(), afterCalculateLabelRotation(), afterDataLimits(), afterDatasetsUpdate(), afterFit(), afterSetDimensions() (+77 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.05
-Nodes (66): addTick(), barSign(), buildTicks(), calculateLabelRotation(), _calculatePadding(), _computeGridLineItems(), _computeLabelItems(), computeTickLimit() (+58 more)
+Cohesion: 0.04
+Nodes (36): BaseAIHandler, BaseGitHandler, normalizeAliases(), normalizeEntries(), CanonicalMap, _computeLabelSizes(), garbageCollect(), isArray() (+28 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.06
-Nodes (50): ghFetch(), ThumbsBar(), apply(), chartOptionScopes(), constructor(), debounce(), _detectPlatform(), getCanvas() (+42 more)
+Cohesion: 0.05
+Nodes (13): buildReviewPrompt(), fillPromptTemplate(), getDefaultAIPrompts(), normalizeAIPrompts(), APIKeyPool, ClaudeHandler, DeepSeekHandler, GeminiHandler (+5 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.06
-Nodes (54): abstract(), _buildStackLine(), calculateDelta(), clone2(), _computeLabelSizes(), _createBoundaryLine(), endOf(), findOrAddLabel() (+46 more)
+Nodes (38): ghFetch(), slugifyCanonicalId(), ThumbsBar(), abstract(), calculateDelta(), endOf(), findOrAddLabel(), format() (+30 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.05
-Nodes (21): BaseAIHandler, BaseGitHandler, createDebugger(), initDebug(), getActiveGitProvider(), getActiveGitProviderInstance(), validateGitProvider(), loadHandler() (+13 more)
-
-### Community 10 - "Community 10"
-Cohesion: 0.05
-Nodes (12): buildReviewPrompt(), fillPromptTemplate(), getDefaultAIPrompts(), normalizeAIPrompts(), APIKeyPool, ClaudeHandler, DeepSeekHandler, GeminiHandler (+4 more)
-
-### Community 11 - "Community 11"
 Cohesion: 0.07
 Nodes (38): addEventListener(), hsl2rgbn(), hsv2rgbn(), hwb2rgbn(), releaseObserver(), removeEventListener(), removeListener(), unlistenDevicePixelRatioChanges() (+30 more)
 
+### Community 10 - "Community 10"
+Cohesion: 0.12
+Nodes (33): $(), _2(), A2(), b(), b2(), C2(), D(), d2() (+25 more)
+
+### Community 11 - "Community 11"
+Cohesion: 0.08
+Nodes (37): applyStack(), _arrayUnique(), _boundSegment(), _buildStackLine(), computeBoundary(), computeLinearBoundary(), computeMinSampleSize(), _createBoundaryLine() (+29 more)
+
 ### Community 12 - "Community 12"
 Cohesion: 0.08
-Nodes (37): applyStack(), _arrayUnique(), _boundSegment(), computeMinSampleSize(), _decodeFill(), decodeTargetIndex(), determineDataLimits(), finiteOrDefault() (+29 more)
+Nodes (36): _angleBetween(), average(), binarySearch(), boundingRects(), dataset(), evaluateInteractionItems(), fromNativeEvent(), getAngleFromPoint() (+28 more)
 
 ### Community 13 - "Community 13"
+Cohesion: 0.13
+Nodes (17): toMs(), number(), base64UrlEncode(), createAppJWT(), env(), getAppJwtKey(), jsonBase64(), pemToArrayBuffer() (+9 more)
+
+### Community 14 - "Community 14"
+Cohesion: 0.11
+Nodes (22): apply(), chartOptionScopes(), constructor(), debounce(), _detectPlatform(), getAfterBody(), getBeforeAfterBodyLines(), getBeforeBody() (+14 more)
+
+### Community 15 - "Community 15"
+Cohesion: 0.36
+Nodes (10): addMessageToChat(), deleteChat(), getAllChats(), getChat(), getChatsByDateRange(), getChatsByProblem(), initDB(), saveAIChat() (+2 more)
+
+### Community 16 - "Community 16"
 Cohesion: 0.36
 Nodes (10): _btnStyle(), createFloatingTimer(), fmt(), loadState(), saveState(), SESSION_KEY(), _setPlayIcon(), _svgPause() (+2 more)
 
-### Community 14 - "Community 14"
+### Community 17 - "Community 17"
 Cohesion: 0.39
 Nodes (5): findEditorToolbar(), injectQoL(), makeCopyBtn(), makePasteBtn(), makePopupBtn()
 
-### Community 15 - "Community 15"
-Cohesion: 0.5
-Nodes (6): base64UrlEncode(), createAppJWT(), env(), getAppJwtKey(), jsonBase64(), pemToArrayBuffer()
-
-### Community 16 - "Community 16"
-Cohesion: 0.7
-Nodes (3): guessCategory(), mapDifficulty(), normalizeRaw()
-
-### Community 17 - "Community 17"
+### Community 18 - "Community 18"
 Cohesion: 0.5
 Nodes (2): fmtDateLabel(), HeatMap()
 
-### Community 18 - "Community 18"
+### Community 19 - "Community 19"
 Cohesion: 0.5
 Nodes (1): BitbucketHandler
 
-### Community 19 - "Community 19"
-Cohesion: 0.5
-Nodes (1): GitLabHandler
-
 ### Community 20 - "Community 20"
-Cohesion: 0.67
+Cohesion: 0.5
 Nodes (0): 
 
 ### Community 21 - "Community 21"
-Cohesion: 0.67
+Cohesion: 0.5
 Nodes (0): 
 
 ### Community 22 - "Community 22"
+Cohesion: 0.67
+Nodes (0): 
+
+### Community 23 - "Community 23"
+Cohesion: 0.67
+Nodes (0): 
+
+### Community 24 - "Community 24"
 Cohesion: 1.0
 Nodes (2): copyRecursiveSync(), sync()
 
-### Community 23 - "Community 23"
+### Community 25 - "Community 25"
 Cohesion: 1.0
 Nodes (2): download(), run()
-
-### Community 24 - "Community 24"
-Cohesion: 0.67
-Nodes (0): 
-
-### Community 25 - "Community 25"
-Cohesion: 0.67
-Nodes (0): 
 
 ### Community 26 - "Community 26"
 Cohesion: 0.67
 Nodes (0): 
 
 ### Community 27 - "Community 27"
-Cohesion: 1.0
+Cohesion: 0.67
 Nodes (0): 
 
 ### Community 28 - "Community 28"
-Cohesion: 1.0
+Cohesion: 0.67
 Nodes (0): 
 
 ### Community 29 - "Community 29"
@@ -413,196 +418,222 @@ Nodes (0):
 
 ### Community 72 - "Community 72"
 Cohesion: 1.0
-Nodes (1): DSA (Data Structures & Algorithms)
+Nodes (0): 
 
 ### Community 73 - "Community 73"
 Cohesion: 1.0
-Nodes (1): README.md
+Nodes (0): 
 
 ### Community 74 - "Community 74"
 Cohesion: 1.0
-Nodes (1): ARCHITECTURE.md
+Nodes (0): 
 
 ### Community 75 - "Community 75"
 Cohesion: 1.0
-Nodes (1): DEPLOYMENT_GUIDE.md
+Nodes (0): 
 
 ### Community 76 - "Community 76"
 Cohesion: 1.0
-Nodes (1): CODELEDGER_EXECUTION_GUIDE.md
+Nodes (0): 
 
 ### Community 77 - "Community 77"
 Cohesion: 1.0
-Nodes (1): GITHUB_APP_SETUP.md
+Nodes (1): DSA (Data Structures & Algorithms)
 
 ### Community 78 - "Community 78"
 Cohesion: 1.0
-Nodes (1): ADDING_PLATFORM_HANDLER.md
+Nodes (1): README.md
 
 ### Community 79 - "Community 79"
 Cohesion: 1.0
-Nodes (1): PORTFOLIO_INTEGRATION.md
+Nodes (1): ARCHITECTURE.md
 
 ### Community 80 - "Community 80"
 Cohesion: 1.0
-Nodes (1): generate-canonical-map-prompt.md
+Nodes (1): DEPLOYMENT_GUIDE.md
 
 ### Community 81 - "Community 81"
 Cohesion: 1.0
-Nodes (1): prompt.md
+Nodes (1): CODELEDGER_EXECUTION_GUIDE.md
 
 ### Community 82 - "Community 82"
 Cohesion: 1.0
-Nodes (1): Apache 2.0 License
+Nodes (1): GITHUB_APP_SETUP.md
 
 ### Community 83 - "Community 83"
 Cohesion: 1.0
-Nodes (1): VKrishna04 (Author)
+Nodes (1): ADDING_PLATFORM_HANDLER.md
 
 ### Community 84 - "Community 84"
 Cohesion: 1.0
-Nodes (1): Life Experimentalist (Organization)
+Nodes (1): PORTFOLIO_INTEGRATION.md
 
 ### Community 85 - "Community 85"
+Cohesion: 1.0
+Nodes (1): generate-canonical-map-prompt.md
+
+### Community 86 - "Community 86"
+Cohesion: 1.0
+Nodes (1): prompt.md
+
+### Community 87 - "Community 87"
+Cohesion: 1.0
+Nodes (1): Apache 2.0 License
+
+### Community 88 - "Community 88"
+Cohesion: 1.0
+Nodes (1): VKrishna04 (Author)
+
+### Community 89 - "Community 89"
+Cohesion: 1.0
+Nodes (1): Life Experimentalist (Organization)
+
+### Community 90 - "Community 90"
 Cohesion: 1.0
 Nodes (1): Manifest V3 Standard
 
 ## Knowledge Gaps
 - **1 isolated node(s):** `DSA (Data Structures & Algorithms)`
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 27`** (2 nodes): `checkFiles()`, `debug-imports.js`
+- **Thin community `Community 29`** (2 nodes): `checkFiles()`, `debug-imports.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 28`** (2 nodes): `fix-htm.js`, `fixHtmImports()`
+- **Thin community `Community 30`** (2 nodes): `fix-htm.js`, `fixHtmImports()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 29`** (2 nodes): `package.js`, `getVersion()`
+- **Thin community `Community 31`** (2 nodes): `package.js`, `getVersion()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 30`** (2 nodes): `scanFile()`, `scan-paths.js`
+- **Thin community `Community 32`** (2 nodes): `scanFile()`, `scan-paths.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 31`** (2 nodes): `gfg-importer.js`, `main()`
+- **Thin community `Community 33`** (2 nodes): `gfg-importer.js`, `main()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 32`** (2 nodes): `fetchClaudeModels()`, `model-fetcher.js`
+- **Thin community `Community 34`** (2 nodes): `fetchClaudeModels()`, `model-fetcher.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 33`** (2 nodes): `fetchAvailableModels()`, `model-fetcher.js`
+- **Thin community `Community 35`** (2 nodes): `fetchAvailableModels()`, `model-fetcher.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 34`** (2 nodes): `fetchOllamaModels()`, `model-fetcher.js`
+- **Thin community `Community 36`** (2 nodes): `fetchOllamaModels()`, `model-fetcher.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 35`** (2 nodes): `fetchOpenAIModels()`, `model-fetcher.js`
+- **Thin community `Community 37`** (2 nodes): `fetchOpenAIModels()`, `model-fetcher.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 36`** (2 nodes): `LibraryApp()`, `library.js`
+- **Thin community `Community 38`** (2 nodes): `LibraryApp()`, `library.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 37`** (2 nodes): `ProblemsView()`, `ProblemsView.js`
+- **Thin community `Community 39`** (2 nodes): `AIChatsView()`, `AIChatsView.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 38`** (2 nodes): `PopupApp()`, `popup.js`
+- **Thin community `Community 40`** (2 nodes): `ProblemsView()`, `ProblemsView.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 39`** (2 nodes): `AIReviewPanel()`, `AIReviewPanel.js`
+- **Thin community `Community 41`** (2 nodes): `PopupApp()`, `popup.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 40`** (2 nodes): `ChartWrapper()`, `ChartWrapper.js`
+- **Thin community `Community 42`** (2 nodes): `AIReviewPanel()`, `AIReviewPanel.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 41`** (2 nodes): `HandlerStatus()`, `HandlerStatus.js`
+- **Thin community `Community 43`** (2 nodes): `ChartWrapper()`, `ChartWrapper.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 42`** (2 nodes): `ModelSelector()`, `ModelSelector.js`
+- **Thin community `Community 44`** (2 nodes): `DifficultyMapPanel()`, `DifficultyMapPanel.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 43`** (2 nodes): `ProviderBadge()`, `ProviderBadge.js`
+- **Thin community `Community 45`** (2 nodes): `HandlerStatus()`, `HandlerStatus.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 44`** (2 nodes): `StatsRing.js`, `StatsRing()`
+- **Thin community `Community 46`** (2 nodes): `MirrorsPanel()`, `MirrorsPanel.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 45`** (2 nodes): `TelemetryPrompt.js`, `TelemetryPrompt()`
+- **Thin community `Community 47`** (2 nodes): `ModelSelector()`, `ModelSelector.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 46`** (2 nodes): `welcome.js`, `WelcomeApp()`
+- **Thin community `Community 48`** (2 nodes): `MultiLineAIChatInput()`, `MultiLineAIChatInput.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (1 nodes): `vite.config.js`
+- **Thin community `Community 49`** (2 nodes): `ProviderBadge()`, `ProviderBadge.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 48`** (1 nodes): `build-canonical-map.js`
+- **Thin community `Community 50`** (2 nodes): `StatsRing.js`, `StatsRing()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 49`** (1 nodes): `clean.js`
+- **Thin community `Community 51`** (2 nodes): `TelemetryPrompt.js`, `TelemetryPrompt()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 50`** (1 nodes): `generate-manifest-domains.js`
+- **Thin community `Community 52`** (2 nodes): `welcome.js`, `WelcomeApp()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 51`** (1 nodes): `package-chrome.js`
+- **Thin community `Community 53`** (2 nodes): `waitForMarker()`, `landing.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 52`** (1 nodes): `package-firefox.js`
+- **Thin community `Community 54`** (1 nodes): `vite.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 53`** (1 nodes): `alarm-manager.js`
+- **Thin community `Community 55`** (1 nodes): `clean.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 54`** (1 nodes): `git-engine.js`
+- **Thin community `Community 56`** (1 nodes): `generate-manifest-domains.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 55`** (1 nodes): `sync-engine.js`
+- **Thin community `Community 57`** (1 nodes): `package-chrome.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 56`** (1 nodes): `presence-marker.js`
+- **Thin community `Community 58`** (1 nodes): `package-firefox.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 57`** (1 nodes): `constants.js`
+- **Thin community `Community 59`** (1 nodes): `alarm-manager.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 58`** (1 nodes): `crypto.js`
+- **Thin community `Community 60`** (1 nodes): `git-engine.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 59`** (1 nodes): `problem-graph.js`
+- **Thin community `Community 61`** (1 nodes): `sync-engine.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (1 nodes): `storage.js`
+- **Thin community `Community 62`** (1 nodes): `presence-marker.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 61`** (1 nodes): `telemetry.js`
+- **Thin community `Community 63`** (1 nodes): `constants.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 62`** (1 nodes): `dom-selectors.js`
+- **Thin community `Community 64`** (1 nodes): `crypto.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 63`** (1 nodes): `dom-selectors.js`
+- **Thin community `Community 65`** (1 nodes): `problem-graph.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 64`** (1 nodes): `dom-selectors.js`
+- **Thin community `Community 66`** (1 nodes): `storage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (1 nodes): `graphql-queries.js`
+- **Thin community `Community 67`** (1 nodes): `telemetry.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (1 nodes): `browser-compat.js`
+- **Thin community `Community 68`** (1 nodes): `dom-selectors.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 67`** (1 nodes): `chart-entry.js`
+- **Thin community `Community 69`** (1 nodes): `dom-selectors.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (1 nodes): `chart.js`
+- **Thin community `Community 70`** (1 nodes): `dom-selectors.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 69`** (1 nodes): `preact-entry.js`
+- **Thin community `Community 71`** (1 nodes): `graphql-queries.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (1 nodes): `preact-hooks.js`
+- **Thin community `Community 72`** (1 nodes): `browser-compat.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 71`** (1 nodes): `landing.js`
+- **Thin community `Community 73`** (1 nodes): `chart-entry.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 72`** (1 nodes): `DSA (Data Structures & Algorithms)`
+- **Thin community `Community 74`** (1 nodes): `chart.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 73`** (1 nodes): `README.md`
+- **Thin community `Community 75`** (1 nodes): `preact-entry.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 74`** (1 nodes): `ARCHITECTURE.md`
+- **Thin community `Community 76`** (1 nodes): `preact-hooks.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (1 nodes): `DEPLOYMENT_GUIDE.md`
+- **Thin community `Community 77`** (1 nodes): `DSA (Data Structures & Algorithms)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (1 nodes): `CODELEDGER_EXECUTION_GUIDE.md`
+- **Thin community `Community 78`** (1 nodes): `README.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (1 nodes): `GITHUB_APP_SETUP.md`
+- **Thin community `Community 79`** (1 nodes): `ARCHITECTURE.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (1 nodes): `ADDING_PLATFORM_HANDLER.md`
+- **Thin community `Community 80`** (1 nodes): `DEPLOYMENT_GUIDE.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (1 nodes): `PORTFOLIO_INTEGRATION.md`
+- **Thin community `Community 81`** (1 nodes): `CODELEDGER_EXECUTION_GUIDE.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (1 nodes): `generate-canonical-map-prompt.md`
+- **Thin community `Community 82`** (1 nodes): `GITHUB_APP_SETUP.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (1 nodes): `prompt.md`
+- **Thin community `Community 83`** (1 nodes): `ADDING_PLATFORM_HANDLER.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (1 nodes): `Apache 2.0 License`
+- **Thin community `Community 84`** (1 nodes): `PORTFOLIO_INTEGRATION.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (1 nodes): `VKrishna04 (Author)`
+- **Thin community `Community 85`** (1 nodes): `generate-canonical-map-prompt.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (1 nodes): `Life Experimentalist (Organization)`
+- **Thin community `Community 86`** (1 nodes): `prompt.md`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 85`** (1 nodes): `Manifest V3 Standard`
+- **Thin community `Community 87`** (1 nodes): `Apache 2.0 License`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 88`** (1 nodes): `VKrishna04 (Author)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 89`** (1 nodes): `Life Experimentalist (Organization)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 90`** (1 nodes): `Manifest V3 Standard`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `get()` connect `Community 1` to `Community 0`, `Community 2`, `Community 4`, `Community 8`, `Community 9`, `Community 10`, `Community 11`?**
-  _High betweenness centrality (0.099) - this node is a cross-community bridge._
-- **Why does `set()` connect `Community 1` to `Community 0`, `Community 2`, `Community 4`, `Community 8`, `Community 10`, `Community 11`?**
-  _High betweenness centrality (0.098) - this node is a cross-community bridge._
-- **Why does `parse()` connect `Community 8` to `Community 0`, `Community 1`, `Community 2`, `Community 5`, `Community 6`, `Community 7`, `Community 9`, `Community 11`, `Community 12`, `Community 13`?**
-  _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Are the 10 inferred relationships involving `parse()` (e.g. with `checkAllHandlers()` and `handleResyncAll()`) actually correct?**
-  _`parse()` has 10 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 21 inferred relationships involving `get()` (e.g. with `run()` and `startServer()`) actually correct?**
-  _`get()` has 21 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `isArray()` connect `Community 6` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 11`, `Community 14`?**
+  _High betweenness centrality (0.087) - this node is a cross-community bridge._
+- **Why does `get()` connect `Community 1` to `Community 0`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 13`?**
+  _High betweenness centrality (0.074) - this node is a cross-community bridge._
+- **Why does `parse()` connect `Community 8` to `Community 0`, `Community 1`, `Community 3`, `Community 5`, `Community 6`, `Community 7`, `Community 9`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 16`?**
+  _High betweenness centrality (0.066) - this node is a cross-community bridge._
+- **Are the 16 inferred relationships involving `isArray()` (e.g. with `normalizeEntries()` and `normalizeAliases()`) actually correct?**
+  _`isArray()` has 16 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 12 inferred relationships involving `parse()` (e.g. with `checkAllHandlers()` and `handleResyncCount()`) actually correct?**
+  _`parse()` has 12 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 22 inferred relationships involving `get()` (e.g. with `run()` and `startServer()`) actually correct?**
+  _`get()` has 22 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `DSA (Data Structures & Algorithms)` to the rest of the system?**
   _1 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.01 - nodes in this community are weakly interconnected._
