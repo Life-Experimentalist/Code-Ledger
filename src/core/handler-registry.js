@@ -125,7 +125,15 @@ class HandlerRegistry {
           default: "",
           description:
             "Optional model name to use across providers that support a global model.",
+
+          key: "aiCopyable",
+          label: "AI Response Copyable",
+          type: "toggle",
+          default: false,
+          description:
+            "Allow copying AI responses. Shows copy prompt on selection (15 min expiry) for security.",
         },
+
         // ── Advanced ───────────────────────────────────────────────────
         {
           key: "incognitoMode",
@@ -134,10 +142,10 @@ class HandlerRegistry {
           default: "off",
           advanced: true,
           options: [
-            { value: "off",     label: "Off" },
-            { value: "1h",      label: "1 hour" },
-            { value: "4h",      label: "4 hours" },
-            { value: "24h",     label: "24 hours" },
+            { value: "off", label: "Off" },
+            { value: "1h", label: "1 hour" },
+            { value: "4h", label: "4 hours" },
+            { value: "24h", label: "24 hours" },
             { value: "forever", label: "Indefinitely" },
           ],
           description:

@@ -17,6 +17,7 @@ import { AnalyticsView } from "./views/AnalyticsView.js";
 import { GraphView } from "./views/GraphView.js";
 import { SettingsView } from "./views/SettingsView.js";
 import { CanonicalView } from "./views/CanonicalView.js";
+import { AIChatsView } from "./views/AIChatsView.js";
 import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
 import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js";
 
@@ -39,7 +40,7 @@ function LibraryApp() {
     setLoading(true);
     Storage.getAllProblems()
       .then((p) => setProblems(p || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -62,7 +63,7 @@ function LibraryApp() {
         const lookup = new Map(); // "platform:slug" → { id, title }
         const entries = Array.isArray(data) ? data : (data.entries || []);
         for (const e of entries) {
-          const id    = e.canonicalId || e.slug;
+          const id = e.canonicalId || e.slug;
           const title = e.canonicalTitle || e.title || id;
           if (!id) continue;
           // aliases as array [{ platform, slug }]
@@ -81,7 +82,7 @@ function LibraryApp() {
         }
         setCanonicalLookup(lookup);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Enrich raw problems with canonical data (computed, not persisted)
@@ -133,6 +134,7 @@ function LibraryApp() {
       "solutions", "archive",   // "archive" kept as alias for old URLs
       "analytics",
       "graph",
+      "ai-chats",
       "canonical",
       "settings",
       "search",
@@ -229,6 +231,7 @@ function LibraryApp() {
     { id: "solutions", label: "Solutions", icon: "💡" },
     { id: "analytics", label: "Analytics", icon: "📈" },
     { id: "graph", label: "Graph", icon: "🔗" },
+    { id: "ai-chats", label: "AI Chats", icon: "🤖" },
     { id: "canonical", label: "Canonical", icon: "🔀" },
     { id: "settings", label: "Settings", icon: "⚙️" },
   ];
@@ -284,6 +287,8 @@ function LibraryApp() {
       return html`<${AnalyticsView} problems=${enrichedProblems} />`;
     if (activeTab === "graph")
       return html`<${GraphView} problems=${enrichedProblems} />`;
+    if (activeTab === "ai-chats")
+      return html`<${AIChatsView} copyableEnabled=${settings?.aiCopyable === true} />`;
     if (activeTab === "canonical")
       return html`<${CanonicalView} problems=${enrichedProblems} />`;
     if (activeTab === "settings")

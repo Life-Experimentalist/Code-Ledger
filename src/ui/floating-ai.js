@@ -13,7 +13,7 @@ function loadHistory(slug) {
   try { return JSON.parse(sessionStorage.getItem(CHAT_KEY(slug)) || "[]"); } catch { return []; }
 }
 function saveHistory(slug, msgs) {
-  try { sessionStorage.setItem(CHAT_KEY(slug), JSON.stringify(msgs)); } catch {}
+  try { sessionStorage.setItem(CHAT_KEY(slug), JSON.stringify(msgs)); } catch { }
 }
 
 /** Attempts to read the current code from the Monaco editor on the page. */
@@ -27,14 +27,14 @@ function readEditorCode() {
         if (code && code.trim()) return code;
       }
     }
-  } catch {}
+  } catch { }
   try {
     // Fallback: read visible lines from the DOM
     const lines = document.querySelectorAll(".monaco-editor .view-lines .view-line");
     if (lines.length > 0) {
       return Array.from(lines).map((l) => l.textContent).join("\n");
     }
-  } catch {}
+  } catch { }
   return "";
 }
 
@@ -397,11 +397,36 @@ export function createFloatingAI(slug = "", opts = {}) {
     // If barely moved, treat as a click — toggle will handle it naturally
   });
 
+  // ── Persistence: re-attach panel if DOM gets mutated (e.g., tab switch) ─────
+  let persistenceObserver = null;
+  function ensurePanelAttached() {
+    if (!root.parentElement) {
+      document.body.appendChild(root);
+    }
+  }
+
+  function startPersistenceMonitor() {
+    if (persistenceObserver) return;
+    persistenceObserver = new MutationObserver(() => {
+      // On any DOM mutation, check if panel is still attached
+      setTimeout(ensurePanelAttached, 0);
+    });
+    persistenceObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  startPersistenceMonitor();
   return {
     destroy() {
       root.remove();
       const styleEl = document.getElementById("cl-ai-styles");
       if (styleEl) styleEl.remove();
+      if (persistenceObserver) {
+        persistenceObserver.disconnect();
+        persistenceObserver = null;
+      }
     },
   };
 }

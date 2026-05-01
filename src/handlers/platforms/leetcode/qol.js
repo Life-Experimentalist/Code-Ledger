@@ -25,7 +25,7 @@ async function pasteWithoutIndent() {
     const dt = new DataTransfer();
     dt.setData("text/plain", text);
     target.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -63,7 +63,16 @@ function findEditorToolbar() {
     })(),
   ];
 
-  return candidates.find(Boolean) || null;
+  // Filter to only valid candidates and pick the one with buttons or most likely toolbar structure
+  const validCandidates = candidates.filter(Boolean);
+
+  // Prefer candidates that already have buttons or are clearly toolbar-like
+  return (
+    validCandidates.find((el) => el.querySelectorAll("button").length > 0) ||
+    validCandidates.find((el) => el.className.includes("flex")) ||
+    validCandidates[0] ||
+    null
+  );
 }
 
 /** Build the copy SVG button element. */
@@ -157,7 +166,7 @@ function makePopupBtn() {
       if (runtime && runtime.sendMessage) {
         await runtime.sendMessage({ type: "OPEN_POPUP", payload: { platform: "leetcode", title, code, url: window.location.href } });
       }
-    } catch (_) {}
+    } catch (_) { }
   };
   return btn;
 }
