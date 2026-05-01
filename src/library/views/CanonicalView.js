@@ -9,8 +9,8 @@
  * Flow:
  *  1. Fetch canonical-map.json from CDN — show existing mappings.
  *  2. Let user search for a problem across platforms.
- *  3. If no mapping exists → submit a GitHub Issue on the main repo (label: canonical-request).
- *  4. Show open canonical-request issues with 👍 vote counts.
+ *  3. If no mapping exists → submit a GitHub Issue on the main repo (label: canonical-mapping).
+ *  4. Show open canonical-mapping issues with 👍 vote counts.
  *  5. Issues with ≥ VOTES_REQUIRED (5) 👍 are shown as "ready to merge".
  */
 
@@ -24,7 +24,7 @@ import { CONSTANTS } from "../../core/constants.js";
 const CANONICAL_REPO = "Life-Experimentalist/Code-Ledger";
 const VOTES_REQUIRED = CONSTANTS.CANONICAL_VOTES_REQUIRED ?? 5;
 const GH_API = "https://api.github.com";
-const ISSUE_LABEL = "canonical-request";
+const ISSUE_LABEL = "canonical-mapping";
 
 const PLATFORMS = ["leetcode", "geeksforgeeks", "codeforces"];
 const PLATFORM_LABEL = { leetcode: "LeetCode", geeksforgeeks: "GeeksForGeeks", codeforces: "Codeforces" };
@@ -41,6 +41,16 @@ const TOPICS = [
   "tree", "graph", "recursion", "backtracking", "bit-manipulation",
   "linked-list", "heap", "trie", "union-find", "segment-tree",
 ];
+
+function slugifyCanonicalId(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "canonical-request";
+}
 
 /* ── GitHub API helpers ──────────────────────────────────────────────── */
 
@@ -202,6 +212,14 @@ export function CanonicalView({ problems }) {
     setSubmitting(true);
     setSubmitResult(null);
 
+    const requestPayload = {
+      canonicalId: slugifyCanonicalId(canonTitle.trim()),
+      canonicalTitle: canonTitle.trim(),
+      topic: canonTopic,
+      aliases: validAliases.map((a) => ({ platform: a.platform, slug: a.slug.trim() })),
+      requestedAt: new Date().toISOString(),
+    };
+
     const aliasLines = validAliases.map((a) => `- **${PLATFORM_LABEL[a.platform] || a.platform}**: \`${a.slug.trim()}\``).join("\n");
     const body = `## Canonical Problem Mapping Request
 
@@ -215,6 +233,11 @@ ${aliasLines}
 - [ ] I have confirmed these problems are equivalent (same algorithm, same constraints)
 - [ ] The canonical title is descriptive and platform-agnostic
 - [ ] All slugs are correct and publicly accessible
+
+<!-- codeledger-canonical-request -->
+```json
+${ JSON.stringify(requestPayload, null, 2) }
+    ```
 
 ---
 *This issue was submitted via CodeLedger library. It needs ${VOTES_REQUIRED} 👍 reactions to be merged into the canonical map.*`;

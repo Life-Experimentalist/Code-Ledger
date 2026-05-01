@@ -3,47 +3,86 @@
   "$id": "https://codeledger.vkrishna04.me/data/schema/canonical-map.schema.json",
   "$comment": "Schema for the canonical map of coding problems",
   "type": "object",
-  "items": {
-    "type": "object",
-    "properties": {
-      "canonicalId": {
-        "type": "string"
-      },
-      "canonicalTitle": {
-        "type": "string"
-      },
-      "topic": {
-        "type": "string"
-      },
-      "difficulty": {
-        "type": "string",
-        "enum": [
-          "Easy",
-          "Medium",
-          "Hard"
-        ]
-      },
-      "pattern": {
-        "type": "string"
-      },
-      "tags": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "aliases": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "string"
-        }
-      }
+  "required": [
+    "version",
+    "entries"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer"
     },
-    "required": [
-      "canonicalId",
-      "canonicalTitle",
-      "topic",
-      "difficulty"
-    ]
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "canonicalId": {
+            "type": "string"
+          },
+          "canonicalTitle": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "Easy",
+              "Medium",
+              "Hard"
+            ]
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": [
+                    "integer",
+                    "string"
+                  ]
+                }
+              },
+              "required": [
+                "platform",
+                "slug"
+              ]
+            }
+          },
+          "voteCount": {
+            "type": "integer"
+          },
+          "confirmedBy": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "canonicalId",
+          "canonicalTitle",
+          "topic",
+          "difficulty"
+        ]
+      }
+    }
   }
 }

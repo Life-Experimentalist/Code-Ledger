@@ -219,10 +219,11 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [promptDraft, setPromptDraft] = useState(getDefaultAIPrompts());
   const [promptStatus, setPromptStatus] = useState("");
   const [promptBusy, setPromptBusy] = useState(false);
-  // Repo sync state per provider (repoSetup/repoValidation removed — handled by GitHubOnboardingModal)
   // Repo sync state per provider
   const [repoSyncing, setRepoSyncing] = useState({});
   const [repoSyncStatus, setRepoSyncStatus] = useState({});
+  // Commit-mode dialog: null = hidden, { provider, count } = shown
+  const [syncConfirm, setSyncConfirm] = useState(null);
   const initializedFromQueryRef = useRef(false);
   const scrolledFromQueryRef = useRef(false);
   const prevRepoRef = useRef(values?.["github_repo"] || null);
@@ -512,20 +513,16 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     [onChange]
   );
 
-  const handleResyncAll = useCallback(async (provider) => {
+  const doResyncAll = useCallback(async (provider, mode) => {
     if (typeof chrome === "undefined" || !chrome.runtime?.id) return;
     setRepoSyncing((s) => ({ ...s, [provider]: true }));
     setRepoSyncStatus((s) => ({ ...s, [provider]: "" }));
     try {
       const result = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: "RESYNC_ALL" }, (resp) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (resp?.ok) {
-            resolve(resp);
-          } else {
-            reject(new Error(resp?.error || "Sync failed"));
-          }
+        chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Sync failed"));
         });
       });
       const msg = result.committed === 0
@@ -538,6 +535,33 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       setRepoSyncing((s) => ({ ...s, [provider]: false }));
     }
   }, []);
+
+  const handleResyncAll = useCallback(async (provider) => {
+    if (typeof chrome === "undefined" || !chrome.runtime?.id) return;
+    // Count unsynced problems first; ask mode if more than one
+    try {
+      const countRes = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: "RESYNC_COUNT" }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Count failed"));
+        });
+      });
+      if (countRes.count === 0) {
+        setRepoSyncStatus((s) => ({ ...s, [provider]: "Already in sync — no missing problems found." }));
+        return;
+      }
+      if (countRes.count > 1) {
+        setSyncConfirm({ provider, count: countRes.count });
+        return;
+      }
+      // Single problem — just commit directly (bulk and individual are identical for 1 problem)
+      await doResyncAll(provider, "bulk");
+    } catch (_) {
+      // If count fails, fall back to direct sync
+      await doResyncAll(provider, "bulk");
+    }
+  }, [doResyncAll]);
 
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
@@ -1382,6 +1406,32 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                 ${activeTab === "git" ? html`<${BackupRestorePanel} />` : ""}
               </div>
             `}
+
+      ${syncConfirm ? html`
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick=${() => setSyncConfirm(null)}>
+          <div class="bg-[#0d1117] border border-white/10 rounded-2xl p-6 w-80 shadow-2xl flex flex-col gap-4" onClick=${(e) => e.stopPropagation()}>
+            <h3 class="text-sm font-bold text-white">Sync ${syncConfirm.count} problems</h3>
+            <p class="text-[11px] text-slate-400">How would you like to commit them to GitHub?</p>
+            <div class="flex flex-col gap-2">
+              <button
+                onClick=${() => { const p = syncConfirm.provider; setSyncConfirm(null); doResyncAll(p, "bulk"); }}
+                class="w-full px-3 py-2.5 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-medium hover:bg-cyan-500/25 transition-colors text-left"
+              >
+                <div class="font-semibold mb-0.5">Single commit <span class="text-cyan-500/60 font-normal">(recommended)</span></div>
+                <div class="text-[10px] text-slate-500">All problems in one atomic commit — avoids GitHub API rate limits.</div>
+              </button>
+              <button
+                onClick=${() => { const p = syncConfirm.provider; setSyncConfirm(null); doResyncAll(p, "individual"); }}
+                class="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/10 transition-colors text-left"
+              >
+                <div class="font-semibold mb-0.5">Individual commits</div>
+                <div class="text-[10px] text-slate-500">One backdated commit per problem — slower, may hit rate limits.</div>
+              </button>
+            </div>
+            <button onClick=${() => setSyncConfirm(null)} class="text-[11px] text-slate-600 hover:text-slate-400 self-end">Cancel</button>
+          </div>
+        </div>
+      ` : ""}
     </div>
   `;
 }

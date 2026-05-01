@@ -129,6 +129,19 @@ Notes:
 - If you prefer CI-based deployment, ensure `CF_API_TOKEN` and all required secrets are set in the repository before triggering the workflow — otherwise the workflow will fail early during validation.
 - If you want me to trigger the workflow now, I can do that (I will check whether `CF_API_TOKEN` exists in repo secrets first). Alternatively I can run `wrangler dev` locally for a smoke test instead.
 
+Canonical mapping automation (GitHub Actions):
+
+- The canonical issue workflow reads these repository variables:
+  - `CANONICAL_VOTES_REQUIRED` — minimum valid `+1` reactions needed before Gemini validation runs. Defaults to `5`.
+  - `GEMINI_MODEL` — optional Gemini model override. Defaults to `gemini-2.5-flash`.
+  - `GEMINI_API_KEYS` — optional newline or comma separated Gemini keys stored as a repository variable.
+- The workflow also accepts these secrets for key rotation:
+  - `GEMINI_API_KEY_1`
+  - `GEMINI_API_KEY_2`
+  - `GEMINI_API_KEY_3`
+- The workflow rotates through the available keys in order, backs off on quota/rate-limit failures, and only appends to `src/data/canonical-map.json` when Gemini returns `decision: yes`.
+- Canonical issues should be labeled `canonical-mapping` so the workflow can find them consistently.
+
 If you want, I can:
 
 - Add a `docs` page with a sample `worker/.env.example` and the minimal `worker/src/index.js` auth routes wired to the App settings.

@@ -13,6 +13,7 @@
   marker.id = 'codeledger-present';
   marker.style.display = 'none';
   marker.setAttribute('data-version', chrome.runtime.getManifest().version);
-  
-  document.body.appendChild(marker);
+  marker.setAttribute('data-source', 'extension');
+
+  (document.body || document.documentElement).appendChild(marker);
 })();

@@ -178,6 +178,8 @@ export function GraphView({ problems }) {
   // Refs so the animation loop can read current hovered/selected without restarting
   const hoveredRef  = useRef(null);
   const selectedRef = useRef(null);
+  // Stable ref to fitView so the problems effect can call it without a dep cycle
+  const fitViewRef  = useRef(null);
 
   // Build graph whenever problems change — incremental: preserve positions of existing nodes.
   useEffect(() => {
@@ -214,6 +216,8 @@ export function GraphView({ problems }) {
     // Full reheat only on first load; gentle reheat when new nodes arrive
     if (existingMap.size === 0) {
       simRef.current.alpha = 1;
+      // Defer fitView so the ResizeObserver has had a chance to size the canvas
+      setTimeout(() => fitViewRef.current?.(), 80);
     } else if (hasNew) {
       simRef.current.alpha = Math.max(simRef.current.alpha, 0.4);
     }
@@ -234,10 +238,13 @@ export function GraphView({ problems }) {
     function loop() {
       if (!running) return;
       const { nodes, edges, alpha } = simRef.current;
-      const w = canvas.width, h = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+      // Logical (CSS) dimensions are what all transform math is based on
+      const logW = canvas._logicalWidth  || canvas.width  / dpr;
+      const logH = canvas._logicalHeight || canvas.height / dpr;
 
-      if (alpha > 0.001) {
-        simulationStep(nodes, edges, alpha, w / 2, h / 2);
+      if (alpha > 0.001 && logW > 0 && logH > 0) {
+        simulationStep(nodes, edges, alpha, logW / 2, logH / 2);
         simRef.current.alpha = Math.max(0, alpha - ALPHA_DECAY);
       }
 
@@ -248,10 +255,14 @@ export function GraphView({ problems }) {
         ? edges.filter((e) => drawNodes.some((n) => n.id === e.source) && drawNodes.some((n) => n.id === e.target))
         : edges;
 
-      ctx.clearRect(0, 0, w, h);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#0a0a0f";
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Scale context so all drawing uses logical CSS pixels regardless of DPR
+      ctx.save();
+      ctx.scale(dpr, dpr);
       drawGraph(ctx, drawNodes, drawEdges, transformRef.current, hoveredRef.current, selectedRef.current);
+      ctx.restore();
       simRef.current.raf = requestAnimationFrame(loop);
     }
 
@@ -265,29 +276,24 @@ export function GraphView({ problems }) {
     if (!canvas) return;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      const prevW = canvas.width  || 0;
-      const prevH = canvas.height || 0;
-      canvas.width  = width;
-      canvas.height = height;
-      if (prevW > 0 && prevH > 0) {
+      const dpr = window.devicePixelRatio || 1;
+      // Track logical (CSS) size separately for transform math
+      const prevLogW = canvas._logicalWidth  || 0;
+      const prevLogH = canvas._logicalHeight || 0;
+      canvas._logicalWidth  = width;
+      canvas._logicalHeight = height;
+      // Set physical pixel dimensions for crisp rendering on HiDPI screens
+      canvas.width  = Math.round(width  * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width  = `${width}px`;
+      canvas.style.height = `${height}px`;
+      if (prevLogW > 0 && prevLogH > 0) {
         // Shift pan so the same world-centre stays on screen
-        transformRef.current.tx += (width  - prevW) / 2;
-        transformRef.current.ty += (height - prevH) / 2;
+        transformRef.current.tx += (width  - prevLogW) / 2;
+        transformRef.current.ty += (height - prevLogH) / 2;
       } else {
         // First resize: fit all existing nodes into view
-        const nodes = simRef.current.nodes.filter((n) => !isNaN(n.x) && !isNaN(n.y));
-        if (nodes.length) {
-          const pad = 80;
-          const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
-          const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
-          const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
-          const gW = maxX - minX || 1, gH = maxY - minY || 1;
-          const scale = Math.min(Math.max(Math.min(width / gW, height / gH), 0.1), 2);
-          const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-          transformRef.current.scale = scale;
-          transformRef.current.tx = width  / 2 - cx * scale;
-          transformRef.current.ty = height / 2 - cy * scale;
-        }
+        fitViewRef.current?.();
       }
       simRef.current.alpha = Math.max(simRef.current.alpha, 0.15);
     });
@@ -380,17 +386,22 @@ export function GraphView({ problems }) {
     const nodes = simRef.current.nodes.filter((n) => !isNaN(n.x) && !isNaN(n.y));
     const canvas = canvasRef.current;
     if (!canvas || !nodes.length) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas._logicalWidth  || canvas.width  / dpr;
+    const h = canvas._logicalHeight || canvas.height / dpr;
+    if (!w || !h) return;
     const pad = 80;
     const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
     const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
     const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
     const gW = maxX - minX || 1, gH = maxY - minY || 1;
-    const scale = Math.min(Math.max(Math.min(canvas.width / gW, canvas.height / gH), 0.1), 2);
+    const scale = Math.min(Math.max(Math.min(w / gW, h / gH), 0.1), 2);
     const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     transformRef.current.scale = scale;
-    transformRef.current.tx = canvas.width  / 2 - cx * scale;
-    transformRef.current.ty = canvas.height / 2 - cy * scale;
+    transformRef.current.tx = w / 2 - cx * scale;
+    transformRef.current.ty = h / 2 - cy * scale;
   }, []);
+  fitViewRef.current = fitView;
 
   const reheat = useCallback(() => {
     simRef.current.alpha = 1;

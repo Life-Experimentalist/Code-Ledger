@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { initDebug, coreDebug } from "../lib/debug.js";
+import { initDebug, coreDebug, setDebug } from "../lib/debug.js";
 import { registry } from "../core/handler-registry.js";
 import { eventBus } from "../core/event-bus.js";
 import { Storage } from "../core/storage.js";
@@ -216,12 +216,35 @@ async function handleLeetCodeImport(username, limit) {
   return { total: submissions.length, imported };
 }
 
+/** Counts how many local problems are missing from the remote repo, without committing. */
+async function handleResyncCount() {
+  const settings = await Storage.getSettings();
+  const git = registry.getGitProvider(settings.gitProvider || "github");
+  if (!git) throw new Error("No git provider configured");
+  const token = await git.getToken();
+  if (!token) throw new Error("Not authenticated with GitHub");
+  const userRes = await git.apiFetch("/user", token);
+  const owner = settings["github_owner"]?.trim() || userRes.login;
+  const repoName = (settings["github_repo"] || settings["gitRepo"] || "").replace(/\s+/g, "-");
+  if (!repoName) throw new Error("No repository configured");
+  const committed = new Set();
+  try {
+    const indexRes = await git.apiFetch(`/repos/${owner}/${repoName}/contents/index.json`, token);
+    const raw = atob((indexRes.content || "").replace(/\n/g, ""));
+    const index = JSON.parse(raw);
+    (index.problems || []).forEach((p) => committed.add(p.titleSlug));
+  } catch (_) {}
+  const allProblems = await Storage.getAllProblems();
+  const missing = allProblems.filter((p) => p.titleSlug && !committed.has(p.titleSlug));
+  return { count: missing.length };
+}
+
 /**
- * Syncs all local problems to GitHub in a single commit.
- * Fetches repo's index.json to find which problems are already committed,
- * then commits only the missing ones together with an updated index.json.
+ * Syncs all local problems to GitHub.
+ * mode="bulk"       — one atomic commit for all missing problems (default, rate-limit safe).
+ * mode="individual" — one commit per problem with correct backdated timestamps.
  */
-async function handleResyncAll() {
+async function handleResyncAll(mode = "bulk") {
   const settings = await Storage.getSettings();
   const git = registry.getGitProvider(settings.gitProvider || "github");
   if (!git) throw new Error("No git provider configured");
@@ -250,29 +273,47 @@ async function handleResyncAll() {
 
   if (missing.length === 0) return { committed: 0 };
 
-  const filesToCommit = [];
-  for (const problem of missing) {
+  function problemFiles(problem) {
+    const out = [];
     if (problem.files && Array.isArray(problem.files) && problem.files.length > 0) {
       for (const f of problem.files) {
-        if (f.path && f.content != null) filesToCommit.push(f);
+        if (f.path && f.content != null) out.push(f);
       }
     } else if (problem.code) {
       const langName = problem.lang?.name || "Solution";
       const langExt = problem.lang?.ext || "txt";
-      const filePath = `topics/${problem.topic || "Untagged"}/${problem.titleSlug}/${langName}.${langExt}`;
-      filesToCommit.push({ path: filePath, content: problem.code });
+      out.push({ path: `topics/${problem.topic || "Untagged"}/${problem.titleSlug}/${langName}.${langExt}`, content: problem.code });
     }
+    return out;
   }
 
-  filesToCommit.push({ path: "index.json", content: await buildIndexJson() });
-
-  const commitDate = new Date();
-  await git.commit(
-    filesToCommit,
-    `chore: sync ${missing.length} problem(s) [CodeLedger]`,
-    repoName,
-    { date: commitDate },
-  );
+  if (mode === "individual") {
+    // One backdated commit per problem, sorted chronologically
+    const historicalCommits = missing.map((p) => ({
+      files: problemFiles(p),
+      message: `[${p.topic || "Untagged"}] ${p.title || p.titleSlug} solved`,
+      date: p.timestamp ? new Date(p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000) : new Date(),
+      repoName,
+    }));
+    // Append index.json only to the last commit
+    if (historicalCommits.length > 0) {
+      historicalCommits[historicalCommits.length - 1].files.push({ path: "index.json", content: await buildIndexJson() });
+    }
+    await git.commitHistorical(historicalCommits);
+  } else {
+    // Bulk: single atomic commit
+    const filesToCommit = [];
+    for (const problem of missing) {
+      for (const f of problemFiles(problem)) filesToCommit.push(f);
+    }
+    filesToCommit.push({ path: "index.json", content: await buildIndexJson() });
+    await git.commit(
+      filesToCommit,
+      `chore: sync ${missing.length} problem(s) [CodeLedger]`,
+      repoName,
+      { date: new Date() },
+    );
+  }
 
   // Mark newly synced problems as committed
   for (const p of missing) {
@@ -334,6 +375,13 @@ chrome.runtime.onInstalled.addListener(() => {
 
 init();
 
+// Keep the debug flag in sync with user preference changes without requiring SW restart
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && CONSTANTS.SK.DEBUG in changes) {
+    setDebug(changes[CONSTANTS.SK.DEBUG].newValue === true);
+  }
+});
+
 // Allow content scripts to ask the background to open the extension popup (best-effort).
 // This enables the LeetCode QoL button to open the extension UI without requiring the user
 // to click the toolbar action directly.
@@ -349,8 +397,15 @@ try {
       return true; // async response
     }
 
+    if (msg && msg.type === "RESYNC_COUNT") {
+      handleResyncCount()
+        .then((result) => sendResponse({ ok: true, ...result }))
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
+      return true;
+    }
+
     if (msg && msg.type === "RESYNC_ALL") {
-      handleResyncAll()
+      handleResyncAll(msg.mode || "bulk")
         .then((result) => sendResponse({ ok: true, ...result }))
         .catch((e) => sendResponse({ ok: false, error: e.message }));
       return true; // async response

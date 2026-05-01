@@ -8,6 +8,34 @@ import { storage } from '../lib/browser-compat.js';
 import { createDebugger } from '../lib/debug.js';
 const dbg = createDebugger('CanonicalMapper');
 
+function normalizeCanonicalEntries(json) {
+  if (Array.isArray(json)) return json;
+  if (json && Array.isArray(json.entries)) return json.entries;
+  return [];
+}
+
+function normalizeAliases(entry) {
+  if (!entry || typeof entry !== 'object') return [];
+
+  if (Array.isArray(entry.aliases)) {
+    return entry.aliases.filter((alias) => alias?.platform && alias?.slug);
+  }
+
+  if (entry.platforms && typeof entry.platforms === 'object') {
+    return Object.entries(entry.platforms)
+      .filter(([, slug]) => !!slug)
+      .map(([platform, slug]) => ({ platform, slug }));
+  }
+
+  if (entry.aliases && typeof entry.aliases === 'object') {
+    return Object.entries(entry.aliases)
+      .filter(([, slug]) => !!slug)
+      .map(([platform, slug]) => ({ platform, slug }));
+  }
+
+  return [];
+}
+
 class CanonicalMapper {
   constructor() {
     this.map = new Map();
@@ -27,7 +55,7 @@ class CanonicalMapper {
     try {
       const headers = etag ? { 'If-None-Match': etag } : {};
       const res = await fetch(CONSTANTS.URLS.CANONICAL_MAP_RAW, { headers });
-      
+
       if (res.status === 304 && data) {
         this.lastFetch = Date.now();
         return;
@@ -51,12 +79,10 @@ class CanonicalMapper {
 
   populate(json) {
     this.map.clear();
-    for (const entry of json) {
+    for (const entry of normalizeCanonicalEntries(json)) {
       this.map.set(entry.canonicalId, entry);
-      if (entry.aliases) {
-        for (const [platform, slug] of Object.entries(entry.aliases)) {
-          this.map.set(`${platform}:${slug}`, entry);
-        }
+      for (const alias of normalizeAliases(entry)) {
+        this.map.set(`${alias.platform}:${alias.slug}`, entry);
       }
     }
   }

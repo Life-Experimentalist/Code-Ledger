@@ -8,6 +8,7 @@ import { useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
+import { getPagesHtml } from "../../handlers/git/github/pages-template.js";
 const html = htm.bind(h);
 const dbg = createDebugger("GitHubOnboarding");
 
@@ -571,6 +572,7 @@ _Last updated: ${now}_
       base_tree: baseTreeSha,
       tree: [
         { path: "index.json",                       mode: "100644", type: "blob", content: JSON.stringify(indexJson, null, 2) },
+        { path: "index.html",                       mode: "100644", type: "blob", content: getPagesHtml() },
         { path: "README.md",                        mode: "100644", type: "blob", content: readme },
         { path: ".gitignore",                       mode: "100644", type: "blob", content: "node_modules/\n.env\n*.log\n.DS_Store\n" },
         { path: ".github/workflows/sync-stats.yml", mode: "100644", type: "blob", content: WORKFLOW_YAML },
