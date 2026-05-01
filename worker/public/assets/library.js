@@ -5,6 +5,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const configResp = await fetch("/config.json").catch(() => null);
   const config = configResp && configResp.ok ? await configResp.json() : {};
 
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   function renderNotInstalled() {
     root.innerHTML = `
       <div style="padding:40px; text-align:center;">
@@ -27,6 +36,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderInstalled(marker) {
     const source = marker.getAttribute("data-source") || "unknown";
     const browser = marker.getAttribute("data-browser") || "";
+    const safeBrowser = escapeHtml(browser);
     root.innerHTML = `
       <div style="padding:16px;">
         <header style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#0a0a0f;border-bottom:1px solid rgba(255,255,255,0.05)">
@@ -34,7 +44,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <img src="/assets/og-image.png" style="width:36px;height:36px;object-fit:contain" alt="CL"/>
             <h2 style="margin:0;color:#fff">CodeLedger Library</h2>
           </div>
-          <div style="color:#9ebbd6;font-size:13px">${source === "store" ? "Installed from store" : source === "temporary" ? "Temporary add-on" : "Extension present"}${browser ? " • " + browser : ""}</div>
+          <div style="color:#9ebbd6;font-size:13px">${source === "store" ? "Installed from store" : source === "temporary" ? "Temporary add-on" : "Extension present"}${safeBrowser ? " • " + safeBrowser : ""}</div>
         </header>
         <main style="padding:20px">
           <p style="color:#cbd5e1">This opens the local library stored in your browser (IndexedDB). The extension keeps this in sync with your GitHub repo when available.</p>
