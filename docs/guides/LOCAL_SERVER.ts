@@ -19,9 +19,17 @@ async function startServer() {
 
   // Simple OAuth callback proxy for local dev
   app.get("/auth/github/callback", (req, res) => {
-    const { code } = req.query;
+    const rawCode = req.query.code;
+    const code =
+      typeof rawCode === "string"
+        ? rawCode
+        : Array.isArray(rawCode)
+          ? rawCode[0] ?? ""
+          : "";
+    const safeCodeLiteral = JSON.stringify(code);
+
     res.send(`<html><body><script>
-      window.opener.postMessage({ type: 'GITHUB_AUTH_CODE', code: '${code}' }, '*');
+      window.opener.postMessage({ type: 'GITHUB_AUTH_CODE', code: ${safeCodeLiteral} }, '*');
       window.close();
     </script></body></html>`);
   });
