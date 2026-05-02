@@ -46,8 +46,9 @@ const LANG_VERBOSE = {
 function langExt(name = "") {
   return LANG_EXT[name.toLowerCase().replace(/\s+/g, "")] || "txt";
 }
-
 /** Normalise submission.lang which can be a string slug OR an object { name, verboseName }. */
+import { normalizeDifficulty } from "../../../core/difficulty-map.js";
+import { querySubmissionResult, isAcceptedVisibleExtended } from "./enhanced-selectors.js";
 function resolveLang(rawLang) {
   if (!rawLang) return { verbose: "Unknown", slug: "txt", ext: "txt" };
   if (typeof rawLang === "string") {
@@ -873,8 +874,9 @@ Be concise. Max 200 words.`;
 
     return false;
   }
-
   async _processSubmission(page, isManual) {
+    // Fallback: try enhanced selector module for modern LeetCode layouts
+    return isAcceptedVisibleExtended();
     this._processingLock = true;
     try {
       const settings = await Storage.getSettings();
