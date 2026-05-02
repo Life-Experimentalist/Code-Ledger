@@ -1,0 +1,54 @@
+name: Core-level change
+about: Report or request core architecture/storage/sync/background changes
+title: "[Core] "
+labels: ["core"]
+body:
+    - type: dropdown
+      id: subsystem
+      attributes:
+          label: Core subsystem
+          options:
+              - Storage
+              - Service worker
+              - Sync engine
+              - Git engine
+              - AI chat system
+              - Library UI
+              - Worker API
+              - Other
+      validations:
+          required: true
+
+    - type: textarea
+      id: summary
+      attributes:
+          label: Summary
+          description: Clear description of the core issue or feature.
+      validations:
+          required: true
+
+    - type: textarea
+      id: impact
+      attributes:
+          label: User impact
+          description: Who is affected and how severe is it?
+          placeholder: Data loss, sync mismatch, commit failure, UX blocker, etc.
+
+    - type: textarea
+      id: constraints
+      attributes:
+          label: Constraints / Compatibility
+          description: Mention migration, backward compatibility, and key invariants.
+          placeholder: |
+              - Keep legacy settings fallback
+              - No direct chrome.* usage outside browser-compat
+              - Preserve existing storage shape
+
+    - type: textarea
+      id: acceptance
+      attributes:
+          label: Acceptance criteria
+          placeholder: |
+              - [ ] Behavior fixed in extension mode
+              - [ ] Behavior fixed in library mode (if applicable)
+              - [ ] Type-check passes

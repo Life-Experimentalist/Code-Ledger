@@ -1,0 +1,81 @@
+name: Canonical mapping request
+about: Propose canonical alias mapping for DSA problems (syncs with canonical validator workflow)
+title: "[Canonical] "
+labels: ["canonical-mapping"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              This template is consumed by the canonical validator workflow.
+              Keep aliases precise and include only equivalent problems.
+
+    - type: input
+      id: canonical-title
+      attributes:
+          label: Canonical title
+          placeholder: e.g. Two Sum
+      validations:
+          required: true
+
+    - type: input
+      id: canonical-id
+      attributes:
+          label: Canonical ID (slug)
+          placeholder: e.g. two-sum
+      validations:
+          required: true
+
+    - type: input
+      id: topic
+      attributes:
+          label: Topic
+          placeholder: arrays, dp, graphs, binary-search, ...
+      validations:
+          required: true
+
+    - type: dropdown
+      id: difficulty
+      attributes:
+          label: Difficulty
+          options:
+              - Easy
+              - Medium
+              - Hard
+      validations:
+          required: true
+
+    - type: textarea
+      id: aliases
+      attributes:
+          label: Aliases (platform -> slug)
+          description: 'One per line in the form `platform: slug`'
+          placeholder: |
+              leetcode: two-sum
+              geeksforgeeks: key-pair
+              codeforces: 4a-watermelon
+      validations:
+          required: true
+
+    - type: textarea
+      id: rationale
+      attributes:
+          label: Rationale
+          description: Explain why these aliases are equivalent.
+      validations:
+          required: true
+
+    - type: markdown
+      attributes:
+          value: |
+              <!-- codeledger-canonical-request -->
+              ```json
+              {
+                "canonicalId": "replace-with-canonical-id",
+                "canonicalTitle": "replace-with-canonical-title",
+                "topic": "replace-with-topic",
+                "difficulty": "Easy|Medium|Hard",
+                "aliases": [
+                  { "platform": "leetcode", "slug": "replace-with-slug" }
+                ]
+              }
+              ```

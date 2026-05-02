@@ -1,0 +1,53 @@
+name: Handler-level change
+about: Report or request a platform/handler-specific change
+title: "[Handler] "
+labels: ["handler"]
+body:
+    - type: dropdown
+      id: area
+      attributes:
+          label: Handler area
+          options:
+              - LeetCode
+              - GeeksForGeeks
+              - Codeforces
+              - AI provider handler
+              - Git provider handler
+              - Other
+      validations:
+          required: true
+
+    - type: textarea
+      id: summary
+      attributes:
+          label: Summary
+          description: What is broken or what should be improved?
+          placeholder: Describe the handler-level issue or request.
+      validations:
+          required: true
+
+    - type: textarea
+      id: repro
+      attributes:
+          label: Reproduction / Scenario
+          description: Steps, page URL pattern, and expected vs actual behavior.
+          placeholder: |
+              1. Go to ...
+              2. Trigger ...
+              3. Expected ...
+              4. Actual ...
+
+    - type: textarea
+      id: selector-impact
+      attributes:
+          label: DOM/API impact
+          description: If known, include selector changes, endpoint changes, or payload differences.
+
+    - type: textarea
+      id: acceptance
+      attributes:
+          label: Acceptance criteria
+          placeholder: |
+              - [ ] Detection works on solve page
+              - [ ] Submission import still works
+              - [ ] Existing handlers unaffected
