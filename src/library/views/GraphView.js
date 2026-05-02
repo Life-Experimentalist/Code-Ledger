@@ -214,9 +214,24 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     ctx.globalAlpha = isSelectedEdge ? 1 : isNeighborEdge ? ((e.type === "topic-problem" ? 0.42 : 0.55) * edgeAlpha) : (isHovered ? 1 : ((e.type === "topic-problem" ? 0.55 : 0.7) * edgeAlpha));
     ctx.stroke();
   }
-  ctx.globalAlpha = 1;
-
   // Nodes
+      // Enhanced glow cascade for edges
+      // Selected edges: Full opacity, thicker
+      // Neighbor edges: 50% opacity, medium thickness
+      // Other edges: Normal opacity
+      if (isSelectedEdge) {
+        ctx.lineWidth = e.type === "canonical" ? 3.5 : 2.5;
+        ctx.globalAlpha = 1;
+      } else if (isNeighborEdge) {
+        ctx.lineWidth = e.type === "canonical" ? 3 : 2.2;
+        ctx.globalAlpha = 0.5 * edgeAlpha; // 50% glow
+      } else if (isHovered) {
+        ctx.lineWidth = e.type === "canonical" ? 2.5 : 1.8;
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.lineWidth = e.type === "canonical" ? 2.5 : 1.8;
+        ctx.globalAlpha = (e.type === "topic-problem" ? 0.55 : 0.7) * edgeAlpha;
+      }
   for (const n of nodes) {
     if (!drawableIds.has(n.id)) continue;
     const r = n.size;
@@ -252,9 +267,25 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-
-    // Labels: always for topics, only when hovered/selected/deeply-zoomed for problems
     if (n.type === "topic" || isH || isSel || isNeighbor || scale > LOD_PROBLEM_LABEL_SCALE) {
+        // Enhanced glow cascade for node selection
+        // Selected node: Full intensity (100%)
+        // Neighbor nodes: 50% intensity glow
+        // Other nodes: No glow
+        if (isSel) {
+          ctx.shadowBlur = 24;
+          ctx.shadowColor = n.color;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+        } else if (isNeighbor) {
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = n.color + "88"; // 50% intensity
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+        } else {
+          ctx.shadowBlur = 0;
+          ctx.shadowColor = "transparent";
+        }
       ctx.fillStyle = "#e2e8f0";
       ctx.font = n.type === "topic" ? `bold ${Math.max(11, r * 0.7)}px sans-serif` : "11px sans-serif";
       ctx.textAlign = "center";
