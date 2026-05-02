@@ -13,53 +13,55 @@ import { ProblemModal } from "../components/ProblemModal.js";
 
 const PLATFORMS = [
   {
-    id:         "leetcode",
-    name:       "LeetCode",
-    url:        "https://leetcode.com/problemset/",
+    id: "leetcode",
+    name: "LeetCode",
+    url: "https://leetcode.com/problemset/",
     profileUrl: (s) => s?.leetcode_username ? `https://leetcode.com/u/${s.leetcode_username}/` : null,
     progressUrl: () => "https://leetcode.com/progress",
-    color:      "#FFA116",
-    bg:         "rgba(255,161,22,0.08)",
-    border:     "rgba(255,161,22,0.25)",
-    favicon:    "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    color: "#FFA116",
+    bg: "rgba(255,161,22,0.08)",
+    border: "rgba(255,161,22,0.25)",
+    favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
   },
   {
-    id:         "geeksforgeeks",
-    name:       "GeeksForGeeks",
-    url:        "https://practice.geeksforgeeks.org/explore",
+    id: "geeksforgeeks",
+    name: "GeeksForGeeks",
+    url: "https://practice.geeksforgeeks.org/explore",
     profileUrl: (s) => s?.gfg_username ? `https://auth.geeksforgeeks.org/user/${s.gfg_username}/` : null,
-    color:      "#2F8D46",
-    bg:         "rgba(47,141,70,0.08)",
-    border:     "rgba(47,141,70,0.25)",
-    favicon:    "https://www.geeksforgeeks.org/favicon.ico",
+    color: "#2F8D46",
+    bg: "rgba(47,141,70,0.08)",
+    border: "rgba(47,141,70,0.25)",
+    favicon: "https://www.geeksforgeeks.org/favicon.ico",
   },
   {
-    id:         "codeforces",
-    name:       "Codeforces",
-    url:        "https://codeforces.com/problemset",
+    id: "codeforces",
+    name: "Codeforces",
+    url: "https://codeforces.com/problemset",
     profileUrl: (s) => s?.cf_username ? `https://codeforces.com/profile/${s.cf_username}` : null,
-    color:      "#1F8ACB",
-    bg:         "rgba(31,138,203,0.08)",
-    border:     "rgba(31,138,203,0.25)",
-    favicon:    "https://codeforces.com/favicon.ico",
+    color: "#1F8ACB",
+    bg: "rgba(31,138,203,0.08)",
+    border: "rgba(31,138,203,0.25)",
+    favicon: "https://codeforces.com/favicon.ico",
   },
 ];
 
 const SORT_OPTIONS = [
-  { value: "newest",    label: "Newest First" },
-  { value: "oldest",    label: "Oldest First" },
-  { value: "diff-asc",  label: "Easy → Hard" },
+  { value: "newest", label: "Newest First" },
+  { value: "oldest", label: "Oldest First" },
+  { value: "diff-asc", label: "Easy → Hard" },
   { value: "diff-desc", label: "Hard → Easy" },
-  { value: "title",     label: "Title A–Z" },
+  { value: "title", label: "Title A–Z" },
+  { value: "platform", label: "Platform A–Z" },
+  { value: "tags", label: "Most Tags" },
 ];
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
 
 export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblemDelete, settings }) {
   const [filterDifficulty, setFilterDifficulty] = useState("All");
-  const [filterPlatform, setFilterPlatform]     = useState("All");
-  const [query, setQuery]                       = useState(searchQuery || "");
-  const [sortBy, setSortBy]                     = useState("newest");
-  const [selectedProblem, setSelectedProblem]   = useState(null);
+  const [filterPlatform, setFilterPlatform] = useState("All");
+  const [query, setQuery] = useState(searchQuery || "");
+  const [sortBy, setSortBy] = useState("newest");
+  const [selectedProblem, setSelectedProblem] = useState(null);
 
   const handleProblemUpdate = (updated) => {
     setSelectedProblem(updated);
@@ -82,23 +84,40 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
   const filtered = useMemo(() => {
     let out = problems || [];
     if (filterDifficulty !== "All") out = out.filter((p) => p.difficulty === filterDifficulty);
-    if (filterPlatform !== "All")   out = out.filter((p) => p.platform === filterPlatform);
+    if (filterPlatform !== "All") out = out.filter((p) => p.platform === filterPlatform);
     if (query && String(query).trim()) {
-      const ql = String(query).toLowerCase();
-      out = out.filter((p) =>
-        (p.title && p.title.toLowerCase().includes(ql)) ||
-        (p.platform && p.platform.toLowerCase().includes(ql)) ||
-        (Array.isArray(p.tags) && p.tags.some(t => t.toLowerCase().includes(ql)))
-      );
+      const tokens = String(query).toLowerCase().split(/\s+/).filter(Boolean);
+      const structured = { tags: [], platform: null, difficulty: null, free: [] };
+      for (const token of tokens) {
+        if (token.startsWith("tag:")) structured.tags.push(token.slice(4));
+        else if (token.startsWith("platform:")) structured.platform = token.slice(9);
+        else if (token.startsWith("difficulty:")) structured.difficulty = token.slice(11);
+        else structured.free.push(token);
+      }
+
+      out = out.filter((p) => {
+        const title = String(p.title || "").toLowerCase();
+        const platform = String(p.platform || "").toLowerCase();
+        const tags = Array.isArray(p.tags) ? p.tags.map((t) => String(t || "").toLowerCase()) : [];
+        const haystack = `${title} ${platform} ${tags.join(" ")}`;
+
+        if (structured.platform && !platform.includes(structured.platform)) return false;
+        if (structured.difficulty && String(p.difficulty || "").toLowerCase() !== structured.difficulty) return false;
+        if (structured.tags.length && !structured.tags.every((tag) => tags.some((t) => t.includes(tag)))) return false;
+        if (structured.free.length && !structured.free.every((term) => haystack.includes(term))) return false;
+        return true;
+      });
     }
     // Apply sort
     const arr = [...out];
     switch (sortBy) {
-      case "newest":    arr.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); break;
-      case "oldest":    arr.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); break;
-      case "diff-asc":  arr.sort((a, b) => (DIFF_ORDER[a.difficulty] ?? 3) - (DIFF_ORDER[b.difficulty] ?? 3)); break;
+      case "newest": arr.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); break;
+      case "oldest": arr.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); break;
+      case "diff-asc": arr.sort((a, b) => (DIFF_ORDER[a.difficulty] ?? 3) - (DIFF_ORDER[b.difficulty] ?? 3)); break;
       case "diff-desc": arr.sort((a, b) => (DIFF_ORDER[b.difficulty] ?? 3) - (DIFF_ORDER[a.difficulty] ?? 3)); break;
-      case "title":     arr.sort((a, b) => (a.title || "").localeCompare(b.title || "")); break;
+      case "title": arr.sort((a, b) => (a.title || "").localeCompare(b.title || "")); break;
+      case "platform": arr.sort((a, b) => (a.platform || "").localeCompare(b.platform || "") || (a.title || "").localeCompare(b.title || "")); break;
+      case "tags": arr.sort((a, b) => (b.tags?.length || 0) - (a.tags?.length || 0) || (a.title || "").localeCompare(b.title || "")); break;
     }
     return arr;
   }, [problems, filterDifficulty, filterPlatform, query, sortBy]);
@@ -109,16 +128,16 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
       <!-- Platform hub -->
       <div class="grid grid-cols-3 gap-4">
         ${PLATFORMS.map((plat) => {
-          const count  = platformCounts[plat.id] || 0;
-          const active = filterPlatform === plat.id;
-          return html`
+    const count = platformCounts[plat.id] || 0;
+    const active = filterPlatform === plat.id;
+    return html`
             <div
               class="relative group flex flex-col items-center gap-3 p-5 rounded-2xl border cursor-pointer transition-all select-none"
               style=${{
-                background:  active ? plat.bg : "rgba(10,10,15,1)",
-                borderColor: active ? plat.color : "rgba(255,255,255,0.05)",
-                boxShadow:   active ? `0 0 20px ${plat.bg}` : "none",
-              }}
+        background: active ? plat.bg : "rgba(10,10,15,1)",
+        borderColor: active ? plat.color : "rgba(255,255,255,0.05)",
+        boxShadow: active ? `0 0 20px ${plat.bg}` : "none",
+      }}
               onClick=${() => setFilterPlatform(active ? "All" : plat.id)}
             >
               <div
@@ -128,10 +147,10 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
                 <img
                   src=${plat.favicon} alt=${plat.name} class="w-7 h-7 object-contain"
                   onError=${(e) => {
-                    e.target.style.display = "none";
-                    e.target.parentElement.innerHTML =
-                      `<span style="color:${plat.color};font-size:18px;font-weight:700">${plat.name.slice(0, 2)}</span>`;
-                  }}
+        e.target.style.display = "none";
+        e.target.parentElement.innerHTML =
+          `<span style="color:${plat.color};font-size:18px;font-weight:700">${plat.name.slice(0, 2)}</span>`;
+      }}
                 />
               </div>
               <div class="flex flex-col items-center gap-0.5">
@@ -162,7 +181,7 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
               </div>
             </div>
           `;
-        })}
+  })}
       </div>
 
       <!-- Filter bar -->
@@ -172,8 +191,8 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
             <button
               onClick=${() => setFilterDifficulty(d)}
               class="px-3 py-1 text-xs rounded transition-colors ${filterDifficulty === d
-                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
-                : "bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10"}"
+      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
+      : "bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10"}"
             >${d}</button>
           `)}
         </div>
@@ -233,6 +252,8 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
         onClose=${() => setSelectedProblem(null)}
         onUpdate=${handleProblemUpdate}
         onDelete=${handleProblemDelete}
+        problemList=${filtered}
+        onNavigateProblem=${setSelectedProblem}
       />
     </div>
   `;

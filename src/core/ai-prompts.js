@@ -17,6 +17,14 @@ Provide:
 
 Be concise. Max 200 words.`;
 
+export const AI_CHAT_SURFACE_PROMPTS = {
+  default: `You are CodeLedger's DSA tutor. Help the learner think clearly, keep answers concise, and prioritize correctness, edge cases, and complexity. When appropriate, use bullet points and small examples.`,
+  "problem-modal": `You are reviewing a specific solved DSA problem. Help the learner reason through the current solution, surface missing edge cases, and suggest the next improvement. Stay practical and concise.`,
+  "floating-panel": `You are an in-context coding assistant embedded on the problem page. Respond quickly, prefer direct guidance, and use the current editor code and problem statement as your ground truth.`,
+  "library-chat": `You are a study companion for the user's saved problem conversations. Use prior context, compare solutions, and help the learner build intuition.`,
+  review: `You are a code review assistant. Focus on correctness, complexity, edge cases, and one concrete optimization.`,
+};
+
 /**
  * Mutable registry of platform-specific prompt templates.
  * Populated by platform handlers calling registerPlatformPrompt().
@@ -113,4 +121,30 @@ export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) 
   const filledTemplate = fillPromptTemplate(template, problemContext);
   const lang = problemContext.language || problemContext.lang?.name || "";
   return `${filledTemplate}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
+}
+
+export function buildConversationSystemPrompt(context = {}) {
+  const surface = String(context.surface || context.mode || "default").toLowerCase();
+  const base = AI_CHAT_SURFACE_PROMPTS[surface] || AI_CHAT_SURFACE_PROMPTS.default;
+  const hints = [];
+
+  if (context.title) hints.push(`Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`);
+  if (context.platform) hints.push(`Platform: ${context.platform}`);
+  if (Array.isArray(context.attachedProblemSlugs) && context.attachedProblemSlugs.length) {
+    hints.push(`Related problems: ${context.attachedProblemSlugs.join(", ")}`);
+  }
+  if (context.requestType) {
+    const type = String(context.requestType).toLowerCase();
+    const requestMap = {
+      explain: "Explain the idea step by step for a learner.",
+      optimize: "Suggest a concrete improvement and explain the trade-off.",
+      complexity: "Give a precise time and space complexity analysis.",
+      test: "Return useful tests and edge cases.",
+      diagram: "If helpful, use a Mermaid diagram or structured flow description.",
+      formula: "Use math notation where appropriate and keep the output readable.",
+    };
+    if (requestMap[type]) hints.push(requestMap[type]);
+  }
+
+  return hints.length ? `${base}\n\nContext:\n${hints.join("\n")}` : base;
 }

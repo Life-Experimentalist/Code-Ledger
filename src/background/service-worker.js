@@ -10,6 +10,8 @@ import { Storage } from "../core/storage.js";
 import { Telemetry } from "../core/telemetry.js";
 import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
+import { buildConversationSystemPrompt } from "../core/ai-prompts.js";
+import { expandChatVariables } from "../lib/chat-variables.js";
 
 // Init background
 async function init() {
@@ -25,6 +27,27 @@ async function init() {
   coreDebug.log("Background initialized");
 }
 
+function getProblemCommitKey(problem = {}) {
+  const slug = String(problem.titleSlug || problem.slug || problem.id || "").trim();
+  if (!slug) return "";
+  const lang = problem.lang?.name || problem.lang?.slug || problem.lang?.ext || problem.language || "";
+  const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
+  return normLang ? `${slug}::${normLang}` : slug;
+}
+
+function getProblemFiles(problem = {}) {
+  const out = [];
+  if (problem.files && Array.isArray(problem.files) && problem.files.length > 0) {
+    for (const f of problem.files) {
+      if (f.path && f.content != null) out.push(f);
+    }
+  } else if (problem.code) {
+    const langName = problem.lang?.name || "Solution";
+    const langExt = problem.lang?.ext || "txt";
+    out.push({ path: `topics/${problem.topic || "Untagged"}/${problem.titleSlug}/${langName}.${langExt}`, content: problem.code });
+  }
+  return out;
+}
 async function handleSolved(data) {
   coreDebug.log("Handling solve event", data);
 
@@ -45,11 +68,12 @@ async function handleSolved(data) {
     }
   }
 
-  // 1. First-time check: only auto-commit the very first time this
-  //    (titleSlug, language) pair is seen — subsequent solves require manual sync.
   const titleSlug = data.titleSlug || "";
-  const langName = data.lang?.name || "";
-  const isFirstCommit = !(await Storage.isSlugLangCommitted(titleSlug, langName).catch(() => false));
+  const langName = data.lang?.name || data.lang?.slug || data.lang?.ext || "";
+  const submissionCommitKey = data.submissionId
+    ? `submission:${data.platform || "unknown"}:${data.submissionId}`
+    : `submission:${data.platform || "unknown"}:${titleSlug}:${langName}:${data.timestamp || data.id || Date.now()}`;
+  const alreadyCommitted = await Storage.isSubmissionCommitted(submissionCommitKey).catch(() => false);
 
   // 2. Save locally — for bulk imports, skip if the user has manually edited this record.
   if (data.skipCommit) {
@@ -60,6 +84,12 @@ async function handleSolved(data) {
     }
   }
   await Storage.saveProblem(data);
+  {
+    const problemCommitKey = getProblemCommitKey(data);
+    if (problemCommitKey) {
+      await Storage.markPendingProblemKey(problemCommitKey).catch(() => { });
+    }
+  }
 
   // 3. AI Review (if enabled)
   const settings = await Storage.getSettings();
@@ -116,21 +146,29 @@ async function handleSolved(data) {
     coreDebug.log("skipCommit flag set — skipping git commit for bulk import", titleSlug);
     return;
   }
-  if (gitEnabled && !isFirstCommit) {
-    coreDebug.log("Already committed slug+lang before — skipping auto-commit. Use manual sync.", titleSlug, langName);
+  if (gitEnabled && alreadyCommitted) {
+    coreDebug.log("Already committed submission event — skipping auto-commit.", submissionCommitKey);
   }
-  if (gitEnabled && isFirstCommit) {
+  if (gitEnabled && !alreadyCommitted) {
     try {
       const git = registry.getGitProvider(settings.gitProvider || "github");
 
-      let filesToCommit = [];
-      if (data.files && Array.isArray(data.files)) {
-        filesToCommit = [...data.files];
-      } else {
-        const fallbackLang = data.lang?.name || "Solution";
-        const fallbackExt = data.lang?.ext || "txt";
-        const filePath = `topics/${data.topic || "Untagged"}/${data.titleSlug}/${fallbackLang}.${fallbackExt}`;
-        filesToCommit.push({ path: filePath, content: data.code });
+      const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
+      const pendingKeys = new Set(Object.keys(pendingMap || {}));
+      const allProblems = await Storage.getAllProblems().catch(() => []);
+      const pendingProblems = allProblems.filter((p) => {
+        const key = getProblemCommitKey(p);
+        return key && pendingKeys.has(key);
+      });
+
+      const filesToCommit = [];
+      const seenPaths = new Set();
+      for (const p of pendingProblems) {
+        for (const f of getProblemFiles(p)) {
+          if (!f?.path || seenPaths.has(f.path)) continue;
+          seenPaths.add(f.path);
+          filesToCommit.push(f);
+        }
       }
 
       filesToCommit.push({
@@ -138,7 +176,10 @@ async function handleSolved(data) {
         content: await buildIndexJson(),
       });
 
-      const commitMsg  = `[${data.topic}] ${data.title} solved`;
+      const pendingCount = pendingProblems.length || 1;
+      const commitMsg = pendingCount > 1
+        ? "chore: sync " + pendingCount + " pending problem(s) [CodeLedger]"
+        : `[${data.topic}] ${data.title} solved`;
       const commitOpts = data.timestamp ? { date: new Date(data.timestamp) } : {};
       await git.commit(
         filesToCommit,
@@ -146,8 +187,11 @@ async function handleSolved(data) {
         settings.github_repo || settings.gitRepo,
         commitOpts,
       );
-      // Mark committed so subsequent solves of the same slug+lang don't auto-push
+      await Storage.markSubmissionCommitted(submissionCommitKey).catch(() => { });
       await Storage.markSlugLangCommitted(titleSlug, langName).catch(() => { });
+      await Storage.clearPendingProblemKeys(
+        pendingProblems.map((p) => getProblemCommitKey(p)).filter(Boolean),
+      ).catch(() => { });
       coreDebug.log("Git commit successful", titleSlug, langName);
 
       // Push to any configured mirrors (fire-and-forget; failures are non-fatal)
@@ -227,10 +271,11 @@ async function handleLeetCodeImport(username, limit) {
   for (const sub of submissions) {
     const ts = Number(sub.timestamp) * 1000;
     const slug = (sub.lang || "").toLowerCase().replace(/\s+/g, "");
-    const existing = await Storage.getProblem?.(sub.titleSlug).catch(() => null);
+    const problemId = `${sub.titleSlug}::${slug || "unknown"}`;
+    const existing = await Storage.getProblem?.(problemId).catch(() => null);
     if (existing) continue; // skip already tracked
     await Storage.saveProblem({
-      id: sub.titleSlug, // Required: keyPath for IDBObjectStore
+      id: problemId, // Required: keyPath for IDBObjectStore
       title: sub.title,
       titleSlug: sub.titleSlug,
       platform: "leetcode",
@@ -241,6 +286,7 @@ async function handleLeetCodeImport(username, limit) {
       code: "",
       url: "https://leetcode.com/problems/" + sub.titleSlug + "/",
     });
+    await Storage.markPendingProblemKey(`${sub.titleSlug}::${slug || "unknown"}`).catch(() => { });
     imported++;
   }
 
@@ -260,13 +306,21 @@ async function handleResyncCount() {
   if (!repoName) throw new Error("No repository configured");
   const committed = new Set();
   try {
-    const indexRes = await git.apiFetch(`/repos/${owner}/${repoName}/contents/index.json`, token);
+    const indexRes = await git.apiFetch("/repos/" + owner + "/" + repoName + "/contents/index.json", token);
     const raw = atob((indexRes.content || "").replace(/\n/g, ""));
     const index = JSON.parse(raw);
-    (index.problems || []).forEach((p) => committed.add(p.titleSlug));
-  } catch (_) {}
+    (index.problems || []).forEach((p) => {
+      const key = getProblemCommitKey(p);
+      if (key) committed.add(key);
+    });
+  } catch (_) { }
   const allProblems = await Storage.getAllProblems();
-  const missing = allProblems.filter((p) => p.titleSlug && !committed.has(p.titleSlug));
+  const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
+  const pendingKeys = new Set(Object.keys(pendingMap || {}));
+  const missing = allProblems.filter((p) => {
+    const key = getProblemCommitKey(p);
+    return key && (!committed.has(key) || pendingKeys.has(key));
+  });
   return { count: missing.length };
 }
 
@@ -288,41 +342,35 @@ async function handleResyncAll(mode = "bulk") {
   const repoName = (settings["github_repo"] || settings["gitRepo"] || "").replace(/\s+/g, "-");
   if (!repoName) throw new Error("No repository configured");
 
-  // Fetch existing index.json to find already-committed slugs
+  // Fetch existing index.json to find already-committed slugs/langs
   const committed = new Set();
   try {
-    const indexRes = await git.apiFetch(`/repos/${owner}/${repoName}/contents/index.json`, token);
+    const indexRes = await git.apiFetch("/repos/" + owner + "/" + repoName + "/contents/index.json", token);
     const raw = atob((indexRes.content || "").replace(/\n/g, ""));
     const index = JSON.parse(raw);
-    (index.problems || []).forEach((p) => committed.add(p.titleSlug));
+    (index.problems || []).forEach((p) => {
+      const key = getProblemCommitKey(p);
+      if (key) committed.add(key);
+    });
   } catch (_) {
     // Repo doesn't exist or has no index.json yet — sync everything
   }
 
   const allProblems = await Storage.getAllProblems();
-  const missing = allProblems.filter((p) => p.titleSlug && !committed.has(p.titleSlug));
+  const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
+  const pendingKeys = new Set(Object.keys(pendingMap || {}));
+  const missing = allProblems.filter((p) => {
+    const key = getProblemCommitKey(p);
+    return key && (!committed.has(key) || pendingKeys.has(key));
+  });
 
   if (missing.length === 0) return { committed: 0 };
-
-  function problemFiles(problem) {
-    const out = [];
-    if (problem.files && Array.isArray(problem.files) && problem.files.length > 0) {
-      for (const f of problem.files) {
-        if (f.path && f.content != null) out.push(f);
-      }
-    } else if (problem.code) {
-      const langName = problem.lang?.name || "Solution";
-      const langExt = problem.lang?.ext || "txt";
-      out.push({ path: `topics/${problem.topic || "Untagged"}/${problem.titleSlug}/${langName}.${langExt}`, content: problem.code });
-    }
-    return out;
-  }
 
   if (mode === "individual") {
     // One backdated commit per problem, sorted chronologically
     const historicalCommits = missing.map((p) => ({
-      files: problemFiles(p),
-      message: `[${p.topic || "Untagged"}] ${p.title || p.titleSlug} solved`,
+      files: getProblemFiles(p),
+      message: "[" + (p.topic || "Untagged") + "] " + (p.title || p.titleSlug) + " solved",
       date: p.timestamp ? new Date(p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000) : new Date(),
       repoName,
     }));
@@ -335,12 +383,12 @@ async function handleResyncAll(mode = "bulk") {
     // Bulk: single atomic commit
     const filesToCommit = [];
     for (const problem of missing) {
-      for (const f of problemFiles(problem)) filesToCommit.push(f);
+      for (const f of getProblemFiles(problem)) filesToCommit.push(f);
     }
     filesToCommit.push({ path: "index.json", content: await buildIndexJson() });
     await git.commit(
       filesToCommit,
-      `chore: sync ${missing.length} problem(s) [CodeLedger]`,
+      "chore: sync " + missing.length + " problem(s) [CodeLedger]",
       repoName,
       { date: new Date() },
     );
@@ -348,26 +396,26 @@ async function handleResyncAll(mode = "bulk") {
 
   // Mark newly synced problems as committed
   for (const p of missing) {
-    await Storage.markSlugLangCommitted(p.titleSlug, p.lang?.name || "").catch(() => {});
+    await Storage.markSlugLangCommitted(p.titleSlug, p.lang?.name || p.lang?.slug || p.lang?.ext || "").catch(() => { });
   }
+  await Storage.clearPendingProblemKeys(
+    missing.map((p) => getProblemCommitKey(p)).filter(Boolean),
+  ).catch(() => { });
 
   // Mirror the bulk sync
   const allFiles = [];
-  for (const p of missing) for (const f of problemFiles(p)) allFiles.push(f);
+  for (const p of missing) for (const f of getProblemFiles(p)) allFiles.push(f);
   allFiles.push({ path: "index.json", content: await buildIndexJson() });
-  await pushToMirrors(allFiles, `chore: sync ${missing.length} problem(s) [CodeLedger]`, {}, settings);
+  await pushToMirrors(allFiles, "chore: sync " + missing.length + " problem(s) [CodeLedger]", {}, settings);
 
   return { committed: missing.length };
 }
 
 async function handleAIChat(messages, context = {}) {
   const settings = await Storage.getSettings();
-
-  // Prepend a system-context message so the AI knows which problem we're discussing
   const contextParts = [];
   if (context.title) contextParts.push(`Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`);
   if (context.problemStatement) {
-    // Strip HTML tags for a cleaner context prompt
     const plain = context.problemStatement.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
     if (plain) contextParts.push(`Description:\n${plain.slice(0, 2000)}`);
   }
@@ -375,9 +423,23 @@ async function handleAIChat(messages, context = {}) {
   else if (context.code) contextParts.push(`My solution:\n\`\`\`\n${context.code.slice(0, 3000)}\n\`\`\``);
   if (context.aiReview) contextParts.push(`Prior AI review:\n${context.aiReview.slice(0, 1000)}`);
 
-  const messagesWithContext = contextParts.length > 0
-    ? [{ role: "user", content: `Context for this conversation:\n\n${contextParts.join("\n\n")}` }, { role: "assistant", content: "Understood, I have the problem and solution context. How can I help?" }, ...messages]
-    : messages;
+  const systemPrompt = buildConversationSystemPrompt(context);
+  const expandedMessages = [];
+  for (const message of messages || []) {
+    if (message?.role === "user") {
+      // eslint-disable-next-line no-await-in-loop
+      const expanded = await expandChatVariables(message.content || "", context);
+      expandedMessages.push({ ...message, content: expanded });
+    } else {
+      expandedMessages.push(message);
+    }
+  }
+
+  const messagesWithContext = [
+    { role: "system", content: systemPrompt },
+    ...(contextParts.length > 0 ? [{ role: "system", content: `Context for this conversation:\n\n${contextParts.join("\n\n")}` }] : []),
+    ...expandedMessages,
+  ];
 
   const seen = new Set();
   const providers = [
@@ -458,6 +520,18 @@ try {
     if (msg && msg.type === "OPEN_WELCOME") {
       try {
         chrome.tabs.create({ url: chrome.runtime.getURL("welcome/welcome.html") });
+      } catch (_) { }
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (msg && msg.type === "OPEN_LIBRARY") {
+      try {
+        const tab = msg.tab || "solutions";
+        const params = new URLSearchParams({ tab });
+        if (msg.chatSlug) params.set("chatSlug", String(msg.chatSlug));
+        if (msg.chatPrompt) params.set("chatPrompt", String(msg.chatPrompt));
+        chrome.tabs.create({ url: chrome.runtime.getURL(`library/library.html?${params.toString()}`) });
       } catch (_) { }
       sendResponse({ ok: true });
       return true;

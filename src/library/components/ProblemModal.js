@@ -8,6 +8,9 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
+import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
+import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
+import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 
 function renderMarkdown(md) {
   if (!md) return "";
@@ -79,30 +82,21 @@ function _fmtElapsed(secs) {
 }
 
 const DIFF_CLASS = {
-  Easy:   "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  Easy: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   Medium: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  Hard:   "bg-rose-500/15 text-rose-400 border-rose-500/30",
+  Hard: "bg-rose-500/15 text-rose-400 border-rose-500/30",
 };
 
 const CHAT_KEY = (slug) => `cl-chat-${slug}`;
 
-function loadChatHistory(slug) {
-  try {
-    return JSON.parse(localStorage.getItem(CHAT_KEY(slug)) || "[]");
-  } catch (_) { return []; }
-}
-
-function saveChatHistory(slug, msgs) {
-  try { localStorage.setItem(CHAT_KEY(slug), JSON.stringify(msgs)); } catch (_) {}
-}
-
-export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
+export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList = [], onNavigateProblem }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [copied, setCopied] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [chatId, setChatId] = useState(null);
 
   // Edit state
   const [editTitle, setEditTitle] = useState("");
@@ -118,9 +112,10 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
   useEffect(() => {
     setActiveTab("overview");
     if (problem) {
-      setChatMessages(problem.titleSlug ? loadChatHistory(problem.titleSlug) : []);
+      setChatMessages([]);
       setChatInput("");
       setChatError("");
+      setChatId(null);
       // Seed edit fields
       setEditTitle(problem.title || "");
       setEditDifficulty(problem.difficulty || "Unknown");
@@ -132,6 +127,17 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
       setEditError("");
       setConfirmDelete(false);
       setDeleting(false);
+
+      if (problem.titleSlug) {
+        getChatsByProblem(problem.titleSlug)
+          .then((chats) => {
+            const latest = chats?.[0];
+            if (!latest) return;
+            setChatId(latest.id);
+            setChatMessages(latest.messages || []);
+          })
+          .catch(() => { });
+      }
     }
   }, [problem?.titleSlug, problem?.id]);
 
@@ -165,10 +171,12 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
       await navigator.clipboard.writeText(problem.code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+  const problemIndex = problemList.findIndex((entry) => (entry?.id || entry?.titleSlug) === (problem?.id || problem?.titleSlug));
+  const canNavigate = problemList.length > 1 && problemIndex >= 0;
 
   const handleDelete = useCallback(async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -191,13 +199,22 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
       const newTags = editTags.split(",").map(t => t.trim()).filter(Boolean);
       const updated = {
         ...problem,
-        title:      editTitle.trim() || problem.title,
+        title: editTitle.trim() || problem.title,
         difficulty: editDifficulty,
-        tags:       newTags,
-        topic:      newTags[0] || problem.topic || "Untagged",
+        tags: newTags,
+        topic: newTags[0] || problem.topic || "Untagged",
         manuallyEdited: true,
       };
       await Storage.saveProblem(updated);
+      {
+        const slug = String(updated.titleSlug || updated.slug || updated.id || "").trim();
+        const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || updated.language || "";
+        const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
+        const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+        if (pendingKey) {
+          await Storage.markPendingProblemKey(pendingKey).catch(() => { });
+        }
+      }
       setEditSaved(true);
       setTimeout(() => setEditSaved(false), 2500);
       if (onUpdate) onUpdate(updated);
@@ -242,12 +259,52 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
       const aiMsg = { role: "assistant", content: response, ts: Date.now() };
       const finalMsgs = [...updatedMsgs, aiMsg];
       setChatMessages(finalMsgs);
-      saveChatHistory(problem.titleSlug, finalMsgs);
+
+      const meta = {
+        problemTitle: problem.title || "",
+        problemTags: Array.isArray(problem.tags) ? problem.tags : [],
+        attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
+        attachedProblems: problem.titleSlug ? [{
+          slug: problem.titleSlug,
+          title: problem.title || problem.titleSlug,
+          platform: problem.platform || "leetcode",
+          url: problemUrl,
+        }] : [],
+        surface: "problem-modal",
+      };
+
+      if (chatId) {
+        await updateAIChat(chatId, finalMsgs, meta);
+      } else {
+        const newChatId = await saveAIChat(problem.titleSlug, problemUrl, finalMsgs, problem.platform || "leetcode", meta);
+        setChatId(newChatId);
+      }
     } catch (e) {
       setChatError(e.message);
     } finally {
       setChatPending(false);
     }
+  };
+
+  const openAIChatsView = () => {
+    const chatSlug = String(problem?.titleSlug || problem?.id || "").trim();
+    const chatPrompt = chatInput.trim();
+    try {
+      chrome.runtime.sendMessage({
+        type: "OPEN_LIBRARY",
+        tab: "ai-chats",
+        chatSlug,
+        ...(chatPrompt ? { chatPrompt } : {}),
+      });
+      return;
+    } catch (_) { }
+
+    try {
+      const params = new URLSearchParams({ tab: "ai-chats" });
+      if (chatSlug) params.set("chatSlug", chatSlug);
+      if (chatPrompt) params.set("chatPrompt", chatPrompt);
+      window.open(chrome.runtime.getURL(`library/library.html?${params.toString()}`), "_blank");
+    } catch (_) { }
   };
 
   const tabs = [
@@ -265,7 +322,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
       style="background:rgba(0,0,0,0.8);backdrop-filter:blur(6px)"
       onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div class="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="relative w-full max-w-[72rem] max-h-[90vh] flex flex-col bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
 
         <!-- ── Header ── -->
         <div class="flex items-start gap-3 p-5 border-b border-white/5 shrink-0">
@@ -282,10 +339,24 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
               ${problem.timestamp ? html`<span class="text-[10px] text-slate-600">${new Date(problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp).toLocaleDateString()}</span>` : ""}
             </div>
           </div>
-          <button
-            onClick=${onClose}
-            class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
-          >✕</button>
+          <div class="flex items-center gap-2 shrink-0">
+            ${canNavigate ? html`
+              <button
+                onClick=${() => onNavigateProblem?.(problemList[(problemIndex - 1 + problemList.length) % problemList.length])}
+                class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+                title="Previous problem"
+              >←</button>
+              <button
+                onClick=${() => onNavigateProblem?.(problemList[(problemIndex + 1) % problemList.length])}
+                class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+                title="Next problem"
+              >→</button>
+            ` : ""}
+            <button
+              onClick=${onClose}
+              class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+            >✕</button>
+          </div>
         </div>
 
         <!-- ── Topics ── -->
@@ -340,8 +411,8 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
               <button
                 onClick=${() => setActiveTab(tab.id)}
                 class="px-3 py-1.5 text-xs rounded-t-lg transition-colors ${activeTab === tab.id
-                  ? "bg-white/10 text-white border border-b-0 border-white/10"
-                  : "text-slate-500 hover:text-slate-300"}"
+      ? "bg-white/10 text-white border border-b-0 border-white/10"
+      : "text-slate-500 hover:text-slate-300"}"
               >${tab.label}</button>
             `)}
           </div>
@@ -394,8 +465,9 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
           ${activeTab === "review" ? html`
             <div
               class="text-sm text-slate-300 leading-relaxed prose-sm"
-              dangerouslySetInnerHTML=${{ __html: renderMarkdown(problem.aiReview) || "<p class='text-slate-500'>No AI review available.</p>" }}
-            ></div>
+            >
+              ${problem.aiReview ? html`<${AIMarkdownRenderer} content=${problem.aiReview} copyableEnabled=${false} />` : html`<p class='text-slate-500'>No AI review available.</p>`}
+            </div>
           ` : ""}
 
           ${activeTab === "chat" ? html`
@@ -415,8 +487,9 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
                   ` : html`
                     <div
                       class="max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed bg-white/5 border border-white/10 text-slate-200"
-                      dangerouslySetInnerHTML=${{ __html: renderMarkdown(msg.content) }}
-                    ></div>
+                    >
+                      <${AIMarkdownRenderer} content=${msg.content} copyableEnabled=${false} />
+                    </div>
                   `}
                     <span class="text-[9px] text-slate-700">${msg.role === "user" ? "You" : "AI"}</span>
                   </div>
@@ -433,24 +506,47 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
                 ` : ""}
               </div>
               <!-- Input row -->
-              <div class="flex gap-2 shrink-0">
-                <input
-                  type="text"
+              <div class="shrink-0">
+                <${MultiLineAIChatInput}
                   value=${chatInput}
-                  placeholder="Ask about complexity, approach, edge cases…"
-                  class="flex-1 px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600"
-                  onInput=${(e) => setChatInput(e.target.value)}
-                  onKeyDown=${(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+                  onChange=${setChatInput}
+                  onSend=${sendChat}
                   disabled=${chatPending}
+                  problem=${problem}
                 />
-                <button
-                  onClick=${sendChat}
-                  disabled=${chatPending || !chatInput.trim()}
-                  class="px-4 py-2 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg transition-colors disabled:opacity-40 shrink-0"
-                >Send</button>
+              </div>
+              <div class="flex items-center justify-between gap-2 shrink-0">
+                <div class="flex items-center gap-2">
+                  <button
+                    onClick=${sendChat}
+                    disabled=${chatPending || !chatInput.trim()}
+                    class="px-4 py-2 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg transition-colors disabled:opacity-40 shrink-0"
+                  >Send</button>
+                  <button
+                    onClick=${openAIChatsView}
+                    class="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 hover:text-cyan-200 hover:border-cyan-500/30 text-xs rounded-lg transition-colors shrink-0"
+                  >Open AI Chats</button>
+                </div>
                 ${chatMessages.length > 0 ? html`
                   <button
-                    onClick=${() => { setChatMessages([]); saveChatHistory(problem.titleSlug, []); setChatError(""); }}
+                    onClick=${async () => {
+          setChatMessages([]);
+          setChatError("");
+          if (chatId) {
+            await updateAIChat(chatId, [], {
+              problemTitle: problem.title || "",
+              problemTags: Array.isArray(problem.tags) ? problem.tags : [],
+              attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
+              attachedProblems: problem.titleSlug ? [{
+                slug: problem.titleSlug,
+                title: problem.title || problem.titleSlug,
+                platform: problem.platform || "leetcode",
+                url: problemUrl,
+              }] : [],
+              surface: "problem-modal",
+            }).catch(() => { });
+          }
+        }}
                     class="px-3 py-2 bg-white/5 border border-white/10 text-slate-500 hover:text-slate-300 text-xs rounded-lg transition-colors shrink-0"
                     title="Clear history"
                   >✕</button>
@@ -464,9 +560,9 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
               ${(problem.similar || []).length === 0 ? html`
                 <p class="text-slate-500 text-sm text-center py-4">No similar problems found.</p>
               ` : (problem.similar || []).map(s => {
-                const sUrl = `https://leetcode.com/problems/${s.titleSlug}/`;
-                const sDiffClass = { Easy: "text-emerald-400", Medium: "text-amber-400", Hard: "text-rose-400" }[s.difficulty] || "text-slate-400";
-                return html`
+          const sUrl = `https://leetcode.com/problems/${s.titleSlug}/`;
+          const sDiffClass = { Easy: "text-emerald-400", Medium: "text-amber-400", Hard: "text-rose-400" }[s.difficulty] || "text-slate-400";
+          return html`
                   <a
                     href=${sUrl}
                     target="_blank"
@@ -477,7 +573,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete }) {
                     <span class="text-xs ${sDiffClass} shrink-0 ml-2">${s.difficulty || ""}</span>
                   </a>
                 `;
-              })}
+        })}
             </div>
           ` : ""}
 

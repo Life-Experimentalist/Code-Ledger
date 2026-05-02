@@ -7,14 +7,7 @@
  * Returns a controller: { destroy }
  */
 
-const CHAT_KEY = (slug) => `cl_ai_chat_${slug || "generic"}`;
-
-function loadHistory(slug) {
-  try { return JSON.parse(sessionStorage.getItem(CHAT_KEY(slug)) || "[]"); } catch { return []; }
-}
-function saveHistory(slug, msgs) {
-  try { sessionStorage.setItem(CHAT_KEY(slug), JSON.stringify(msgs)); } catch { }
-}
+import { getChatsByProblem, saveAIChat, updateAIChat } from "../core/ai-chat-storage.js";
 
 /** Attempts to read the current code from the Monaco editor on the page. */
 function readEditorCode() {
@@ -68,14 +61,35 @@ const PANEL_STYLE = `
   #cl-ai-send:hover:not(:disabled) { background: rgba(6,182,212,0.25); }
   #cl-ai-send:disabled { opacity: 0.4; cursor: not-allowed; }
   #cl-ai-clear:hover { color: #94a3b8; }
+  #cl-ai-open:hover { color: #67e8f9; border-color: rgba(6,182,212,0.35); }
 `;
 
 export function createFloatingAI(slug = "", opts = {}) {
   const { position = { bottom: "70px", right: "20px" } } = opts;
 
-  let messages = loadHistory(slug);
+  let messages = [];
   let pending = false;
   let expanded = false;
+  let chatId = null;
+
+  function openAIChatsPage() {
+    const chatSlug = String(slug || "").trim();
+    try {
+      chrome.runtime.sendMessage({
+        type: "OPEN_LIBRARY",
+        tab: "ai-chats",
+        chatSlug,
+      });
+      return;
+    } catch (_) { }
+
+    try {
+      const params = new URLSearchParams({ tab: "ai-chats" });
+      if (chatSlug) params.set("chatSlug", chatSlug);
+      const url = chrome.runtime.getURL(`library/library.html?${params.toString()}`);
+      window.open(url, "_blank");
+    } catch (_) { }
+  }
 
   // Inject styles once
   if (!document.getElementById("cl-ai-styles")) {
@@ -130,7 +144,10 @@ export function createFloatingAI(slug = "", opts = {}) {
     <span style="font-size:12px;font-weight:600;color:#94a3b8;letter-spacing:0.04em;display:flex;align-items:center;gap:6px;">
       <span style="font-size:14px;">✦</span> AI Assistant
     </span>
-    <button id="cl-ai-clear" title="Clear chat" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px;border-radius:4px;transition:color 0.15s;">Clear</button>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button id="cl-ai-open" title="Open AI Chats" style="background:none;border:1px solid rgba(255,255,255,0.12);cursor:pointer;color:#94a3b8;font-size:10px;padding:2px 6px;border-radius:999px;transition:color 0.15s,border-color 0.15s;">Chats</button>
+      <button id="cl-ai-clear" title="Clear chat" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px;border-radius:4px;transition:color 0.15s;">Clear</button>
+    </div>
   `;
 
   // Message list
@@ -222,6 +239,14 @@ export function createFloatingAI(slug = "", opts = {}) {
   root.appendChild(toggle);
   document.body.appendChild(root);
 
+  getChatsByProblem(slug).then((chats) => {
+    const latest = chats?.[0];
+    if (!latest) return;
+    chatId = latest.id;
+    messages = latest.messages || [];
+    renderMessages();
+  }).catch(() => { });
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   function renderMessages() {
@@ -292,9 +317,13 @@ export function createFloatingAI(slug = "", opts = {}) {
   });
 
   const clearBtn = header.querySelector("#cl-ai-clear");
+  const openBtn = header.querySelector("#cl-ai-open");
+  openBtn.addEventListener("click", openAIChatsPage);
   clearBtn.addEventListener("click", () => {
     messages = [];
-    saveHistory(slug, []);
+    if (chatId) {
+      updateAIChat(chatId, [], { surface: "floating-panel", attachedProblemSlugs: slug ? [slug] : [] }).catch(() => { });
+    }
     renderMessages();
   });
 
@@ -324,6 +353,8 @@ export function createFloatingAI(slug = "", opts = {}) {
               difficulty: meta.difficulty || "",
               code: code || "",
               lang: { name: "" },
+              surface: "floating-panel",
+              attachedProblemSlugs: slug ? [slug] : [],
             },
           },
           (resp) => {
@@ -340,7 +371,17 @@ export function createFloatingAI(slug = "", opts = {}) {
 
       const aiMsg = { role: "assistant", content: response };
       messages = [...messages, aiMsg];
-      saveHistory(slug, messages);
+      const problemRecord = {
+        problemSlug: slug,
+        problemURL: window.location.href,
+        platform: "leetcode",
+        problemTitle: meta.title || slug,
+        attachedProblemSlugs: slug ? [slug] : [],
+        attachedProblems: slug ? [{ slug, title: meta.title || slug, platform: "leetcode", url: window.location.href }] : [],
+        surface: "floating-panel",
+      };
+      if (chatId) await updateAIChat(chatId, messages, problemRecord).catch(() => { });
+      else chatId = await saveAIChat(slug, window.location.href, messages, "leetcode", problemRecord).catch(() => null);
     } catch (e) {
       showError(e.message);
       // Remove the optimistic user message on failure

@@ -153,6 +153,13 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
   ctx.scale(scale, scale);
 
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const neighborIds = new Set();
+  if (selected) {
+    for (const e of edges) {
+      if (e.source === selected.id) neighborIds.add(e.target);
+      if (e.target === selected.id) neighborIds.add(e.source);
+    }
+  }
 
   const showSimilarEdges = scale > LOD_SIMILAR_MIN_SCALE;
   const showCanonicalEdges = scale > LOD_CANONICAL_MIN_SCALE;
@@ -194,13 +201,17 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       (hovered.id === e.source || hovered.id === e.target) ||
       (selected && (selected.id === e.source || selected.id === e.target))
     );
+    const isSelectedEdge = selected && (selected.id === e.source || selected.id === e.target);
+    const isNeighborEdge = selected && !isSelectedEdge && (
+      neighborIds.has(e.source) || neighborIds.has(e.target)
+    );
 
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.strokeStyle = EDGE_COLOR[e.type] ?? "#64748b";
-    ctx.lineWidth = isHovered ? (e.type === "canonical" ? 3.5 : 2.5) : (e.type === "canonical" ? 2.5 : 1.8);
-    ctx.globalAlpha = isHovered ? 1 : ((e.type === "topic-problem" ? 0.55 : 0.7) * edgeAlpha);
+    ctx.lineWidth = isHovered || isSelectedEdge ? (e.type === "canonical" ? 3.5 : 2.5) : (e.type === "canonical" ? 2.5 : 1.8);
+    ctx.globalAlpha = isSelectedEdge ? 1 : isNeighborEdge ? ((e.type === "topic-problem" ? 0.42 : 0.55) * edgeAlpha) : (isHovered ? 1 : ((e.type === "topic-problem" ? 0.55 : 0.7) * edgeAlpha));
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
@@ -211,22 +222,25 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     const r = n.size;
     const isH = hovered?.id === n.id;
     const isSel = selected?.id === n.id;
+    const isNeighbor = selected && !isSel && neighborIds.has(n.id);
 
     ctx.beginPath();
     ctx.arc(n.x, n.y, r + (isH ? 3 : 0), 0, Math.PI * 2);
+    ctx.shadowBlur = isSel ? 18 : isNeighbor ? 10 : 0;
+    ctx.shadowColor = isSel ? n.color : isNeighbor ? `${n.color}66` : "transparent";
 
     if (n.type === "topic") {
       ctx.fillStyle = n.color + "33";
       ctx.fill();
       ctx.strokeStyle = n.color;
-      ctx.lineWidth = isH || isSel ? 3 : 2;
+      ctx.lineWidth = isH || isSel ? 3 : isNeighbor ? 2.5 : 2;
       ctx.stroke();
     } else if (n.solved) {
       ctx.fillStyle = n.color;
       ctx.fill();
       ctx.strokeStyle = isSel ? "#fff" : (n.platformColor || PLATFORM_COLOR[n.platform] || "#64748b");
-      ctx.lineWidth = isSel ? 2.5 : n.isMultiPlatform ? 2.5 : 1.5;
-      ctx.globalAlpha = isSel ? 1 : 0.85;
+      ctx.lineWidth = isSel ? 2.5 : isNeighbor ? 2.2 : n.isMultiPlatform ? 2.5 : 1.5;
+      ctx.globalAlpha = isSel ? 1 : isNeighbor ? 0.65 : 0.85;
       ctx.stroke();
       ctx.globalAlpha = 1;
     } else {
@@ -240,7 +254,7 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     }
 
     // Labels: always for topics, only when hovered/selected/deeply-zoomed for problems
-    if (n.type === "topic" || isH || isSel || scale > LOD_PROBLEM_LABEL_SCALE) {
+    if (n.type === "topic" || isH || isSel || isNeighbor || scale > LOD_PROBLEM_LABEL_SCALE) {
       ctx.fillStyle = "#e2e8f0";
       ctx.font = n.type === "topic" ? `bold ${Math.max(11, r * 0.7)}px sans-serif` : "11px sans-serif";
       ctx.textAlign = "center";
@@ -718,6 +732,8 @@ export function GraphView({ problems }) {
       <${ProblemModal}
         problem=${modalProblem}
         onClose=${() => setModalProblem(null)}
+        problemList=${simRef.current.nodes.filter((node) => node.type === "problem")}
+        onNavigateProblem=${setModalProblem}
       />
     </div>
   `;

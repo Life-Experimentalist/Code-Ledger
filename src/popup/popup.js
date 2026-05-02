@@ -157,6 +157,12 @@ function PopupApp() {
           Open Dashboard
         </button>
         <button
+          class="w-full py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs font-bold uppercase tracking-widest hover:bg-emerald-500/20 transition-colors"
+          onClick=${() => openLibrary("ai-chats")}
+        >
+          AI Chats
+        </button>
+        <button
           class="w-full py-2 bg-white/5 border border-white/10 rounded-lg text-slate-300 text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
           onClick=${() => openLibrary("settings")}
         >

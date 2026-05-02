@@ -70,6 +70,7 @@ export class LeetCodeHandler extends BasePlatformHandler {
     this._timerSlug = null;
     this._aiPanel = null;
     this._aiPanelSlug = null;
+    this._submissionPollTimer = null;
     registerPlatformPrompt("leetcode", this.getDefaultPrompt());
   }
 
@@ -156,6 +157,12 @@ Be concise. Max 200 words.`;
       this._stopAIPanel();
     }
 
+    if (page.type === PAGE_TYPES.PROBLEM || page.type === PAGE_TYPES.SUBMISSION) {
+      this._startSubmissionPolling();
+    } else {
+      this._stopSubmissionPolling();
+    }
+
     // Profile page import button
     if (page.type === PAGE_TYPES.PROFILE) {
       this._injectProfileImportBtn(page.username).catch(() => { });
@@ -204,6 +211,20 @@ Be concise. Max 200 words.`;
     }
   }
 
+  _startSubmissionPolling() {
+    if (this._submissionPollTimer) return;
+    this._submissionPollTimer = setInterval(() => {
+      this._checkSubmission();
+    }, 2000);
+  }
+
+  _stopSubmissionPolling() {
+    if (this._submissionPollTimer) {
+      clearInterval(this._submissionPollTimer);
+      this._submissionPollTimer = null;
+    }
+  }
+
   _getElapsedSeconds() {
     if (!this._timer) return null;
     const ms = this._timer.getElapsed();
@@ -225,7 +246,7 @@ Be concise. Max 200 words.`;
       clearTimeout(_debounceTimer);
       _debounceTimer = setTimeout(() => this._checkSubmission(), 600);
     });
-    this.mutationObserver.observe(document.body, { childList: true, subtree: true });
+    this.mutationObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
   }
 
   /** Called when LeetCode SPA navigates to a new page. */
@@ -237,12 +258,21 @@ Be concise. Max 200 words.`;
     if (page.type === PAGE_TYPES.PROBLEM) {
       import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
       setTimeout(() => injectQoL(), 1500);
-      // Start a fresh timer and AI panel for the new slug
+      // Start a fresh timer, AI panel and submission watcher for the new slug
       this._startTimer(page.slug);
       this._startAIPanel(page.slug);
+    } else if (page.type === PAGE_TYPES.SUBMISSION) {
+      this._stopTimer();
+      this._stopAIPanel();
     } else {
       this._stopTimer();
       this._stopAIPanel();
+    }
+
+    if (page.type === PAGE_TYPES.PROBLEM || page.type === PAGE_TYPES.SUBMISSION) {
+      this._startSubmissionPolling();
+    } else {
+      this._stopSubmissionPolling();
     }
 
     // On submission detail pages, trigger a check immediately after render settles
@@ -741,6 +771,7 @@ Be concise. Max 200 words.`;
 
         eventBus.emit("problem:solved", {
           id: `${sub.titleSlug}::${lang.slug}`,
+          submissionId: sub.id || null,
           platform: "leetcode",
           title,
           titleSlug: sub.titleSlug,
@@ -906,6 +937,7 @@ Be concise. Max 200 words.`;
       eventBus.emit("problem:solved", {
         platform: "leetcode",
         id: `${slug}::${lang.slug}`,
+        submissionId: submission.id || null,
         title: meta?.title || submission.question?.title || slug,
         titleSlug: slug,
         difficulty: normalizeDifficulty(meta?.difficulty || submission.question?.difficulty || ""),

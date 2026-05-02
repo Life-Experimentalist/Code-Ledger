@@ -288,7 +288,7 @@ function LibraryApp() {
     if (activeTab === "graph")
       return html`<${GraphView} problems=${enrichedProblems} />`;
     if (activeTab === "ai-chats")
-      return html`<${AIChatsView} copyableEnabled=${settings?.aiCopyable === true} />`;
+      return html`<${AIChatsView} copyableEnabled=${settings?.aiCopyable === true} problems=${enrichedProblems} settings=${settings} />`;
     if (activeTab === "canonical")
       return html`<${CanonicalView} problems=${enrichedProblems} />`;
     if (activeTab === "settings")

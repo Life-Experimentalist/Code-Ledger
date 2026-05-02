@@ -182,4 +182,48 @@ export const Storage = {
     const map = await this.getCommittedSlugLangs();
     return !!map[`${titleSlug}::${String(langName || "").toLowerCase()}`];
   },
+
+  async getCommittedSubmissions() {
+    const key = "cl.committed.submissions";
+    const res = await browserStorage.local.get(key);
+    return res[key] || {};
+  },
+
+  async markSubmissionCommitted(commitKey) {
+    const key = "cl.committed.submissions";
+    const map = await this.getCommittedSubmissions();
+    map[String(commitKey || "")] = Date.now();
+    await browserStorage.local.set({ [key]: map });
+  },
+
+  async isSubmissionCommitted(commitKey) {
+    const map = await this.getCommittedSubmissions();
+    return !!map[String(commitKey || "")];
+  },
+
+  async getPendingProblemKeys() {
+    const key = "cl.pending.problemkeys";
+    const res = await browserStorage.local.get(key);
+    return res[key] || {};
+  },
+
+  async markPendingProblemKey(problemCommitKey) {
+    const key = "cl.pending.problemkeys";
+    const map = await this.getPendingProblemKeys();
+    const commitKey = String(problemCommitKey || "").trim();
+    if (!commitKey) return;
+    map[commitKey] = Date.now();
+    await browserStorage.local.set({ [key]: map });
+  },
+
+  async clearPendingProblemKeys(problemCommitKeys = []) {
+    const key = "cl.pending.problemkeys";
+    const map = await this.getPendingProblemKeys();
+    for (const raw of problemCommitKeys || []) {
+      const commitKey = String(raw || "").trim();
+      if (!commitKey) continue;
+      delete map[commitKey];
+    }
+    await browserStorage.local.set({ [key]: map });
+  },
 };

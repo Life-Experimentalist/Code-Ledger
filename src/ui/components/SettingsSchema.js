@@ -142,11 +142,12 @@ function LeetCodeImportPanel({ username }) {
       const submissions = data?.data?.recentAcSubmissionList || [];
       let imported = 0;
       for (const sub of submissions) {
-        const existing = await Storage.getProblem?.(sub.titleSlug).catch(() => null);
-        if (existing) continue;
         const slug = (sub.lang || "").toLowerCase().replace(/\s+/g, "");
+        const problemId = `${sub.titleSlug}::${slug || "unknown"}`;
+        const existing = await Storage.getProblem?.(problemId).catch(() => null);
+        if (existing) continue;
         await Storage.saveProblem({
-          id: sub.titleSlug,
+          id: problemId,
           title: sub.title,
           titleSlug: sub.titleSlug,
           platform: "leetcode",
@@ -157,6 +158,7 @@ function LeetCodeImportPanel({ username }) {
           code: "",
           url: "https://leetcode.com/problems/" + sub.titleSlug + "/",
         });
+        await Storage.markPendingProblemKey(`${sub.titleSlug}::${slug || "unknown"}`).catch(() => { });
         imported++;
       }
       setStatus(
@@ -215,6 +217,7 @@ function maskKey(k) {
 export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
+  const [savedAIKeys, setSavedAIKeys] = useState({});
   const [advancedMap, setAdvancedMap] = useState({});
   const [activeTab, setActiveTab] = useState("general");
   const [showAdvancedProviders, setShowAdvancedProviders] = useState(false);
@@ -240,6 +243,22 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       .catch(() => {
         if (!mounted) return;
         setPromptDraft(getDefaultAIPrompts());
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    Storage.getAIKeys()
+      .then((all) => {
+        if (!mounted) return;
+        setSavedAIKeys(all || {});
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setSavedAIKeys({});
       });
     return () => {
       mounted = false;
@@ -349,16 +368,30 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
 
   const persistProviderKeys = async (providerId, rawVal) => {
     const all = await Storage.getAIKeys();
-    all[providerId] = parseKeys(rawVal);
+    const existing = Array.isArray(all[providerId]) ? all[providerId] : [];
+    const incoming = parseKeys(rawVal);
+    const merged = [...existing, ...incoming].map((k) => String(k || "").trim()).filter(Boolean);
+    all[providerId] = [...new Set(merged)];
     await Storage.setAIKeys(all);
+    setSavedAIKeys(all);
   };
 
-  const handleProviderKeysChange = async (providerId, fieldKey, rawVal) => {
+  const handleProviderKeysChange = async (_providerId, fieldKey, rawVal) => {
     onChange(fieldKey, rawVal);
+  };
+
+  const handleSaveAllKeys = async (providerId, keyField, rawVal) => {
+    const keys = parseKeys(rawVal);
+    if (!keys.length) {
+      setTestResults((s) => ({ ...s, [`${keyField}:all`]: "No keys to save" }));
+      return;
+    }
     try {
       await persistProviderKeys(providerId, rawVal);
+      onChange(keyField, "");
+      setTestResults((s) => ({ ...s, [`${keyField}:all`]: `Saved ${keys.length} key(s)` }));
     } catch (e) {
-      // ignore persistence failure in UI layer
+      setTestResults((s) => ({ ...s, [`${keyField}:all`]: e.message || "Failed to save keys" }));
     }
   };
 
@@ -372,7 +405,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     const key = String(keyVal || "").trim();
     if (!key) {
       setTestResults((s) => ({ ...s, [resultKey]: "No key provided" }));
-      return;
+      return false;
     }
 
     setTesting((s) => ({ ...s, [resultKey]: true }));
@@ -382,8 +415,10 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
         ...s,
         [resultKey]: res.ok ? "OK" : res.error || "Failed",
       }));
+      return !!res.ok;
     } catch (e) {
       setTestResults((s) => ({ ...s, [resultKey]: e.message || "Failed" }));
+      return false;
     } finally {
       setTesting((s) => ({ ...s, [resultKey]: false }));
     }
@@ -398,14 +433,25 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       }));
       return;
     }
+    let allPassed = true;
     for (let i = 0; i < keys.length; i++) {
       // eslint-disable-next-line no-await-in-loop
-      await handleTestKey(
+      const ok = await handleTestKey(
         providerId,
         keys[i],
         `${baseResultKey}:${i}`,
         values?.[`${providerId}_endpoint`] || ""
       );
+      if (!ok) allPassed = false;
+    }
+    if (allPassed) {
+      await persistProviderKeys(providerId, rawVal);
+      onChange(baseResultKey, "");
+      setTestResults((s) => ({
+        ...s,
+        [`${baseResultKey}:all`]: `Tested and saved ${keys.length} key(s)`,
+      }));
+      return;
     }
     setTestResults((s) => ({
       ...s,
@@ -1087,6 +1133,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       const strategyField = `${pid}_keyStrategy`;
       const rawKeys = values[keyField] || "";
       const keyList = parseKeys(rawKeys);
+      const savedKeys = Array.isArray(savedAIKeys[pid]) ? savedAIKeys[pid] : [];
       const endpoint = values[endpointField] || p.endpoint || "";
       const providerEnabled =
         typeof values[enabledField] === "undefined"
@@ -1152,15 +1199,24 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                       ></textarea>
                       <div class="flex items-center justify-between">
                         <span class="text-[11px] text-slate-500"
-                          >${keyList.length} key(s) detected</span
+                          >${savedKeys.length} saved • ${keyList.length} draft</span
                         >
-                        <button
-                          onClick=${() =>
+                        <div class="flex items-center gap-2">
+                          <button
+                            onClick=${() =>
+              handleSaveAllKeys(pid, keyField, rawKeys)}
+                            class="px-3 py-1.5 bg-[#0f766e]/30 hover:bg-[#0f766e]/45 text-xs text-cyan-100 rounded"
+                          >
+                            Save Keys
+                          </button>
+                          <button
+                            onClick=${() =>
               handleTestAllKeys(pid, rawKeys, keyField)}
-                          class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-                        >
-                          Test All
-                        </button>
+                            class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                          >
+                            Test All
+                          </button>
+                        </div>
                       </div>
                       ${testResults[`${keyField}:all`]
               ? html`<div class="text-[11px] text-slate-400">
@@ -1405,8 +1461,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
         : html`
               <div class="space-y-6">
                 ${standardSections.map((section) => renderSection(section))}
-                ${activeTab === "git"     ? html`<${BackupRestorePanel} /><${MirrorsPanel} />` : ""}
-                ${activeTab === "general" ? html`<${DifficultyMapPanel} />`  : ""}
+                ${activeTab === "git" ? html`<${BackupRestorePanel} /><${MirrorsPanel} />` : ""}
+                ${activeTab === "general" ? html`<${DifficultyMapPanel} />` : ""}
               </div>
             `}
 

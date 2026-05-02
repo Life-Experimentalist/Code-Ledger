@@ -125,7 +125,8 @@ class HandlerRegistry {
           default: "",
           description:
             "Optional model name to use across providers that support a global model.",
-
+        },
+        {
           key: "aiCopyable",
           label: "AI Response Copyable",
           type: "toggle",
