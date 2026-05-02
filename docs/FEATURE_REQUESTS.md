@@ -63,6 +63,7 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 | AI key draft/save safety                  | Key input is now draft-only; deleting textbox content no longer removes saved keys until explicit save                                                                                                               |
 | Deferred sync queue for imports/edits     | Imported and edited problems are marked pending locally and committed on next auto/manual sync                                                                                                                       |
 
+| Graph node glow cascade                    | Selected node: 24px shadow blur (100% intensity), neighbors: 12px shadow blur (50% intensity); neighbor edges 50% opacity with increased line width (commit 803dcc6)                                                 |
 ---
 
 ## In Progress 🔄
@@ -102,7 +103,6 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 | Bug                                      | Priority     | Notes                                                                                        |
 | ---------------------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
 | **Commit on LeetCode accept not firing** | **IN-PROGRESS** | Enhanced selector detection added (d9f736b); extended ARIA/data-testid/color-based selectors; fallback from slow text-walk to enhanced module; needs testing |
-| **Graph node glow cascade missing**      | **HIGH**     | Selected node should glow full intensity; connected nodes glow 50%; connected edges glow 50% |
 | **Problem modal not unified**            | **HIGH**     | Each handler creates own modal; should use single constant component across all platforms    |
 
 ---
