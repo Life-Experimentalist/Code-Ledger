@@ -101,7 +101,7 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 
 | Bug                                      | Priority     | Notes                                                                                        |
 | ---------------------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
-| **Commit on LeetCode accept not firing** | **CRITICAL** | Service worker doesn't receive problem:solved event on submit; handler detection may fail    |
+| **Commit on LeetCode accept not firing** | **IN-PROGRESS** | Enhanced selector detection added (d9f736b); extended ARIA/data-testid/color-based selectors; fallback from slow text-walk to enhanced module; needs testing |
 | **Graph node glow cascade missing**      | **HIGH**     | Selected node should glow full intensity; connected nodes glow 50%; connected edges glow 50% |
 | **Problem modal not unified**            | **HIGH**     | Each handler creates own modal; should use single constant component across all platforms    |
 
