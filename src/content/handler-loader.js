@@ -4,6 +4,10 @@
  */
 
 // Extension root IS src/ — paths must NOT include a 'src/' prefix.
+function isHost(domain, host) {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
 async function loadHandler() {
   const hostname = window.location.hostname;
 
@@ -15,19 +19,19 @@ async function loadHandler() {
   } catch (_) {}
 
   try {
-    if (hostname.includes("leetcode.com")) {
+    if (isHost("leetcode.com", hostname)) {
       const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
       const { LeetCodeHandler } = await import(url);
       const handler = new LeetCodeHandler();
       await handler.init();
 
-    } else if (hostname.includes("geeksforgeeks.org")) {
+    } else if (isHost("geeksforgeeks.org", hostname)) {
       const url = chrome.runtime.getURL("handlers/platforms/geeksforgeeks/index.js");
       const { GFGHandler } = await import(url);
       const handler = new GFGHandler();
       await handler.init();
 
-    } else if (hostname.includes("codeforces.com")) {
+    } else if (isHost("codeforces.com", hostname)) {
       const url = chrome.runtime.getURL("handlers/platforms/codeforces/index.js");
       const { CodeforcesHandler } = await import(url);
       const handler = new CodeforcesHandler();
