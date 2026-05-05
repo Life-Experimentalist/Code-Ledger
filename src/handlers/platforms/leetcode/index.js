@@ -13,9 +13,8 @@ import { Storage } from "../../../core/storage.js";
 import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
-import { createFloatingTimer } from "../../../ui/floating-timer.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
-import { normalizeDifficulty } from "../../../core/difficulty-map.js";
+import { runtime, tabs } from "../../../lib/browser-compat.js";
 
 const dbg = createDebugger("LeetCode");
 
@@ -48,6 +47,7 @@ function langExt(name = "") {
 }
 /** Normalise submission.lang which can be a string slug OR an object { name, verboseName }. */
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
+import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { querySubmissionResult, isAcceptedVisibleExtended } from "./enhanced-selectors.js";
 function resolveLang(rawLang) {
   if (!rawLang) return { verbose: "Unknown", slug: "txt", ext: "txt" };
@@ -67,8 +67,6 @@ export class LeetCodeHandler extends BasePlatformHandler {
     this.mutationObserver = null;
     this.lastDetectedId = null;
     this._processingLock = false;
-    this._timer = null;
-    this._timerSlug = null;
     this._aiPanel = null;
     this._aiPanelSlug = null;
     this._submissionPollTimer = null;
@@ -93,105 +91,166 @@ Be concise. Max 200 words.`;
       title: "LeetCode",
       order: 10,
       fields: [
+        // ── Core Tracking ──────────────────────────────────────────
         {
           key: "leetcode_enable",
           label: "Enable tracking",
-          type: "toggle", default: true,
-          description: "Auto-detect accepted submissions and save them."
+          type: "toggle",
+          default: true,
+          description: "Auto-detect accepted submissions on LeetCode and save them to CodeLedger.",
         },
         {
-          key: "leetcode_readme", label: "Include problem description", type: "toggle", default: true,
-          description: "Commit a README.md with the full problem statement and your stats."
+          key: "leetcode_auto_review",
+          label: "AI review on accept",
+          type: "toggle",
+          default: true,
+          description: "Automatically analyze your code with AI immediately after acceptance.",
+        },
+
+        // ── Commit Content ─────────────────────────────────────────
+        {
+          key: "leetcode_readme",
+          label: "Include problem description",
+          type: "toggle",
+          default: true,
+          description: "Save full problem statement and your stats to README.md.",
         },
         {
-          key: "leetcode_similar", label: "Include similar problems", type: "toggle", default: true,
-          description: "Add a Similar Problems section to the README."
+          key: "leetcode_similar",
+          label: "Include similar problems",
+          type: "toggle",
+          default: true,
+          description: "Add LeetCode's similar problems list to your commit.",
         },
         {
-          key: "leetcode_qol", label: "Quality-of-life features", type: "toggle", default: true,
-          description: "Show daily challenge banner, 'Sync to CodeLedger' button on submission pages, and quick-open button."
+          key: "leetcode_sync_hints",
+          label: "Include hints",
+          type: "toggle",
+          default: false,
+          description: "Save problem hints to hints.md alongside your solution.",
+          advanced: true,
         },
+
+        // ── UI Features ────────────────────────────────────────────
         {
-          key: "leetcode_timer", label: "Floating solve timer", type: "toggle", default: true,
-          description: "Show a floating stopwatch overlay on problem pages to track your solve time."
+          key: "leetcode_ai_panel",
+          label: "Floating AI assistant",
+          type: "toggle",
+          default: true,
+          description: "Show a floating AI chat panel for instant code feedback on problem pages.",
         },
+
+        // ── Import (Advanced) ──────────────────────────────────────
         {
-          key: "leetcode_ai_panel", label: "Floating AI assistant", type: "toggle", default: true,
-          description: "Show a floating AI chat panel on problem pages for instant help about your solution."
-        },
-        {
-          key: "leetcode_sync_hints", label: "Include hints in commit", type: "toggle", default: false,
-          description: "Commit a separate hints.md file alongside your solution.", advanced: true
-        },
-        {
-          key: "leetcode_auto_review", label: "AI review after acceptance", type: "toggle", default: true,
-          description: "Run AI code review immediately after a new accepted submission.", advanced: true
-        },
-        {
-          key: "leetcode_username", label: "LeetCode username", type: "text", default: "",
-          description: "Your public LeetCode username — used for profile import.", advanced: true,
-          placeholder: "e.g. vkrishna04"
+          key: "leetcode_username",
+          label: "LeetCode username",
+          type: "text",
+          default: "",
+          description: "Your public LeetCode username for importing your profile history.",
+          advanced: true,
+          placeholder: "e.g. vkrishna04",
         },
       ],
     };
   }
 
   async init() {
-    dbg.log("LeetCode handler active");
+    dbg.log("LeetCode handler active on", window.location.pathname);
     this._setupMutationObserver();
     this._setupSyncButtons();
-    this._handlePageSpecific();
+    await this._handlePageSpecific();
+  }
+
+  /** Setup handlers for page sync buttons — runs at init + on mutations. */
+  _setupSyncButtons() {
+    // Initial checks at different time intervals (elements may render staggered)
+    this._syncButtonsForCurrentPage();
+    setTimeout(() => this._syncButtonsForCurrentPage(), 800);
+    setTimeout(() => this._syncButtonsForCurrentPage(), 2000);
+
+    // Watch for mutations and re-evaluate button state
+    const observer = new MutationObserver(() => this._syncButtonsForCurrentPage());
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  async _handleOnDemandFetch(page) {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get("codeledger_fetch")) return false;
+      const slug = page.slug || params.get("cl_fetch_id") || params.get("slug");
+      if (!slug) return false;
+      const existing = await Storage.getProblem(String(slug)).catch(() => null);
+      const meta = await this._fetchMetadata(slug);
+      const merged = {
+        ...(existing || {}),
+        platform: "leetcode",
+        id: String(slug),
+        title: meta?.title || existing?.title || slug,
+        titleSlug: slug,
+        difficulty: normalizeDifficulty(meta?.difficulty || existing?.difficulty || ""),
+        tags: (meta?.topicTags || []).map(t => t.name),
+        problemStatement: meta?.content || existing?.problemStatement || null,
+        timestamp: existing?.timestamp || Date.now(),
+      };
+      await Storage.saveProblem(merged).catch(() => { });
+      await new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage({ type: "REFRESH_METADATA_DONE", platform: "leetcode", slug }, () => resolve());
+        } catch (_) {
+          resolve();
+        }
+      });
+      try { window.close(); } catch (_) { }
+      return true;
+    } catch (e) {
+      dbg.error("on-demand fetch failed", e);
+      return false;
+    }
   }
 
   /** Handle page-specific init logic on load and SPA navigation. */
-  _handlePageSpecific() {
+  async _handlePageSpecific() {
     const page = detectPage(window.location.pathname);
 
-    // QoL buttons on problem pages — always inject (not blocked by QoL toggle)
+    // Fast path for refresh-data fetch flow opened from library modal.
+    const fetched = await this._handleOnDemandFetch(page);
+    if (fetched) return;
+
+    // QoL buttons on problem pages
     if (page.type === PAGE_TYPES.PROBLEM) {
-      // Start retry loop — toolbar may not be rendered yet
       setTimeout(() => injectQoL(), 1500);
-      this._startTimer(page.slug);
-      this._startAIPanel(page.slug);
-    } else {
-      this._stopTimer();
-      this._stopAIPanel();
     }
 
+    // AI panel on problem and submission pages
     if (page.type === PAGE_TYPES.PROBLEM || page.type === PAGE_TYPES.SUBMISSION) {
+      if (page.slug) this._startAIPanel(page.slug);
       this._startSubmissionPolling();
     } else {
+      this._stopAIPanel();
       this._stopSubmissionPolling();
     }
 
-    // Profile page import button
-    if (page.type === PAGE_TYPES.PROFILE) {
-      this._injectProfileImportBtn(page.username).catch(() => { });
+    // Immediate check on submission detail pages
+    if (page.type === PAGE_TYPES.SUBMISSION) {
+      setTimeout(() => this._checkSubmission(), 250);
     }
 
-    // /progress page import button
+    // /progress page import button (only progress page keeps import)
     if (page.type === PAGE_TYPES.PROGRESS) {
       this._injectProgressImportBtn().catch(() => { });
+    } else {
+      this._removeProgressImportButton();
+    }
+
+    if (page.type === PAGE_TYPES.PROFILE) {
+      this._injectProfileActionButtons().catch(() => { });
+    } else {
+      this._removeProfileActionButtons();
     }
   }
 
-  _startTimer(slug) {
-    Storage.getSettings().then((settings) => {
-      if (settings.leetcode_timer === false) return;
-      if (this._timer && this._timerSlug === slug) return; // already running for this slug
-      this._stopTimer();
-      this._timerSlug = slug;
-      this._timer = createFloatingTimer(slug, { autoStart: true });
-    }).catch(() => { });
-  }
-
-  _stopTimer() {
-    if (this._timer) {
-      this._timer.pause();
-      this._timer.destroy();
-      this._timer = null;
-      this._timerSlug = null;
-    }
+  _getNativeTimerElement() {
+    return document.querySelector(".select-none.text-sm.text-sd-blue-400");
   }
 
   _startAIPanel(slug) {
@@ -206,7 +265,7 @@ Be concise. Max 200 words.`;
 
   _stopAIPanel() {
     if (this._aiPanel) {
-      this._aiPanel.destroy();
+      this._aiPanel.destroy({ force: true });
       this._aiPanel = null;
       this._aiPanelSlug = null;
     }
@@ -227,9 +286,18 @@ Be concise. Max 200 words.`;
   }
 
   _getElapsedSeconds() {
-    if (!this._timer) return null;
-    const ms = this._timer.getElapsed();
-    return ms > 0 ? Math.round(ms / 1000) : null;
+    const timerEl = this._getNativeTimerElement();
+    if (!timerEl) return null;
+
+    const text = timerEl.textContent || "";
+    const match = text.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+    if (!match) return null;
+
+    const parts = match[1].split(":").map((n) => Number(n));
+    if (parts.some((n) => Number.isNaN(n))) return null;
+    if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+    if (parts.length === 2) return (parts[0] * 60) + parts[1];
+    return null;
   }
 
   _setupMutationObserver() {
@@ -255,18 +323,16 @@ Be concise. Max 200 words.`;
     const page = detectPage(pathname);
     dbg.log("SPA navigate →", page.type, pathname);
 
+    this._handleOnDemandFetch(page).catch(() => { });
+
     // Re-inject QoL on problem pages
     if (page.type === PAGE_TYPES.PROBLEM) {
       import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
       setTimeout(() => injectQoL(), 1500);
-      // Start a fresh timer, AI panel and submission watcher for the new slug
-      this._startTimer(page.slug);
       this._startAIPanel(page.slug);
     } else if (page.type === PAGE_TYPES.SUBMISSION) {
-      this._stopTimer();
-      this._stopAIPanel();
+      if (page.slug) this._startAIPanel(page.slug);
     } else {
-      this._stopTimer();
       this._stopAIPanel();
     }
 
@@ -283,238 +349,133 @@ Be concise. Max 200 words.`;
     }
 
     // Profile page import button
-    if (page.type === PAGE_TYPES.PROFILE) {
-      this._injectProfileImportBtn(page.username).catch(() => { });
-    }
-
-    // /progress page — inject the same import button (no username check needed)
+    // Only progress page import remains; profile import removed per user request
     if (page.type === PAGE_TYPES.PROGRESS) {
       this._injectProgressImportBtn().catch(() => { });
+    } else {
+      this._removeProgressImportButton();
+    }
+
+    if (page.type === PAGE_TYPES.PROFILE) {
+      this._injectProfileActionButtons().catch(() => { });
+    } else {
+      this._removeProfileActionButtons();
     }
   }
 
-  /* ── Sync button on submission detail + submission list pages ──────── */
-  _setupSyncButtons() {
-    const observer = new MutationObserver(() => {
-      const page = detectPage(window.location.pathname);
+  /** Manage sync button visibility based on current page type. */
+  _syncButtonsForCurrentPage() {
+    const page = detectPage(window.location.pathname);
 
-      if (page.type === PAGE_TYPES.SUBMISSION && !document.getElementById("cl-sync-btn")) {
-        this._injectDetailSyncBtn(page);
-      }
+    // Clean up deprecated row-sync buttons from old versions
+    document.querySelectorAll(".cl-row-sync").forEach((el) => el.remove());
 
-      if (page.type === PAGE_TYPES.SUBMISSION_LIST) {
-        this._injectListSyncBtns(page);
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    const detailSyncBtn = document.getElementById("cl-sync-btn");
+    const listSyncBtn = document.getElementById("cl-submission-list-sync");
+
+    // Show detail sync button only on submission detail pages
+    if (page.type === PAGE_TYPES.SUBMISSION) {
+      if (listSyncBtn) listSyncBtn.remove();
+      if (!detailSyncBtn) this._injectDetailSyncBtn(page);
+    }
+    // Show list sync button only on submission list pages
+    else if (page.type === PAGE_TYPES.SUBMISSION_LIST) {
+      if (detailSyncBtn) detailSyncBtn.remove();
+      if (!listSyncBtn) this._injectSubmissionListSyncBtn(page);
+    }
+    // Hide both buttons on other pages
+    else {
+      if (detailSyncBtn) detailSyncBtn.remove();
+      if (listSyncBtn) listSyncBtn.remove();
+    }
   }
 
   _injectDetailSyncBtn(page) {
-    // Try multiple toolbar selectors — LeetCode changes class names frequently
-    const toolbar =
-      document.querySelector("[class*='action-bar']") ||
+    if (document.getElementById("cl-sync-btn")) return;
+
+    // Find the submission-page action button row (contains "Back" / "Solution" buttons).
+    // Same approach as the LeetHub reference: .flex.flex-none.gap-2 excluding centered/space-between rows.
+    const btnRow =
       document.querySelector(".flex.flex-none.gap-2:not(.justify-center):not(.justify-between)") ||
-      document.querySelector("[class*='submission-detail'] .flex.gap-2") ||
-      document.querySelector("div[class*='flex'][class*='gap-2']:has(button)") ||
-      (() => {
-        // Find any container near a "Copy" or "Definition" button — that's the toolbar
-        const copy = Array.from(document.querySelectorAll("button")).find(
-          b => /^copy$/i.test(b.textContent.trim())
-        );
-        return copy?.closest("div.flex, div[class*='gap']") || null;
-      })();
-    if (!toolbar) return;
+      document.querySelector(".flex.gap-2:not(.justify-center):not(.justify-between)");
+
+    if (!btnRow || !btnRow.offsetParent) {
+      setTimeout(() => this._injectDetailSyncBtn(page), 1200);
+      return;
+    }
+
+    if (document.getElementById("cl-sync-btn")) return;
 
     const btn = document.createElement("button");
     btn.id = "cl-sync-btn";
     btn.title = "Sync this submission to CodeLedger";
     btn.className =
-      "whitespace-nowrap focus:outline-none flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors";
-    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`;
+      "group whitespace-nowrap focus:outline-none flex items-center justify-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors";
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`;
     btn.addEventListener("click", () => this._manualSync(page, btn));
-    toolbar.prepend(btn);
+    btnRow.appendChild(btn);
   }
 
-  _injectListSyncBtns(page) {
-    // LeetCode renders submissions as both table rows and div-based rows — handle both
-    const rowCandidates = [
-      ...document.querySelectorAll("table tbody tr:not(.cl-synced)"),
-      ...document.querySelectorAll("div[class*='submission'] [class*='row']:not(.cl-synced)"),
-      // New LeetCode UI: each submission is a div with a link to /submissions/<id>
-      ...Array.from(document.querySelectorAll("div[class*='flex']:not(.cl-synced)")).filter(
-        el => el.querySelector("a[href*='/submissions/']") && el.textContent
-      ),
-    ];
+  _injectSubmissionListSyncBtn(page) {
+    if (document.getElementById("cl-submission-list-sync")) return;
 
-    for (const row of rowCandidates) {
-      if (row.querySelector(".cl-row-sync")) continue;
-
-      // Only process Accepted submissions
-      const rowText = row.textContent || "";
-      if (!/accepted/i.test(rowText)) continue;
-
-      const submissionId =
-        row.getAttribute("data-submission-id") ||
-        row.querySelector("a[href*='/submissions/']")?.href?.match(/\/submissions\/(\d+)/)?.[1];
-
-      if (!submissionId) continue;
-
-      const btn = document.createElement("button");
-      btn.className = "cl-row-sync text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors ml-2 shrink-0";
-      btn.textContent = "Add to Ledger";
-      btn.style.cssText = "font-family:inherit;cursor:pointer;white-space:nowrap;";
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        btn.textContent = "⏳";
-        btn.disabled = true;
-        try {
-          await this._processSubmission(
-            { type: PAGE_TYPES.SUBMISSION, slug: page.slug, submissionId },
-            true,
-          );
-          btn.textContent = "✓ Added";
-          btn.style.color = "#34d399";
-          btn.style.borderColor = "rgba(52,211,153,0.3)";
-          row.classList.add("cl-synced");
-        } catch {
-          btn.textContent = "✗ Failed";
-          btn.disabled = false;
-        }
-      });
-
-      // Append to the last cell / end of row
-      const anchor = row.querySelector("td:last-child") || row;
-      anchor.appendChild(btn);
-    }
+    const btn = document.createElement("button");
+    btn.id = "cl-submission-list-sync";
+    btn.title = "Refresh the latest accepted submission for this problem";
+    btn.className =
+      "fixed right-4 bottom-4 z-[2147483646] whitespace-nowrap focus:outline-none flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border border-cyan-500/30 text-cyan-300 bg-slate-950/90 shadow-lg hover:bg-cyan-500/10 transition-colors";
+    btn.textContent = "Sync latest accepted";
+    btn.addEventListener("click", () => this._manualSync(page, btn));
+    document.body.appendChild(btn);
   }
 
+  /**
+   * Manual sync triggered by user clicking sync button.
+   * Provides clear state feedback: "Syncing…" → "✓ Synced" → restore button.
+   */
   async _manualSync(page, btn) {
-    if (btn) { btn.textContent = "⏳ Syncing…"; btn.disabled = true; }
+    const originalHTML = btn.innerHTML;
+    const originalText = btn.textContent;
+
     try {
+      // State: Syncing
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "⏳ Syncing…";
+      }
+
       await this._processSubmission(page, true);
+
+      // State: Success
       if (btn) {
         btn.textContent = "✓ Synced";
-        setTimeout(() => { if (btn) { btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`; btn.disabled = false; } }, 3000);
+        // Restore after 2.5s
+        setTimeout(() => {
+          if (btn && btn.parentElement) {
+            btn.innerHTML = originalHTML;
+            btn.textContent = originalText;
+            btn.disabled = false;
+          }
+        }, 2500);
       }
     } catch (e) {
       dbg.error("Manual sync failed", e);
-      if (btn) { btn.textContent = "✗ Failed"; btn.disabled = false; }
-    }
-  }
-
-  /* ── Profile page import ───────────────────────────────────────────── */
-
-  /**
-   * Inject the "Import All Solves" button on a LeetCode profile page.
-   * Uses a retry loop (MutationObserver fallback) so the button appears even
-   * after React finishes rendering the profile header.
-   */
-  async _injectProfileImportBtn(pageUsername) {
-    if (!pageUsername) return;
-
-    // Honour explicit username filter — only skip if we KNOW it's a different user
-    const settings = await Storage.getSettings().catch(() => ({}));
-    const savedUsername = (settings.leetcode_username || "").toLowerCase();
-    if (savedUsername && savedUsername !== pageUsername.toLowerCase()) return;
-
-    // If no explicit username saved, verify with a lightweight userStatus query.
-    // On any failure (CSRF, network, not-signed-in) we still show the button;
-    // the import itself will surface any auth error clearly.
-    if (!savedUsername) {
-      try {
-        const res = await this._gql(QUERIES.GLOBAL_DATA, {});
-        const status = res?.data?.userStatus;
-        if (status?.isSignedIn === false) return; // definitely not logged in — no button
-        if (status?.username && status.username.toLowerCase() !== pageUsername.toLowerCase()) return;
-        // else: signed in as this user, or could not determine → show button
-      } catch (_) {
-        // Network / auth error — still show the button; import will explain the issue
+      // State: Error
+      if (btn && btn.parentElement) {
+        btn.textContent = "✗ Failed";
+        btn.disabled = false;
+        // Restore after 3s
+        setTimeout(() => {
+          if (btn && btn.parentElement) {
+            btn.innerHTML = originalHTML;
+            btn.textContent = originalText;
+          }
+        }, 3000);
       }
     }
-
-    // Retry injecting the DOM element for up to 8 seconds (React renders lazily)
-    const MAX_ATTEMPTS = 16;
-    const RETRY_MS = 500;
-
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      if (document.getElementById("cl-profile-import")) return; // already injected
-
-      const anchor = this._findProfileAnchor(pageUsername);
-      if (anchor) {
-        this._mountProfileImportBtn(pageUsername, anchor);
-        return;
-      }
-
-      await new Promise((r) => setTimeout(r, RETRY_MS));
-    }
-
-    // Last resort: floating fixed button at bottom-right so the import is always accessible
-    if (!document.getElementById("cl-profile-import")) {
-      const floater = document.createElement("div");
-      floater.style.cssText =
-        "position:fixed;bottom:80px;right:20px;z-index:9999;" +
-        "display:flex;flex-direction:column;gap:6px;align-items:flex-end;";
-
-      const btn = this._createImportBtn(pageUsername);
-      btn.style.boxShadow = "0 4px 24px rgba(6,182,212,0.25)";
-
-      const progress = document.createElement("div");
-      progress.id = "cl-import-progress";
-      progress.style.cssText =
-        "font-size:11px;color:#94a3b8;background:#0a0a0f;border:1px solid #1e293b;" +
-        "padding:4px 8px;border-radius:6px;max-width:240px;text-align:right;display:none;";
-
-      floater.appendChild(progress);
-      floater.appendChild(btn);
-      document.body.appendChild(floater);
-    }
   }
 
-  /** Find a stable DOM anchor near the profile username heading. */
-  _findProfileAnchor(pageUsername) {
-    const lower = pageUsername.toLowerCase();
-
-    // 1. Look for a heading that contains exactly this username
-    const headings = [...document.querySelectorAll("h1, h2, [class*='username'], [class*='realname']")];
-    for (const el of headings) {
-      if (el.textContent.trim().toLowerCase() === lower) {
-        return el.closest("div") || el.parentElement;
-      }
-    }
-
-    // 2. Look for canonical profile selectors LeetCode has used historically
-    const byClass =
-      document.querySelector("[class*='profile-info']") ||
-      document.querySelector("[class*='profile-header']") ||
-      document.querySelector("[class*='user-info']") ||
-      document.querySelector("[class*='userInfo']");
-    if (byClass) return byClass;
-
-    // 3. Find the avatar + heading container
-    const avatar = document.querySelector("img[class*='avatar'], img[alt*='avatar'], img[class*='user']");
-    if (avatar) return avatar.closest("div[class]") || avatar.parentElement;
-
-    return null;
-  }
-
-  /** Build and mount the import button + progress div onto a DOM anchor. */
-  _mountProfileImportBtn(pageUsername, anchor) {
-    if (document.getElementById("cl-profile-import")) return;
-
-    const container = document.createElement("div");
-    container.style.cssText = "margin-top:12px;display:flex;flex-direction:column;gap:6px;";
-
-    const btn = this._createImportBtn(pageUsername);
-    const progress = document.createElement("div");
-    progress.id = "cl-import-progress";
-    progress.style.cssText = "font-size:12px;color:#94a3b8;display:none;";
-
-    container.appendChild(btn);
-    container.appendChild(progress);
-    anchor.appendChild(container);
-  }
-
+  /* ── Progress page import ─────────────────────────────────────────── */
   /**
    * Inject the import button on leetcode.com/progress (stable URL; always the logged-in user).
    * The progress page is preferred over /u/{username} because it's a fixed URL with no
@@ -570,6 +531,102 @@ Be concise. Max 200 words.`;
       floater.appendChild(btn);
       document.body.appendChild(floater);
     }
+  }
+
+  _removeProgressImportButton() {
+    document.getElementById("cl-profile-import")?.remove();
+    document.getElementById("cl-import-progress")?.remove();
+  }
+
+  async _injectProfileActionButtons() {
+    if (document.getElementById("cl-profile-actions")) return;
+
+    const MAX_ATTEMPTS = 16;
+    const RETRY_MS = 500;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (document.getElementById("cl-profile-actions")) return;
+
+      // Find the avatar image (LeetCode uses h-20/h-24 rounded-full for profile avatars)
+      const avatar =
+        document.querySelector('img[class*="h-20"][class*="w-20"]') ||
+        document.querySelector('img[class*="h-24"][class*="w-24"]') ||
+        document.querySelector('[class*="avatar"] img, img[class*="avatar"]') ||
+        document.querySelector('img[alt*="avatar" i], img[alt*="profile" i]');
+
+      // Walk up from the avatar to find the flex-col sidebar column (narrow, centered)
+      let column = null;
+      if (avatar) {
+        let el = avatar.parentElement;
+        for (let i = 0; i < 8 && el; i++, el = el.parentElement) {
+          const cls = el.className || "";
+          if (/flex-col/.test(cls) && /items-center/.test(cls)) {
+            column = el;
+            break;
+          }
+        }
+        if (!column) {
+          column =
+            avatar.closest('div[class*="flex-col"]') ||
+            document.querySelector('[class*="profile-card"]') ||
+            document.querySelector('[class*="user-card"]') ||
+            avatar.parentElement;
+        }
+      }
+
+      if (column) {
+        const actions = document.createElement("div");
+        actions.id = "cl-profile-actions";
+        actions.style.cssText =
+          "margin-top:12px;display:flex;flex-direction:column;gap:8px;" +
+          "width:100%;padding:0 4px;box-sizing:border-box;";
+
+        actions.appendChild(this._createProfileActionButton("Open CodeLedger Library", () => {
+          try {
+            tabs.create({ url: runtime.getURL("library/library.html") });
+          } catch (_) { }
+        }));
+
+        actions.appendChild(this._createProfileActionButton("Open GitHub Repo", async () => {
+          const fallbackUrl = runtime.getURL("library/library.html?tab=settings&settingsTab=git");
+          try {
+            const settings = await Storage.getSettings();
+            const owner = settings.github_owner || settings.github_username || settings.gitUser;
+            const repo = settings.github_repo || settings.gitRepo;
+            if (owner && repo) {
+              tabs.create({ url: `https://github.com/${owner}/${repo}` });
+              return;
+            }
+          } catch (_) { }
+          tabs.create({ url: fallbackUrl });
+        }));
+
+        column.appendChild(actions);
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+    }
+  }
+
+  _createProfileActionButton(label, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.style.cssText =
+      "display:inline-flex;align-items:center;justify-content:center;" +
+      "width:100%;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;" +
+      "font-family:inherit;cursor:pointer;border:1px solid rgba(6,182,212,0.35);" +
+      "color:#67e8f9;background:rgba(6,182,212,0.08);transition:background 0.2s;" +
+      "box-sizing:border-box;";
+    btn.onmouseenter = () => { btn.style.background = "rgba(6,182,212,0.18)"; };
+    btn.onmouseleave = () => { btn.style.background = "rgba(6,182,212,0.08)"; };
+    btn.addEventListener("click", onClick);
+    return btn;
+  }
+
+  _removeProfileActionButtons() {
+    document.getElementById("cl-profile-actions")?.remove();
   }
 
   /** Create the styled import button element. */
@@ -760,7 +817,7 @@ Be concise. Max 200 words.`;
       for (const sub of picks) {
         const lang = resolveLang(sub.lang || sub.langName);
         const tags = tagsMap[sub.titleSlug] || [];
-        const topic = tags[0] || "Untagged";
+        const topic = resolvePrimaryTopic(tags);
         const title = titleMap[sub.titleSlug] || sub.title || sub.titleSlug;
 
         // Build file list when code is available so the record is commit-ready
@@ -791,6 +848,7 @@ Be concise. Max 200 words.`;
           hints: hintsMap[sub.titleSlug] || null,
           acRate: acRateMap[sub.titleSlug] ?? null,
           similar: similarMap[sub.titleSlug] || null,
+          hasSimilar: similarMap[sub.titleSlug] ? (similarMap[sub.titleSlug].length > 0 ? true : false) : null, // explicit mark: queried and none|some found
           skipCommit: true,
         });
 
@@ -872,11 +930,9 @@ Be concise. Max 200 words.`;
       if (root !== document.body) break; // only fall through to body as last resort
     }
 
-    return false;
+    return isAcceptedVisibleExtended();
   }
   async _processSubmission(page, isManual) {
-    // Fallback: try enhanced selector module for modern LeetCode layouts
-    return isAcceptedVisibleExtended();
     this._processingLock = true;
     try {
       const settings = await Storage.getSettings();
@@ -943,7 +999,7 @@ Be concise. Max 200 words.`;
         title: meta?.title || submission.question?.title || slug,
         titleSlug: slug,
         difficulty: normalizeDifficulty(meta?.difficulty || submission.question?.difficulty || ""),
-        topic: meta?.topicTags?.[0]?.name || "Untagged",
+        topic: resolvePrimaryTopic(meta?.topicTags?.map(t => t.name) || []),
         tags: meta?.topicTags?.map(t => t.name) || [],
         canonical: canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
         code: submission.code || "",
@@ -960,6 +1016,8 @@ Be concise. Max 200 words.`;
         similar: (meta?.similarQuestionList || []).filter(q => !q.isPaidOnly),
         problemStatement: meta?.content || null,
         elapsedSeconds,
+        hasSimilar: meta?.hasSimilar ?? null, // explicit "no similar" field: true|false|null
+        submissionsUrl: `https://leetcode.com/problems/${slug}/submissions/`, // direct link to submissions page
       });
 
       dbg.log("Solve emitted", { slug, canonical: canonical?.canonicalId });
@@ -973,7 +1031,8 @@ Be concise. Max 200 words.`;
   /* ── File set builder ────────────────────────────────────────────── */
   _buildFileSet(submission, meta, settings, slug, elapsedSeconds = null) {
     const { verbose: langVerbose, ext } = resolveLang(submission.lang);
-    const topic = meta?.topicTags?.[0]?.name || "Untagged";
+    const topicTags = meta?.topicTags?.map?.(t => t?.name).filter(Boolean) || [];
+    const topic = resolvePrimaryTopic(topicTags);
     const title = meta?.title || slug;
     const base = `topics/${topic}/${slug}/`;
 
@@ -1066,10 +1125,27 @@ Be concise. Max 200 words.`;
   }
 
   /* ── GraphQL + metadata ──────────────────────────────────────────── */
+  /**
+   * GraphQL-first metadata fetching with explicit "no similar" field.
+   * Returns: { title, difficulty, content, topicTags, hints, acRate, likes, dislikes,
+   *           similarQuestionList, hasSimilar: true|false|null }
+   * - hasSimilar: true (has similar problems), false (queried, none found), null (not yet queried)
+   */
   async _fetchMetadata(slug) {
     try {
       const res = await this._gql(QUERIES.QUESTION, { titleSlug: slug });
-      return res.data?.question || null;
+      const question = res.data?.question || null;
+      if (!question) return null;
+
+      // Explicitly mark similar field: null = not queried, false = queried & none found, true = has similar
+      const similar = question.similarQuestionList || [];
+      const hasSimilar = similar.length > 0 ? true : false; // explicit: either has some or none
+
+      return {
+        ...question,
+        hasSimilar, // new field: explicitly marks if similar questions were queried
+        similarQuestionList: similar.filter(q => !q.isPaidOnly),
+      };
     } catch (_) {
       return null;
     }

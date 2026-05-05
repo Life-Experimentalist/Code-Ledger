@@ -10,6 +10,7 @@ const html = htm.bind(h);
 
 import { ProblemCard } from "../../ui/components/ProblemCard.js";
 import { ProblemModal } from "../components/ProblemModal.js";
+import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 
 const PLATFORMS = [
   {
@@ -56,9 +57,12 @@ const SORT_OPTIONS = [
 ];
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
 
-export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblemDelete, settings }) {
+export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblemDelete, settings, onOpenGraphProblem }) {
   const [filterDifficulty, setFilterDifficulty] = useState("All");
   const [filterPlatform, setFilterPlatform] = useState("All");
+  const [filterLanguage, setFilterLanguage] = useState("All");
+  const [filterTag, setFilterTag] = useState("All");
+  const [filterOverview, setFilterOverview] = useState("All");
   const [query, setQuery] = useState(searchQuery || "");
   const [sortBy, setSortBy] = useState("newest");
   const [selectedProblem, setSelectedProblem] = useState(null);
@@ -73,7 +77,49 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
     if (onProblemDelete) onProblemDelete(id);
   };
 
+  // Restore problem from URL param on mount
+  useEffect(() => {
+    const problemId = getQueryParam("problem");
+    if (problemId && problems.length > 0) {
+      const found = problems.find(p => (p.id === problemId || p.titleSlug === problemId));
+      if (found) setSelectedProblem(found);
+    }
+  }, [problems.length]);
+
+  const handleSelectProblem = (problem) => {
+    setSelectedProblem(problem);
+    updateQueryParams({ problem: problem.titleSlug || problem.id });
+  };
+
+  const handleCloseModal = () => {
+    setSelectedProblem(null);
+    updateQueryParams({ problem: null });
+  };
+
   useEffect(() => { setQuery(searchQuery || ""); }, [searchQuery]);
+
+  function tokenizeSearch(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return [];
+    const tokens = [];
+    raw.replace(/"([^"]+)"|(\S+)/g, (_match, quoted, bare) => {
+      tokens.push((quoted || bare || "").trim());
+      return "";
+    });
+    return tokens;
+  }
+
+  function buildSearchSpec(value) {
+    const spec = { tags: [], platforms: [], difficulties: [], free: [] };
+    for (const token of tokenizeSearch(value).map((t) => t.toLowerCase())) {
+      if (token.startsWith("tag:")) spec.tags.push(token.slice(4));
+      else if (token.startsWith("topic:")) spec.tags.push(token.slice(6));
+      else if (token.startsWith("platform:")) spec.platforms.push(token.slice(9));
+      else if (token.startsWith("difficulty:")) spec.difficulties.push(token.slice(11));
+      else spec.free.push(token);
+    }
+    return spec;
+  }
 
   const platformCounts = useMemo(() => {
     const counts = {};
@@ -81,29 +127,51 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
     return counts;
   }, [problems]);
 
+  const languageOptions = useMemo(() => {
+    const set = new Set();
+    (problems || []).forEach((p) => {
+      const lang = p.lang?.name || p.language;
+      if (lang) set.add(lang);
+    });
+    return ["All", ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b)))];
+  }, [problems]);
+
+  const tagOptions = useMemo(() => {
+    const set = new Set();
+    (problems || []).forEach((p) => {
+      (p.tags || []).forEach((t) => t && set.add(t));
+      if (p.topic) set.add(p.topic);
+    });
+    return ["All", ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b)))];
+  }, [problems]);
+
   const filtered = useMemo(() => {
     let out = problems || [];
     if (filterDifficulty !== "All") out = out.filter((p) => p.difficulty === filterDifficulty);
     if (filterPlatform !== "All") out = out.filter((p) => p.platform === filterPlatform);
+    if (filterLanguage !== "All") out = out.filter((p) => (p.lang?.name || p.language || "") === filterLanguage);
+    if (filterTag !== "All") out = out.filter((p) => (p.tags || []).includes(filterTag) || p.topic === filterTag);
+    if (filterOverview === "Missing") out = out.filter((p) => !p.problemStatement);
+    if (filterOverview === "Present") out = out.filter((p) => !!p.problemStatement);
     if (query && String(query).trim()) {
-      const tokens = String(query).toLowerCase().split(/\s+/).filter(Boolean);
-      const structured = { tags: [], platform: null, difficulty: null, free: [] };
-      for (const token of tokens) {
-        if (token.startsWith("tag:")) structured.tags.push(token.slice(4));
-        else if (token.startsWith("platform:")) structured.platform = token.slice(9);
-        else if (token.startsWith("difficulty:")) structured.difficulty = token.slice(11);
-        else structured.free.push(token);
-      }
+      const structured = buildSearchSpec(query);
 
       out = out.filter((p) => {
         const title = String(p.title || "").toLowerCase();
         const platform = String(p.platform || "").toLowerCase();
         const tags = Array.isArray(p.tags) ? p.tags.map((t) => String(t || "").toLowerCase()) : [];
-        const haystack = `${title} ${platform} ${tags.join(" ")}`;
+        const topic = String(p.topic || "").toLowerCase();
+        const lang = String(p.lang?.name || p.language || "").toLowerCase();
+        const review = String(p.aiReview || "").toLowerCase();
+        const code = String(p.code || "").toLowerCase();
+        const statement = String(p.problemStatement || p.description || "").toLowerCase();
+        const hints = Array.isArray(p.hints) ? p.hints.join(" ").toLowerCase() : "";
+        const similar = Array.isArray(p.similar) ? p.similar.map((s) => s?.title || s?.titleSlug || "").join(" ").toLowerCase() : "";
+        const haystack = `${title} ${platform} ${topic} ${tags.join(" ")} ${lang} ${review} ${code} ${statement} ${hints} ${similar}`;
 
-        if (structured.platform && !platform.includes(structured.platform)) return false;
-        if (structured.difficulty && String(p.difficulty || "").toLowerCase() !== structured.difficulty) return false;
-        if (structured.tags.length && !structured.tags.every((tag) => tags.some((t) => t.includes(tag)))) return false;
+        if (structured.platforms.length && !structured.platforms.every((needle) => platform.includes(needle))) return false;
+        if (structured.difficulties.length && !structured.difficulties.every((needle) => String(p.difficulty || "").toLowerCase() === needle)) return false;
+        if (structured.tags.length && !structured.tags.every((tag) => tags.some((t) => t.includes(tag)) || topic.includes(tag))) return false;
         if (structured.free.length && !structured.free.every((term) => haystack.includes(term))) return false;
         return true;
       });
@@ -120,7 +188,36 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
       case "tags": arr.sort((a, b) => (b.tags?.length || 0) - (a.tags?.length || 0) || (a.title || "").localeCompare(b.title || "")); break;
     }
     return arr;
-  }, [problems, filterDifficulty, filterPlatform, query, sortBy]);
+  }, [problems, filterDifficulty, filterPlatform, filterLanguage, filterTag, filterOverview, query, sortBy]);
+
+  const buildRefreshUrl = (problem) => {
+    if (!problem?.titleSlug) return null;
+    if (problem.platform === "leetcode") {
+      return `https://leetcode.com/problems/${problem.titleSlug}/?codeledger_fetch=1&cl_fetch_id=${encodeURIComponent(problem.titleSlug)}`;
+    }
+    if (problem.platform === "geeksforgeeks") {
+      return `https://practice.geeksforgeeks.org/problems/${problem.titleSlug}?codeledger_fetch=1&cl_fetch_id=${encodeURIComponent(problem.titleSlug)}`;
+    }
+    if (problem.platform === "codeforces") {
+      return `https://codeforces.com/problemset/problem/${problem.titleSlug}?codeledger_fetch=1&cl_fetch_id=${encodeURIComponent(problem.titleSlug)}`;
+    }
+    return null;
+  };
+
+  const refreshProblemData = (problem) => {
+    const url = buildRefreshUrl(problem);
+    if (!url) return;
+    window.open(url, "_blank");
+  };
+
+  const refreshMissingFiltered = () => {
+    const missing = filtered.filter((p) => !p.problemStatement).slice(0, 20);
+    missing.forEach((p, idx) => {
+      const url = buildRefreshUrl(p);
+      if (!url) return;
+      setTimeout(() => window.open(url, "_blank"), idx * 400);
+    });
+  };
 
   return html`
     <div class="flex flex-col gap-6 w-full">
@@ -185,7 +282,7 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
       </div>
 
       <!-- Filter bar -->
-      <div class="flex justify-between items-center bg-[#0a0a0f] p-4 rounded-xl border border-white/5 gap-3 flex-wrap">
+      <div class="flex flex-col bg-[#0a0a0f] p-4 rounded-xl border border-white/5 gap-3">
         <div class="flex gap-2 flex-wrap">
           ${["All", "Easy", "Medium", "Hard"].map((d) => html`
             <button
@@ -196,7 +293,7 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
             >${d}</button>
           `)}
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <select
             value=${sortBy}
             onChange=${(e) => setSortBy(e.target.value)}
@@ -210,9 +307,38 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
             onInput=${(e) => setQuery(e.target.value)}
             class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white min-w-[220px]"
           />
+          <select
+            value=${filterLanguage}
+            onChange=${(e) => setFilterLanguage(e.target.value)}
+            class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
+          >
+            ${languageOptions.map((o) => html`<option value=${o}>${o === "All" ? "All Languages" : o}</option>`)}
+          </select>
+          <select
+            value=${filterTag}
+            onChange=${(e) => setFilterTag(e.target.value)}
+            class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
+          >
+            ${tagOptions.map((o) => html`<option value=${o}>${o === "All" ? "All Tags" : o}</option>`)}
+          </select>
+          <select
+            value=${filterOverview}
+            onChange=${(e) => setFilterOverview(e.target.value)}
+            class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
+          >
+            <option value="All">All Overview</option>
+            <option value="Missing">Missing Overview</option>
+            <option value="Present">Has Overview</option>
+          </select>
           ${query ? html`
             <button onClick=${() => setQuery("")} class="text-slate-500 hover:text-slate-300 text-xs px-2">✕</button>
           ` : ""}
+        </div>
+        <div class="flex items-center gap-2 justify-end">
+          <button
+            onClick=${refreshMissingFiltered}
+            class="text-[11px] px-2.5 py-1 rounded border border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+          >Refresh missing overviews</button>
         </div>
       </div>
 
@@ -220,11 +346,11 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
       <div class="flex items-center justify-between -mt-2">
         <p class="text-[10px] text-slate-600 uppercase tracking-wider">
           ${filtered.length} solution${filtered.length !== 1 ? "s" : ""}
-          ${filterDifficulty !== "All" || filterPlatform !== "All" || query ? " (filtered)" : ""}
+          ${filterDifficulty !== "All" || filterPlatform !== "All" || filterLanguage !== "All" || filterTag !== "All" || filterOverview !== "All" || query ? " (filtered)" : ""}
         </p>
-        ${(filterDifficulty !== "All" || filterPlatform !== "All" || query) ? html`
+        ${(filterDifficulty !== "All" || filterPlatform !== "All" || filterLanguage !== "All" || filterTag !== "All" || filterOverview !== "All" || query) ? html`
           <button
-            onClick=${() => { setFilterDifficulty("All"); setFilterPlatform("All"); setQuery(""); }}
+            onClick=${() => { setFilterDifficulty("All"); setFilterPlatform("All"); setFilterLanguage("All"); setFilterTag("All"); setFilterOverview("All"); setQuery(""); }}
             class="text-[10px] text-slate-500 hover:text-slate-300 underline"
           >Clear filters</button>
         ` : ""}
@@ -236,7 +362,8 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
           <${ProblemCard}
             key=${p.id || p.titleSlug}
             problem=${p}
-            onSelect=${setSelectedProblem}
+            onSelect=${handleSelectProblem}
+            onRefresh=${refreshProblemData}
           />
         `)}
         ${filtered.length === 0 ? html`
@@ -249,11 +376,12 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
       <!-- Problem detail modal -->
       <${ProblemModal}
         problem=${selectedProblem}
-        onClose=${() => setSelectedProblem(null)}
+        onClose=${handleCloseModal}
         onUpdate=${handleProblemUpdate}
         onDelete=${handleProblemDelete}
         problemList=${filtered}
-        onNavigateProblem=${setSelectedProblem}
+        onNavigateProblem=${handleSelectProblem}
+        onOpenGraphProblem=${onOpenGraphProblem}
       />
     </div>
   `;

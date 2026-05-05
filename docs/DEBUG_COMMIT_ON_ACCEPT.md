@@ -96,14 +96,14 @@ In DevTools:
 
 ## Common Failure Points
 
-| Issue | Symptom | Fix |
-|-------|---------|-----|
-| **Selectors outdated** | "Accepted" text not found via selectors | Update DOM selectors in `src/handlers/platforms/leetcode/dom-selectors.js` |
-| **MutationObserver not triggered** | `_checkSubmission` never called | Check if mutations are happening on problem page |
-| **eventBus emit not working** | Event is emitted but SW doesn't receive | Verify eventBus module is properly imported |
-| **SW not listening** | SW initialized but event handler not registered | Check `eventBus.on("problem:solved")` in service-worker |
-| **Incognito mode enabled** | Event received but silently ignored | Check settings - `incognitoMode` should be "off" |
-| **Git disabled** | Event received but commit skipped | Check settings - `gitEnabled` should be true |
+| Issue                              | Symptom                                         | Fix                                                                        |
+| ---------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
+| **Selectors outdated**             | "Accepted" text not found via selectors         | Update DOM selectors in `src/handlers/platforms/leetcode/dom-selectors.js` |
+| **MutationObserver not triggered** | `_checkSubmission` never called                 | Check if mutations are happening on problem page                           |
+| **eventBus emit not working**      | Event is emitted but SW doesn't receive         | Verify eventBus module is properly imported                                |
+| **SW not listening**               | SW initialized but event handler not registered | Check `eventBus.on("problem:solved")` in service-worker                    |
+| **Incognito mode enabled**         | Event received but silently ignored             | Check settings - `incognitoMode` should be "off"                           |
+| **Git disabled**                   | Event received but commit skipped               | Check settings - `gitEnabled` should be true                               |
 
 ---
 

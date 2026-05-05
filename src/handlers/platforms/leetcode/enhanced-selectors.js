@@ -14,47 +14,47 @@ import { SELECTORS } from "./dom-selectors.js";
  * Includes all original selectors plus additional ones for robustness
  */
 export const ENHANCED_SELECTORS = {
-  // Original LeetCode selectors
-  ...SELECTORS,
-  
-  submission: {
-    ...SELECTORS.submission,
-    // Extended success indicator list
-    successIndicatorExtended: [
-      // Original selectors
-      '[data-e2e-locator="submission-result"]',
-      '[data-e2e-locator="console-result"]',
-      '.text-green-s',
-      'span[class*="text-green"]',
-      '[class*="accepted"]',
-      '[class*="Accepted"]',
-      
-      // Additional modern LeetCode UI patterns
-      '[data-testid*="result"]',
-      '[data-testid*="verdict"]',
-      '[data-testid*="message"]',
-      '[role="status"]',
-      '[role="alert"]',
-      
-      // Common class patterns
-      '[class*="success"]',
-      '[class*="result"]',
-      '[class*="verdict"]',
-      '[class*="console"]',
-      '[class*="message"]',
-      '[class*="status"]',
-      '[class*="output"]',
-      
-      // Color-based indicators (green for accept)
-      '[class*="green"]',
-      '[class*="text-green"]',
-      '[class*="bg-green"]',
-      '[style*="green"]',
-      '[style*="0f5c2e"]', // Common green color hex
-      '[style*="22c55e"]', // Tailwind green-500
-      '[style*="16a34a"]', // Tailwind green-600
-    ],
-  },
+    // Original LeetCode selectors
+    ...SELECTORS,
+
+    submission: {
+        ...SELECTORS.submission,
+        // Extended success indicator list
+        successIndicatorExtended: [
+            // Original selectors
+            '[data-e2e-locator="submission-result"]',
+            '[data-e2e-locator="console-result"]',
+            '.text-green-s',
+            'span[class*="text-green"]',
+            '[class*="accepted"]',
+            '[class*="Accepted"]',
+
+            // Additional modern LeetCode UI patterns
+            '[data-testid*="result"]',
+            '[data-testid*="verdict"]',
+            '[data-testid*="message"]',
+            '[role="status"]',
+            '[role="alert"]',
+
+            // Common class patterns
+            '[class*="success"]',
+            '[class*="result"]',
+            '[class*="verdict"]',
+            '[class*="console"]',
+            '[class*="message"]',
+            '[class*="status"]',
+            '[class*="output"]',
+
+            // Color-based indicators (green for accept)
+            '[class*="green"]',
+            '[class*="text-green"]',
+            '[class*="bg-green"]',
+            '[style*="green"]',
+            '[style*="0f5c2e"]', // Common green color hex
+            '[style*="22c55e"]', // Tailwind green-500
+            '[style*="16a34a"]', // Tailwind green-600
+        ],
+    },
 };
 
 /**
@@ -63,25 +63,25 @@ export const ENHANCED_SELECTORS = {
  * @returns {Element|null} - Found result element or null
  */
 export function querySubmissionResult(context = document) {
-  const selectors = ENHANCED_SELECTORS.submission.successIndicatorExtended;
-  
-  for (const selector of selectors) {
-    try {
-      const el = context.querySelector(selector);
-      if (el) {
-        // Verify element is visible
-        const style = window.getComputedStyle(el);
-        if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
-          return el;
+    const selectors = ENHANCED_SELECTORS.submission.successIndicatorExtended;
+
+    for (const selector of selectors) {
+        try {
+            const el = context.querySelector(selector);
+            if (el) {
+                // Verify element is visible
+                const style = window.getComputedStyle(el);
+                if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
+                    return el;
+                }
+            }
+        } catch (e) {
+            // Skip invalid selectors
+            continue;
         }
-      }
-    } catch (e) {
-      // Skip invalid selectors
-      continue;
     }
-  }
-  
-  return null;
+
+    return null;
 }
 
 /**
@@ -89,12 +89,12 @@ export function querySubmissionResult(context = document) {
  * @returns {boolean} - true if Accepted status is found and visible
  */
 export function isAcceptedVisibleExtended() {
-  const resultEl = querySubmissionResult();
-  if (!resultEl) return false;
-  
-  // Check if element contains "Accepted" text
-  const text = resultEl.textContent || "";
-  return /accepted/i.test(text);
+    const resultEl = querySubmissionResult();
+    if (!resultEl) return false;
+
+    // Check if element contains "Accepted" text
+    const text = resultEl.textContent || "";
+    return /accepted/i.test(text);
 }
 
 /**
@@ -102,12 +102,12 @@ export function isAcceptedVisibleExtended() {
  * @returns {string|null} - The verdict text (e.g., "Accepted", "Wrong Answer") or null
  */
 export function getSubmissionVerdict() {
-  const resultEl = querySubmissionResult();
-  if (!resultEl) return null;
-  
-  const text = resultEl.textContent || "";
-  const match = text.match(/Accepted|Wrong Answer|Time Limit Exceeded|Runtime Error|Memory Limit Exceeded|Compile Error|Output Limit Exceeded/i);
-  return match ? match[0] : null;
+    const resultEl = querySubmissionResult();
+    if (!resultEl) return null;
+
+    const text = resultEl.textContent || "";
+    const match = text.match(/Accepted|Wrong Answer|Time Limit Exceeded|Runtime Error|Memory Limit Exceeded|Compile Error|Output Limit Exceeded/i);
+    return match ? match[0] : null;
 }
 
 /**
@@ -116,25 +116,25 @@ export function getSubmissionVerdict() {
  * @returns {Element[]} - Array of found result elements
  */
 export function findAllPotentialResultElements() {
-  const selectors = ENHANCED_SELECTORS.submission.successIndicatorExtended;
-  const results = [];
-  const seen = new Set();
-  
-  for (const selector of selectors) {
-    try {
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        const key = el.outerHTML.slice(0, 100); // Use partial HTML as dedup key
-        if (!seen.has(key)) {
-          seen.add(key);
-          results.push(el);
+    const selectors = ENHANCED_SELECTORS.submission.successIndicatorExtended;
+    const results = [];
+    const seen = new Set();
+
+    for (const selector of selectors) {
+        try {
+            const elements = document.querySelectorAll(selector);
+            for (const el of elements) {
+                const key = el.outerHTML.slice(0, 100); // Use partial HTML as dedup key
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    results.push(el);
+                }
+            }
+        } catch (e) {
+            // Skip invalid selectors
+            continue;
         }
-      }
-    } catch (e) {
-      // Skip invalid selectors
-      continue;
     }
-  }
-  
-  return results;
+
+    return results;
 }

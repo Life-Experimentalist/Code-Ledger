@@ -15,6 +15,18 @@ const dbg = createDebugger("GitHubOnboarding");
 const DEFAULT_REPO_NAME = "CodeLedger-Sync";
 const DEFAULT_REPO_DESC =
   "My LeetCode & DSA problem solutions tracked via CodeLedger https://codeledger.vkrishna04.me/";
+const DEFAULT_REPO_TOPICS = [
+  "codeledger",
+  "dsa",
+  "leetcode",
+  "algorithms",
+  "dynamic-programming",
+  "graphs",
+  "trees",
+  "arrays",
+  "hashing",
+  "greedy",
+];
 
 /**
  * GitHub Onboarding Modal
@@ -33,15 +45,15 @@ const DEFAULT_REPO_DESC =
  *   token       – GitHub OAuth/PAT token
  */
 export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
-  const [step,         setStep]         = useState("check");
-  const [repoName,     setRepoName]     = useState(DEFAULT_REPO_NAME);
-  const [repoDesc,     setRepoDesc]     = useState(DEFAULT_REPO_DESC);
-  const [busy,         setBusy]         = useState(false);
-  const [error,        setError]        = useState("");
-  const [progress,     setProgress]     = useState("");
-  const [finalRepo,    setFinalRepo]    = useState(""); // actual created/linked repo name
+  const [step, setStep] = useState("check");
+  const [repoName, setRepoName] = useState(DEFAULT_REPO_NAME);
+  const [repoDesc, setRepoDesc] = useState(DEFAULT_REPO_DESC);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState("");
+  const [finalRepo, setFinalRepo] = useState(""); // actual created/linked repo name
   // For "existing" picker
-  const [userRepos,    setUserRepos]    = useState([]);
+  const [userRepos, setUserRepos] = useState([]);
   const [reposLoading, setReposLoading] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState("");
 
@@ -94,8 +106,8 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
   const saveRepoConfig = async (owner, repo) => {
     const settings = await Storage.getSettings();
-    settings.github_repo   = repo;
-    settings.github_owner  = owner;
+    settings.github_repo = repo;
+    settings.github_owner = owner;
     await Storage.setSettings(settings);
   };
 
@@ -165,6 +177,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       setProgress("Setting up initial files…");
       await initializeRepository(repoData.owner.login, repoData.name, token);
 
+      setProgress("Applying repository settings…");
+      await configureRepositoryPresentation(repoData.owner.login, repoData.name, token);
+
       setProgress("Enabling GitHub Pages…");
       await enableGitHubPages(repoData.owner.login, repoData.name, token);
 
@@ -207,6 +222,8 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       if (!Array.isArray(contents) || contents.length === 0) {
         setProgress("Initializing repository structure…");
         await initializeRepository(repoData.owner.login, repoData.name, token);
+        setProgress("Applying repository settings…");
+        await configureRepositoryPresentation(repoData.owner.login, repoData.name, token);
       }
 
       await saveRepoConfig(repoData.owner.login, repoData.name);
@@ -224,21 +241,21 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   // ── Render ─────────────────────────────────────────────────────────────
 
   const stepLabel = {
-    check:    "",
-    already:  "",
-    choice:   "Step 1 of 2",
-    new:      "Step 2 of 2",
+    check: "",
+    already: "",
+    choice: "Step 1 of 2",
+    new: "Step 2 of 2",
     existing: "Step 2 of 2",
-    done:     "Setup complete",
+    done: "Setup complete",
   }[step] || "";
 
   const stepTitle = {
-    check:    "Loading…",
-    already:  "Already Connected",
-    choice:   "Set Up GitHub",
-    new:      "Create Repository",
+    check: "Loading…",
+    already: "Already Connected",
+    choice: "Set Up GitHub",
+    new: "Create Repository",
     existing: "Link Existing Repository",
-    done:     "All Set! 🎉",
+    done: "All Set! 🎉",
   }[step] || "";
 
   const canClose = !busy && step !== "check";
@@ -543,7 +560,7 @@ async function initializeRepository(owner, repo, token) {
   };
 
   const readme =
-`# ${repo}
+    `# ${repo}
 
 Automatically synced LeetCode & DSA problem solutions via [CodeLedger](https://codeledger.vkrishna04.me).
 
@@ -571,10 +588,10 @@ _Last updated: ${now}_
     body: JSON.stringify({
       base_tree: baseTreeSha,
       tree: [
-        { path: "index.json",                       mode: "100644", type: "blob", content: JSON.stringify(indexJson, null, 2) },
-        { path: "index.html",                       mode: "100644", type: "blob", content: getPagesHtml() },
-        { path: "README.md",                        mode: "100644", type: "blob", content: readme },
-        { path: ".gitignore",                       mode: "100644", type: "blob", content: "node_modules/\n.env\n*.log\n.DS_Store\n" },
+        { path: "index.json", mode: "100644", type: "blob", content: JSON.stringify(indexJson, null, 2) },
+        { path: "index.html", mode: "100644", type: "blob", content: getPagesHtml() },
+        { path: "README.md", mode: "100644", type: "blob", content: readme },
+        { path: ".gitignore", mode: "100644", type: "blob", content: "node_modules/\n.env\n*.log\n.DS_Store\n" },
         { path: ".github/workflows/sync-stats.yml", mode: "100644", type: "blob", content: WORKFLOW_YAML },
       ],
     }),
@@ -601,8 +618,48 @@ _Last updated: ${now}_
   }
 }
 
+async function configureRepositoryPresentation(owner, repo, token) {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    Accept: "application/vnd.github.v3+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+
+  const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({
+      has_wiki: false,
+      has_projects: false,
+      has_discussions: false,
+      allow_merge_commit: false,
+      allow_rebase_merge: true,
+      allow_squash_merge: true,
+      delete_branch_on_merge: true,
+    }),
+  });
+  if (!repoRes.ok) {
+    const e = await repoRes.json().catch(() => ({}));
+    throw new Error(e.message || `GitHub API ${repoRes.status}`);
+  }
+
+  const topicsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/topics`, {
+    method: "PUT",
+    headers: {
+      ...headers,
+      Accept: "application/vnd.github.mercy-preview+json",
+    },
+    body: JSON.stringify({ names: DEFAULT_REPO_TOPICS }),
+  });
+  if (!topicsRes.ok) {
+    const e = await topicsRes.json().catch(() => ({}));
+    throw new Error(e.message || `GitHub API ${topicsRes.status}`);
+  }
+}
+
 const WORKFLOW_YAML =
-`name: Sync Stats
+  `name: Sync Stats
 on:
   push:
     branches: [main, master]

@@ -9,6 +9,8 @@ const WATCH_DIRS = process.argv.slice(2).length
 const debounceMs = 300;
 let timer = null;
 let lastFile = null;
+let buildInFlight = false;
+let manualBuildRequested = false;
 
 function runBuild(changedFile) {
   const f = changedFile || "";
@@ -20,9 +22,28 @@ function runBuild(changedFile) {
   }
 
   console.log(`Change detected (${f || "unknown"}) — running: ${cmd}`);
+  buildInFlight = true;
   const p = exec(cmd, { cwd: process.cwd() });
   p.stdout.pipe(process.stdout);
   p.stderr.pipe(process.stderr);
+  p.on("exit", () => {
+    buildInFlight = false;
+    if (manualBuildRequested) {
+      manualBuildRequested = false;
+      runBuild(lastFile);
+    }
+  });
+}
+
+function triggerManualBuild() {
+  if (buildInFlight) {
+    manualBuildRequested = true;
+    console.log("Manual rebuild queued…");
+    return;
+  }
+
+  console.log("Manual rebuild requested via Enter…");
+  runBuild(lastFile || "");
 }
 
 // Initial build on startup
@@ -56,3 +77,14 @@ for (const d of WATCH_DIRS) {
 }
 
 console.log("Watcher started. Press Ctrl+C to exit.");
+
+if (process.stdin.isTTY) {
+  process.stdin.setEncoding("utf8");
+  process.stdin.resume();
+  process.stdin.on("data", (chunk) => {
+    const input = String(chunk || "").replace(/\r?\n/g, "").trim();
+    if (input === "") {
+      triggerManualBuild();
+    }
+  });
+}

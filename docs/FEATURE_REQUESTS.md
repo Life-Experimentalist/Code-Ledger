@@ -2,6 +2,12 @@
 
 Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-do`
 
+## How to add new feature requests
+Drop plain text at the bottom of this file (below the tables). Claude/GitHub Copilot will read it, convert it into a proper row in the right section, and delete the raw text.
+
+1.
+2.
+
 ---
 
 ## Completed ✅
@@ -43,10 +49,12 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 | GitHub flow: post-auth auto-setup         | After OAuth success, if no repo configured → auto-expands setup wizard and scrolls to it                                                                                                                             |
 | GitHub flow: setup-incomplete banner      | Yellow warning + "Setup repo →" button shown in GitHub section when connected but no repo linked                                                                                                                     |
 | GitHub flow: connected & ready indicator  | Green "✓ Connected & repository linked" shown once both token and repo are set                                                                                                                                       |
+| Profile import button on /progress page   | "Import All Solves" injects on `leetcode.com/progress` and auto-starts from the stable progress page                                                                                                                 |
 | Canonical linking pipeline                | `CanonicalView`: search canonical-map, submit GitHub Issues, vote with 👍, progress bar per issue                                                                                                                     |
 | Timer integration                         | `src/ui/floating-timer.js`: draggable overlay on LeetCode/GFG problem pages; elapsed time stored in problem record, shown in README and ProblemModal; Avg Solve Time KPI in Analytics                                |
 | Onboarding welcome page                   | `src/welcome/welcome.{html,js}`: 5-step checklist (installed → GitHub → repo → solve → commit); auto-opened on first repo link via `OPEN_WELCOME` message from SettingsSchema; platforms grid; "Open Library" button |
 | GitHub flow end-to-end fix                | `auto_init: true`; Trees API for atomic repo init (no btoa, no emoji crash); OAuth-only token path; removed duplicate onboarding trigger from SettingsSchema; `github_repo` key used consistently                    |
+| GitHub repo presentation hardening        | Repo settings disable wiki/projects/discussions, curated topics are applied, and GitHub Pages is enabled only after initialization is complete                                                                       |
 | Graph physics singularity fix             | 12px softening radius (Plummer sphere), 15 px/frame velocity cap; prevents node collapse to origin                                                                                                                   |
 | Graph edge visibility (glow + colors)     | Two-pass rendering with glow layer, lighter colors (slate-500/blue/amber), hover highlighting on connected edges                                                                                                     |
 | AI chat markdown rendering                | All AI responses render markdown: headings, lists, code blocks with syntax highlighting, links, emphasis                                                                                                             |
@@ -62,154 +70,143 @@ Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-d
 | aiCopyable global setting                 | New toggle in core settings, default OFF; controls text copy ability across all AI responses                                                                                                                         |
 | AI key draft/save safety                  | Key input is now draft-only; deleting textbox content no longer removes saved keys until explicit save                                                                                                               |
 | Deferred sync queue for imports/edits     | Imported and edited problems are marked pending locally and committed on next auto/manual sync                                                                                                                       |
+| Graph node glow cascade                   | Selected node: 24px shadow blur (100% intensity), neighbors: 12px shadow blur (50% intensity); neighbor edges 50% opacity with increased line width (commit 803dcc6)                                                 |
+| Unified ProblemModal component            | Single shared `ProblemModal` used by `ProblemsView` and `GraphView`; same modal surface across library views                                                                                                         |
+| Graph layered / circular / force views    | Layered default groups topics by row and difficulty; circular keeps the ring view; force mode seeds a freeform layout for exploration                                                                                |
+| LeetCode row sync buttons removed         | Removed all `Add to Ledger` row buttons (`cl-row-sync`) and stale injection code; detail sync button now constrained to `#ide-top-btns` only                                                                         |
+| LeetHub-style sync resilience patterns    | LeetCode sync button now uses multiple selector strategies (fallback chain), retry logic with backoff, collision detection to prevent duplicates; matches LeetHub's proven patterns                                  |
+| Explicit "no similar questions" field     | GraphQL QUESTION query now returns `hasSimilar: true\|false\|null` field; prevents redundant refresh attempts for problems with no similar questions                                                                 |
+| Submissions page direct navigation URL    | problem:solved event now includes `submissionsUrl` field; enables direct link to problem's submissions page from library UI                                                                                          |
+| Floating AI command variable expansion    | `/mycode`, `/problem`, `/errors`, `/submission`, `/hints`, `/similar`, `/constraints` now expand in floating panel before sending to AI; tracked in chat metadata with usedCommands array                            |
+| Temp chat save confirmation               | Floating AI panel now prompts on close when a conversation has unsaved messages; saves to AIChatsView with problem/platform/difficulty metadata before closing                                                       |
+| Settings refresh control                  | Refresh missing metadata moved into Settings maintenance panel; service-worker now queues background fetches one tab at a time                                                                                       |
+| Refresh data button in ProblemModal       | "📥 Fetch Description" button in Overview tab (visible when no problemStatement cached); shows loading state "⏳ Fetching…"; polls Storage for updates up to 10 seconds; auto-updates modal on success                 |
+| Submissions navigation button in modal    | "Submissions ↗" button in ProblemModal header; direct link to problem's submissions page; conditionally shown for leetcode problems                                                                                  |
+| Submission list page fallback sync        | LeetCode `/problems/{slug}/submissions/` now gets a fixed floating sync button to refresh the latest accepted solve; detail pages keep the IDE-top button                                                            |
 
-| Graph node glow cascade                    | Selected node: 24px shadow blur (100% intensity), neighbors: 12px shadow blur (50% intensity); neighbor edges 50% opacity with increased line width (commit 803dcc6)                                                 |
 ---
 
 ## In Progress 🔄
 
-| Feature                              | Status  | Notes                                                                                      |
-| ------------------------------------ | ------- | ------------------------------------------------------------------------------------------ |
-| Multi-platform analytics integration | partial | Graph has platform colors; analytics still mostly LeetCode-centric                         |
-| LeetCode import completeness         | partial | Recent 20 via public API; full history via profile page button only                        |
-| LeetCode profile import overhaul     | active  | GraphQL 400 errors; tags/difficulty not fetched; timestamp wrong; integrate with analytics |
-
----
-
-## Pending 📋
-
-| Feature                                      | Priority    | Notes                                                                                                          |
-| -------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
-| Problem multi-select + bulk CRUD             | high        | Checkbox select mode in Solutions view; bulk delete, bulk re-tag, bulk export                                  |
-| Per-problem topic tag editor                 | high        | In ProblemModal Edit tab: add/remove individual tags (not just comma-list); toggle enabled/disabled per tag    |
-| Auto-add accepted submissions                | high        | On LeetCode accept event, auto-save to library respecting incognito toggle                                     |
-| Profile import button on /progress page      | medium      | Inject import button on `leetcode.com/progress` instead of profile page (more stable URL)                      |
-| ProblemModal enhancements                    | medium      | Show: accept rate, hints, similar problems with links; remove non-useful fields (likes/dislikes from LeetCode) |
-| Custom scrollbar design                      | medium      | Replace stock OS scrollbars with styled thin scrollbar across the library UI                                   |
-| LeetCode /progress page stats integration    | low         | Reference `leetcode.com/progress` for streak calendar, topic breakdown, badge data                             |
-| AI submission context (test vs submit)       | high        | Detect test case failures vs accept/reject submission; auto-fetch errors and analysis                          |
-| AI chat in library                           | medium      | API-key powered chat; conversation saved to git repo alongside solution                                        |
-| AI system on LeetCode/platform pages         | medium      | Floating panel with question + editor code context; calls configured AI handler                                |
-| Incognito mode timer + "indefinitely" option | medium      | Time selector on incognito toggle; options: 1h, 4h, 24h, indefinitely                                          |
-| Enhanced recommendation system               | low         | Beyond Blind 75 — personalized from weak topics / recent solves                                                |
-| Full multi-platform analytics                | low         | GFG + Codeforces in heatmap, difficulty chart, topic breakdown                                                 |
-| Submission auto-detect investigation         | investigate | LeetCode handler MutationObserver may miss accepted results in some layouts                                    |
-| GitHub Action: auto-merge canonical issues   | low         | GH Action on main repo: when issue gets ≥5 👍 → append to canonical-map.json and close issue                    |
+| Feature                              | Status  | Notes                                                                                                                         |
+| ------------------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Multi-platform analytics integration | partial | Graph has platform colors; analytics still mostly LeetCode-centric                                                            |
+| LeetCode import completeness         | partial | Recent 20 via public API; full history via profile page button only                                                           |
+| LeetCode profile import overhaul     | active  | GraphQL 400 errors; tags/difficulty not fetched; timestamp wrong; integrate with analytics                                    |
+| Graph drag modes (single vs group)   | active  | Double-click + drag moves node + connected neighbors; depth slider controls child depth; single-drag moves only selected node |
+| Graph search/sort/layering UI        | active  | Search/sort + filters hide nodes (without deleting data), includes topic comparison counts and intersection                   |
+| Solutions advanced search & filters  | active  | Add dropdowns, tag/topic/language filters, free-text search across title/tags/overview                                        |
+| On-demand problem fetch (refresh)    | done    | Refresh control moved to Settings maintenance panel; service-worker queues background metadata fetches one problem at a time  |
 
 ---
 
 ## Bugs to Fix 🐛
 
-| Bug                                      | Priority     | Notes                                                                                        |
-| ---------------------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
-| **Commit on LeetCode accept not firing** | **IN-PROGRESS** | Enhanced selector detection added (d9f736b); extended ARIA/data-testid/color-based selectors; fallback from slow text-walk to enhanced module; needs testing |
-| **Problem modal not unified**            | **HIGH**     | Each handler creates own modal; should use single constant component across all platforms    |
+| Bug                                  | Priority | Notes                                                                                                                                                                                     |
+| ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Commit on LeetCode accept not firing | done     | Enhanced selector detection added (d9f736b); extended ARIA/data-testid/color-based selectors; direct submission-page initialization now injects and auto-saves without waiting for reload |
 
----
+## Pending 📋
 
-## AI Advanced Features 🤖
+| Feature                                      | Priority    | Notes                                                                                                                                                               |
+| -------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Problem multi-select + bulk CRUD             | high        | Checkbox select mode in Solutions view; bulk delete, bulk re-tag, bulk export                                                                                       |
+| Per-problem topic tag editor                 | high        | In ProblemModal Edit tab: add/remove individual tags (not just comma-list); toggle enabled/disabled per tag; Single Chat can be linked with multiple problems       |
+| Auto-add accepted submissions                | done        | On LeetCode accept event, auto-save to library respecting incognito toggle; direct submission pages now inject immediately and auto-save without requiring a reload |
+| ProblemModal enhancements                    | medium      | Show: accept rate, hints, similar problems with links; remove non-useful fields (likes/dislikes from LeetCode)                                                      |
+| Custom scrollbar design                      | medium      | Replace stock OS scrollbars with styled thin scrollbar across the library UI                                                                                        |
+| LeetCode /progress page stats integration    | low         | Reference `leetcode.com/progress` for streak calendar, topic breakdown, badge data                                                                                  |
+| AI submission context (test vs submit)       | high        | Detect test case failures vs accept/reject submission; auto-fetch errors and analysis                                                                               |
+| AI chat in library                           | medium      | API-key powered chat; conversation saved to git repo alongside solution                                                                                             |
+| AI system on LeetCode/platform pages         | medium      | Floating panel with question + editor code context; calls configured AI handler                                                                                     |
+| Incognito mode timer + "indefinitely" option | medium      | Time selector on incognito toggle; options: 1h, 4h, 24h, indefinitely                                                                                               |
+| Enhanced recommendation system               | low         | Beyond Blind 75 — personalized from weak topics / recent solves                                                                                                     |
+| Full multi-platform analytics                | low         | GFG + Codeforces in heatmap, difficulty chart, topic breakdown                                                                                                      |
+| Submission auto-detect investigation         | investigate | LeetCode handler MutationObserver may miss accepted results in some layouts                                                                                         |
+| GitHub Action: auto-merge canonical issues   | low         | GH Action on main repo: when issue gets ≥5 👍 → append to canonical-map.json and close issue                                                                         |
+| Platform-specific scraping in handlers only  | high        | Ensure all site scraping/fetching logic lives in `src/handlers/*` and library UI only opens pages or sends generic requests                                         |
+
 
 ### Math & Scientific Notation
 
-| Feature                   | Priority | Notes                                                                           |
-| ------------------------- | -------- | ------------------------------------------------------------------------------- |
-| **Math rendering parity** | **HIGH** | Render inline and block math correctly when AI returns math syntax in responses |
+| Feature               | Priority | Notes                                                                           |
+| --------------------- | -------- | ------------------------------------------------------------------------------- |
+| Math rendering parity | HIGH     | Render inline and block math correctly when AI returns math syntax in responses |
 
 ### Diagram & Visual Generation
 
-| Feature                      | Priority | Notes                                                               |
-| ---------------------------- | -------- | ------------------------------------------------------------------- |
-| **Mermaid rendering parity** | **HIGH** | Render Mermaid code blocks correctly when AI responses include them |
+| Feature                  | Priority | Notes                                                               |
+| ------------------------ | -------- | ------------------------------------------------------------------- |
+| Mermaid rendering parity | HIGH     | Render Mermaid code blocks correctly when AI responses include them |
 
 ### AI Command Palette & UX
 
-| Feature                             | Priority   | Notes                                                                                                      |
-| ----------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
-| **AI command palette on `/` input** | **HIGH**   | Dropdown showing available commands `/mycode`, `/problem`, `/mermaid`, `/math`, `/test`, `/optimize`, etc. |
-| **Command descriptions & hints**    | **HIGH**   | Show usage hints and what each command does; context-aware suggestions                                     |
-| **Command autocomplete**            | **HIGH**   | Fuzzy search commands as user types; keyboard navigation (arrow keys, Enter)                               |
-| **Recently used commands**          | **MEDIUM** | Pin favorite commands to top; show history; sorting by usage frequency                                     |
-| **AI request templates**            | **MEDIUM** | Save common requests as templates; quick-insert with Ctrl+K shortcut                                       |
+| Feature                         | Priority | Notes                                                                                 |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------- |
+| AI command palette on `/` input | HIGH     | Dropdown showing available commands `/mycode`, `/problem`, `/test`, `/optimize`, etc. |
+| Command descriptions & hints    | HIGH     | Show usage hints and what each command does; context-aware suggestions                |
+| Command autocomplete            | HIGH     | Fuzzy search commands as user types; keyboard navigation (arrow keys, Enter)          |
+| Recently used commands          | MEDIUM   | Pin favorite commands to top; show history; sorting by usage frequency                |
+| AI request templates            | MEDIUM   | Save common requests as templates; quick-insert with Ctrl+K shortcut                  |
 
 ### New Chat Variables
 
-| Feature                                   | Priority   | Notes                                                                           |
-| ----------------------------------------- | ---------- | ------------------------------------------------------------------------------- |
-| **`/mermaid` - Diagram generation**       | **HIGH**   | Insert `\`\`\`mermaid ... \`\`\`` block generated by AI                         |
-| **`/test` - Test case extractor**         | **HIGH**   | Extract all test cases from problem; format as structured JSON                  |
-| **`/optimize` - Optimization request**    | **HIGH**   | Suggest code optimizations; show before/after; explain trade-offs               |
-| **`/explain` - Detailed explanation**     | **HIGH**   | Break down algorithm step-by-step; explain data structures, operations          |
-| **`/math` - Math helper**                 | **MEDIUM** | Show relevant formulas; LaTeX rendering for complex expressions                 |
-| **`/similar-patterns` - Pattern matcher** | **MEDIUM** | Show similar problems solved; extract common patterns; suggest technique to use |
-| **`/complexity` - Complexity analyzer**   | **MEDIUM** | Detailed time/space complexity analysis; include proof or derivation            |
+| Feature                               | Priority | Notes                                                                           |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------- |
+| `/mermaid` - Diagram generation       | HIGH     | Insert ```mermaid ... ``` block generated by AI                                 |
+| `/test` - Test case extractor         | HIGH     | Generate test cases and test if the code works or not                  |
+| `/optimize` - Optimization request    | HIGH     | Suggest code optimizations; show before/after; explain trade-offs               |
+| `/explain` - Detailed explanation     | HIGH     | Break down algorithm step-by-step; explain data structures, operations          |
+| `/math` - Math helper                 | MEDIUM   | Show relevant formulas; LaTeX rendering for complex expressions                 |
+| `/similar-patterns` - Pattern matcher | MEDIUM   | Show similar problems solved; extract common patterns; suggest technique to use |
+| `/complexity` - Complexity analyzer   | MEDIUM   | Detailed time/space complexity analysis; include proof or derivation            |
 
 ### AI Enhanced Storage
 
-| Feature                         | Priority   | Notes                                                                                        |
-| ------------------------------- | ---------- | -------------------------------------------------------------------------------------------- |
-| **AI chat metadata enrichment** | **HIGH**   | Store request templates, favorite commands, tags per conversation                            |
-| **Chat response ratings**       | **HIGH**   | 👍/👎 feedback; thumbs up helpful responses for AI training feedback                           |
-| **AI session analytics**        | **MEDIUM** | Track which commands used most; which AI responses most helpful; patterns in problem solving |
+| Feature                     | Priority | Notes                                                                                        |
+| --------------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| AI chat metadata enrichment | HIGH     | Store request templates, favorite commands, tags per conversation                            |
+| Chat response ratings       | HIGH     | 👍/👎 feedback; thumbs up helpful responses for AI training feedback                           |
+| AI session analytics        | MEDIUM   | Track which commands used most; which AI responses most helpful; patterns in problem solving |
 
----
+### Enhanced AIChatsView 📚
 
-## Enhanced AIChatsView 📚
+| Feature                     | Priority | Notes                                                                                                            |
+| --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| New chat from AIChatsView   | HIGH     | "+ New Chat" button; modal to select problem, AI model, difficulty level; start chat directly                    |
+| Problem attachment in chats | HIGH     | Link multiple problems from different platforms to single conversation; browse related solutions in same context |
 
-| Feature                         | Priority   | Notes                                                                                         |
-| ------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
-| **New chat from AIChatsView**   | **HIGH**   | "+ New Chat" button; modal to select problem, AI model, difficulty level; start chat directly |
-| **Problem attachment in chats** | **HIGH**   | Link multiple problems to single conversation; browse related solutions in same context       |
-| **Chat templates & favorites**  | **HIGH**   | Save conversation patterns; reuse templates for similar problems                              |
-| **Export chat as markdown/PDF** | **MEDIUM** | Download individual chats or entire collection; include diagrams, math, code                  |
-| **Chat collaboration metadata** | **MEDIUM** | Track sources: platform, timestamp, difficulty, duration; show learning journey               |
-| **Share chat links**            | **LOW**    | Generate shareable links; paste as markdown in GitHub discussions                             |
+### Graph Advanced Visualization 📊
 
----
+| Feature                     | Priority | Notes                                                                              |
+| --------------------------- | -------- | ---------------------------------------------------------------------------------- |
+| Node selection cascade glow | CRITICAL | Selected node: full intensity; 1-hop neighbors: 50% glow; edges: same 50% glow     |
+| Multi-node selection        | HIGH     | Ctrl+Click to select multiple; shows interaction between selected problems         |
+| Node density filtering      | HIGH     | Zoom-based: far=topics only, medium=topics+solved, close=all; improves readability |
+| Graph filter controls       | HIGH     | Toggles: by difficulty, platform, solved/unsolved; combined filtering              |
+| Graph community detection   | MEDIUM   | Detect topic clusters; highlight communities; suggest learning paths               |
+| Edge label rendering        | MEDIUM   | Show edge types: "topic", "similar", "canonical"; toggle visibility                |
 
-## Graph Advanced Visualization 📊
+### Unified Problem Modal 🔧
 
-| Feature                         | Priority     | Notes                                                                                        |
-| ------------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
-| **Node selection cascade glow** | **CRITICAL** | Selected node: full intensity; 1-hop neighbors: 50% glow; edges: same 50% glow               |
-| **Multi-node selection**        | **HIGH**     | Ctrl+Click to select multiple; shows interaction between selected problems                   |
-| **Node density filtering**      | **HIGH**     | Zoom-based: far=topics only, medium=topics+solved, close=all; improves readability           |
-| **Graph filter controls**       | **HIGH**     | Toggles: by difficulty, platform, solved/unsolved; combined filtering                        |
-| **Dynamic layout switching**    | **HIGH**     | Force-directed (current), Circular (topics in ring), Hierarchical (tree); smooth transitions |
-| **Graph community detection**   | **MEDIUM**   | Detect topic clusters; highlight communities; suggest learning paths                         |
-| **Edge label rendering**        | **MEDIUM**   | Show edge types: "topic", "similar", "canonical"; toggle visibility                          |
+| Feature                         | Priority | Notes                                                                               |
+| ------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| Constant ProblemModal component | CRITICAL | Single unified component used by ALL platforms; consistent UX regardless of handler |
+| Handler-agnostic modal          | CRITICAL | Abstract platform-specific data into standard schema before passing to modal        |
+| Modal tabs standard             | HIGH     | Overview, Code, AI Chat, Similar, Analysis; same for all platforms                  |
+| Modal persistence               | HIGH     | Keep modal state across tab switches; restore scroll position and expanded sections |
 
----
+### AI-MCP Integration 🧠
 
-## Unified Problem Modal 🔧
-
-| Feature                             | Priority     | Notes                                                                               |
-| ----------------------------------- | ------------ | ----------------------------------------------------------------------------------- |
-| **Constant ProblemModal component** | **CRITICAL** | Single unified component used by ALL platforms; consistent UX regardless of handler |
-| **Handler-agnostic modal**          | **CRITICAL** | Abstract platform-specific data into standard schema before passing to modal        |
-| **Modal tabs standard**             | **HIGH**     | Overview, Code, AI Chat, Similar, Analysis; same for all platforms                  |
-| **Modal persistence**               | **HIGH**     | Keep modal state across tab switches; restore scroll position and expanded sections |
-
----
-
-## AI-MCP Integration 🧠
-
-| Feature                                  | Priority   | Notes                                                                                            |
-| ---------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------ |
-| **MCP Tool: Query Problems**             | **HIGH**   | AI can search: by topic, difficulty, platform, pass rate; get problem recommendations            |
-| **MCP Tool: Get Problem Stats**          | **HIGH**   | Get detailed stats for any problem: solve time, pass rate, difficulty consensus, acceptance rate |
-| **MCP Tool: Next Problem Suggestion**    | **HIGH**   | Analyze weak topics from solved; suggest next best problem; explain why it's recommended         |
-| **MCP Tool: Code Quality Analysis**      | **MEDIUM** | Run code analysis: complexity, edge cases, improvement suggestions; cache results                |
-| **MCP Tool: Trend Analysis**             | **MEDIUM** | Show learning trends: improvement over time, difficulty progression, platform distribution       |
-| **MCP Tool: Similar Solution Discovery** | **MEDIUM** | Find similar problems solved; extract patterns; suggest technique application                    |
-| **MCP Context: User Profile**            | **HIGH**   | Provide IndexedDB snapshot: solved problems, weak topics, preferred platforms, solve patterns    |
-
----
-
----
-
-## How to add new feature requests
-
-Drop plain text at the bottom of this file (below the tables). Claude/GitHub Copilot will read it, convert it into a proper row in the right section, and delete the raw text.
+| Feature                              | Priority | Notes                                                                                            |
+| ------------------------------------ | -------- | ------------------------------------------------------------------------------------------------ |
+| MCP Tool: Query Problems             | HIGH     | AI can search: by topic, difficulty, platform, pass rate; get problem recommendations            |
+| MCP Tool: Get Problem Stats          | HIGH     | Get detailed stats for any problem: solve time, pass rate, difficulty consensus, acceptance rate |
+| MCP Tool: Next Problem Suggestion    | HIGH     | Analyze weak topics from solved; suggest next best problem; explain why it's recommended         |
+| MCP Tool: Code Quality Analysis      | MEDIUM   | Run code analysis: complexity, edge cases, improvement suggestions; cache results                |
+| MCP Tool: Trend Analysis             | MEDIUM   | Show learning trends: improvement over time, difficulty progression, platform distribution       |
+| MCP Tool: Similar Solution Discovery | MEDIUM   | Find similar problems solved; extract patterns; suggest technique application                    |
+| MCP Context: User Profile            | HIGH     | Provide IndexedDB snapshot: solved problems, weak topics, preferred platforms, solve patterns    |
 
 ---
 

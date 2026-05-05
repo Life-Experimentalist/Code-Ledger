@@ -12,6 +12,7 @@ import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
 import { buildConversationSystemPrompt } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
+import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
 
 // Init background
 async function init() {
@@ -23,6 +24,10 @@ async function init() {
 
   // Set up event listeners
   eventBus.on("problem:solved", handleSolved);
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    completeRefreshMetadata(tabId);
+  });
 
   coreDebug.log("Background initialized");
 }
@@ -509,6 +514,21 @@ try {
         .catch((e) => sendResponse({ ok: false, error: e.message }));
       return true; // async response
     }
+
+    if (msg && msg.type === "REFRESH_METADATA") {
+      handleRefreshMetadata(msg.problems || [])
+        .then((result) => sendResponse({ ok: true, ...result }))
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
+      return true; // async response
+    }
+
+    if (msg && msg.type === "REFRESH_METADATA_DONE") {
+      const result = completeRefreshMetadata(sender?.tab?.id);
+      sendResponse({ ok: true, ...result });
+      return true;
+    }
+
+
 
     if (msg && msg.type === "AI_CHAT") {
       handleAIChat(msg.messages || [], msg.context || {})

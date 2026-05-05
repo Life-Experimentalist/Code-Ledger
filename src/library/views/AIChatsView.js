@@ -10,6 +10,7 @@ const html = htm.bind(h);
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { CHAT_COMMANDS, AI_MENTION_OPTIONS } from "../../lib/chat-variables.js";
+import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { getAllChats, searchChats, deleteChat, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 
 function formatTime(ts) {
@@ -57,6 +58,7 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
   const [replyPending, setReplyPending] = useState(false);
   const [replyError, setReplyError] = useState("");
   const [prefillHandled, setPrefillHandled] = useState(false);
+  const [prefillChatSlug, setPrefillChatSlug] = useState("");
 
   const problemIndex = useMemo(() => {
     const map = new Map();
@@ -83,6 +85,28 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
     loadChats();
   }, [loadChats]);
 
+  // Listen for AI chat updates from floating panels and other surfaces
+  useEffect(() => {
+    const handleMessage = (msg) => {
+      if (msg && msg.type === "AI_CHAT_UPDATED") {
+        // Reload chats when a chat is updated from another surface
+        loadChats().catch(() => { });
+      }
+    };
+
+    try {
+      chrome.runtime.onMessage.addListener(handleMessage);
+      return () => {
+        try {
+          chrome.runtime.onMessage.removeListener(handleMessage);
+        } catch (_) { }
+      };
+    } catch (_) {
+      // Not in extension context (e.g., GitHub Pages mode)
+      return () => { };
+    }
+  }, [loadChats]);
+
   useEffect(() => {
     if (prefillHandled) return;
     const params = new URLSearchParams(window.location.search);
@@ -99,6 +123,7 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
     setComposeError("");
     setSelectedAttachments(prefillProblem ? [prefillProblem] : []);
     setSelectedChat(null);
+    setPrefillChatSlug(chatSlug);
     setPrefillHandled(true);
 
     params.delete("chatSlug");
@@ -107,6 +132,15 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
     const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash || ""}`;
     window.history.replaceState({}, "", nextUrl);
   }, [prefillHandled, problemIndex]);
+
+  useEffect(() => {
+    if (!prefillChatSlug || chats.length === 0) return;
+    const matched = chats.find((chat) =>
+      String(chat.problemSlug || "").toLowerCase() === prefillChatSlug.toLowerCase()
+      || (Array.isArray(chat.attachedProblemSlugs) && chat.attachedProblemSlugs.some((slug) => String(slug || "").toLowerCase() === prefillChatSlug.toLowerCase()))
+    );
+    if (matched) setSelectedChat(matched);
+  }, [chats, prefillChatSlug]);
 
   const groupedChats = useMemo(() => {
     const byProblem = {};
@@ -180,20 +214,19 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
     setComposeError("");
     try {
       const primary = selectedAttachments[0] || null;
-      const context = primary ? {
+      const context = buildAIChatContext({
         surface: "library-chat",
-        title: primary.title,
-        difficulty: primary.difficulty || "",
-        code: primary.code || "",
-        lang: { name: primary.lang || "" },
-        platform: primary.platform,
-        problemStatement: primary.statement || "",
+        problem: primary,
+        text,
+        title: primary?.title || "AI Study Chat",
+        difficulty: primary?.difficulty || "",
+        platform: primary?.platform || "library",
+        code: primary?.code || "",
+        lang: primary?.lang || "",
+        problemStatement: primary?.statement || "",
         attachedProblemSlugs: selectedAttachments.map((p) => p.slug),
-      } : {
-        surface: "library-chat",
-        title: "AI Study Chat",
-        attachedProblemSlugs: selectedAttachments.map((p) => p.slug),
-      };
+        attachedProblems: selectedAttachments.map((p) => ({ slug: p.slug, title: p.title, platform: p.platform, url: p.url })),
+      });
 
       const response = await new Promise((resolve, reject) => {
         if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
@@ -223,7 +256,12 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
         attachedProblemSlugs: selectedAttachments.map((p) => p.slug),
         attachedProblems: selectedAttachments.map((p) => ({ slug: p.slug, title: p.title, platform: p.platform, url: p.url })),
         surface: "library-chat",
+        requestType: context.requestType || "",
+        usedCommands: context.usedCommands || [],
+        requestTemplate: text,
         summary: text.slice(0, 120),
+        aiProvider: settings?.aiProvider || "gemini",
+        aiModel: settings?.aiPrimaryModel || "gemini-2.0-flash",
       };
 
       const chatId = await saveAIChat(primary?.slug || "library-chat", primary?.url || "", messages, primary?.platform || "library", meta);
@@ -255,16 +293,24 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
         || (selectedChat.problemSlug ? problemIndex.get(selectedChat.problemSlug) : null)
         || null;
 
-      const context = {
+      const context = buildAIChatContext({
         surface: "library-chat",
+        problem: primaryAttachment,
+        text,
         title: primaryAttachment?.title || selectedChat.problemTitle || "AI Study Chat",
         difficulty: primaryAttachment?.difficulty || "",
-        code: primaryAttachment?.code || "",
-        lang: { name: primaryAttachment?.lang || "" },
         platform: primaryAttachment?.platform || selectedChat.platform || "library",
+        code: primaryAttachment?.code || "",
+        lang: primaryAttachment?.lang || "",
         problemStatement: primaryAttachment?.statement || "",
         attachedProblemSlugs: selectedChat.attachedProblemSlugs || [],
-      };
+        attachedProblems: selectedChat.attachedProblems || (primaryAttachment ? [{
+          slug: primaryAttachment.slug,
+          title: primaryAttachment.title,
+          platform: primaryAttachment.platform,
+          url: primaryAttachment.url,
+        }] : []),
+      });
 
       const response = await new Promise((resolve, reject) => {
         if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
@@ -299,6 +345,9 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
           url: primaryAttachment.url,
         }] : []),
         surface: "library-chat",
+        requestType: context.requestType || selectedChat.requestType || "",
+        usedCommands: context.usedCommands || selectedChat.usedCommands || [],
+        requestTemplate: selectedChat.requestTemplate || text,
         summary: selectedChat.summary || (selectedChat.messages?.[0]?.content || "").slice(0, 120),
       };
 
@@ -433,6 +482,7 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
                   >
                     <div class="text-xs text-slate-300">${formatTime(chat.createdAt)}</div>
                     <div class="text-xs text-slate-400 mt-1 truncate">${chat.summary || chat.messages?.[0]?.content?.substring(0, 60) || "(empty)"}</div>
+                    ${chat.requestType ? html`<div class="mt-2"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-cyan-500/20 bg-cyan-500/10 text-cyan-200 uppercase tracking-[0.12em]">${chat.requestType}</span></div>` : ""}
                     <div class="text-[10px] text-slate-500 mt-1">${(chat.messages || []).length} message${(chat.messages || []).length === 1 ? "" : "s"}</div>
                   </button>
                 `)}
@@ -451,6 +501,7 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
                   >
                     <div class="text-xs font-medium text-slate-200 truncate">${chat.problemTitle || chat.problemSlug || "AI Chat"}</div>
                     <div class="text-xs text-slate-400 mt-1 truncate">${chat.summary || chat.messages?.[0]?.content?.substring(0, 60) || "(empty)"}</div>
+                    ${chat.requestType ? html`<div class="mt-2"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-cyan-500/20 bg-cyan-500/10 text-cyan-200 uppercase tracking-[0.12em]">${chat.requestType}</span></div>` : ""}
                     <div class="text-[10px] text-slate-500 mt-1">${(chat.messages || []).length} message${(chat.messages || []).length === 1 ? "" : "s"}</div>
                   </button>
                 `)}
@@ -467,6 +518,8 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
                     <h3 class="font-semibold text-slate-100">${selectedChat.problemTitle || selectedChat.problemSlug || "AI Chat"}</h3>
                     ${selectedChat.problemURL ? html`<a href=${selectedChat.problemURL} target="_blank" rel="noopener" class="text-xs text-cyan-400 hover:text-cyan-300">View problem ↗</a>` : ""}
                     <div class="text-xs text-slate-500 mt-1">${formatTime(selectedChat.createdAt)}</div>
+                    ${selectedChat.requestType ? html`<div class="mt-2"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-cyan-500/20 bg-cyan-500/10 text-cyan-200 uppercase tracking-[0.12em]">${selectedChat.requestType}</span></div>` : ""}
+                     ${selectedChat.aiProvider ? html`<div class="text-xs text-cyan-400 mt-1">🤖 ${selectedChat.aiModel || selectedChat.aiProvider}${selectedChat.aiProvider ? ` (${selectedChat.aiProvider})` : ""}</div>` : ""}
                   </div>
                   <div class="flex items-center gap-2">
                     <button onClick=${() => startNewChat(selectedChat.attachedProblems?.[0] || (selectedChat.problemSlug ? problemIndex.get(selectedChat.problemSlug) : null))} class="px-2 py-1 rounded border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-500/10">Continue</button>

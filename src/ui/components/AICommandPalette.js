@@ -8,17 +8,18 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 export function AICommandPalette({
-    items = [],
-    visible = false,
-    activeIndex = 0,
-    onSelect,
-    title = "Commands",
-    emptyLabel = "No matches",
+  items = [],
+  visible = false,
+  activeIndex = 0,
+  onSelect,
+  title = "Commands",
+  emptyLabel = "No matches",
+  style = {},
 }) {
-    if (!visible) return null;
+  if (!visible) return null;
 
-    return html`
-      <div class="absolute left-0 right-0 bottom-full z-20 mb-2 rounded-xl border border-slate-700 bg-slate-950/98 shadow-2xl overflow-hidden">
+  return html`
+      <div class="rounded-xl border border-slate-700 bg-slate-950/98 shadow-2xl overflow-hidden" style=${{ position: "fixed", zIndex: 2147483647, ...style }}>
         <div class="flex items-center justify-between px-3 py-2 border-b border-slate-800 bg-slate-900/80">
           <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">${title}</span>
           <span class="text-[10px] text-slate-600">${items.length} item${items.length === 1 ? "" : "s"}</span>

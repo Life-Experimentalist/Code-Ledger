@@ -26,9 +26,11 @@ export function MultiLineAIChatInput({
   const textareaRef = useRef(null);
   const [showVariableHint, setShowVariableHint] = useState(false);
   const [matchedVars, setMatchedVars] = useState([]);
-  const [suggestionState, setSuggestionState] = useState({ visible: false, mode: "command", query: "", items: [], activeIndex: 0, start: 0, end: 0 });
+  const [suggestionState, setSuggestionState] = useState({ visible: false, mode: "command", query: "", items: [], activeIndex: 0, start: 0, end: 0, position: null });
 
   const updateSuggestionState = (text, cursor) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
     const beforeCursor = text.slice(0, cursor);
     const tokenMatch = beforeCursor.match(/(^|\s)([\/\@][^\s]*)$/);
     if (!tokenMatch) {
@@ -39,6 +41,7 @@ export function MultiLineAIChatInput({
     const token = tokenMatch[2] || "";
     const prefix = token[0];
     const query = token.slice(1).toLowerCase();
+    const rect = textarea.getBoundingClientRect();
     const items = prefix === "/"
       ? getCommandSuggestions(query).filter((item) => commandItems.some((def) => def.id === item.id))
       : getMentionSuggestions(query).filter((item) => mentionItems.some((def) => def.id === item.id));
@@ -51,6 +54,11 @@ export function MultiLineAIChatInput({
       activeIndex: 0,
       start: cursor - token.length,
       end: cursor,
+      position: {
+        left: rect.left,
+        width: rect.width,
+        top: Math.max(8, rect.top - 12),
+      },
     });
   };
 
@@ -181,6 +189,7 @@ export function MultiLineAIChatInput({
         activeIndex=${suggestionState.activeIndex}
         title=${suggestionState.mode === "command" ? "Commands" : "Tags"}
         emptyLabel=${suggestionState.mode === "command" ? "No commands match." : "No tags match."}
+        style=${suggestionState.position ? { left: `${suggestionState.position.left}px`, top: `${Math.max(8, suggestionState.position.top - 8)}px`, width: `${suggestionState.position.width}px`, transform: "translateY(-100%)" } : {}}
         onSelect=${(item) => replaceToken(suggestionState.mode === "command" ? `/${item.id} ` : `@${item.id} `)}
       />
 

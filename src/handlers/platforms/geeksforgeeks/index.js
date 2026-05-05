@@ -13,6 +13,7 @@ import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { createFloatingTimer } from "../../../ui/floating-timer.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
+import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 
 const dbg = createDebugger("GFG");
 
@@ -57,8 +58,8 @@ Be concise. Max 200 words.`;
       title: "GeeksForGeeks",
       order: 20,
       fields: [
-        { key: "gfg_enable",  label: "Enable tracking",             type: "toggle", default: true },
-        { key: "gfg_readme",  label: "Include problem description", type: "toggle", default: true },
+        { key: "gfg_enable", label: "Enable tracking", type: "toggle", default: true },
+        { key: "gfg_readme", label: "Include problem description", type: "toggle", default: true },
       ],
     };
   }
@@ -73,8 +74,40 @@ Be concise. Max 200 words.`;
         if (s.gfg_timer !== false) {
           this._timer = createFloatingTimer(page.slug || "gfg", { autoStart: true });
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
+    // Handle on-demand fetch requests opened by Library: ?codeledger_fetch=1&cl_fetch_id=<slug>
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("codeledger_fetch") && page.type === PAGE_TYPES.PROBLEM) {
+        (async () => {
+          try {
+            const slug = page.slug || params.get("cl_fetch_id");
+            if (!slug) return;
+            const meta = this._extractMetadata(slug);
+            const problem = {
+              platform: "geeksforgeeks",
+              id: String(slug),
+              title: meta.title || slug,
+              titleSlug: slug,
+              difficulty: meta.difficulty || null,
+              tags: meta.tags || [],
+              problemStatement: meta.description || null,
+              timestamp: Date.now(),
+            };
+            await Storage.saveProblem(problem).catch(() => { });
+            await new Promise((resolve) => {
+              try {
+                chrome.runtime.sendMessage({ type: "REFRESH_METADATA_DONE", platform: "geeksforgeeks", slug }, () => resolve());
+              } catch (_) {
+                resolve();
+              }
+            });
+            try { window.close(); } catch (e) { }
+          } catch (e) { dbg.error('gfg fetch-save failed', e); }
+        })();
+      }
+    } catch (e) { /* ignore */ }
   }
 
   _setupMutationObserver() {
@@ -136,10 +169,10 @@ Be concise. Max 200 words.`;
       this.lastDetectedId = slug;
 
       // Extract problem data from DOM
-      const meta   = this._extractMetadata(slug);
-      const code   = this._extractCode();
-      const lang   = this._extractLanguage();
-      const topic  = meta.tags?.[0] || "Untagged";
+      const meta = this._extractMetadata(slug);
+      const code = this._extractCode();
+      const lang = this._extractLanguage();
+      const topic = resolvePrimaryTopic(meta.tags || []);
 
       if (!code || code.includes("extraction failed")) {
         dbg.warn("Code extraction failed, skipping commit");
@@ -149,7 +182,7 @@ Be concise. Max 200 words.`;
       sessionStorage.setItem(dedupKey, "1");
 
       // Canonical mapping
-      try { await canonicalMapper.loadMap(); } catch (_) {}
+      try { await canonicalMapper.loadMap(); } catch (_) { }
       const canonical = canonicalMapper.resolve("geeksforgeeks", slug);
 
       // Build file set
@@ -159,20 +192,20 @@ Be concise. Max 200 words.`;
       const elapsedSeconds = elapsedMs > 0 ? Math.round(elapsedMs / 1000) : null;
 
       eventBus.emit("problem:solved", {
-        platform:   "geeksforgeeks",
-        id:         meta.platformId || null,
-        title:      meta.title || slug,
-        titleSlug:  slug,
+        platform: "geeksforgeeks",
+        id: meta.platformId || null,
+        title: meta.title || slug,
+        titleSlug: slug,
         difficulty: meta.difficulty || null,
         topic,
-        tags:       meta.tags || [],
-        canonical:  canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
+        tags: meta.tags || [],
+        canonical: canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
         code,
         files,
-        lang:       { name: lang.name, ext: lang.ext },
-        runtime:    meta.runtime || null,
-        memory:     meta.memory || null,
-        timestamp:  Math.floor(Date.now() / 1000),
+        lang: { name: lang.name, ext: lang.ext },
+        runtime: meta.runtime || null,
+        memory: meta.memory || null,
+        timestamp: Math.floor(Date.now() / 1000),
         elapsedSeconds,
       });
 
@@ -194,14 +227,14 @@ Be concise. Max 200 words.`;
 
     const tags = this._extractTags();
     const runtime = this.safeQuery(SELECTORS.submission.runtime);
-    const memory  = this.safeQuery(SELECTORS.submission.memory);
+    const memory = this.safeQuery(SELECTORS.submission.memory);
 
     return {
-      title:      titleEl ? titleEl.textContent.trim() : slug,
-      difficulty: diffEl  ? normalizeDifficulty(diffEl.textContent.trim()) : null,
+      title: titleEl ? titleEl.textContent.trim() : slug,
+      difficulty: diffEl ? normalizeDifficulty(diffEl.textContent.trim()) : null,
       tags,
-      runtime:    runtime ? runtime.textContent.trim() : null,
-      memory:     memory  ? memory.textContent.trim()  : null,
+      runtime: runtime ? runtime.textContent.trim() : null,
+      memory: memory ? memory.textContent.trim() : null,
       description: this._extractDescription(),
       platformId: null,
     };
@@ -254,9 +287,9 @@ Be concise. Max 200 words.`;
       "[class*='language'] [class*='selected']",
       "select[name='language'] option:checked",
     ]);
-    const raw  = langEl ? langEl.textContent.trim().split("(")[0].trim() : "C++";
+    const raw = langEl ? langEl.textContent.trim().split("(")[0].trim() : "C++";
     const name = raw || "C++";
-    const ext  = langExt(name);
+    const ext = langExt(name);
     return { name, ext };
   }
 
@@ -271,8 +304,8 @@ Be concise. Max 200 words.`;
 
   /* ── File set builder ────────────────────────────────────────────── */
   _buildFileSet(meta, code, lang, settings, slug) {
-    const topic = meta.tags?.[0] || "Untagged";
-    const base  = `topics/${topic}/${slug}/`;
+    const topic = resolvePrimaryTopic(meta.tags || []);
+    const base = `topics/${topic}/${slug}/`;
     const files = [];
 
     files.push({
@@ -312,7 +345,7 @@ Be concise. Max 200 words.`;
 
     const stats = [];
     if (meta.runtime) stats.push(`Runtime: ${meta.runtime}`);
-    if (meta.memory)  stats.push(`Memory: ${meta.memory}`);
+    if (meta.memory) stats.push(`Memory: ${meta.memory}`);
     if (stats.length) {
       lines.push("", "## My Submission", "", ...stats.map((s) => `- ${s}`));
     }

@@ -50,6 +50,9 @@ function normalizeChatRecord(record = {}) {
         attachedProblemSlugs: Array.isArray(record.attachedProblemSlugs) ? record.attachedProblemSlugs : [],
         attachedProblems: Array.isArray(record.attachedProblems) ? record.attachedProblems : [],
         surface: record.surface || "problem-modal",
+        requestType: record.requestType || "",
+        usedCommands: Array.isArray(record.usedCommands) ? record.usedCommands : [],
+        requestTemplate: record.requestTemplate || "",
         summary: record.summary || "",
         createdAt: record.createdAt || Date.now(),
         updatedAt: record.updatedAt || Date.now(),
@@ -196,7 +199,10 @@ export async function searchChats(query) {
         const matchesAttachment = (chat.attachedProblemSlugs || []).some((slug) => String(slug || "").toLowerCase().includes(lowerQuery));
         const matchesMessage = (chat.messages || []).some((m) => String(m.content || "").toLowerCase().includes(lowerQuery));
         const matchesSurface = String(chat.surface || "").toLowerCase().includes(lowerQuery);
-        return matchesURL || matchesSlug || matchesTitle || matchesTag || matchesAttachment || matchesMessage || matchesSurface;
+        const matchesRequestType = String(chat.requestType || "").toLowerCase().includes(lowerQuery);
+        const matchesTemplate = String(chat.requestTemplate || "").toLowerCase().includes(lowerQuery);
+        const matchesCommands = (chat.usedCommands || []).some((command) => String(command || "").toLowerCase().includes(lowerQuery));
+        return matchesURL || matchesSlug || matchesTitle || matchesTag || matchesAttachment || matchesMessage || matchesSurface || matchesRequestType || matchesTemplate || matchesCommands;
     });
 }
 
@@ -257,6 +263,9 @@ export const CHAT_SCHEMA = {
     attachedProblemSlugs: ["string"],
     attachedProblems: ["{ slug, title, platform, url }"],
     surface: "string",
+    requestType: "string",
+    usedCommands: ["string"],
+    requestTemplate: "string",
     messages: [
         {
             role: "string (user | assistant | system)",

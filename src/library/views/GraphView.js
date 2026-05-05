@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { h, useState, useEffect, useRef, useCallback } from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useRef, useCallback, useMemo } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 import { buildKnowledgeGraph, DIFFICULTY_COLOR, PLATFORM_COLOR } from "../../core/knowledge-graph.js";
@@ -17,7 +17,7 @@ const LINK_STR = { "topic-problem": 0.45, similar: 0.08, canonical: 0.5, "topic-
 // At radius 700: force = 700 × 0.0008 = 0.56 px/frame.
 // Repulsion at 50px: 3500/2501 ≈ 1.4 px/frame — repulsion wins at short range.
 // Without alpha-scaling, gravity is constant so it never overwhelms repulsion.
-const GRAVITY = 0.0008;
+const GRAVITY = 0.00035;
 const DAMPING = 0.85;
 const ALPHA_DECAY = 0.013;
 
@@ -76,32 +76,49 @@ function simulationStep(nodes, edges, alpha) {
   }
 }
 
-/* ── Radial initial layout ───────────────────────────────────────────── */
-// All world positions are centered at (0,0) — independent of canvas size.
-// Topics go in a ring; each problem spawns near its primary topic.
-function applyRadialLayout(nodes, edges) {
-  const topicNodes = nodes.filter((n) => n.type === "topic");
-  const problemNodes = nodes.filter((n) => n.type === "problem");
+/* ── Layout modes ────────────────────────────────────────────────────── */
+const GRAPH_LAYOUT_MODES = [
+  { id: "layered", label: "Layered" },
+  { id: "circular", label: "Circular" },
+  { id: "force", label: "Force" },
+];
 
-  // Space topics evenly around a ring large enough so clusters don't overlap
-  const topicRadius = Math.max(180, topicNodes.length * 28);
-  const topicPos = new Map();
+function seedNode(node, x, y) {
+  node.x = x;
+  node.y = y;
+  node.vx = 0;
+  node.vy = 0;
+  node.fx = 0;
+  node.fy = 0;
+}
 
-  topicNodes.forEach((n, i) => {
-    const angle = (i / topicNodes.length) * Math.PI * 2 - Math.PI / 2;
-    n.x = Math.cos(angle) * topicRadius;
-    n.y = Math.sin(angle) * topicRadius;
-    n.vx = 0; n.vy = 0; n.fx = 0; n.fy = 0;
-    topicPos.set(n.id, { x: n.x, y: n.y });
-  });
-
-  // First topic-problem edge per problem → primary topic for placement
+function getPrimaryTopics(edges) {
   const primaryTopic = new Map();
   for (const e of edges) {
     if (e.type === "topic-problem" && !primaryTopic.has(e.target)) {
       primaryTopic.set(e.target, e.source);
     }
   }
+  return primaryTopic;
+}
+
+// All world positions are centered at (0,0) — independent of canvas size.
+// Topics go in a ring; each problem spawns near its primary topic.
+function applyCircularLayout(nodes, edges) {
+  const topicNodes = nodes.filter((n) => n.type === "topic");
+  const problemNodes = nodes.filter((n) => n.type === "problem");
+
+  // Space topics evenly around a ring large enough so clusters don't overlap
+  const topicRadius = Math.max(120, topicNodes.length * 18);
+  const topicPos = new Map();
+
+  topicNodes.forEach((n, i) => {
+    const angle = (i / topicNodes.length) * Math.PI * 2 - Math.PI / 2;
+    seedNode(n, Math.cos(angle) * topicRadius, Math.sin(angle) * topicRadius);
+    topicPos.set(n.id, { x: n.x, y: n.y });
+  });
+
+  const primaryTopic = getPrimaryTopics(edges);
 
   // Count problems per topic so we spread them evenly in a ring around the topic node
   const perTopicCount = new Map();
@@ -118,11 +135,76 @@ function applyRadialLayout(nodes, edges) {
     const count = perTopicCount.get(tid) || 1;
     perTopicIdx.set(tid, idx + 1);
     const angle = (idx / count) * Math.PI * 2;
-    const spread = n.solved ? 50 + Math.random() * 30 : 85 + Math.random() * 35;
-    n.x = base.x + Math.cos(angle) * spread;
-    n.y = base.y + Math.sin(angle) * spread;
-    n.vx = 0; n.vy = 0; n.fx = 0; n.fy = 0;
+    const spread = n.solved ? 28 + Math.random() * 18 : 48 + Math.random() * 22;
+    seedNode(n, base.x + Math.cos(angle) * spread, base.y + Math.sin(angle) * spread);
   });
+}
+
+function applyLayeredLayout(nodes, edges) {
+  const topicNodes = nodes
+    .filter((n) => n.type === "topic")
+    .sort((a, b) => (b.count || 0) - (a.count || 0) || String(a.label).localeCompare(String(b.label)));
+  const problemNodes = nodes.filter((n) => n.type === "problem");
+  const primaryTopic = getPrimaryTopics(edges);
+
+  const topicGap = Math.max(180, Math.min(300, 1200 / Math.max(topicNodes.length, 1)));
+  const topicY = -280;
+  const topicBase = (topicNodes.length - 1) / 2;
+  const topicPos = new Map();
+
+  topicNodes.forEach((n, i) => {
+    const x = (i - topicBase) * topicGap;
+    seedNode(n, x, topicY);
+    topicPos.set(n.id, { x, y: topicY });
+  });
+
+  const bucketsByTopic = new Map();
+  for (const n of problemNodes) {
+    const topicId = primaryTopic.get(n.id) || "__orphan__";
+    if (!bucketsByTopic.has(topicId)) {
+      bucketsByTopic.set(topicId, { Easy: [], Medium: [], Hard: [], Unknown: [] });
+    }
+    const bucket = bucketsByTopic.get(topicId);
+    const difficulty = bucket[n.difficulty] ? n.difficulty : "Unknown";
+    bucket[difficulty].push(n);
+  }
+
+  const rows = { Easy: -90, Medium: 20, Hard: 130, Unknown: 240 };
+  const itemGap = 48;
+
+  for (const [topicId, bucket] of bucketsByTopic) {
+    const baseX = topicId === "__orphan__" ? 0 : (topicPos.get(topicId)?.x || 0);
+    for (const difficulty of ["Easy", "Medium", "Hard", "Unknown"]) {
+      const items = bucket[difficulty];
+      if (!items.length) continue;
+      const spread = (items.length - 1) * itemGap;
+      items.forEach((n, index) => {
+        const x = baseX + index * itemGap - spread / 2;
+        const y = rows[difficulty] + (n.solved ? 0 : 26);
+        seedNode(n, x, y);
+      });
+    }
+  }
+}
+
+function applyForceSeedLayout(nodes) {
+  nodes.forEach((n, index) => {
+    const angle = index * 2.399963229728653;
+    const radius = 18 + Math.sqrt(index + 1) * 28;
+    seedNode(n, Math.cos(angle) * radius, Math.sin(angle) * radius);
+  });
+}
+
+function applyGraphLayout(nodes, edges, mode) {
+  if (mode === "layered") {
+    applyLayeredLayout(nodes, edges);
+    return;
+  }
+  if (mode === "force") {
+    applyForceSeedLayout(nodes);
+    return;
+  }
+  applyCircularLayout(nodes, edges);
 }
 
 /* ── Level-of-detail thresholds ──────────────────────────────────────── */
@@ -214,24 +296,8 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     ctx.globalAlpha = isSelectedEdge ? 1 : isNeighborEdge ? ((e.type === "topic-problem" ? 0.42 : 0.55) * edgeAlpha) : (isHovered ? 1 : ((e.type === "topic-problem" ? 0.55 : 0.7) * edgeAlpha));
     ctx.stroke();
   }
-  // Nodes
-      // Enhanced glow cascade for edges
-      // Selected edges: Full opacity, thicker
-      // Neighbor edges: 50% opacity, medium thickness
-      // Other edges: Normal opacity
-      if (isSelectedEdge) {
-        ctx.lineWidth = e.type === "canonical" ? 3.5 : 2.5;
-        ctx.globalAlpha = 1;
-      } else if (isNeighborEdge) {
-        ctx.lineWidth = e.type === "canonical" ? 3 : 2.2;
-        ctx.globalAlpha = 0.5 * edgeAlpha; // 50% glow
-      } else if (isHovered) {
-        ctx.lineWidth = e.type === "canonical" ? 2.5 : 1.8;
-        ctx.globalAlpha = 1;
-      } else {
-        ctx.lineWidth = e.type === "canonical" ? 2.5 : 1.8;
-        ctx.globalAlpha = (e.type === "topic-problem" ? 0.55 : 0.7) * edgeAlpha;
-      }
+
+  // Nodes — selected/neighbor emphasis mirrors the graphify-style focal halo
   for (const n of nodes) {
     if (!drawableIds.has(n.id)) continue;
     const r = n.size;
@@ -241,8 +307,8 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
 
     ctx.beginPath();
     ctx.arc(n.x, n.y, r + (isH ? 3 : 0), 0, Math.PI * 2);
-    ctx.shadowBlur = isSel ? 18 : isNeighbor ? 10 : 0;
-    ctx.shadowColor = isSel ? n.color : isNeighbor ? `${n.color}66` : "transparent";
+    ctx.shadowBlur = isSel ? 24 : isNeighbor ? 12 : 0;
+    ctx.shadowColor = isSel ? n.color : isNeighbor ? `${n.color}88` : "transparent";
 
     if (n.type === "topic") {
       ctx.fillStyle = n.color + "33";
@@ -255,7 +321,7 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       ctx.fill();
       ctx.strokeStyle = isSel ? "#fff" : (n.platformColor || PLATFORM_COLOR[n.platform] || "#64748b");
       ctx.lineWidth = isSel ? 2.5 : isNeighbor ? 2.2 : n.isMultiPlatform ? 2.5 : 1.5;
-      ctx.globalAlpha = isSel ? 1 : isNeighbor ? 0.65 : 0.85;
+      ctx.globalAlpha = isSel ? 1 : isNeighbor ? 0.82 : 0.85;
       ctx.stroke();
       ctx.globalAlpha = 1;
     } else {
@@ -268,24 +334,20 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       ctx.setLineDash([]);
     }
     if (n.type === "topic" || isH || isSel || isNeighbor || scale > LOD_PROBLEM_LABEL_SCALE) {
-        // Enhanced glow cascade for node selection
-        // Selected node: Full intensity (100%)
-        // Neighbor nodes: 50% intensity glow
-        // Other nodes: No glow
-        if (isSel) {
-          ctx.shadowBlur = 24;
-          ctx.shadowColor = n.color;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-        } else if (isNeighbor) {
-          ctx.shadowBlur = 12;
-          ctx.shadowColor = n.color + "88"; // 50% intensity
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-        } else {
-          ctx.shadowBlur = 0;
-          ctx.shadowColor = "transparent";
-        }
+      if (isSel) {
+        ctx.shadowBlur = 28;
+        ctx.shadowColor = n.color;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      } else if (isNeighbor) {
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = n.color + "99";
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      } else {
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+      }
       ctx.fillStyle = "#e2e8f0";
       ctx.font = n.type === "topic" ? `bold ${Math.max(11, r * 0.7)}px sans-serif` : "11px sans-serif";
       ctx.textAlign = "center";
@@ -328,8 +390,10 @@ const PLATFORM_FAVICON = {
   codeforces: "https://codeforces.com/favicon.ico",
 };
 
+const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
+
 /* ── Component ───────────────────────────────────────────────────────── */
-export function GraphView({ problems }) {
+export function GraphView({ problems, focusProblem = null, onFocusProblemHandled = null, onProblemDelete = null, onProblemUpdate = null }) {
   const canvasRef = useRef(null);
   const simRef = useRef({ nodes: [], edges: [], alpha: 0, raf: null });
   const transformRef = useRef({ tx: 0, ty: 0, scale: 1 });
@@ -338,8 +402,22 @@ export function GraphView({ problems }) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [selected, setSelected] = useState(null);
   const [modalProblem, setModalProblem] = useState(null);
+  const [graphSearch, setGraphSearch] = useState("");
+  const [graphSort, setGraphSort] = useState("label");
+  const [topicA, setTopicA] = useState("");
+  const [topicB, setTopicB] = useState("");
+  const [groupDepth, setGroupDepth] = useState(1);
   const [filterSolved, setFilterSolved] = useState(false);
+  const [filterDifficultyGraph, setFilterDifficultyGraph] = useState("All");
+  const [filterPlatformGraph, setFilterPlatformGraph] = useState("All");
+  const [filterTopicGraph, setFilterTopicGraph] = useState("All");
+  const [layoutMode, setLayoutMode] = useState("layered");
   const filterSolvedRef = useRef(false);
+  const graphSearchRef = useRef("");
+  const filterDifficultyRef = useRef("All");
+  const filterPlatformRef = useRef("All");
+  const filterTopicRef = useRef("All");
+  const groupDepthRef = useRef(1);
   const hoveredRef = useRef(null);
   const selectedRef = useRef(null);
   const fitViewRef = useRef(null);
@@ -392,14 +470,14 @@ export function GraphView({ problems }) {
     }
 
     if (isFirstLoad) {
-      // First load: apply radial layout in world space (centered at 0,0)
-      applyRadialLayout(newNodes, newEdges);
+      // First load: apply the selected layout in world space (centered at 0,0)
+      applyGraphLayout(newNodes, newEdges, layoutMode);
       hasNew = true;
     } else {
       const brandNew = newNodes.filter((n) => !existingMap.has(n.id));
       if (brandNew.length > 0) {
-        // Only re-layout the new nodes around their topic positions
-        applyRadialLayout(brandNew, newEdges);
+        // Only seed the new nodes; keep existing nodes where they are
+        applyGraphLayout(brandNew, newEdges, layoutMode);
         hasNew = true;
       }
     }
@@ -420,11 +498,89 @@ export function GraphView({ problems }) {
       solved: newNodes.filter((n) => n.type === "problem" && n.solved).length,
       suggested: newNodes.filter((n) => n.type === "problem" && !n.solved).length,
     });
-  }, [problems]);
+  }, [problems, layoutMode]);
 
   useEffect(() => { filterSolvedRef.current = filterSolved; }, [filterSolved]);
+  useEffect(() => { graphSearchRef.current = graphSearch; }, [graphSearch]);
+  useEffect(() => { filterDifficultyRef.current = filterDifficultyGraph; }, [filterDifficultyGraph]);
+  useEffect(() => { filterPlatformRef.current = filterPlatformGraph; }, [filterPlatformGraph]);
+  useEffect(() => { filterTopicRef.current = filterTopicGraph; }, [filterTopicGraph]);
+  useEffect(() => { groupDepthRef.current = groupDepth; }, [groupDepth]);
   useEffect(() => { hoveredRef.current = hovered; }, [hovered]);
   useEffect(() => { selectedRef.current = selected; }, [selected]);
+
+  useEffect(() => {
+    const { nodes, edges } = simRef.current;
+    if (!nodes.length) return;
+    applyGraphLayout(nodes, edges, layoutMode);
+    simRef.current.alpha = 1;
+    setTimeout(() => fitViewRef.current?.(), 30);
+  }, [layoutMode]);
+
+  useEffect(() => {
+    if (!focusProblem) return;
+    const nodes = simRef.current.nodes || [];
+    const match = nodes.find((node) =>
+      node.type === "problem" && (
+        node.id === focusProblem.id
+        || node.titleSlug === focusProblem.titleSlug
+        || (focusProblem.platform && node.platform === focusProblem.platform && node.titleSlug === focusProblem.titleSlug)
+      )
+    );
+    if (match) {
+      setSelected(match);
+      setModalProblem(match);
+      setTimeout(() => fitViewRef.current?.(), 20);
+    }
+    onFocusProblemHandled?.();
+  }, [focusProblem, onFocusProblemHandled]);
+
+  function getVisibleGraphData() {
+    const { nodes, edges } = simRef.current;
+    const query = String(graphSearchRef.current || "").trim().toLowerCase();
+    const solvedOnly = !!filterSolvedRef.current;
+    const diff = filterDifficultyRef.current;
+    const platform = filterPlatformRef.current;
+    const topic = filterTopicRef.current;
+
+    const visibleProblemIds = new Set();
+    for (const n of nodes) {
+      if (n.type !== "problem") continue;
+      if (solvedOnly && !n.solved) continue;
+      if (diff !== "All" && String(n.difficulty || "Unknown") !== diff) continue;
+      if (platform !== "All" && String(n.platform || "") !== platform) continue;
+      if (topic !== "All") {
+        const tags = n.tags || [];
+        const primary = n.topic || n.primaryTopic || "";
+        if (!tags.includes(topic) && primary !== topic) continue;
+      }
+      if (query) {
+        const hay = `${n.label || ""} ${n.title || ""} ${(n.tags || []).join(" ")} ${n.platform || ""} ${n.difficulty || ""}`.toLowerCase();
+        if (!hay.includes(query)) continue;
+      }
+      visibleProblemIds.add(n.id);
+    }
+
+    const drawNodeIds = new Set(visibleProblemIds);
+    for (const e of edges) {
+      if (visibleProblemIds.has(e.source)) drawNodeIds.add(e.target);
+      if (visibleProblemIds.has(e.target)) drawNodeIds.add(e.source);
+    }
+
+    // Keep matching topic nodes discoverable even when no problem currently visible.
+    if (query) {
+      for (const n of nodes) {
+        if (n.type === "topic" && String(n.label || "").toLowerCase().includes(query)) {
+          drawNodeIds.add(n.id);
+        }
+      }
+    }
+
+    const drawNodes = nodes.filter((n) => drawNodeIds.has(n.id));
+    const ids = new Set(drawNodes.map((n) => n.id));
+    const drawEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+    return { drawNodes, drawEdges };
+  }
 
   /* ── Animation loop ─────────────────────────────────────────────── */
   useEffect(() => {
@@ -443,17 +599,8 @@ export function GraphView({ problems }) {
         simRef.current.alpha = Math.max(0, alpha - ALPHA_DECAY);
       }
 
-      // Filter for solved-only mode using a Set for O(1) lookup
-      const filterActive = filterSolvedRef.current;
-      let drawNodes, drawEdges;
-      if (filterActive) {
-        drawNodes = nodes.filter((n) => n.type === "topic" || n.solved);
-        const ids = new Set(drawNodes.map((n) => n.id));
-        drawEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
-      } else {
-        drawNodes = nodes;
-        drawEdges = edges;
-      }
+      // Filters hide nodes from view but keep them in the simulation data model.
+      const { drawNodes, drawEdges } = getVisibleGraphData();
 
       // Clear and fill background in physical pixels
       const dpr = window.devicePixelRatio || 1;
@@ -476,6 +623,41 @@ export function GraphView({ problems }) {
       cancelAnimationFrame(simRef.current.raf);
     };
   }, []);
+
+  // Derived topic list and counts for search/compare UI
+  const topicList = useMemo(() => simRef.current.nodes.filter(n => n.type === 'topic').map(t => t.label).sort(), [problems]);
+  const topicCounts = useMemo(() => {
+    const map = new Map();
+    for (const n of simRef.current.nodes.filter(n => n.type === 'problem')) {
+      for (const t of (n.tags || [])) {
+        map.set(t, (map.get(t) || 0) + 1);
+      }
+      const primary = n.primaryTopic || n.topic;
+      if (primary) map.set(primary, (map.get(primary) || 0) + 1);
+    }
+    return map;
+  }, [problems]);
+
+  const searchResults = useMemo(() => {
+    const q = String(graphSearch || "").trim().toLowerCase();
+    if (!q) return [];
+    const nodes = (simRef.current.nodes || []).filter(n => {
+      const hay = `${n.label || ''} ${(n.tags || []).join(' ')} ${(n.title || '')} ${(n.platform || '')} ${(n.difficulty || '')}`.toLowerCase();
+      return hay.includes(q);
+    });
+    const rank = (n) => {
+      if (graphSort === "difficulty") return DIFF_ORDER[String(n.difficulty || "Unknown")] ?? 3;
+      if (graphSort === "platform") return String(n.platform || "");
+      return String(n.label || "").toLowerCase();
+    };
+    const sorted = [...nodes].sort((a, b) => {
+      const ra = rank(a);
+      const rb = rank(b);
+      if (typeof ra === "number" && typeof rb === "number") return ra - rb;
+      return String(ra).localeCompare(String(rb));
+    });
+    return sorted.slice(0, 40);
+  }, [graphSearch, graphSort, problems]);
 
   /* ── Resize observer ────────────────────────────────────────────── */
   useEffect(() => {
@@ -524,18 +706,31 @@ export function GraphView({ problems }) {
       return;
     }
     if (dragRef.current?.type === "node") {
-      const { node } = dragRef.current;
+      const d = dragRef.current;
       const { tx, ty, scale } = transformRef.current;
-      node.x = (mx - tx) / scale;
-      node.y = (my - ty) / scale;
-      node.vx = 0; node.vy = 0;
-      simRef.current.alpha = Math.max(simRef.current.alpha, 0.3);
+      const worldX = (mx - tx) / scale;
+      const worldY = (my - ty) / scale;
+      if (d.group) {
+        // move all movedNodes by same delta from snapshot
+        const dx = worldX - d.startWorld.x;
+        const dy = worldY - d.startWorld.y;
+        for (const n of d.movedNodes) {
+          const snap = d.snapshot.get(n.id);
+          if (!snap) continue;
+          n.x = snap.x + dx;
+          n.y = snap.y + dy;
+          n.vx = 0; n.vy = 0;
+        }
+      } else {
+        const { node } = d;
+        node.x = worldX;
+        node.y = worldY;
+        node.vx = 0; node.vy = 0;
+      }
       return;
     }
 
-    const testNodes = filterSolvedRef.current
-      ? simRef.current.nodes.filter((n) => n.type === "topic" || n.solved)
-      : simRef.current.nodes;
+    const testNodes = getVisibleGraphData().drawNodes;
     const hit = hitTest(testNodes, mx, my, transformRef.current);
     setHovered(hit);
     setMousePos({ x: e.clientX, y: e.clientY });
@@ -545,22 +740,56 @@ export function GraphView({ problems }) {
   const onMouseDown = useCallback((e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const testNodes = filterSolvedRef.current
-      ? simRef.current.nodes.filter((n) => n.type === "topic" || n.solved)
-      : simRef.current.nodes;
+    const testNodes = getVisibleGraphData().drawNodes;
     const hit = hitTest(testNodes, e.clientX - rect.left, e.clientY - rect.top, transformRef.current);
-    dragRef.current = hit ? { type: "node", node: hit } : { type: "pan" };
+    // Support double-click + drag to move node + neighbors up to configured depth.
+    const isGroupDrag = e.detail >= 2;
+    if (hit) {
+      if (isGroupDrag) {
+        const depthLimit = Math.max(1, Number(groupDepthRef.current || 1));
+        const adjacency = new Map();
+        for (const ed of simRef.current.edges) {
+          if (!adjacency.has(ed.source)) adjacency.set(ed.source, []);
+          if (!adjacency.has(ed.target)) adjacency.set(ed.target, []);
+          adjacency.get(ed.source).push(ed.target);
+          adjacency.get(ed.target).push(ed.source);
+        }
+        const neighbors = new Set([hit.id]);
+        const q = [{ id: hit.id, depth: 0 }];
+        while (q.length) {
+          const cur = q.shift();
+          if (cur.depth >= depthLimit) continue;
+          for (const nxt of (adjacency.get(cur.id) || [])) {
+            if (neighbors.has(nxt)) continue;
+            neighbors.add(nxt);
+            q.push({ id: nxt, depth: cur.depth + 1 });
+          }
+        }
+        const movedNodes = simRef.current.nodes.filter(n => neighbors.has(n.id));
+        const snapshot = new Map(movedNodes.map(n => [n.id, { x: n.x, y: n.y }]));
+        const startMouse = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const { tx, ty, scale } = transformRef.current;
+        const startWorld = { x: (startMouse.x - tx) / scale, y: (startMouse.y - ty) / scale };
+        dragRef.current = { type: "node", node: hit, group: true, movedNodes, snapshot, startWorld };
+      } else {
+        dragRef.current = { type: "node", node: hit, group: false };
+      }
+    } else {
+      dragRef.current = { type: "pan" };
+    }
   }, []);
 
   const onMouseUp = useCallback((e) => {
     if (dragRef.current?.type === "node") {
       const canvas = canvasRef.current;
       const rect = canvas.getBoundingClientRect();
-      const testNodes = filterSolvedRef.current
-        ? simRef.current.nodes.filter((n) => n.type === "topic" || n.solved)
-        : simRef.current.nodes;
+      const testNodes = getVisibleGraphData().drawNodes;
       const hit = hitTest(testNodes, e.clientX - rect.left, e.clientY - rect.top, transformRef.current);
       if (hit) setSelected((prev) => (prev?.id === hit.id ? null : hit));
+      // if group drag, settle velocities to zero for moved nodes
+      if (dragRef.current.group && dragRef.current.movedNodes) {
+        for (const n of dragRef.current.movedNodes) { n.vx = 0; n.vy = 0; }
+      }
     }
     dragRef.current = null;
   }, []);
@@ -589,10 +818,10 @@ export function GraphView({ problems }) {
   const reLayout = useCallback(() => {
     const { nodes, edges } = simRef.current;
     if (!nodes.length) return;
-    applyRadialLayout(nodes, edges);
+    applyGraphLayout(nodes, edges, layoutMode);
     simRef.current.alpha = 1;
     setTimeout(() => fitViewRef.current?.(), 30);
-  }, []);
+  }, [layoutMode]);
 
   /* ── Problem URL ─────────────────────────────────────────────────── */
   function problemUrl(node) {
@@ -605,12 +834,40 @@ export function GraphView({ problems }) {
   /* ── Node detail (tooltip + selected panel) ─────────────────────── */
   function NodeDetail({ node, compact = false }) {
     if (!node) return null;
-    if (node.type === "topic") return html`
-      <div class="flex flex-col gap-1.5">
-        <div class="text-xs font-bold text-white">${node.label}</div>
-        <div class="text-[11px] text-slate-400">${node.count} problem${node.count !== 1 ? "s" : ""} solved</div>
-      </div>
-    `;
+    if (node.type === "topic") {
+      const topicProblems = simRef.current.nodes
+        .filter((candidate) => candidate.type === "problem" && (candidate.tags || []).includes(node.label))
+        .sort((a, b) => (a.solved === b.solved ? String(a.label).localeCompare(String(b.label)) : (a.solved ? -1 : 1)));
+      return html`
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-xs font-bold text-white">${node.label}</div>
+            <div class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-400">
+              ${node.count} problem${node.count !== 1 ? "s" : ""}
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-400">${node.count} problem${node.count !== 1 ? "s" : ""} solved</div>
+          ${!compact && topicProblems.length ? html`
+            <div class="mt-1 border-t border-white/5 pt-2 flex flex-col gap-1">
+              <div class="text-[10px] uppercase tracking-wider text-slate-600">Problems</div>
+              <div class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
+                ${topicProblems.map((problem) => html`
+                  <button
+                    onClick=${() => setModalProblem(problem)}
+                    class="text-left px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-500/20 transition-colors"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[11px] text-slate-200 leading-snug">${problem.label}</span>
+                      <span class="text-[10px] text-slate-500 shrink-0">${problem.platform || ""}</span>
+                    </div>
+                  </button>
+                `)}
+              </div>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
     const url = problemUrl(node);
     const favicon = PLATFORM_FAVICON[node.platform];
     const diffClass = node.difficulty === "Easy" ? "bg-emerald-500/20 text-emerald-400"
@@ -667,6 +924,68 @@ export function GraphView({ problems }) {
           <span class="px-2 py-1 rounded bg-white/5 border border-white/10">${stats.solved} solved</span>
           <span class="px-2 py-1 rounded bg-white/5 border border-white/10">${stats.suggested} suggested</span>
         </div>
+        <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 text-xs text-slate-400">
+          ${GRAPH_LAYOUT_MODES.map((mode) => html`
+            <button
+              onClick=${() => setLayoutMode(mode.id)}
+              class="px-2 py-1 rounded-md transition-colors ${layoutMode === mode.id
+      ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+      : "text-slate-500 hover:text-slate-300 hover:bg-white/5"}"
+              title=${mode.id === "layered" ? "Topics on top, problems grouped by difficulty" : mode.id === "circular" ? "Topics in a ring with clustered problems" : "Loose force-directed seed layout"}
+            >${mode.label}</button>
+          `)}
+        </div>
+        <div class="flex items-center gap-2 ml-2">
+          <input
+            placeholder="Search graph…"
+            value=${graphSearch}
+            onInput=${(e) => setGraphSearch(e.target.value)}
+            class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-white min-w-[200px]"
+          />
+          <select value=${graphSort} onChange=${(e) => setGraphSort(e.target.value)} class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300">
+            <option value="label">Label</option>
+            <option value="difficulty">Difficulty</option>
+            <option value="platform">Platform</option>
+          </select>
+          <select value=${filterDifficultyGraph} onChange=${(e) => setFilterDifficultyGraph(e.target.value)} class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300">
+            <option value="All">All Difficulty</option>
+            <option value="Easy">Easy</option>
+            <option value="Medium">Medium</option>
+            <option value="Hard">Hard</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+          <select value=${filterPlatformGraph} onChange=${(e) => setFilterPlatformGraph(e.target.value)} class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300">
+            <option value="All">All Platform</option>
+            <option value="leetcode">LeetCode</option>
+            <option value="geeksforgeeks">GFG</option>
+            <option value="codeforces">Codeforces</option>
+          </select>
+          <div class="flex items-center gap-1 text-xs text-slate-400">
+            <select value=${filterTopicGraph} onChange=${(e) => setFilterTopicGraph(e.target.value)} class="px-2 py-1 bg-black border border-white/10 rounded text-xs text-white">
+              <option value="All">All Topics</option>
+              ${topicList.map(t => html`<option value=${t}>${t}</option>`)}
+            </select>
+            <select value=${topicA} onChange=${(e) => setTopicA(e.target.value)} class="px-2 py-1 bg-black border border-white/10 rounded text-xs text-white">
+              <option value="">Compare…</option>
+              ${topicList.map(t => html`<option value=${t}>${t} (${topicCounts.get(t) || 0})</option>`)}
+            </select>
+            <select value=${topicB} onChange=${(e) => setTopicB(e.target.value)} class="px-2 py-1 bg-black border border-white/10 rounded text-xs text-white">
+              <option value=""> </option>
+              ${topicList.map(t => html`<option value=${t}>${t} (${topicCounts.get(t) || 0})</option>`)}
+            </select>
+            <div class="flex items-center gap-1 text-[10px] text-slate-400 ml-1">
+              Depth
+              <input type="range" min="1" max="4" value=${groupDepth} onInput=${(e) => setGroupDepth(Number(e.target.value) || 1)} class="w-20" />
+              <span>${groupDepth}</span>
+            </div>
+            ${topicA && topicB ? html`<div class="text-[10px] text-slate-300">A: ${topicCounts.get(topicA) || 0} · B: ${topicCounts.get(topicB) || 0} · ∩: ${(() => {
+      const a = new Set(simRef.current.nodes.filter(n => n.type === 'problem' && (n.tags || []).includes(topicA)).map(n => n.id));
+      const b = new Set(simRef.current.nodes.filter(n => n.type === 'problem' && (n.tags || []).includes(topicB)).map(n => n.id));
+      let inter = 0; for (const id of a) if (b.has(id)) inter++;
+      return inter;
+    })()}</div>` : ""}
+          </div>
+        </div>
         <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer ml-auto">
           <input type="checkbox" checked=${filterSolved} onChange=${(e) => setFilterSolved(e.target.checked)} />
           Solved only
@@ -680,6 +999,23 @@ export function GraphView({ problems }) {
           class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-colors"
         >↺ Re-layout</button>
       </div>
+
+      ${graphSearch && searchResults.length ? html`
+        <div class="rounded-lg border border-white/10 bg-black/40 p-2 max-h-36 overflow-y-auto">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Search Results</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-1">
+            ${searchResults.map((n) => html`
+              <button
+                class="text-left px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-200"
+                onClick=${() => {
+        setSelected(n);
+        if (n.type === "problem") setModalProblem(n);
+      }}
+              >${n.label} <span class="text-slate-500">${n.type}${n.platform ? ` · ${n.platform}` : ""}</span></button>
+            `)}
+          </div>
+        </div>
+      ` : ""}
 
       <!-- Canvas area -->
       <div class="relative flex-1 rounded-2xl overflow-hidden border border-white/5 bg-[#0a0a0f]" style="min-height:500px">
@@ -757,7 +1093,7 @@ export function GraphView({ problems }) {
       </div>
 
       <p class="text-[10px] text-slate-600 text-center">
-        Drag nodes · scroll to zoom · hover to preview · click to pin · ▣ Fit view · ↺ Re-layout
+        Drag nodes · scroll to zoom · hover to preview · click to pin · layout modes above · ▣ Fit view · ↺ Re-layout
       </p>
 
       <${ProblemModal}
@@ -765,6 +1101,13 @@ export function GraphView({ problems }) {
         onClose=${() => setModalProblem(null)}
         problemList=${simRef.current.nodes.filter((node) => node.type === "problem")}
         onNavigateProblem=${setModalProblem}
+        onDelete=${(id) => {
+      if (onProblemDelete) onProblemDelete(id);
+      setModalProblem(null);
+    }}
+        onUpdate=${(updated) => {
+      if (onProblemUpdate) onProblemUpdate(updated);
+    }}
       />
     </div>
   `;

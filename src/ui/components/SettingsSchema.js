@@ -214,6 +214,53 @@ function maskKey(k) {
   return `${s.slice(0, 4)}...${s.slice(-4)}`;
 }
 
+function MaintenancePanel({ problems, onRefreshMissing }) {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+
+  const missingMetadataCount = (problems || []).filter(p => !p.tags || p.tags.length === 0).length;
+
+  const handleRefreshMissing = async () => {
+    if (!missingMetadataCount || busy) return;
+    setBusy(true);
+    setStatus("Starting refresh queue…");
+    try {
+      const result = await new Promise((resolve, reject) => {
+        if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+          reject(new Error("Extension not available"));
+          return;
+        }
+        chrome.runtime.sendMessage({ type: "REFRESH_METADATA", problems }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Refresh failed"));
+        });
+      });
+      setStatus(`Queued ${result.queued || missingMetadataCount} problem(s) for background refresh.`);
+    } catch (e) {
+      setStatus("Refresh failed: " + (e.message || String(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return html`
+    <div class="mt-4 p-4 bg-blue-950/20 rounded-xl border border-blue-500/15">
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Maintenance</h3>
+      <p class="text-[11px] text-slate-500 mb-4">Refresh missing problem metadata (tags, difficulty, description) in the background, one problem at a time.</p>
+      <div class="flex items-center gap-3 flex-wrap">
+        <button
+          onClick=${handleRefreshMissing}
+          disabled=${busy || !missingMetadataCount}
+          class="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >${busy ? "Refreshing…" : `Refresh ${missingMetadataCount} problem${missingMetadataCount !== 1 ? "s" : ""}`}</button>
+        ${!missingMetadataCount ? html`<span class="text-xs text-slate-500">All problems have metadata!</span>` : ""}
+      </div>
+      ${status ? html`<p class="mt-3 text-xs ${status.includes("failed") || status.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">${status}</p>` : ""}
+    </div>
+  `;
+}
+
 export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
@@ -229,6 +276,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [repoSyncStatus, setRepoSyncStatus] = useState({});
   // Commit-mode dialog: null = hidden, { provider, count } = shown
   const [syncConfirm, setSyncConfirm] = useState(null);
+  // Problems for maintenance panel
+  const [problems, setProblems] = useState([]);
   const initializedFromQueryRef = useRef(false);
   const scrolledFromQueryRef = useRef(false);
   const prevRepoRef = useRef(values?.["github_repo"] || null);
@@ -266,6 +315,23 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   }, []);
 
   const providerFromField = (key) => {
+    // Load problems for maintenance panel
+    useEffect(() => {
+      let mounted = true;
+      Storage.getAllProblems?.()
+        .then((all) => {
+          if (!mounted) return;
+          setProblems(all || []);
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setProblems([]);
+        });
+      return () => {
+        mounted = false;
+      };
+    }, []);
+
     const k = (key || "").toLowerCase();
     if (k.includes("gemini")) return "gemini";
     if (k.includes("openai")) return "openai";
@@ -1462,6 +1528,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               <div class="space-y-6">
                 ${standardSections.map((section) => renderSection(section))}
                 ${activeTab === "git" ? html`<${BackupRestorePanel} /><${MirrorsPanel} />` : ""}
+                                ${activeTab === "git" ? html`<${MaintenancePanel} problems=${problems} />` : ""}
                 ${activeTab === "general" ? html`<${DifficultyMapPanel} />` : ""}
               </div>
             `}

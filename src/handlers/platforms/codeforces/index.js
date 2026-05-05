@@ -7,6 +7,7 @@ import { BasePlatformHandler } from '../../_base/BasePlatformHandler.js';
 import { SELECTORS } from './dom-selectors.js';
 import { detectPage } from './page-detector.js';
 import { registerPlatformPrompt } from '../../../core/ai-prompts.js';
+import { Storage } from '../../../core/storage.js';
 
 export class CodeforcesHandler extends BasePlatformHandler {
   constructor() {
@@ -28,6 +29,45 @@ Be concise. Max 200 words.`;
 
   async init() {
     this.dbg.log('Initializing Codeforces handler');
+    const page = detectPage(window.location.pathname);
+    await this._handleOnDemandFetch(page).catch(() => { });
     // Polling based submission tracker for codeforces since UI is dynamic heavily on a separate submissions tab usually.
+  }
+
+  async _handleOnDemandFetch(page) {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('codeledger_fetch')) return false;
+    if (page.type !== 'problem') return false;
+
+    const slug = params.get('cl_fetch_id') || page.slug;
+    if (!slug) return false;
+
+    const statementEl = document.querySelector(SELECTORS.problem.description);
+    const titleEl = document.querySelector(SELECTORS.problem.title);
+    const titleText = (titleEl?.textContent || '').trim() || slug;
+    const statementHtml = statementEl?.innerHTML || null;
+
+    const existing = await Storage.getProblem(String(slug)).catch(() => null);
+    await Storage.saveProblem({
+      ...(existing || {}),
+      platform: 'codeforces',
+      id: String(slug),
+      title: existing?.title || titleText,
+      titleSlug: slug,
+      tags: existing?.tags || [],
+      problemStatement: statementHtml || existing?.problemStatement || null,
+      timestamp: existing?.timestamp || Date.now(),
+    }).catch(() => { });
+
+    await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "REFRESH_METADATA_DONE", platform: "codeforces", slug }, () => resolve());
+      } catch (_) {
+        resolve();
+      }
+    });
+
+    try { window.close(); } catch (_) { }
+    return true;
   }
 }

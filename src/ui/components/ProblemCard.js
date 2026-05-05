@@ -29,9 +29,9 @@ const PLATFORM_META = {
 };
 
 const DIFF_STYLE = {
-  Easy:   "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30",
+  Easy: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30",
   Medium: "bg-amber-500/10 text-amber-400 border border-amber-500/30",
-  Hard:   "bg-red-500/10 text-red-400 border border-red-500/30",
+  Hard: "bg-red-500/10 text-red-400 border border-red-500/30",
 };
 
 /**
@@ -41,7 +41,7 @@ const DIFF_STYLE = {
  * @param {function} [onSelect] - if provided, clicking the card body opens the modal;
  *                                 the "↗" link still navigates directly to the platform.
  */
-export function ProblemCard({ problem, onSelect }) {
+export function ProblemCard({ problem, onSelect, onRefresh }) {
   const diffStyle = DIFF_STYLE[problem.difficulty] || "bg-slate-500/10 text-slate-400 border border-slate-500/30";
   const meta = PLATFORM_META[problem.platform] || { label: problem.platform, color: "#64748b", url: () => "#", favicon: null };
   const problemUrl = meta.url(problem.titleSlug || problem.id || "");
@@ -91,19 +91,27 @@ export function ProblemCard({ problem, onSelect }) {
         ${topics.length > 5 ? html`<span class="text-[9px] text-slate-600">+${topics.length - 5}</span>` : ""}
       </div>
 
-      <!-- Footer: date + direct link -->
-      <div class="mt-auto pt-3 flex justify-between items-center z-10 border-t border-white/5">
+      <!-- Footer: date + actions -->
+      <div class="mt-auto pt-3 flex justify-between items-center z-10 border-t border-white/5 gap-2">
         <span class="text-[10px] font-mono text-slate-600">
-          ${problem.timestamp ? new Date(problem.timestamp * 1000).toLocaleDateString() : ""}
+          ${problem.timestamp ? new Date((problem.timestamp < 1e10 ? problem.timestamp * 1000 : problem.timestamp)).toLocaleDateString() : ""}
         </span>
-        <a
-          href=${problemUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open on ${meta.label}"
-          onClick=${(e) => e.stopPropagation()}
-          class="text-[10px] text-slate-500 hover:text-cyan-400 transition-colors"
-        >↗</a>
+        <div class="flex items-center gap-2">
+          ${!problem.problemStatement && onRefresh ? html`
+            <button
+              onClick=${(e) => { e.stopPropagation(); onRefresh(problem); }}
+              class="text-[10px] px-2 py-0.5 rounded border border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+            >Refresh data</button>
+          ` : ""}
+          <a
+            href=${problemUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open on ${meta.label}"
+            onClick=${(e) => e.stopPropagation()}
+            class="text-[10px] text-slate-500 hover:text-cyan-400 transition-colors"
+          >↗</a>
+        </div>
       </div>
     </div>
   `;

@@ -4,7 +4,7 @@
  *
  * Self-contained floating draggable timer overlay.
  * Content-script safe — no framework, no bundler, no Tailwind.
- * Returns a controller: { getElapsed, pause, resume, reset, destroy }
+ * Returns a controller: { getElapsed, pause, resume, reset, destroy, ensureTimerAttached }
  */
 
 const SESSION_KEY = (slug) => `cl_timer_${slug || "generic"}`;
@@ -13,7 +13,7 @@ function loadState(slug) {
   try { return JSON.parse(sessionStorage.getItem(SESSION_KEY(slug)) || "null"); } catch { return null; }
 }
 function saveState(slug, st) {
-  try { sessionStorage.setItem(SESSION_KEY(slug), JSON.stringify(st)); } catch {}
+  try { sessionStorage.setItem(SESSION_KEY(slug), JSON.stringify(st)); } catch { }
 }
 
 function fmt(ms) {
@@ -155,7 +155,33 @@ export function createFloatingTimer(slug = "", opts = {}) {
   function destroy() {
     cancelAnimationFrame(rafId);
     root.remove();
+    if (persistenceObserver) {
+      persistenceObserver.disconnect();
+      persistenceObserver = null;
+    }
   }
+
+  // ── Persistence: re-attach timer if DOM gets mutated (e.g., tab switch) ────
+  let persistenceObserver = null;
+  function ensureTimerAttached() {
+    if (!root.parentElement) {
+      document.body.appendChild(root);
+    }
+  }
+
+  function startPersistenceMonitor() {
+    if (persistenceObserver) return;
+    persistenceObserver = new MutationObserver(() => {
+      // On any DOM mutation, check if timer is still attached
+      setTimeout(ensureTimerAttached, 0);
+    });
+    persistenceObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  startPersistenceMonitor();
 
   btnPlay.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -201,7 +227,7 @@ export function createFloatingTimer(slug = "", opts = {}) {
     root.style.cursor = "grab";
   });
 
-  return { getElapsed, pause, resume, reset, destroy };
+  return { getElapsed, pause, resume, reset, destroy, ensureTimerAttached };
 }
 
 function _btnStyle() {

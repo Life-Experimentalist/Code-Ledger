@@ -14,6 +14,19 @@ export class GitHubHandler extends BaseGitHandler {
     super("github", "GitHub");
   }
 
+  static DEFAULT_REPO_TOPICS = [
+    "codeledger",
+    "dsa",
+    "leetcode",
+    "algorithms",
+    "dynamic-programming",
+    "graphs",
+    "trees",
+    "arrays",
+    "hashing",
+    "greedy",
+  ];
+
   getSettingsSchema() {
     return {
       id: this.id,
@@ -102,23 +115,25 @@ export class GitHubHandler extends BaseGitHandler {
                 "Collection of solved DSA problems managed by CodeLedger",
               private: false,
               auto_init: true,
+              has_wiki: false,
+              has_projects: false,
+              has_discussions: false,
+              allow_merge_commit: false,
+              allow_rebase_merge: true,
+              allow_squash_merge: true,
+              delete_branch_on_merge: true,
             }),
           });
           isNewRepo = true;
           // Give GitHub time to initialize the default branch
           await new Promise((resolve) => setTimeout(resolve, 3000));
+          await this._configureRepoPresentation(owner, name, token);
           const refRes = await this.apiFetch(
             `/repos/${owner}/${name}/git/ref/heads/${branch}`,
             token,
           );
           latestCommitSha = refRes.object.sha;
 
-          // Enable GitHub Pages on new repos (best-effort; may fail on free private repos)
-          if (settings["github_pages"] !== false) {
-            this._enablePages(owner, name, branch, token).catch((e) =>
-              this.dbg.warn("GitHub Pages enable failed (non-fatal):", e.message),
-            );
-          }
         } catch (createErr) {
           throw new Error(`Failed to create repository: ${createErr.message}`);
         }
@@ -189,6 +204,12 @@ export class GitHubHandler extends BaseGitHandler {
       { method: "PATCH", body: JSON.stringify({ sha: commitRes.sha }) },
     );
 
+    if (isNewRepo && settings["github_pages"] !== false) {
+      this._enablePages(owner, name, branch, token).catch((e) =>
+        this.dbg.warn("GitHub Pages enable failed (non-fatal):", e.message),
+      );
+    }
+
     this.dbg.log("Atomic commit successful");
   }
 
@@ -213,8 +234,8 @@ export class GitHubHandler extends BaseGitHandler {
    */
   async _getMissingInfraFiles(owner, name, branch, token, settings) {
     const candidates = [
-      { path: "index.html",                            content: () => getPagesHtml(),        skip: settings?.github_pages === false },
-      { path: ".github/workflows/update-stats.yml",   content: () => getActionsWorkflow(),  skip: false },
+      { path: "index.html", content: () => getPagesHtml(), skip: settings?.github_pages === false },
+      { path: ".github/workflows/update-stats.yml", content: () => getActionsWorkflow(), skip: false },
     ];
 
     const results = await Promise.all(
@@ -243,6 +264,29 @@ export class GitHubHandler extends BaseGitHandler {
       body: JSON.stringify({ source: { branch, path: "/" } }),
     });
     this.dbg.log("GitHub Pages enabled:", `https://${owner}.github.io/${name}/`);
+  }
+
+  async _configureRepoPresentation(owner, name, token) {
+    await this.apiFetch(`/repos/${owner}/${name}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({
+        has_wiki: false,
+        has_projects: false,
+        has_discussions: false,
+        allow_merge_commit: false,
+        allow_rebase_merge: true,
+        allow_squash_merge: true,
+        delete_branch_on_merge: true,
+      }),
+    });
+
+    await this.apiFetch(`/repos/${owner}/${name}/topics`, token, {
+      method: "PUT",
+      headers: {
+        Accept: "application/vnd.github.mercy-preview+json",
+      },
+      body: JSON.stringify({ names: GitHubHandler.DEFAULT_REPO_TOPICS }),
+    });
   }
 
   async apiFetch(url, token, options = {}) {

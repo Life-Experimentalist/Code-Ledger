@@ -20,6 +20,7 @@ import { CanonicalView } from "./views/CanonicalView.js";
 import { AIChatsView } from "./views/AIChatsView.js";
 import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
 import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js";
+import { DuplicateDetectionModal, findDuplicates } from "./components/DuplicateDetectionModal.js";
 
 initializeHandlers();
 
@@ -34,6 +35,9 @@ function LibraryApp() {
   const [gitUser, setGitUser] = useState(null);
   const [showGitHubOnboarding, setShowGitHubOnboarding] = useState(false);
   const [onboardingData, setOnboardingData] = useState({ username: "", token: "" });
+  const [graphFocusProblem, setGraphFocusProblem] = useState(null);
+  const [duplicateGroups, setDuplicateGroups] = useState([]);
+  const [currentDuplicateGroup, setCurrentDuplicateGroup] = useState(null);
 
   // Reload problems from IndexedDB (used after import or external change)
   const reloadProblems = useCallback(() => {
@@ -103,6 +107,13 @@ function LibraryApp() {
         if (!mounted) return;
         setProblems(p || []);
         setSettings(s || {});
+
+        // Check for duplicate problems
+        const dups = findDuplicates(p || []);
+        setDuplicateGroups(dups);
+        if (dups.length > 0) {
+          setCurrentDuplicateGroup(dups[0]);
+        }
 
         // Resolve GitHub user for header display
         // Priority 1: OAuth token from auth.tokens (correct path after Connect)
@@ -212,6 +223,22 @@ function LibraryApp() {
     setSettings(updated || {});
   };
 
+  const handleDuplicateResolved = useCallback((deletedId, action) => {
+    // Remove the resolved duplicate from state
+    setProblems((prev) => prev.filter((p) => p.id !== deletedId));
+    // Move to next duplicate group if any remain
+    if (duplicateGroups.length > 0) {
+      const nextGroup = duplicateGroups.slice(1);
+      if (nextGroup.length > 0) {
+        setDuplicateGroups(nextGroup);
+        setCurrentDuplicateGroup(nextGroup[0]);
+      } else {
+        setDuplicateGroups([]);
+        setCurrentDuplicateGroup(null);
+      }
+    }
+  }, [duplicateGroups]);
+
   // Called from SettingsSchema "Set up repository" / "Change repo" button
   const handleSetupRepo = useCallback(async (token, _owner) => {
     const t = token || (await Storage.getAuthToken("github").catch(() => null));
@@ -226,6 +253,12 @@ function LibraryApp() {
     setOnboardingData({ username: uName, token: t });
     setShowGitHubOnboarding(true);
   }, [gitUser]);
+
+  const openProblemInGraph = useCallback((problem) => {
+    if (!problem) return;
+    setGraphFocusProblem({ ...problem });
+    setActiveTab("graph");
+  }, []);
 
   const navItems = [
     { id: "solutions", label: "Solutions", icon: "💡" },
@@ -279,14 +312,14 @@ function LibraryApp() {
       </p>`;
 
     if (activeTab === "search")
-      return html`<${ProblemsView} problems=${enrichedProblems} searchQuery=${searchQuery} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} searchQuery=${searchQuery} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} onOpenGraphProblem=${openProblemInGraph} />`;
 
     if (activeTab === "solutions")
-      return html`<${ProblemsView} problems=${enrichedProblems} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} onOpenGraphProblem=${openProblemInGraph} />`;
     if (activeTab === "analytics")
       return html`<${AnalyticsView} problems=${enrichedProblems} />`;
     if (activeTab === "graph")
-      return html`<${GraphView} problems=${enrichedProblems} />`;
+      return html`<${GraphView} problems=${enrichedProblems} focusProblem=${graphFocusProblem} onFocusProblemHandled=${() => setGraphFocusProblem(null)} onProblemDelete=${handleProblemDelete} onProblemUpdate=${handleProblemUpdate} />`;
     if (activeTab === "ai-chats")
       return html`<${AIChatsView} copyableEnabled=${settings?.aiCopyable === true} problems=${enrichedProblems} settings=${settings} />`;
     if (activeTab === "canonical")
@@ -495,6 +528,15 @@ function LibraryApp() {
         username=${onboardingData.username}
         token=${onboardingData.token}
       />
+
+      <!-- Duplicate detection modal -->
+      ${currentDuplicateGroup ? html`
+        <${DuplicateDetectionModal}
+          duplicateGroup=${currentDuplicateGroup}
+          onResolve=${handleDuplicateResolved}
+          onClose=${() => { setCurrentDuplicateGroup(null); }}
+        />
+      ` : ""}
     </div>
   `;
 }

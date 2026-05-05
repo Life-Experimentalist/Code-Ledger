@@ -9,6 +9,7 @@ const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
 import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
+import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 
@@ -89,7 +90,7 @@ const DIFF_CLASS = {
 
 const CHAT_KEY = (slug) => `cl-chat-${slug}`;
 
-export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList = [], onNavigateProblem }) {
+export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList = [], onNavigateProblem, onOpenGraphProblem }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [copied, setCopied] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
@@ -97,6 +98,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState("");
   const [chatId, setChatId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Edit state
   const [editTitle, setEditTitle] = useState("");
@@ -158,6 +160,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
     favicon: null,
   };
   const problemUrl = meta.url(problem.titleSlug || problem.id || "");
+
   const topics = (Array.isArray(problem.tags) && problem.tags.length > 0
     ? problem.tags
     : problem.topic ? [problem.topic] : []
@@ -177,6 +180,39 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
   const problemIndex = problemList.findIndex((entry) => (entry?.id || entry?.titleSlug) === (problem?.id || problem?.titleSlug));
   const canNavigate = problemList.length > 1 && problemIndex >= 0;
+
+  // Handle refresh of problem statement from handler
+  const handleRefreshData = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const id = encodeURIComponent(problem.titleSlug || problem.id || "");
+      const url = `${problemUrl}${problemUrl.includes("?") ? "&" : "?"}codeledger_fetch=1&cl_fetch_id=${id}`;
+      window.open(url, "_blank", "noopener,noreferrer,width=800,height=600");
+
+      let fetched = false;
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const updated = await Storage.getProblem(problem.id || problem.titleSlug);
+          if (updated?.problemStatement && updated.problemStatement !== problem.problemStatement) {
+            onUpdate?.(updated);
+            fetched = true;
+            break;
+          }
+        } catch (_) { }
+      }
+      if (!fetched) {
+        setChatError("Refresh timeout. Check the opened tab and try again.");
+        setTimeout(() => setChatError(""), 5000);
+      }
+    } catch (e) {
+      setChatError("Refresh failed: " + (e.message || e));
+      setTimeout(() => setChatError(""), 5000);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [problem, refreshing, onUpdate, problemUrl]);
 
   const handleDelete = useCallback(async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -237,18 +273,31 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
     setChatError("");
 
     try {
+      const context = buildAIChatContext({
+        surface: "problem-modal",
+        problem,
+        text,
+        code: problem.code || "",
+        lang: problem.lang,
+        aiReview: problem.aiReview || "",
+        problemStatement: problem.problemStatement || "",
+        hints: problem.hints || [],
+        similar: problem.similar || [],
+        constraints: problem.constraints || "",
+        attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
+        attachedProblems: problem.titleSlug ? [{
+          slug: problem.titleSlug,
+          title: problem.title || problem.titleSlug,
+          platform: problem.platform || "leetcode",
+          url: problemUrl,
+        }] : [],
+      });
+
       const response = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           type: "AI_CHAT",
           messages: updatedMsgs.map(({ role, content }) => ({ role, content })),
-          context: {
-            title: problem.title,
-            difficulty: problem.difficulty,
-            code: problem.code || "",
-            lang: problem.lang,
-            aiReview: problem.aiReview || "",
-            problemStatement: problem.problemStatement || "",
-          },
+          context,
         }, (resp) => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp.response);
@@ -271,6 +320,10 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
           url: problemUrl,
         }] : [],
         surface: "problem-modal",
+        requestType: context.requestType || "",
+        usedCommands: context.usedCommands || [],
+        requestTemplate: text,
+        summary: text.slice(0, 120),
       };
 
       if (chatId) {
@@ -322,7 +375,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
       style="background:rgba(0,0,0,0.8);backdrop-filter:blur(6px)"
       onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div class="relative w-full max-w-[72rem] max-h-[90vh] flex flex-col bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="relative w-full max-w-[72rem] max-h-[calc(100vh-80px)] flex flex-col bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
 
         <!-- ── Header ── -->
         <div class="flex items-start gap-3 p-5 border-b border-white/5 shrink-0">
@@ -340,6 +393,22 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            ${onOpenGraphProblem ? html`
+              <button
+                onClick=${() => onOpenGraphProblem(problem)}
+                class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors"
+                title="Open this problem in the graph"
+              >Graph ↗</button>
+                        ` : ""}
+                        ${problem.submissionsUrl || (problem.platform === "leetcode" && problem.titleSlug) ? html`
+                          <a
+                            href=${problem.submissionsUrl || `https://leetcode.com/problems/${problem.titleSlug}/submissions/`}
+                            target="_blank"
+                            rel="noopener"
+                            class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                            title="View all submissions for this problem"
+                          >Submissions ↗</a>
+            ` : ""}
             ${canNavigate ? html`
               <button
                 onClick=${() => onNavigateProblem?.(problemList[(problemIndex - 1 + problemList.length) % problemList.length])}
@@ -433,6 +502,16 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
                   <span class="text-2xl">📄</span>
                   <p class="text-slate-400 text-sm">No problem statement cached locally.</p>
                   <p class="text-slate-600 text-xs">Open on ${meta.label} to view the full description.</p>
+                  <div class="flex gap-2 mt-3">
+                    <a href=${problemUrl} target="_blank" rel="noopener" class="text-xs text-cyan-400 hover:text-cyan-300">Open ${meta.label} ↗</a>
+                                      <button
+                                        onClick=${handleRefreshData}
+                                        disabled=${refreshing}
+                                        class="text-[10px] px-3 py-1.5 rounded font-medium transition-all ${refreshing
+          ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 cursor-wait"
+          : "bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20"}"
+                                      >${refreshing ? "⏳ Fetching…" : "📥 Fetch Description"}</button>
+                  </div>
                 </div>
               `}
               ${problem.hints?.length ? html`
@@ -544,6 +623,9 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
                 url: problemUrl,
               }] : [],
               surface: "problem-modal",
+              requestType: "",
+              usedCommands: [],
+              requestTemplate: "",
             }).catch(() => { });
           }
         }}

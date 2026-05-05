@@ -24,6 +24,12 @@ function parseMarkdown(text) {
 
   let result = String(text)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\\times/g, "×")
+    .replace(/\\cdot/g, "·")
+    .replace(/\\leq/g, "≤")
+    .replace(/\\geq/g, "≥")
+    .replace(/\\le/g, "≤")
+    .replace(/\\ge/g, "≥")
     .replace(/```([\w-]+)?\n([\s\S]*?)```/g, (match, lang, code) => {
       const clean = escapeHtml(code.trimEnd());
       if ((lang || "").toLowerCase() === "mermaid") {
@@ -38,6 +44,16 @@ function parseMarkdown(text) {
     })
     .replace(/\$\$([\s\S]+?)\$\$/g, (_match, math) => {
       return stash(`<div class="my-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-100 font-mono overflow-x-auto"><span class="text-[10px] uppercase tracking-[0.2em] text-amber-300/70 mr-2">Math</span>${escapeHtml(math.trim())}</div>`);
+    })
+    .replace(/\$([^\$\n]+?)\$/g, (_match, math) => {
+      const normalized = escapeHtml(math.trim())
+        .replace(/\\times/g, "×")
+        .replace(/\\cdot/g, "·")
+        .replace(/\\leq/g, "≤")
+        .replace(/\\geq/g, "≥")
+        .replace(/\\le/g, "≤")
+        .replace(/\\ge/g, "≥");
+      return stash(`<span class="inline-flex items-center px-1.5 py-0.5 rounded-md border border-amber-500/20 bg-amber-500/5 text-amber-100 font-mono text-[0.95em]">${normalized}</span>`);
     })
     .replace(/`([^`\n]+)`/g, (_match, code) => `<code class="px-1 py-0.5 rounded bg-white/10 text-cyan-300 text-[0.85em] font-mono">${escapeHtml(code)}</code>`)
     .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-white mt-4 mb-1">$1</h3>')
