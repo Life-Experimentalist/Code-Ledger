@@ -4,9 +4,10 @@
  */
 
 import { h } from "../../vendor/preact-bundle.js";
-import { useMemo, useState, useEffect } from "../../vendor/preact-bundle.js";
+import { useMemo, useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
+import { ProblemModal } from "../components/ProblemModal.js";
 
 import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
@@ -108,8 +109,10 @@ function toMs(ts) {
   return n < 1e10 ? n * 1000 : n; // < year 2286 in seconds → treat as seconds
 }
 
-export function AnalyticsView({ problems }) {
+export function AnalyticsView({ problems, onNavigate }) {
   const [userMap, setUserMap] = useState({});
+  const [modalProblem, setModalProblem] = useState(null);
+  const [drilldown, setDrilldown] = useState(null); // { label, problems[] }
   useEffect(() => {
     let m = true;
     loadUserDifficultyMap()
@@ -215,6 +218,30 @@ export function AnalyticsView({ problems }) {
 
     return s;
   }, [problems, userMap]);
+
+  const openDrilldown = useCallback((label, filterFn) => {
+    setDrilldown({ label, problems: problems.filter(filterFn) });
+  }, [problems]);
+
+  const handleDifficultyClick = useCallback((label) => {
+    openDrilldown(label, (p) => {
+      const cat = mapDifficulty(p.difficulty, userMap);
+      if (label === "Unknown") return !cat || cat === "Unknown";
+      return cat === label;
+    });
+  }, [openDrilldown, userMap]);
+
+  const handleLangClick = useCallback((label) => {
+    openDrilldown(label, (p) => normalizeLang(p.lang?.name || p.language || "") === label);
+  }, [openDrilldown]);
+
+  const handlePlatformClick = useCallback((label) => {
+    openDrilldown(label, (p) => (PLATFORM_META[p.platform]?.name || p.platform) === label);
+  }, [openDrilldown]);
+
+  const handleTopicClick = useCallback((topic) => {
+    openDrilldown(topic, (p) => (p.tags || []).includes(topic) || p.topic === topic);
+  }, [openDrilldown]);
 
   const chartData = useMemo(() => {
     const sortedTopics = Object.entries(stats.topics).sort(
@@ -322,6 +349,15 @@ export function AnalyticsView({ problems }) {
   return html`
     <div class="flex flex-col gap-6 w-full pb-10">
 
+      <!-- Quick nav to other views -->
+      ${onNavigate ? html`
+        <div class="flex gap-2 items-center">
+          <span class="text-[10px] text-slate-600 uppercase tracking-wider mr-1">Jump to:</span>
+          <button onClick=${() => onNavigate("solutions")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Solutions</button>
+          <button onClick=${() => onNavigate("graph")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Graph</button>
+        </div>
+      ` : ""}
+
       <!-- Quick stats row -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         ${[
@@ -354,7 +390,7 @@ export function AnalyticsView({ problems }) {
             const meta = PLATFORM_META[pid] || { name: pid, color: "#94a3b8", bg: "rgba(148,163,184,0.10)" };
             const pct = (n) => counts.total ? Math.round((n / counts.total) * 100) : 0;
             return html`
-              <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3">
+              <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 cursor-pointer hover:border-white/15 transition-colors" onClick=${() => handlePlatformClick(meta.name)}>
                 <div class="flex items-center justify-between">
                   <span class="text-sm font-semibold" style=${{ color: meta.color }}>${meta.name}</span>
                   <span class="text-lg font-bold text-white">${counts.total}</span>
@@ -388,6 +424,7 @@ export function AnalyticsView({ problems }) {
             <${ChartWrapper}
               type="doughnut"
               data=${chartData.difficultyDonut}
+              onElementClick=${handleDifficultyClick}
               options=${{
                 responsive: true,
                 maintainAspectRatio: false,
@@ -449,6 +486,7 @@ export function AnalyticsView({ problems }) {
             <${ChartWrapper}
               type="pie"
               data=${chartData.langPie}
+              onElementClick=${handleLangClick}
               options=${{
                 plugins: {
                   legend: { position: "bottom", labels: { color: "#94a3b8", usePointStyle: true, boxWidth: 8, font: { size: 10 } } },
@@ -467,7 +505,7 @@ export function AnalyticsView({ problems }) {
             ${topTopics.map(([topic, counts]) => {
               const barPct = Math.round((counts.total / maxTopicCount) * 100);
               return html`
-                <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-xl hover:border-cyan-900/50 transition-colors cursor-pointer group">
+                <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-xl hover:border-cyan-900/50 transition-colors cursor-pointer group" onClick=${() => handleTopicClick(topic)}>
                   <div class="flex justify-between items-center mb-2">
                     <span class="font-medium text-sm text-slate-300 group-hover:text-cyan-400 transition-colors truncate pr-2">${topic}</span>
                     <span class="text-xs font-mono text-slate-500 shrink-0">${counts.total} solved</span>
@@ -519,6 +557,50 @@ export function AnalyticsView({ problems }) {
           </div>
         </div>
       </div>
+      <!-- Drilldown panel -->
+      ${drilldown ? html`
+        <div class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick=${(e) => { if (e.target === e.currentTarget) setDrilldown(null); }}>
+          <div class="bg-[#0d0d14] border border-white/10 rounded-2xl w-full max-w-lg max-h-[70vh] flex flex-col shadow-2xl">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
+              <div class="flex flex-col">
+                <span class="text-sm font-bold text-white">${drilldown.label}</span>
+                <span class="text-[11px] text-slate-500">${drilldown.problems.length} problem${drilldown.problems.length !== 1 ? "s" : ""}</span>
+              </div>
+              <button onClick=${() => setDrilldown(null)} class="text-slate-500 hover:text-white text-xl leading-none px-1">✕</button>
+            </div>
+            <div class="overflow-y-auto flex-1 px-3 py-3 flex flex-col gap-1.5">
+              ${drilldown.problems.length === 0
+                ? html`<p class="text-slate-500 text-sm text-center py-8">No problems found.</p>`
+                : drilldown.problems.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).map((p) => {
+                    const diffCls = p.difficulty === "Easy" ? "text-emerald-400" : p.difficulty === "Medium" ? "text-amber-400" : p.difficulty === "Hard" ? "text-rose-400" : "text-slate-500";
+                    return html`
+                      <button
+                        class="w-full text-left px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.07] hover:border-cyan-500/20 transition-colors"
+                        onClick=${() => { setModalProblem(p); setDrilldown(null); }}
+                      >
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-sm text-slate-200 leading-snug truncate">${p.title || p.titleSlug}</span>
+                          <span class="text-[11px] ${diffCls} shrink-0">${p.difficulty || "?"}</span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5 text-[10px] text-slate-600">
+                          <span>${p.platform || ""}</span>
+                          ${p.lang?.name ? html`<span>· ${p.lang.name}</span>` : ""}
+                        </div>
+                      </button>
+                    `;
+                  })
+              }
+            </div>
+          </div>
+        </div>
+      ` : ""}
+
+      <${ProblemModal}
+        problem=${modalProblem}
+        onClose=${() => setModalProblem(null)}
+        problemList=${problems}
+        onNavigateProblem=${setModalProblem}
+      />
     </div>
   `;
 }

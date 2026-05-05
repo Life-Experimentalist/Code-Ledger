@@ -11,8 +11,8 @@ import { ProblemModal } from "../components/ProblemModal.js";
 
 /* ── Force simulation constants ─────────────────────────────────────── */
 const REPULSION = 3500;
-const LINK_DIST = { "topic-problem": 100, similar: 80, canonical: 60, "topic-topic": 220 };
-const LINK_STR = { "topic-problem": 0.45, similar: 0.08, canonical: 0.5, "topic-topic": 0.25 };
+const LINK_DIST = { "topic-problem": 100, similar: 80, canonical: 60 };
+const LINK_STR  = { "topic-problem": 0.45, similar: 0.08, canonical: 0.5 };
 // Very weak gravity toward origin — NOT alpha-scaled.
 // At radius 700: force = 700 × 0.0008 = 0.56 px/frame.
 // Repulsion at 50px: 3500/2501 ≈ 1.4 px/frame — repulsion wins at short range.
@@ -55,6 +55,27 @@ function simulationStep(nodes, edges, alpha) {
     const f = (d - ld) * str * alpha;
     a.fx += (f * dx) / d; a.fy += (f * dy) / d;
     b.fx -= (f * dx) / d; b.fy -= (f * dy) / d;
+  }
+
+  // Single-topic orbit: problems with exactly one topic connection orbit at ~80px from it
+  const problemTopicCount = new Map();
+  const singleTopicMap = new Map();
+  for (const e of edges) {
+    if (e.type !== "topic-problem") continue;
+    const pId = e.target;
+    problemTopicCount.set(pId, (problemTopicCount.get(pId) || 0) + 1);
+    singleTopicMap.set(pId, e.source);
+  }
+  for (const [problemId, topicId] of singleTopicMap) {
+    if ((problemTopicCount.get(problemId) || 0) !== 1) continue;
+    const p = nodeMap.get(problemId);
+    const t = nodeMap.get(topicId);
+    if (!p || !t) continue;
+    const dx = t.x - p.x, dy = t.y - p.y;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const pull = (d - 80) * 0.012 * alpha;
+    p.fx += (pull * dx) / d;
+    p.fy += (pull * dy) / d;
   }
 
   // Constant weak gravity toward origin — not alpha-scaled so it never dominates repulsion
@@ -215,17 +236,15 @@ const LOD_PROBLEM_LABEL_SCALE = 1.1;
 
 /* ── Drawing ─────────────────────────────────────────────────────────── */
 const EDGE_COLOR = {
-  "topic-problem": "#64748b",  // Brighter slate-500
-  similar: "#3b82f6",          // Bright blue
-  canonical: "#f59e0b",        // Bright amber
-  "topic-topic": "#475569",    // Brighter slate-600
+  "topic-problem": "#64748b",
+  similar: "#3b82f6",
+  canonical: "#f59e0b",
 };
 
 const EDGE_GLOW_COLOR = {
-  "topic-problem": "#94a3b833", // Soft glow
+  "topic-problem": "#94a3b833",
   similar: "#3b82f633",
   canonical: "#f59e0b33",
-  "topic-topic": "#47556933",
 };
 
 function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
@@ -393,7 +412,7 @@ const PLATFORM_FAVICON = {
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
 
 /* ── Component ───────────────────────────────────────────────────────── */
-export function GraphView({ problems, focusProblem = null, onFocusProblemHandled = null, onProblemDelete = null, onProblemUpdate = null }) {
+export function GraphView({ problems, focusProblem = null, onFocusProblemHandled = null, onProblemDelete = null, onProblemUpdate = null, onNavigate = null }) {
   const canvasRef = useRef(null);
   const simRef = useRef({ nodes: [], edges: [], alpha: 0, raf: null });
   const transformRef = useRef({ tx: 0, ty: 0, scale: 1 });
@@ -562,9 +581,22 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
     }
 
     const drawNodeIds = new Set(visibleProblemIds);
+
+    // Only add topic nodes directly connected to a VISIBLE problem node.
+    // Scoping to topic-problem edges prevents unrelated topics bleeding in.
     for (const e of edges) {
-      if (visibleProblemIds.has(e.source)) drawNodeIds.add(e.target);
-      if (visibleProblemIds.has(e.target)) drawNodeIds.add(e.source);
+      if (e.type !== "topic-problem") continue;
+      if (visibleProblemIds.has(e.target)) drawNodeIds.add(e.source); // source = topic
+      if (visibleProblemIds.has(e.source)) drawNodeIds.add(e.target); // target = topic
+    }
+
+    // Also draw similar/canonical edges between visible problems
+    for (const e of edges) {
+      if (e.type === "topic-problem") continue;
+      if (visibleProblemIds.has(e.source) && visibleProblemIds.has(e.target)) {
+        drawNodeIds.add(e.source);
+        drawNodeIds.add(e.target);
+      }
     }
 
     // Keep matching topic nodes discoverable even when no problem currently visible.
@@ -917,6 +949,15 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
   return html`
     <div class="flex flex-col gap-4 w-full h-full min-h-[600px]">
 
+      <!-- Quick nav to other views -->
+      ${onNavigate ? html`
+        <div class="flex gap-2 items-center">
+          <span class="text-[10px] text-slate-600 uppercase tracking-wider mr-1">Jump to:</span>
+          <button onClick=${() => onNavigate("solutions")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Solutions</button>
+          <button onClick=${() => onNavigate("analytics")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Analytics</button>
+        </div>
+      ` : ""}
+
       <!-- Toolbar -->
       <div class="flex items-center gap-3 flex-wrap">
         <div class="flex gap-2 text-xs text-slate-400">
@@ -998,6 +1039,18 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
           onClick=${reLayout}
           class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-colors"
         >↺ Re-layout</button>
+        ${(filterDifficultyGraph !== "All" || filterPlatformGraph !== "All" || filterTopicGraph !== "All" || filterSolved || graphSearch) ? html`
+          <button
+            onClick=${() => {
+              setFilterDifficultyGraph("All");
+              setFilterPlatformGraph("All");
+              setFilterTopicGraph("All");
+              setFilterSolved(false);
+              setGraphSearch("");
+            }}
+            class="text-xs px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 transition-colors"
+          >✕ Clear filters</button>
+        ` : ""}
       </div>
 
       ${graphSearch && searchResults.length ? html`

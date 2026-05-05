@@ -52,16 +52,26 @@ class CanonicalMapper {
       return;
     }
 
-    try {
-      const headers = etag ? { 'If-None-Match': etag } : {};
-      const res = await fetch(CONSTANTS.URLS.CANONICAL_MAP_RAW, { headers });
+    const headers = etag ? { 'If-None-Match': etag } : {};
+    const urls = [CONSTANTS.URLS.CANONICAL_MAP, CONSTANTS.URLS.CANONICAL_MAP_RAW];
+    let res = null;
 
-      if (res.status === 304 && data) {
+    for (const url of urls) {
+      try {
+        res = await fetch(url, { headers });
+        if (res.ok || res.status === 304) break;
+      } catch (_) {
+        res = null;
+      }
+    }
+
+    try {
+      if (res?.status === 304 && data) {
         this.lastFetch = Date.now();
         return;
       }
 
-      if (res.ok) {
+      if (res?.ok) {
         const json = await res.json();
         const newEtag = res.headers.get('ETag');
         await storage.local.set({
@@ -72,7 +82,7 @@ class CanonicalMapper {
         this.lastFetch = Date.now();
       }
     } catch (err) {
-      dbg.error('Failed to fetch canonical map', err);
+      dbg.error('Failed to load canonical map', err);
       if (data) this.populate(data);
     }
   }

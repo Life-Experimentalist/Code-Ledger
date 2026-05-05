@@ -226,4 +226,24 @@ export const Storage = {
     }
     await browserStorage.local.set({ [key]: map });
   },
+
+  async markRenameNeeded(id, { oldBase, newBase }) {
+    const all = await this._getRenames();
+    const filtered = all.filter(r => r.id !== id);
+    filtered.push({ id, oldBase, newBase, ts: Date.now() });
+    await browserStorage.local.set({ "cl.renames": JSON.stringify(filtered) });
+  },
+
+  async getPendingRenames() {
+    return this._getRenames();
+  },
+
+  async clearPendingRenames() {
+    await browserStorage.local.set({ "cl.renames": "[]" });
+  },
+
+  async _getRenames() {
+    const raw = await browserStorage.local.get("cl.renames");
+    try { return JSON.parse(raw["cl.renames"] || "[]"); } catch { return []; }
+  },
 };

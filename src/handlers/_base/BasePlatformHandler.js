@@ -4,6 +4,7 @@
  */
 
 import { createDebugger } from '../../lib/debug.js';
+import { PlatformTimer } from '../../core/platform-timer.js';
 
 export class BasePlatformHandler {
   constructor(id, name, config) {
@@ -11,6 +12,7 @@ export class BasePlatformHandler {
     this.name = name;
     this.config = config;
     this.dbg = createDebugger(`${name}Handler`);
+    this._timer = new PlatformTimer();
   }
 
   /**
@@ -53,6 +55,5 @@ export class BasePlatformHandler {
 
   // To be implemented by subclasses
   async detectSubmission() { throw new Error('Not implemented'); }
-  async getProblemMetadata() { throw new Error('Not implemented'); }
   async getSolutionCode() { throw new Error('Not implemented'); }
 }

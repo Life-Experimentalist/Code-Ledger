@@ -13,6 +13,7 @@ import { CONSTANTS } from "../core/constants.js";
 import { buildConversationSystemPrompt } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
 import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
+import { buildProblemFiles, problemBase } from "../core/path-builder.js";
 
 // Init background
 async function init() {
@@ -40,18 +41,25 @@ function getProblemCommitKey(problem = {}) {
   return normLang ? `${slug}::${normLang}` : slug;
 }
 
-function getProblemFiles(problem = {}) {
-  const out = [];
-  if (problem.files && Array.isArray(problem.files) && problem.files.length > 0) {
-    for (const f of problem.files) {
-      if (f.path && f.content != null) out.push(f);
-    }
-  } else if (problem.code) {
-    const langName = problem.lang?.name || "Solution";
-    const langExt = problem.lang?.ext || "txt";
-    out.push({ path: `topics/${problem.topic || "Untagged"}/${problem.titleSlug}/${langName}.${langExt}`, content: problem.code });
+function getProblemFiles(problem = {}, settings = {}) {
+  const files = buildProblemFiles(problem, settings);
+  if (files.length > 0) return files;
+
+  // Fallback for legacy records that lack readmeContent/code on the object.
+  if (problem.code) {
+    const lang = problem.lang || { verbose: "Solution", name: "solution", ext: "txt" };
+    const canonical = problem.canonical || null;
+    const slug = problem.titleSlug || String(problem.id || "unknown");
+    const root = (settings?.problems_dir || "problems").replace(/\/+$/, "");
+    const dir  = canonical?.canonicalId || slug;
+    const verbose = (lang.verbose || lang.name || "Solution").replace(/\s+/g, "_");
+    const ext = lang.ext || "txt";
+    const filePath = canonical?.canonicalId
+      ? `${root}/${dir}/${problem.platform}/${verbose}.${ext}`
+      : `${root}/${dir}/${verbose}.${ext}`;
+    return [{ path: filePath, content: problem.code }];
   }
-  return out;
+  return [];
 }
 async function handleSolved(data) {
   coreDebug.log("Handling solve event", data);
@@ -97,7 +105,16 @@ async function handleSolved(data) {
   }
 
   // 3. AI Review (if enabled)
+  // Note: settings is loaded here so rename detection below can use it too
   const settings = await Storage.getSettings();
+
+  // Detect canonical path migration — schedule rename if stored base differs from new base
+  if (data.canonical?.id && data._storedBasePath) {
+    const expectedBase = problemBase(data.titleSlug || data.id, { canonicalId: data.canonical.id }, settings);
+    if (data._storedBasePath !== expectedBase) {
+      await Storage.markRenameNeeded(data.id, { oldBase: data._storedBasePath, newBase: expectedBase }).catch(() => { });
+    }
+  }
   if (settings.autoReview) {
     const providerPlan = [
       {
@@ -169,7 +186,7 @@ async function handleSolved(data) {
       const filesToCommit = [];
       const seenPaths = new Set();
       for (const p of pendingProblems) {
-        for (const f of getProblemFiles(p)) {
+        for (const f of getProblemFiles(p, settings)) {
           if (!f?.path || seenPaths.has(f.path)) continue;
           seenPaths.add(f.path);
           filesToCommit.push(f);
@@ -198,6 +215,20 @@ async function handleSolved(data) {
         pendingProblems.map((p) => getProblemCommitKey(p)).filter(Boolean),
       ).catch(() => { });
       coreDebug.log("Git commit successful", titleSlug, langName);
+
+      if (settings.notifications !== false) {
+        try {
+          chrome.notifications.create({
+            type: "basic",
+            iconUrl: chrome.runtime.getURL("assets/icons/icon48.png"),
+            title: "CodeLedger: Committed!",
+            message: `${data.title || titleSlug} saved to GitHub.`,
+          });
+        } catch (_) { }
+      }
+
+      // Fire-and-forget: rename files to canonical paths if needed
+      performPendingRenames().catch(() => { });
 
       // Push to any configured mirrors (fire-and-forget; failures are non-fatal)
       await pushToMirrors(filesToCommit, commitMsg, commitOpts, settings);
@@ -236,6 +267,63 @@ async function pushToMirrors(files, message, commitOpts, settings) {
   );
 }
 
+/**
+ * Performs pending canonical renames as a single maintenance commit.
+ * Called fire-and-forget after a normal solve commit.
+ */
+async function performPendingRenames() {
+  const renames = await Storage.getPendingRenames().catch(() => []);
+  if (!renames.length) return;
+
+  const settings = await Storage.getSettings();
+  const git = registry.getGitProvider(settings.gitProvider || "github");
+  if (!git) return;
+  const token = await git.getToken().catch(() => null);
+  if (!token) return;
+
+  const userRes = await git.apiFetch("/user", token).catch(() => null);
+  const owner = settings.github_owner?.trim() || userRes?.login;
+  const repo  = (settings.github_repo || settings.gitRepo || "").replace(/\s+/g, "-");
+  if (!owner || !repo) return;
+
+  const filesToAdd = [];
+  const pathsToDelete = [];
+
+  for (const r of renames) {
+    try {
+      const tree = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`, token);
+      const relevant = (tree.tree || []).filter(f => f.type === "blob" && f.path.startsWith(r.oldBase + "/"));
+      for (const f of relevant) {
+        const newPath = f.path.replace(r.oldBase, r.newBase);
+        const blob = await git.apiFetch(`/repos/${owner}/${repo}/git/blobs/${f.sha}`, token);
+        const content = atob((blob.content || "").replace(/\n/g, ""));
+        filesToAdd.push({ path: newPath, content });
+        pathsToDelete.push(f.path);
+      }
+    } catch (e) {
+      coreDebug.warn("Rename preflight failed for", r.oldBase, e.message);
+    }
+  }
+
+  if (!filesToAdd.length && !pathsToDelete.length) {
+    await Storage.clearPendingRenames().catch(() => { });
+    return;
+  }
+
+  try {
+    await git.commit(
+      filesToAdd,
+      `chore: reorganise ${renames.length} problem(s) to canonical paths [maintenance]`,
+      repo,
+      { deletes: pathsToDelete },
+    );
+    await Storage.clearPendingRenames().catch(() => { });
+    coreDebug.log("Canonical renames committed:", renames.length);
+  } catch (e) {
+    coreDebug.error("Rename commit failed:", e.message);
+  }
+}
+
 async function buildIndexJson() {
   const problems = await Storage.getAllProblems();
   const stats = {
@@ -246,56 +334,6 @@ async function buildIndexJson() {
   };
 
   return JSON.stringify({ updatedAt: new Date().toISOString(), stats, problems }, null, 2);
-}
-
-/**
- * Fetches recent accepted submissions from LeetCode's public GraphQL API.
- * The background SW has host_permissions for leetcode.com so there are no CORS issues.
- * Limited to 20 results via the public API — full history requires an authenticated session.
- */
-async function handleLeetCodeImport(username, limit) {
-  if (!username) throw new Error("Username is required");
-
-  const query = `query recentAcSubmissions($username: String!, $limit: Int!) {
-    recentAcSubmissionList(username: $username, limit: $limit) {
-      id title titleSlug timestamp lang
-    }
-  }`;
-
-  const res = await fetch("https://leetcode.com/graphql", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, variables: { username, limit } }),
-  });
-
-  if (!res.ok) throw new Error("LeetCode API returned " + res.status);
-  const data = await res.json();
-  const submissions = data?.data?.recentAcSubmissionList || [];
-
-  let imported = 0;
-  for (const sub of submissions) {
-    const ts = Number(sub.timestamp) * 1000;
-    const slug = (sub.lang || "").toLowerCase().replace(/\s+/g, "");
-    const problemId = `${sub.titleSlug}::${slug || "unknown"}`;
-    const existing = await Storage.getProblem?.(problemId).catch(() => null);
-    if (existing) continue; // skip already tracked
-    await Storage.saveProblem({
-      id: problemId, // Required: keyPath for IDBObjectStore
-      title: sub.title,
-      titleSlug: sub.titleSlug,
-      platform: "leetcode",
-      difficulty: "Unknown",
-      lang: { name: slug, ext: slug, slug },
-      tags: [],
-      timestamp: ts,
-      code: "",
-      url: "https://leetcode.com/problems/" + sub.titleSlug + "/",
-    });
-    await Storage.markPendingProblemKey(`${sub.titleSlug}::${slug || "unknown"}`).catch(() => { });
-    imported++;
-  }
-
-  return { total: submissions.length, imported };
 }
 
 /** Counts how many local problems are missing from the remote repo, without committing. */
@@ -374,7 +412,7 @@ async function handleResyncAll(mode = "bulk") {
   if (mode === "individual") {
     // One backdated commit per problem, sorted chronologically
     const historicalCommits = missing.map((p) => ({
-      files: getProblemFiles(p),
+      files: getProblemFiles(p, settings),
       message: "[" + (p.topic || "Untagged") + "] " + (p.title || p.titleSlug) + " solved",
       date: p.timestamp ? new Date(p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000) : new Date(),
       repoName,
@@ -388,7 +426,7 @@ async function handleResyncAll(mode = "bulk") {
     // Bulk: single atomic commit
     const filesToCommit = [];
     for (const problem of missing) {
-      for (const f of getProblemFiles(problem)) filesToCommit.push(f);
+      for (const f of getProblemFiles(problem, settings)) filesToCommit.push(f);
     }
     filesToCommit.push({ path: "index.json", content: await buildIndexJson() });
     await git.commit(
@@ -409,7 +447,7 @@ async function handleResyncAll(mode = "bulk") {
 
   // Mirror the bulk sync
   const allFiles = [];
-  for (const p of missing) for (const f of getProblemFiles(p)) allFiles.push(f);
+  for (const p of missing) for (const f of getProblemFiles(p, settings)) allFiles.push(f);
   allFiles.push({ path: "index.json", content: await buildIndexJson() });
   await pushToMirrors(allFiles, "chore: sync " + missing.length + " problem(s) [CodeLedger]", {}, settings);
 
@@ -491,16 +529,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // to click the toolbar action directly.
 try {
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    // LeetCode profile import via background (bypasses CORS)
-    if (msg && msg.type === "LEETCODE_IMPORT") {
-      const username = msg.username || "";
-      const limit = Math.min(msg.limit || 20, 100);
-      handleLeetCodeImport(username, limit)
-        .then((result) => sendResponse({ ok: true, ...result }))
-        .catch((e) => sendResponse({ ok: false, error: e.message }));
-      return true; // async response
-    }
-
     if (msg && msg.type === "RESYNC_COUNT") {
       handleResyncCount()
         .then((result) => sendResponse({ ok: true, ...result }))

@@ -12,6 +12,9 @@ import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
+import { modalTabRegistry } from "../../core/modal-tab-registry.js";
+// Side-effect: registers LeetCode tabs into modalTabRegistry
+import "../../handlers/platforms/leetcode/modal-tabs.js";
 
 function renderMarkdown(md) {
   if (!md) return "";
@@ -100,16 +103,6 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const [chatId, setChatId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Edit state
-  const [editTitle, setEditTitle] = useState("");
-  const [editDifficulty, setEditDifficulty] = useState("Unknown");
-  const [editTags, setEditTags] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
-  const [editSaved, setEditSaved] = useState(false);
-  const [editError, setEditError] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
   // Reset tab and load chat history when problem changes
   useEffect(() => {
     setActiveTab("overview");
@@ -118,17 +111,6 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
       setChatInput("");
       setChatError("");
       setChatId(null);
-      // Seed edit fields
-      setEditTitle(problem.title || "");
-      setEditDifficulty(problem.difficulty || "Unknown");
-      const existingTags = Array.isArray(problem.tags) && problem.tags.length > 0
-        ? problem.tags.join(", ")
-        : problem.topic && problem.topic !== "Untagged" ? problem.topic : "";
-      setEditTags(existingTags);
-      setEditSaved(false);
-      setEditError("");
-      setConfirmDelete(false);
-      setDeleting(false);
 
       if (problem.titleSlug) {
         getChatsByProblem(problem.titleSlug)
@@ -181,6 +163,14 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const problemIndex = problemList.findIndex((entry) => (entry?.id || entry?.titleSlug) === (problem?.id || problem?.titleSlug));
   const canNavigate = problemList.length > 1 && problemIndex >= 0;
 
+  // Siblings: same problem solved in a different language or on a different platform
+  const siblings = problemList.filter((p) => {
+    if (!p || p.id === problem.id) return false;
+    const sameSlug = p.titleSlug && p.titleSlug === problem.titleSlug;
+    const sameCanonical = p.canonical?.id && p.canonical.id === problem.canonical?.id;
+    return sameSlug || sameCanonical;
+  });
+
   // Handle refresh of problem statement from handler
   const handleRefreshData = useCallback(async () => {
     if (refreshing) return;
@@ -213,53 +203,6 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
       setRefreshing(false);
     }
   }, [problem, refreshing, onUpdate, problemUrl]);
-
-  const handleDelete = useCallback(async () => {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    setDeleting(true);
-    try {
-      await Storage.deleteProblem(problem.id);
-      if (onDelete) onDelete(problem.id);
-      onClose();
-    } catch (e) {
-      setEditError("Delete failed: " + (e.message || e));
-      setDeleting(false);
-      setConfirmDelete(false);
-    }
-  }, [confirmDelete, problem, onDelete, onClose]);
-
-  const handleSaveEdit = useCallback(async () => {
-    setEditSaving(true);
-    setEditError("");
-    try {
-      const newTags = editTags.split(",").map(t => t.trim()).filter(Boolean);
-      const updated = {
-        ...problem,
-        title: editTitle.trim() || problem.title,
-        difficulty: editDifficulty,
-        tags: newTags,
-        topic: newTags[0] || problem.topic || "Untagged",
-        manuallyEdited: true,
-      };
-      await Storage.saveProblem(updated);
-      {
-        const slug = String(updated.titleSlug || updated.slug || updated.id || "").trim();
-        const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || updated.language || "";
-        const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
-        const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
-        if (pendingKey) {
-          await Storage.markPendingProblemKey(pendingKey).catch(() => { });
-        }
-      }
-      setEditSaved(true);
-      setTimeout(() => setEditSaved(false), 2500);
-      if (onUpdate) onUpdate(updated);
-    } catch (e) {
-      setEditError("Save failed: " + (e.message || e));
-    } finally {
-      setEditSaving(false);
-    }
-  }, [problem, editTitle, editDifficulty, editTags, onUpdate]);
 
   const sendChat = async () => {
     const text = chatInput.trim();
@@ -360,14 +303,11 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
     } catch (_) { }
   };
 
-  const tabs = [
-    { id: "overview", label: "Overview" },
-    ...(problem.code ? [{ id: "code", label: "Code" }] : []),
-    ...(problem.aiReview ? [{ id: "review", label: "AI Review" }] : []),
-    ...((problem.similar?.length) ? [{ id: "similar", label: `Similar (${problem.similar.length})` }] : []),
-    ...(isExtension ? [{ id: "chat", label: "Ask AI" }] : []),
-    { id: "edit", label: "Edit" },
-  ];
+  const registryTabs = modalTabRegistry.getTabs(problem.platform || "leetcode", problem);
+  const tabs = registryTabs.map(tab => ({
+    id: tab.id,
+    label: typeof tab.label === "function" ? tab.label(problem) : tab.label,
+  }));
 
   return html`
     <div
@@ -473,6 +413,30 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
           </div>
         ` : ""}
 
+        <!-- ── Siblings (same problem, other language / platform) ── -->
+        ${siblings.length ? html`
+          <div class="flex items-center gap-2 px-5 pt-3 shrink-0 flex-wrap">
+            <span class="text-[10px] uppercase tracking-wider text-slate-600 shrink-0">Also solved as</span>
+            ${siblings.map(sib => {
+              const sibMeta = PLATFORM_META[sib.platform] || { label: sib.platform || "?", favicon: null };
+              const sibLang = sib.lang?.name || sib.language || "?";
+              const isSamePlatform = sib.platform === problem.platform;
+              return html`
+                <button
+                  onClick=${() => onNavigateProblem?.(sib)}
+                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-white/20 transition-colors"
+                  title="Open ${sibMeta.label} / ${sibLang} solution"
+                >
+                  ${sibMeta.favicon ? html`<img src=${sibMeta.favicon} alt="" class="w-3 h-3 object-contain"
+                    onError=${(e) => { e.target.style.display = "none"; }} />` : ""}
+                  ${!isSamePlatform ? html`<span class="text-slate-500">${sibMeta.label}</span>` : ""}
+                  <span class="font-mono text-cyan-400/80">${sibLang}</span>
+                </button>
+              `;
+            })}
+          </div>
+        ` : ""}
+
         <!-- ── Tabs ── -->
         ${tabs.length > 1 ? html`
           <div class="flex gap-0.5 px-5 pt-3 border-b border-white/5 shrink-0">
@@ -489,252 +453,31 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
 
         <!-- ── Tab content ── -->
         <div class="flex-1 overflow-y-auto p-5 min-h-0">
-
-          ${activeTab === "overview" ? html`
-            <div class="flex flex-col gap-4">
-              ${problem.problemStatement ? html`
-                <div
-                  class="text-sm text-slate-300 leading-relaxed lc-content"
-                  dangerouslySetInnerHTML=${{ __html: problem.problemStatement }}
-                ></div>
-              ` : html`
-                <div class="flex flex-col items-center justify-center py-8 gap-3 text-center">
-                  <span class="text-2xl">📄</span>
-                  <p class="text-slate-400 text-sm">No problem statement cached locally.</p>
-                  <p class="text-slate-600 text-xs">Open on ${meta.label} to view the full description.</p>
-                  <div class="flex gap-2 mt-3">
-                    <a href=${problemUrl} target="_blank" rel="noopener" class="text-xs text-cyan-400 hover:text-cyan-300">Open ${meta.label} ↗</a>
-                                      <button
-                                        onClick=${handleRefreshData}
-                                        disabled=${refreshing}
-                                        class="text-[10px] px-3 py-1.5 rounded font-medium transition-all ${refreshing
-          ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 cursor-wait"
-          : "bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20"}"
-                                      >${refreshing ? "⏳ Fetching…" : "📥 Fetch Description"}</button>
-                  </div>
-                </div>
-              `}
-              ${problem.hints?.length ? html`
-                <div class="mt-2">
-                  <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-2">Hints</p>
-                  ${problem.hints.map((h, i) => html`
-                    <details class="mb-1 group">
-                      <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 select-none">Hint ${i + 1}</summary>
-                      <p class="text-xs text-slate-400 mt-1 pl-3 border-l border-white/10">${h}</p>
-                    </details>
-                  `)}
-                </div>
-              ` : ""}
-            </div>
-          ` : ""}
-
-          ${activeTab === "code" ? html`
-            <div class="flex flex-col gap-2">
-              <div class="flex justify-between items-center">
-                <span class="text-[10px] uppercase tracking-wider text-slate-600">${langName || "Solution"}</span>
-                <button
-                  onClick=${copyCode}
-                  class="text-[10px] px-2.5 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                >${copied ? "✓ Copied" : "Copy"}</button>
-              </div>
-              <pre class="text-xs text-slate-300 leading-relaxed overflow-x-auto bg-black/50 rounded-xl border border-white/5 p-4 whitespace-pre font-mono m-0">${problem.code || "// No code saved for this problem."}</pre>
-            </div>
-          ` : ""}
-
-          ${activeTab === "review" ? html`
-            <div
-              class="text-sm text-slate-300 leading-relaxed prose-sm"
-            >
-              ${problem.aiReview ? html`<${AIMarkdownRenderer} content=${problem.aiReview} copyableEnabled=${false} />` : html`<p class='text-slate-500'>No AI review available.</p>`}
-            </div>
-          ` : ""}
-
-          ${activeTab === "chat" ? html`
-            <div class="flex flex-col gap-3 h-full">
-              <!-- Message list -->
-              <div class="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0 max-h-[340px]">
-                ${chatMessages.length === 0 ? html`
-                  <div class="flex flex-col items-center justify-center py-10 gap-2 text-center">
-                    <span class="text-2xl">💬</span>
-                    <p class="text-slate-400 text-sm">Ask anything about this problem or your solution.</p>
-                    <p class="text-slate-600 text-xs">Uses your configured AI provider.</p>
-                  </div>
-                ` : chatMessages.map((msg) => html`
-                  <div class="flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}">
-                    ${msg.role === "user" ? html`
-                    <div class="max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed bg-cyan-600/20 border border-cyan-500/30 text-cyan-100 whitespace-pre-wrap">${msg.content}</div>
-                  ` : html`
-                    <div
-                      class="max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed bg-white/5 border border-white/10 text-slate-200"
-                    >
-                      <${AIMarkdownRenderer} content=${msg.content} copyableEnabled=${false} />
-                    </div>
-                  `}
-                    <span class="text-[9px] text-slate-700">${msg.role === "user" ? "You" : "AI"}</span>
-                  </div>
-                `)}
-                ${chatPending ? html`
-                  <div class="flex items-start gap-2">
-                    <div class="px-3 py-2 bg-white/5 border border-white/10 rounded-xl">
-                      <span class="text-xs text-slate-500 animate-pulse">Thinking…</span>
-                    </div>
-                  </div>
-                ` : ""}
-                ${chatError ? html`
-                  <p class="text-xs text-rose-400 px-1">${chatError}</p>
-                ` : ""}
-              </div>
-              <!-- Input row -->
-              <div class="shrink-0">
-                <${MultiLineAIChatInput}
-                  value=${chatInput}
-                  onChange=${setChatInput}
-                  onSend=${sendChat}
-                  disabled=${chatPending}
-                  problem=${problem}
-                />
-              </div>
-              <div class="flex items-center justify-between gap-2 shrink-0">
-                <div class="flex items-center gap-2">
-                  <button
-                    onClick=${sendChat}
-                    disabled=${chatPending || !chatInput.trim()}
-                    class="px-4 py-2 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg transition-colors disabled:opacity-40 shrink-0"
-                  >Send</button>
-                  <button
-                    onClick=${openAIChatsView}
-                    class="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 hover:text-cyan-200 hover:border-cyan-500/30 text-xs rounded-lg transition-colors shrink-0"
-                  >Open AI Chats</button>
-                </div>
-                ${chatMessages.length > 0 ? html`
-                  <button
-                    onClick=${async () => {
-          setChatMessages([]);
-          setChatError("");
-          if (chatId) {
-            await updateAIChat(chatId, [], {
-              problemTitle: problem.title || "",
-              problemTags: Array.isArray(problem.tags) ? problem.tags : [],
-              attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
-              attachedProblems: problem.titleSlug ? [{
-                slug: problem.titleSlug,
-                title: problem.title || problem.titleSlug,
-                platform: problem.platform || "leetcode",
-                url: problemUrl,
-              }] : [],
-              surface: "problem-modal",
-              requestType: "",
-              usedCommands: [],
-              requestTemplate: "",
-            }).catch(() => { });
-          }
-        }}
-                    class="px-3 py-2 bg-white/5 border border-white/10 text-slate-500 hover:text-slate-300 text-xs rounded-lg transition-colors shrink-0"
-                    title="Clear history"
-                  >✕</button>
-                ` : ""}
-              </div>
-            </div>
-          ` : ""}
-
-          ${activeTab === "similar" ? html`
-            <div class="flex flex-col gap-2">
-              ${(problem.similar || []).length === 0 ? html`
-                <p class="text-slate-500 text-sm text-center py-4">No similar problems found.</p>
-              ` : (problem.similar || []).map(s => {
-          const sUrl = `https://leetcode.com/problems/${s.titleSlug}/`;
-          const sDiffClass = { Easy: "text-emerald-400", Medium: "text-amber-400", Hard: "text-rose-400" }[s.difficulty] || "text-slate-400";
-          return html`
-                  <a
-                    href=${sUrl}
-                    target="_blank"
-                    rel="noopener"
-                    class="flex items-center justify-between p-3 bg-white/3 border border-white/5 rounded-xl hover:border-cyan-500/20 hover:bg-white/5 transition-colors no-underline"
-                  >
-                    <span class="text-sm text-slate-200">${s.title || s.titleSlug}</span>
-                    <span class="text-xs ${sDiffClass} shrink-0 ml-2">${s.difficulty || ""}</span>
-                  </a>
-                `;
-        })}
-            </div>
-          ` : ""}
-
-          ${activeTab === "edit" ? html`
-            <div class="flex flex-col gap-5">
-              <p class="text-[11px] text-slate-500">Update metadata for this problem. Changes are saved locally to your browser database.</p>
-
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[11px] uppercase tracking-wider text-slate-500">Title</label>
-                <input
-                  type="text"
-                  value=${editTitle}
-                  onInput=${(e) => setEditTitle(e.target.value)}
-                  class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
-                />
-              </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[11px] uppercase tracking-wider text-slate-500">Difficulty</label>
-                <select
-                  value=${editDifficulty}
-                  onChange=${(e) => setEditDifficulty(e.target.value)}
-                  class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
-                >
-                  <option value="Easy">Easy</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Hard">Hard</option>
-                  <option value="Unknown">Unknown</option>
-                </select>
-              </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[11px] uppercase tracking-wider text-slate-500">Tags / Topics <span class="text-slate-600 normal-case">(comma-separated)</span></label>
-                <input
-                  type="text"
-                  value=${editTags}
-                  onInput=${(e) => setEditTags(e.target.value)}
-                  placeholder="Array, Dynamic Programming, Two Pointers…"
-                  class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
-                />
-                <p class="text-[10px] text-slate-600">First tag becomes the primary topic used in analytics and the graph.</p>
-              </div>
-
-              <div class="flex items-center justify-between mt-1">
-                <div>
-                  ${editSaved ? html`<span class="text-xs text-emerald-400">✓ Saved successfully</span>` : ""}
-                  ${editError ? html`<span class="text-xs text-rose-400">${editError}</span>` : ""}
-                </div>
-                <button
-                  onClick=${handleSaveEdit}
-                  disabled=${editSaving}
-                  class="px-4 py-2 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg transition-colors disabled:opacity-40"
-                >${editSaving ? "Saving…" : "Save changes"}</button>
-              </div>
-
-              <div class="border-t border-white/5 pt-4 mt-2">
-                <p class="text-[10px] text-slate-600 mb-2">Danger zone — this removes the problem from your local database permanently.</p>
-                ${confirmDelete ? html`
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs text-rose-400">Are you sure?</span>
-                    <button
-                      onClick=${handleDelete}
-                      disabled=${deleting}
-                      class="px-3 py-1.5 bg-rose-600/40 hover:bg-rose-600/60 border border-rose-500/30 text-rose-300 text-xs rounded-lg transition-colors disabled:opacity-40"
-                    >${deleting ? "Deleting…" : "Yes, delete"}</button>
-                    <button
-                      onClick=${() => setConfirmDelete(false)}
-                      class="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 text-xs rounded-lg transition-colors"
-                    >Cancel</button>
-                  </div>
-                ` : html`
-                  <button
-                    onClick=${() => setConfirmDelete(true)}
-                    class="px-3 py-1.5 bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/20 text-rose-400 text-xs rounded-lg transition-colors"
-                  >Delete problem</button>
-                `}
-              </div>
-            </div>
-          ` : ""}
+          ${(() => {
+            const renderer = modalTabRegistry.getRenderer(problem.platform || "leetcode", activeTab);
+            if (!renderer) return html`<p class="text-slate-500 text-sm">No content.</p>`;
+            const onClearChat = async () => {
+              setChatMessages([]);
+              setChatError("");
+              if (chatId) {
+                await updateAIChat(chatId, [], {
+                  problemTitle: problem.title || "",
+                  problemTags: Array.isArray(problem.tags) ? problem.tags : [],
+                  attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
+                  attachedProblems: problem.titleSlug ? [{ slug: problem.titleSlug, title: problem.title || problem.titleSlug, platform: problem.platform || "leetcode", url: problemUrl }] : [],
+                  surface: "problem-modal", requestType: "", usedCommands: [], requestTemplate: "",
+                }).catch(() => {});
+              }
+            };
+            const ctx = {
+              html, isExtension, onClose, onUpdate, onDelete,
+              refreshing, handleRefreshData, problemUrl, meta,
+              langName, copied, copyCode,
+              chatMessages, chatInput, setChatInput, sendChat, chatPending, chatError,
+              AIMarkdownRenderer, MultiLineAIChatInput, openAIChatsView, onClearChat, chatId,
+            };
+            return renderer(problem, ctx);
+          })()}
         </div>
 
         <!-- ── Footer ── -->
@@ -755,3 +498,164 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
     </div>
   `;
 }
+
+// ── EditTab sub-component — manages its own edit/delete state ───────────────
+
+function EditTab({ problem, onUpdate, onDelete, onClose }) {
+  const [title, setTitle]           = useState(problem.title || "");
+  const [difficulty, setDifficulty] = useState(problem.difficulty || "Unknown");
+  const [tags, setTags]             = useState(() => {
+    const t = Array.isArray(problem.tags) && problem.tags.length > 0
+      ? problem.tags.join(", ")
+      : problem.topic && problem.topic !== "Untagged" ? problem.topic : "";
+    return t;
+  });
+  const [notes, setNotes]           = useState(problem.notes || "");
+  const [saving, setSaving]         = useState(false);
+  const [saved, setSaved]           = useState(false);
+  const [error, setError]           = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting]     = useState(false);
+
+  const save = async () => {
+    setSaving(true); setError("");
+    try {
+      const newTags = tags.split(",").map(t => t.trim()).filter(Boolean);
+      const updated = {
+        ...problem,
+        title: title.trim() || problem.title,
+        difficulty,
+        tags: newTags,
+        topic: newTags[0] || problem.topic || "Untagged",
+        notes: notes.trim(),
+        manuallyEdited: true,
+      };
+      await Storage.saveProblem(updated);
+      const slug = String(updated.titleSlug || updated.id || "").trim();
+      const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
+      const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
+      const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+      if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => {});
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      onUpdate?.(updated);
+    } catch (e) { setError("Save failed: " + (e.message || e)); }
+    finally { setSaving(false); }
+  };
+
+  const doDelete = async () => {
+    setDeleting(true);
+    try {
+      await Storage.deleteProblem(problem.id);
+      onDelete?.(problem.id);
+      onClose?.();
+    } catch (e) { setError("Delete failed: " + (e.message || e)); setDeleting(false); setConfirmDelete(false); }
+  };
+
+  return html`
+    <div class="flex flex-col gap-5">
+      <p class="text-[11px] text-slate-500">Update metadata for this problem. Changes are saved locally to your browser database.</p>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] uppercase tracking-wider text-slate-500">Title</label>
+        <input type="text" value=${title} onInput=${e => setTitle(e.target.value)}
+          class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50" />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] uppercase tracking-wider text-slate-500">Difficulty</label>
+        <select value=${difficulty} onChange=${e => setDifficulty(e.target.value)}
+          class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
+          ${["Easy","Medium","Hard","Unknown"].map(d => html`<option value=${d}>${d}</option>`)}
+        </select>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] uppercase tracking-wider text-slate-500">Tags / Topics <span class="text-slate-600 normal-case">(comma-separated)</span></label>
+        <input type="text" value=${tags} onInput=${e => setTags(e.target.value)}
+          placeholder="Array, Dynamic Programming, Two Pointers…"
+          class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50" />
+        <p class="text-[10px] text-slate-600">First tag becomes the primary topic used in analytics and the graph.</p>
+      </div>
+
+      <!-- Platform metadata (read-only) -->
+      <div class="flex flex-col gap-1">
+        <span class="text-[10px] uppercase tracking-wider text-slate-500">Metadata</span>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          ${[
+            ["Platform", problem.platform],
+            ["Language", problem.lang?.name],
+            ["Runtime", problem.runtime],
+            ["Memory", problem.memory],
+            ["Accept Rate", problem.acRate ? (typeof problem.acRate === "number" ? problem.acRate.toFixed(1) : problem.acRate) + "%" : null],
+            ["Solved", problem.timestamp ? new Date(problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp).toLocaleDateString() : null],
+          ].map(([label, val]) => val ? html`
+            <div class="bg-white/3 rounded p-2">
+              <span class="text-slate-500 text-[10px]">${label}</span>
+              <p class="text-slate-300 mt-0.5">${val}</p>
+            </div>
+          ` : "")}
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] uppercase tracking-wider text-slate-500">Notes</label>
+        <textarea value=${notes} onInput=${e => setNotes(e.target.value)} rows="4"
+          placeholder="Personal notes, approach, key insights…"
+          class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-y font-sans"
+        ></textarea>
+      </div>
+
+      <div class="flex items-center justify-between mt-1">
+        <div>
+          ${saved ? html`<span class="text-xs text-emerald-400">✓ Saved successfully</span>` : ""}
+          ${error ? html`<span class="text-xs text-rose-400">${error}</span>` : ""}
+        </div>
+        <button onClick=${save} disabled=${saving}
+          class="px-4 py-2 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg transition-colors disabled:opacity-40"
+        >${saving ? "Saving…" : "Save changes"}</button>
+      </div>
+
+      <div class="border-t border-white/5 pt-4 mt-2">
+        <p class="text-[10px] text-slate-600 mb-2">Danger zone — this removes the problem from your local database permanently.</p>
+        ${confirmDelete ? html`
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-rose-400">Are you sure?</span>
+            <button onClick=${doDelete} disabled=${deleting}
+              class="px-3 py-1.5 bg-rose-600/40 hover:bg-rose-600/60 border border-rose-500/30 text-rose-300 text-xs rounded-lg transition-colors disabled:opacity-40"
+            >${deleting ? "Deleting…" : "Yes, delete"}</button>
+            <button onClick=${() => setConfirmDelete(false)}
+              class="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 text-xs rounded-lg transition-colors"
+            >Cancel</button>
+          </div>
+        ` : html`
+          <button onClick=${() => setConfirmDelete(true)}
+            class="px-3 py-1.5 bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/20 text-rose-400 text-xs rounded-lg transition-colors"
+          >Delete problem</button>
+        `}
+      </div>
+    </div>`;
+}
+
+// ── Global tabs (Notes + Edit) registered for all platforms ─────────────────
+
+modalTabRegistry.register("*", [
+  {
+    id: "notes",
+    label: "Notes",
+    show: (p) => !!p.notes,
+    render(problem, { html }) {
+      return html`
+        <div class="prose prose-invert prose-sm max-w-none">
+          <pre class="whitespace-pre-wrap text-sm text-slate-300 font-sans leading-relaxed">${problem.notes}</pre>
+        </div>`;
+    },
+  },
+  {
+    id: "edit",
+    label: "Edit",
+    render(problem, { html, onUpdate, onDelete, onClose }) {
+      return html`<${EditTab} problem=${problem} onUpdate=${onUpdate} onDelete=${onDelete} onClose=${onClose} />`;
+    },
+  },
+]);

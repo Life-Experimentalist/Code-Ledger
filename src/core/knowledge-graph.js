@@ -178,20 +178,6 @@ export function buildKnowledgeGraph(problems) {
     }
   }
 
-  // Backbone: connect all topic nodes in a ring so no cluster can fully detach.
-  // Use a sparse ring (O(n) edges) — enough to keep the graph connected without
-  // over-constraining the layout.
-  const topicNodeIds = [...nodes.values()]
-    .filter((n) => n.type === "topic")
-    .map((n) => n.id);
-  for (let i = 0; i < topicNodeIds.length; i++) {
-    edges.push({
-      source: topicNodeIds[i],
-      target: topicNodeIds[(i + 1) % topicNodeIds.length],
-      type: "topic-topic",
-    });
-  }
-
   // Second pass: detect cross-platform duplicates (same titleSlug, different platforms)
   // Merge their platform lists and blend colors to show multi-platform status
   for (const [, idSet] of slugToIds) {

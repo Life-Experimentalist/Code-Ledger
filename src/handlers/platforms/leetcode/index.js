@@ -48,6 +48,7 @@ function langExt(name = "") {
 /** Normalise submission.lang which can be a string slug OR an object { name, verboseName }. */
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
+import { solutionPath, readmePath, hintsPath } from "../../../core/path-builder.js";
 import { querySubmissionResult, isAcceptedVisibleExtended } from "./enhanced-selectors.js";
 function resolveLang(rawLang) {
   if (!rawLang) return { verbose: "Unknown", slug: "txt", ext: "txt" };
@@ -70,6 +71,8 @@ export class LeetCodeHandler extends BasePlatformHandler {
     this._aiPanel = null;
     this._aiPanelSlug = null;
     this._submissionPollTimer = null;
+    // Wire native timer reader into the shared PlatformTimer instance
+    this._timer.getNativeElapsed = () => this._getElapsedSeconds();
     registerPlatformPrompt("leetcode", this.getDefaultPrompt());
   }
 
@@ -366,9 +369,6 @@ Be concise. Max 200 words.`;
   /** Manage sync button visibility based on current page type. */
   _syncButtonsForCurrentPage() {
     const page = detectPage(window.location.pathname);
-
-    // Clean up deprecated row-sync buttons from old versions
-    document.querySelectorAll(".cl-row-sync").forEach((el) => el.remove());
 
     const detailSyncBtn = document.getElementById("cl-sync-btn");
     const listSyncBtn = document.getElementById("cl-submission-list-sync");
@@ -980,12 +980,14 @@ Be concise. Max 200 words.`;
       // Canonical mapping
       try { await canonicalMapper.loadMap(); } catch (_) { }
       const canonical = canonicalMapper.resolve("leetcode", slug);
+      this._canonical = canonical; // stored for _buildFileSet
 
       const lang = resolveLang(submission.lang);
-      const elapsedSeconds = this._getElapsedSeconds();
+      const elapsedSeconds = this._timer.getElapsedSeconds();
 
       // Build file list for the single atomic commit
       const files = this._buildFileSet(submission, meta, settings, slug, elapsedSeconds);
+      const readmeFile = files.find(f => f.path.endsWith("README.md"));
 
       // Normalize timestamp to ms — LeetCode API returns Unix seconds
       const tsMs = submission.timestamp
@@ -1002,6 +1004,7 @@ Be concise. Max 200 words.`;
         topic: resolvePrimaryTopic(meta?.topicTags?.map(t => t.name) || []),
         tags: meta?.topicTags?.map(t => t.name) || [],
         canonical: canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
+        readmeContent: readmeFile?.content || null,
         code: submission.code || "",
         files,
         lang: { name: lang.verbose, ext: lang.ext, slug: lang.slug },
@@ -1030,28 +1033,25 @@ Be concise. Max 200 words.`;
 
   /* ── File set builder ────────────────────────────────────────────── */
   _buildFileSet(submission, meta, settings, slug, elapsedSeconds = null) {
-    const { verbose: langVerbose, ext } = resolveLang(submission.lang);
-    const topicTags = meta?.topicTags?.map?.(t => t?.name).filter(Boolean) || [];
-    const topic = resolvePrimaryTopic(topicTags);
-    const title = meta?.title || slug;
-    const base = `topics/${topic}/${slug}/`;
+    const lang      = resolveLang(submission.lang);
+    const canonical = this._canonical || null;
+    const title     = meta?.title || slug;
 
     const files = [];
 
     // 1. Solution file
     files.push({
-      path: `${base}${langVerbose.replace(/\s+/g, "_")}.${ext}`,
+      path: solutionPath(slug, "leetcode", lang, canonical, settings),
       content: submission.code || "// (no code retrieved)",
     });
 
     // 2. README (problem description + stats)
     if (settings.leetcode_readme !== false && meta?.content) {
-      const stats = this._formatStats(submission, meta, elapsedSeconds);
+      const stats   = this._formatStats(submission, meta, elapsedSeconds);
       const similar = this._formatSimilar(meta, settings);
-      const hints = this._formatHints(meta, settings);
 
       files.push({
-        path: `${base}README.md`,
+        path: readmePath(slug, canonical, settings),
         content: [
           `# ${meta.questionFrontendId ? `[${meta.questionFrontendId}] ` : ""}${title}`,
           "",
@@ -1062,7 +1062,7 @@ Be concise. Max 200 words.`;
           "## Problem",
           "",
           meta.content
-            .replace(/<[^>]+>/g, "")   // strip HTML tags for plain text
+            .replace(/<[^>]+>/g, "")
             .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
             .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
             .replace(/\n{3,}/g, "\n\n")
@@ -1070,7 +1070,6 @@ Be concise. Max 200 words.`;
           "",
           stats,
           similar,
-          hints,
         ].filter(Boolean).join("\n"),
       });
     }
@@ -1078,7 +1077,7 @@ Be concise. Max 200 words.`;
     // 3. Hints (separate file if enabled)
     if (settings.leetcode_sync_hints && meta?.hints?.length) {
       files.push({
-        path: `${base}hints.md`,
+        path: hintsPath(slug, canonical, settings),
         content: [
           `# Hints — ${title}`,
           "",
@@ -1117,11 +1116,6 @@ Be concise. Max 200 words.`;
       ...similar.map(q => `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`),
       "",
     ].join("\n");
-  }
-
-  _formatHints(meta, settings) {
-    if (settings.leetcode_sync_hints || !meta?.hints?.length) return "";
-    return "";  // hints go in separate file when that setting is on
   }
 
   /* ── GraphQL + metadata ──────────────────────────────────────────── */
@@ -1169,8 +1163,4 @@ Be concise. Max 200 words.`;
     return json;
   }
 
-  /* ── Legacy compat ─────────────────────────────────────────────── */
-  async checkSubmission() { return this._checkSubmission(); }
-  async fetchGraphQL(q, v) { return this._gql(q, v); }
-  async getProblemMetadata(slug) { return this._fetchMetadata(slug); }
 }

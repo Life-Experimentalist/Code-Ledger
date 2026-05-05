@@ -27,11 +27,49 @@ Provide:
 Be concise. Max 200 words.`;
   }
 
+  getSettingsSchema() {
+    return {
+      id: this.id,
+      title: "Codeforces",
+      order: 30,
+      fields: [
+        {
+          key: "cf_enable",
+          label: "Enable tracking",
+          type: "toggle",
+          default: true,
+          description: "Auto-detect accepted submissions on Codeforces and save them to CodeLedger.",
+        },
+        {
+          key: "cf_readme",
+          label: "Include problem description",
+          type: "toggle",
+          default: true,
+          description: "Save the problem statement to README.md alongside your solution.",
+        },
+        {
+          key: "cf_timer",
+          label: "Show solve timer",
+          type: "toggle",
+          default: true,
+          description: "Display a floating stopwatch overlay while solving Codeforces problems.",
+        },
+      ],
+    };
+  }
+
   async init() {
     this.dbg.log('Initializing Codeforces handler');
     const page = detectPage(window.location.pathname);
     await this._handleOnDemandFetch(page).catch(() => { });
-    // Polling based submission tracker for codeforces since UI is dynamic heavily on a separate submissions tab usually.
+
+    if (page.type === 'problem') {
+      Storage.getSettings().then((s) => {
+        if (s.cf_timer !== false) {
+          this._timer.startFloating(page.slug || 'cf');
+        }
+      }).catch(() => { });
+    }
   }
 
   async _handleOnDemandFetch(page) {

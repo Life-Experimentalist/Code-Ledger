@@ -69,6 +69,15 @@ export class GitHubHandler extends BaseGitHandler {
             "Serve a public stats page at {owner}.github.io/{repo}/ — enabled automatically when creating a new repo.",
           advanced: true,
         },
+        {
+          key: "problems_dir",
+          label: "Problems root directory",
+          type: "text",
+          default: "problems",
+          description: "Root folder inside your repo where solutions are stored. Default: problems",
+          advanced: true,
+          placeholder: "problems",
+        },
       ],
     };
   }
@@ -156,6 +165,13 @@ export class GitHubHandler extends BaseGitHandler {
       type: "blob",
       content: f.content,
     }));
+
+    // Add deletions: sha: null removes the file from the tree atomically
+    if (Array.isArray(opts.deletes)) {
+      for (const delPath of opts.deletes) {
+        treeItems.push({ path: delPath, mode: "100644", type: "blob", sha: null });
+      }
+    }
 
     // Always recover missing infrastructure files so accidental deletions are self-healing.
     // Skip the check on mirror commits (opts.isMirror) to avoid redundant API calls.

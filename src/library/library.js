@@ -312,14 +312,14 @@ function LibraryApp() {
       </p>`;
 
     if (activeTab === "search")
-      return html`<${ProblemsView} problems=${enrichedProblems} searchQuery=${searchQuery} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} onOpenGraphProblem=${openProblemInGraph} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} searchQuery=${searchQuery} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} onOpenGraphProblem=${openProblemInGraph} onNavigate=${setActiveTab} />`;
 
     if (activeTab === "solutions")
-      return html`<${ProblemsView} problems=${enrichedProblems} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} onOpenGraphProblem=${openProblemInGraph} />`;
+      return html`<${ProblemsView} problems=${enrichedProblems} onProblemUpdate=${handleProblemUpdate} onProblemDelete=${handleProblemDelete} settings=${settings} onOpenGraphProblem=${openProblemInGraph} onNavigate=${setActiveTab} />`;
     if (activeTab === "analytics")
-      return html`<${AnalyticsView} problems=${enrichedProblems} />`;
+      return html`<${AnalyticsView} problems=${enrichedProblems} onNavigate=${setActiveTab} />`;
     if (activeTab === "graph")
-      return html`<${GraphView} problems=${enrichedProblems} focusProblem=${graphFocusProblem} onFocusProblemHandled=${() => setGraphFocusProblem(null)} onProblemDelete=${handleProblemDelete} onProblemUpdate=${handleProblemUpdate} />`;
+      return html`<${GraphView} problems=${enrichedProblems} focusProblem=${graphFocusProblem} onFocusProblemHandled=${() => setGraphFocusProblem(null)} onProblemDelete=${handleProblemDelete} onProblemUpdate=${handleProblemUpdate} onNavigate=${setActiveTab} />`;
     if (activeTab === "ai-chats")
       return html`<${AIChatsView} copyableEnabled=${settings?.aiCopyable === true} problems=${enrichedProblems} settings=${settings} />`;
     if (activeTab === "canonical")

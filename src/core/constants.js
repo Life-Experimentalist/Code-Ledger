@@ -47,6 +47,9 @@ export const CONSTANTS = Object.freeze({
     LANDING: "https://codeledger.vkrishna04.me",
     AUTH_WORKER: "https://codeledger.vkrishna04.me/api",
     TELEMETRY: "https://counter.vkrishna04.me",
+    // Primary: served from the worker (CDN-cached, versioned)
+    CANONICAL_MAP: "https://codeledger.vkrishna04.me/api/data/canonical-map.json",
+    // Fallback: raw GitHub (used only when primary 4xx/5xx)
     CANONICAL_MAP_RAW:
       "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/data/canonical-map.json",
     CANONICAL_MAP_SCHEMA:
@@ -178,6 +181,12 @@ export const CONSTANTS = Object.freeze({
   IMPORT_COMMIT_MESSAGE:
     "chore: import {count} solutions from {platform} profile",
   INDEX_JSON_PATH: "index.json",
+  PROBLEMS_DIR_DEFAULT: "problems",
+  COMMIT_TYPE: {
+    SOLVE:       "solve",
+    MAINTENANCE: "maintenance",
+    IMPORT:      "import",
+  },
 
   HEARTBEAT_PORT_NAME: "heartbeat",
   HEARTBEAT_INTERVAL_MS: 20_000,

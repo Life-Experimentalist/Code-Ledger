@@ -11,9 +11,9 @@ import { Storage } from "../../../core/storage.js";
 import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
-import { createFloatingTimer } from "../../../ui/floating-timer.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
+import { solutionPath, readmePath } from "../../../core/path-builder.js";
 
 const dbg = createDebugger("GFG");
 
@@ -36,7 +36,6 @@ export class GFGHandler extends BasePlatformHandler {
     this.mutationObserver = null;
     this.lastDetectedId = null;
     this._processingLock = false;
-    this._timer = null;
     registerPlatformPrompt("geeksforgeeks", this.getDefaultPrompt());
   }
 
@@ -58,8 +57,27 @@ Be concise. Max 200 words.`;
       title: "GeeksForGeeks",
       order: 20,
       fields: [
-        { key: "gfg_enable", label: "Enable tracking", type: "toggle", default: true },
-        { key: "gfg_readme", label: "Include problem description", type: "toggle", default: true },
+        {
+          key: "gfg_enable",
+          label: "Enable tracking",
+          type: "toggle",
+          default: true,
+          description: "Auto-detect accepted submissions on GeeksForGeeks and save them to CodeLedger.",
+        },
+        {
+          key: "gfg_readme",
+          label: "Include problem description",
+          type: "toggle",
+          default: true,
+          description: "Save full problem statement and your stats to README.md.",
+        },
+        {
+          key: "gfg_timer",
+          label: "Show solve timer",
+          type: "toggle",
+          default: true,
+          description: "Display a floating stopwatch overlay while solving problems on GFG.",
+        },
       ],
     };
   }
@@ -72,7 +90,7 @@ Be concise. Max 200 words.`;
     if (page.type === PAGE_TYPES.PROBLEM) {
       Storage.getSettings().then((s) => {
         if (s.gfg_timer !== false) {
-          this._timer = createFloatingTimer(page.slug || "gfg", { autoStart: true });
+          this._timer.startFloating(page.slug || "gfg");
         }
       }).catch(() => { });
     }
@@ -186,10 +204,10 @@ Be concise. Max 200 words.`;
       const canonical = canonicalMapper.resolve("geeksforgeeks", slug);
 
       // Build file set
-      const files = this._buildFileSet(meta, code, lang, settings, slug);
+      const files = this._buildFileSet(meta, code, lang, settings, slug, canonical);
+      const readmeFile = files.find(f => f.path.endsWith("README.md"));
 
-      const elapsedMs = this._timer ? this._timer.getElapsed() : 0;
-      const elapsedSeconds = elapsedMs > 0 ? Math.round(elapsedMs / 1000) : null;
+      const elapsedSeconds = this._timer.getElapsedSeconds();
 
       eventBus.emit("problem:solved", {
         platform: "geeksforgeeks",
@@ -200,6 +218,7 @@ Be concise. Max 200 words.`;
         topic,
         tags: meta.tags || [],
         canonical: canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
+        readmeContent: readmeFile?.content || null,
         code,
         files,
         lang: { name: lang.name, ext: lang.ext },
@@ -303,20 +322,20 @@ Be concise. Max 200 words.`;
   }
 
   /* ── File set builder ────────────────────────────────────────────── */
-  _buildFileSet(meta, code, lang, settings, slug) {
-    const topic = resolvePrimaryTopic(meta.tags || []);
-    const base = `topics/${topic}/${slug}/`;
+  _buildFileSet(meta, code, lang, settings, slug, canonical = null) {
+    const langObj = { verbose: lang.name.replace(/[^a-zA-Z0-9]/g, "_"), name: lang.name, ext: lang.ext };
     const files = [];
 
     files.push({
-      path: `${base}${lang.name.replace(/[^a-zA-Z0-9]/g, "_")}.${lang.ext}`,
+      path: solutionPath(slug, "geeksforgeeks", langObj, canonical, settings),
       content: code,
     });
 
     if (settings.gfg_readme !== false) {
+      const readmeContent = this._buildReadme(meta, lang, slug);
       files.push({
-        path: `${base}README.md`,
-        content: this._buildReadme(meta, lang, slug),
+        path: readmePath(slug, canonical, settings),
+        content: readmeContent,
       });
     }
 
@@ -355,6 +374,4 @@ Be concise. Max 200 words.`;
     return lines.join("\n");
   }
 
-  /* ── Legacy compat ─────────────────────────────────────────────── */
-  async checkSubmission() { return this._checkSubmission(); }
 }

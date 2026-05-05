@@ -83,6 +83,20 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 | Refresh data button in ProblemModal       | "📥 Fetch Description" button in Overview tab (visible when no problemStatement cached); shows loading state "⏳ Fetching…"; polls Storage for updates up to 10 seconds; auto-updates modal on success                 |
 | Submissions navigation button in modal    | "Submissions ↗" button in ProblemModal header; direct link to problem's submissions page; conditionally shown for leetcode problems                                                                                  |
 | Submission list page fallback sync        | LeetCode `/problems/{slug}/submissions/` now gets a fixed floating sync button to refresh the latest accepted solve; detail pages keep the IDE-top button                                                            |
+| On-demand problem fetch (refresh)         | Refresh control moved to Settings maintenance panel; service-worker queues background metadata fetches one problem at a time                                                                                         |
+| Auto-add accepted submissions             | On LeetCode accept event, auto-save to library respecting incognito toggle; direct submission pages inject immediately and auto-save without reload                                                                  |
+| Flat canonical-slug repo structure        | `path-builder.js` single source of truth; canonical → `{root}/{canonicalId}/{platform}/`; no-canonical → `{root}/{slug}/`; settings `problems_dir` field                                                           |
+| GitHub canonical rename pipeline          | `performPendingRenames()` in service-worker; `Storage.markRenameNeeded/getPendingRenames`; delete+create in single maintenance commit via `sha:null`                                                                 |
+| Platform-agnostic modal tab registry      | `modal-tab-registry.js` + `modal-tabs.js` for LeetCode; Notes + Edit as global `"*"` tabs; `ProblemModal` is a pure renderer                                                                                        |
+| Graph topic-topic edge removal            | Removed ring backbone edges from `knowledge-graph.js`; physics gravity keeps clusters connected                                                                                                                     |
+| Graph filter edge-walk fix                | `getVisibleGraphData` scoped to `topic-problem` edges only; prevents unrelated topics bleeding in                                                                                                                   |
+| Graph single-topic orbit attraction       | Problems with exactly one topic connection orbit at 80px from their topic node in `simulationStep`                                                                                                                  |
+| Graph clear-filters button                | Appears when any filter is non-default; one-click resets difficulty, platform, topic, solved-only, search                                                                                                           |
+| Graph layout modes (layered/circular/force) | Three seeded layouts; re-layout button; layout persists across problem additions                                                                                                                                   |
+| Platform timer abstraction                | `PlatformTimer` in `core/platform-timer.js`; base class holds `_timer`; GFG uses `startFloating`; LeetCode overrides `getNativeElapsed`                                                                            |
+| Canonical map primary endpoint            | `CONSTANTS.URLS.CANONICAL_MAP` → `codeledger.vkrishna04.me/api/data/canonical-map.json`; GitHub raw as fallback; `canonical-mapper.js` tries primary first                                                         |
+| Analytics clickable charts + drilldown    | Difficulty, language, platform, topic all clickable → scrollable problem overlay → `ProblemModal`; nav buttons to Solutions + Graph added to all three views                                                       |
+| Multi-language/platform modal navigation  | `siblings` filter in `ProblemModal` (same titleSlug = other language; same canonical.id = cross-platform); "Also solved as" pill strip in modal header with favicon + lang; click navigates modal                  |
 
 ---
 
@@ -93,18 +107,15 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 | Multi-platform analytics integration | partial | Graph has platform colors; analytics still mostly LeetCode-centric                                                            |
 | LeetCode import completeness         | partial | Recent 20 via public API; full history via profile page button only                                                           |
 | LeetCode profile import overhaul     | active  | GraphQL 400 errors; tags/difficulty not fetched; timestamp wrong; integrate with analytics                                    |
-| Graph drag modes (single vs group)   | active  | Double-click + drag moves node + connected neighbors; depth slider controls child depth; single-drag moves only selected node |
-| Graph search/sort/layering UI        | active  | Search/sort + filters hide nodes (without deleting data), includes topic comparison counts and intersection                   |
 | Solutions advanced search & filters  | active  | Add dropdowns, tag/topic/language filters, free-text search across title/tags/overview                                        |
-| On-demand problem fetch (refresh)    | done    | Refresh control moved to Settings maintenance panel; service-worker queues background metadata fetches one problem at a time  |
 
 ---
 
 ## Bugs to Fix 🐛
 
-| Bug                                  | Priority | Notes                                                                                                                                                                                     |
-| ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Commit on LeetCode accept not firing | done     | Enhanced selector detection added (d9f736b); extended ARIA/data-testid/color-based selectors; direct submission-page initialization now injects and auto-saves without waiting for reload |
+| Bug                                  | Priority | Notes |
+| ------------------------------------ | -------- | ----- |
+| (none currently open)                | —        | —     |
 
 ## Pending 📋
 
@@ -112,7 +123,6 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 | -------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Problem multi-select + bulk CRUD             | high        | Checkbox select mode in Solutions view; bulk delete, bulk re-tag, bulk export                                                                                       |
 | Per-problem topic tag editor                 | high        | In ProblemModal Edit tab: add/remove individual tags (not just comma-list); toggle enabled/disabled per tag; Single Chat can be linked with multiple problems       |
-| Auto-add accepted submissions                | done        | On LeetCode accept event, auto-save to library respecting incognito toggle; direct submission pages now inject immediately and auto-save without requiring a reload |
 | ProblemModal enhancements                    | medium      | Show: accept rate, hints, similar problems with links; remove non-useful fields (likes/dislikes from LeetCode)                                                      |
 | Custom scrollbar design                      | medium      | Replace stock OS scrollbars with styled thin scrollbar across the library UI                                                                                        |
 | LeetCode /progress page stats integration    | low         | Reference `leetcode.com/progress` for streak calendar, topic breakdown, badge data                                                                                  |
@@ -180,10 +190,8 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 
 | Feature                     | Priority | Notes                                                                              |
 | --------------------------- | -------- | ---------------------------------------------------------------------------------- |
-| Node selection cascade glow | CRITICAL | Selected node: full intensity; 1-hop neighbors: 50% glow; edges: same 50% glow     |
 | Multi-node selection        | HIGH     | Ctrl+Click to select multiple; shows interaction between selected problems         |
 | Node density filtering      | HIGH     | Zoom-based: far=topics only, medium=topics+solved, close=all; improves readability |
-| Graph filter controls       | HIGH     | Toggles: by difficulty, platform, solved/unsolved; combined filtering              |
 | Graph community detection   | MEDIUM   | Detect topic clusters; highlight communities; suggest learning paths               |
 | Edge label rendering        | MEDIUM   | Show edge types: "topic", "similar", "canonical"; toggle visibility                |
 
@@ -191,9 +199,6 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 
 | Feature                         | Priority | Notes                                                                               |
 | ------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| Constant ProblemModal component | CRITICAL | Single unified component used by ALL platforms; consistent UX regardless of handler |
-| Handler-agnostic modal          | CRITICAL | Abstract platform-specific data into standard schema before passing to modal        |
-| Modal tabs standard             | HIGH     | Overview, Code, AI Chat, Similar, Analysis; same for all platforms                  |
 | Modal persistence               | HIGH     | Keep modal state across tab switches; restore scroll position and expanded sections |
 
 ### AI-MCP Integration 🧠
