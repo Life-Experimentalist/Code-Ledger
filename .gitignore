@@ -19,6 +19,10 @@ settings.local.json
 *.pem
 *.pdf
 
+# Build artifacts
+src/ui/styles/compiled.css
+src/_manifest_ff_tmp.json
+
 # Ignore local env file with secrets
 .env
 env
