@@ -33,7 +33,7 @@ That's it. No manual git commands needed.
    `
 
 2. **Update CHANGELOG.md** (at the top):
-   `markdown
+   ```markdown
    ## [X.Y.Z] — 2026-MM-DD
 
    ### Added
@@ -334,3 +334,4 @@ npm run release                    # Go live!
 ---
 
 Last updated: 2026-05-07
+
