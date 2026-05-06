@@ -61,21 +61,25 @@ Your GitHub contribution graph fills up. Your profile becomes a living portfolio
 
 ## Install
 
+### From Web Stores (Coming Soon)
+
+- **Chrome Web Store** — 📥 Coming soon v1.1.0
+- **Firefox Add-ons** — 🦊 Coming soon v1.1.0
+- **Microsoft Edge** — 🔮 Future release (v1.3.0+)
+
+### Or Load Unpacked Now (Development Mode)
+
 **Chrome / Edge / Brave**
 
 ```
 chrome://extensions  →  Developer mode ON  →  Load unpacked  →  select the src/ folder
 ```
 
-Or install directly from the **[Chrome Web Store →](https://chrome.google.com/webstore/detail/codeledger/)**
-
 **Firefox**
 
 ```
 about:debugging  →  Load Temporary Add-on  →  select src/manifest.json
 ```
-
-Or install from **[Firefox Add-ons →](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)**
 
 <br/>
 

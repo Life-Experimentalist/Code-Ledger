@@ -8,10 +8,11 @@ Complete requirements and checklist for submitting CodeLedger to Chrome Web Stor
 
 CodeLedger will be submitted to:
 
-1. **Chrome Web Store** (codeledger by VKrishna04)
-2. **Firefox Add-ons** (codeledger)
+1. **Chrome Web Store** (codeledger by VKrishna04) — 🟡 **Coming Soon** (not yet published)
+2. **Firefox Add-ons** (codeledger) — 🟡 **Coming Soon** (not yet published)
+3. **Microsoft Edge Add-ons** (CodeLedger) — 🔮 **Future** (will publish in future releases)
 
-Both follow similar but distinct requirements. This document covers both.
+This document provides comprehensive submission requirements for all three stores. Chrome and Firefox submissions are in progress; Edge will be published in a future release.
 
 ---
 
@@ -392,6 +393,49 @@ For each, provide justification:
 - [ ] Share link on social media
 - [ ] Monitor reviews and user feedback
 - [ ] Respond to bug reports
+
+---
+
+## Microsoft Edge Add-ons (Future Release)
+
+**Status**: 🔮 **Not Yet Published** — Will be published in a future release
+
+Edge Add-ons store uses the same Manifest V3 API as Chrome, so the same zip file can be submitted to both stores.
+
+### When to Submit to Edge
+
+Target: **v1.3.0 or later** (after Chrome & Firefox launch success)
+
+### Submission Process
+
+1. Go to [Microsoft Edge Add-ons Developer Dashboard](https://partner.microsoft.com/dashboard/microsoftedge)
+2. Create developer account (requires Microsoft account)
+3. Click **Create new extension**
+4. Upload `codeledger-chrome-vX.Y.Z.zip` (same as Chrome)
+5. Fill in store listing (same fields as Chrome Web Store, see above)
+6. Upload screenshots (same as Chrome)
+7. Submit for review
+
+### Store Listing Requirements
+
+**Same as Chrome Web Store** — Edge uses identical:
+- Title format
+- Description
+- Screenshots
+- Category (Productivity)
+- Permissions justification
+
+### Review Timeline
+
+- **Processing**: 1–3 days (typically faster than Chrome)
+- **Feedback**: Check dashboard for review comments
+- **Resubmit**: Fix issues and reupload
+
+### After Approval
+
+- Add-on appears on [Microsoft Edge Add-ons store](https://microsoftedge.microsoft.com/addons)
+- Share announcement: "Now available on Edge Add-ons!"
+- Monitor reviews same as other stores
 
 ---
 
