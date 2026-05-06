@@ -38,7 +38,7 @@ This Code of Conduct applies in all project spaces — GitHub issues, pull reque
 
 ## Reporting
 
-If you experience or witness behavior that violates this Code of Conduct, report it privately to the maintainers via email at **krishnalsh2004@gmail.com**.
+If you experience or witness behavior that violates this Code of Conduct, report it privately to the maintainers via email at **github@vkrishna04.me**.
 
 When reporting, please include:
 - Links or screenshots of the relevant content
@@ -51,11 +51,11 @@ All reports will be reviewed promptly, handled confidentially, and responded to 
 
 Maintainers will follow these guidelines in determining the consequences for any action they deem in violation of this Code of Conduct:
 
-| Level | Violation | Consequence |
-|-------|-----------|-------------|
-| 1 | Minor, unintentional, first offense | Private warning with explanation |
-| 2 | Repeated or more serious violation | Temporary ban from project spaces |
-| 3 | Severe, sustained, or targeted harassment | Permanent ban |
+| Level | Violation                                 | Consequence                       |
+| ----- | ----------------------------------------- | --------------------------------- |
+| 1     | Minor, unintentional, first offense       | Private warning with explanation  |
+| 2     | Repeated or more serious violation        | Temporary ban from project spaces |
+| 3     | Severe, sustained, or targeted harassment | Permanent ban                     |
 
 ## Attribution
 

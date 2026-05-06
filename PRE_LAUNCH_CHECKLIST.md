@@ -138,7 +138,7 @@ Test on at least Chrome and Firefox.
   - [ ] Full description (1,400+ chars)
   - [ ] Category: Productivity
   - [ ] Permissions justified
-  - [ ] Support email: krishnalsh2004@gmail.com
+  - [ ] Support email: github@vkrishna04.me
   - [ ] Homepage: https://codeledger.vkrishna04.me
   - [ ] Privacy policy linked: PRIVACY.md
 
@@ -155,7 +155,7 @@ Test on at least Chrome and Firefox.
   - [ ] Name: "CodeLedger"
   - [ ] Summary (250 chars max)
   - [ ] Description (1,000+ chars)
-  - [ ] Support email: krishnalsh2004@gmail.com
+  - [ ] Support email: github@vkrishna04.me
   - [ ] Privacy policy: https://github.com/Life-Experimentalist/Code-Ledger/blob/main/PRIVACY.md
 
 ### Microsoft Edge Add-ons (Future)
@@ -325,6 +325,6 @@ npm run release  # One command releases everything!
 
 ---
 
-**Last updated**: 2026-05-07  
-**Version**: 1.1.0  
+**Last updated**: 2026-05-07
+**Version**: 1.1.0
 **Status**: Ready for launch checklist

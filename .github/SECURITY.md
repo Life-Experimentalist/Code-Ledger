@@ -2,11 +2,11 @@
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| Latest (`main`) | ✅ Actively supported |
-| Previous minor | ⚠️ Critical fixes only |
-| Older releases | ❌ No longer supported |
+| Version         | Supported             |
+| --------------- | --------------------- |
+| Latest (`main`) | ✅ Actively supported  |
+| Previous minor  | ⚠️ Critical fixes only |
+| Older releases  | ❌ No longer supported |
 
 We recommend always running the latest release from the [Chrome Web Store](https://chrome.google.com/webstore/detail/codeledger/) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/codeledger/).
 
@@ -14,7 +14,7 @@ We recommend always running the latest release from the [Chrome Web Store](https
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Report privately via email: **krishnalsh2004@gmail.com**
+Report privately via email: **github@vkrishna04.me**
 
 Use the subject line: `[CodeLedger Security] <brief description>`
 
@@ -28,12 +28,12 @@ Use the subject line: `[CodeLedger Security] <brief description>`
 
 ### What to expect
 
-| Milestone | Target |
-|-----------|--------|
-| Initial acknowledgement | Within 72 hours |
-| Triage decision (valid / invalid / need more info) | Within 7 days |
-| Fix ETA communicated | Within 14 days of confirmed validity |
-| Public disclosure | After patch is released (coordinated with reporter) |
+| Milestone                                          | Target                                              |
+| -------------------------------------------------- | --------------------------------------------------- |
+| Initial acknowledgement                            | Within 72 hours                                     |
+| Triage decision (valid / invalid / need more info) | Within 7 days                                       |
+| Fix ETA communicated                               | Within 14 days of confirmed validity                |
+| Public disclosure                                  | After patch is released (coordinated with reporter) |
 
 We will credit researchers by name (or handle) in the release notes unless they prefer to remain anonymous.
 

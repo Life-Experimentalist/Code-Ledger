@@ -22,10 +22,10 @@ Before uploading to any store, verify:
 
 ### Code & Build
 
-- [ ] All tests pass: 
+- [ ] All tests pass:
 pm run lint
 - [ ] No TypeScript errors: 	sc --noEmit
-- [ ] Build succeeds: 
+- [ ] Build succeeds:
 pm run build
 - [ ] Zips are valid: unzip -t releases/*.zip
 - [ ] Working directory clean: git status
@@ -205,7 +205,7 @@ Alarms: Syncs with GitHub periodically (1-hour intervals)
 #### Official URL
 
 - **Website**: https://codeledger.vkrishna04.me
-- **Support email**: krishnalsh2004@gmail.com
+- **Support email**: github@vkrishna04.me
 - **Privacy policy**: https://github.com/Life-Experimentalist/Code-Ledger/blob/main/PRIVACY.md (create this)
 
 #### Submission Checklist
@@ -312,7 +312,7 @@ Your code is committed to your GitHub repository only. CodeLedger never stores y
 
 License: Apache 2.0
 GitHub: https://github.com/Life-Experimentalist/Code-Ledger
-Support: krishnalsh2004@gmail.com
+Support: github@vkrishna04.me
 `
 
 #### Category
@@ -498,7 +498,7 @@ See [Cloudflare Privacy Policy](https://www.cloudflare.com/privacy/).
 ## Contacting Us
 
 For privacy concerns or questions:
-- **Email**: krishnalsh2004@gmail.com
+- **Email**: github@vkrishna04.me
 - **GitHub Issues**: https://github.com/Life-Experimentalist/Code-Ledger/issues
 
 ---
@@ -512,9 +512,9 @@ Last updated: 2026-05-07
 
 ### Code & Quality
 
-- [ ] Lint passes: 
+- [ ] Lint passes:
 pm run lint
-- [ ] Build succeeds: 
+- [ ] Build succeeds:
 pm run build
 - [ ] No console errors in DevTools (when extension runs)
 - [ ] Tested on Chrome 120+
@@ -593,5 +593,5 @@ pm run build
 
 ---
 
-**Last updated**: 2026-05-07  
+**Last updated**: 2026-05-07
 **Version**: 1.1.0

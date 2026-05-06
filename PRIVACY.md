@@ -53,14 +53,14 @@ CodeLedger supports six AI providers for code review. **You choose which one to 
 
 **If you enable AI review**, your code is sent to your chosen provider:
 
-| Provider | Data Sent | Privacy Policy | Your Control |
-|----------|-----------|---|---|
-| **Google Gemini** | Problem code | [Google Privacy](https://policies.google.com/privacy) | Disable AI review anytime |
-| **OpenAI** | Problem code | [OpenAI Privacy](https://openai.com/privacy) | Disable AI review anytime |
-| **Anthropic Claude** | Problem code | [Anthropic Privacy](https://www.anthropic.com/privacy) | Disable AI review anytime |
-| **DeepSeek** | Problem code | [DeepSeek Privacy](https://www.deepseek.com/privacy) | Disable AI review anytime |
-| **Ollama** | Problem code (stays local) | No external server | Runs on your machine only |
-| **OpenRouter** | Problem code | [OpenRouter Privacy](https://openrouter.ai/privacy) | Disable AI review anytime |
+| Provider             | Data Sent                  | Privacy Policy                                         | Your Control              |
+| -------------------- | -------------------------- | ------------------------------------------------------ | ------------------------- |
+| **Google Gemini**    | Problem code               | [Google Privacy](https://policies.google.com/privacy)  | Disable AI review anytime |
+| **OpenAI**           | Problem code               | [OpenAI Privacy](https://openai.com/privacy)           | Disable AI review anytime |
+| **Anthropic Claude** | Problem code               | [Anthropic Privacy](https://www.anthropic.com/privacy) | Disable AI review anytime |
+| **DeepSeek**         | Problem code               | [DeepSeek Privacy](https://www.deepseek.com/privacy)   | Disable AI review anytime |
+| **Ollama**           | Problem code (stays local) | No external server                                     | Runs on your machine only |
+| **OpenRouter**       | Problem code               | [OpenRouter Privacy](https://openrouter.ai/privacy)    | Disable AI review anytime |
 
 **You are responsible for**:
 - Providing your own API keys (never shared with CodeLedger)
@@ -73,7 +73,7 @@ CodeLedger supports six AI providers for code review. **You choose which one to 
 
 **Where it goes**: https://codeledger.vkrishna04.me (Cloudflare Worker)
 
-**What happens**: 
+**What happens**:
 1. You click "Connect GitHub"
 2. GitHub authorization window opens
 3. You approve CodeLedger access
@@ -163,7 +163,7 @@ Your continued use of CodeLedger after changes means you accept the new policy.
 
 For privacy questions or concerns:
 
-- **Email**: krishnalsh2004@gmail.com
+- **Email**: github@vkrishna04.me
 - **GitHub Issues**: https://github.com/Life-Experimentalist/Code-Ledger/issues/new
 - **GitHub Discussions**: https://github.com/Life-Experimentalist/Code-Ledger/discussions
 
@@ -179,6 +179,6 @@ CodeLedger stores all data locally in your browser. It commits code to your GitH
 
 ---
 
-**License**: Apache 2.0  
-**Last updated**: 2026-05-07  
+**License**: Apache 2.0
+**Last updated**: 2026-05-07
 **Version**: 1.1.0

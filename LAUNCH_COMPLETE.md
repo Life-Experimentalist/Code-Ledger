@@ -26,17 +26,17 @@ npm run release
 
 ### 2. **Comprehensive Documentation**
 
-| Document | Purpose | Location |
-|----------|---------|----------|
-| **ARCHITECTURE.md** | Technical deep-dive with system diagrams | docs/ |
-| **RELEASE_VERSIONING.md** | Semantic versioning with patch/minor/major examples | docs/ |
-| **RELEASE_GUIDE.md** | Step-by-step release walkthrough | docs/guides/ |
-| **RELEASE_QUICK_START.md** | One-page quick reference | root |
-| **VERSION_TIMING.md** | Clarifies when to update version (BEFORE release) | docs/ |
-| **STORE_SUBMISSION.md** | Chrome Web Store, Firefox Add-ons, Edge (future) submission requirements | docs/ |
-| **PRE_LAUNCH_CHECKLIST.md** | 7-phase checklist covering everything | root |
-| **PRIVACY.md** | Privacy policy for store submissions | root |
-| **LINKEDIN_POST.md** | Launch announcement drafts | root |
+| Document                    | Purpose                                                                  | Location     |
+| --------------------------- | ------------------------------------------------------------------------ | ------------ |
+| **ARCHITECTURE.md**         | Technical deep-dive with system diagrams                                 | docs/        |
+| **RELEASE_VERSIONING.md**   | Semantic versioning with patch/minor/major examples                      | docs/        |
+| **RELEASE_GUIDE.md**        | Step-by-step release walkthrough                                         | docs/guides/ |
+| **RELEASE_QUICK_START.md**  | One-page quick reference                                                 | root         |
+| **VERSION_TIMING.md**       | Clarifies when to update version (BEFORE release)                        | docs/        |
+| **STORE_SUBMISSION.md**     | Chrome Web Store, Firefox Add-ons, Edge (future) submission requirements | docs/        |
+| **PRE_LAUNCH_CHECKLIST.md** | 7-phase checklist covering everything                                    | root         |
+| **PRIVACY.md**              | Privacy policy for store submissions                                     | root         |
+| **LINKEDIN_POST.md**        | Launch announcement drafts                                               | root         |
 
 ### 3. **Store Submission Ready**
 
@@ -136,11 +136,11 @@ npm run release
 
 ### Semantic Versioning Examples
 
-| Scenario | Change | Example |
-|----------|--------|---------|
-| Bug fix | PATCH | 1.1.0 → 1.1.1 |
-| New feature | MINOR | 1.1.0 → 1.2.0 |
-| Breaking change | MAJOR | 1.1.0 → 2.0.0 |
+| Scenario        | Change | Example       |
+| --------------- | ------ | ------------- |
+| Bug fix         | PATCH  | 1.1.0 → 1.1.1 |
+| New feature     | MINOR  | 1.1.0 → 1.2.0 |
+| Breaking change | MAJOR  | 1.1.0 → 2.0.0 |
 
 See docs/RELEASE_VERSIONING.md for full examples.
 
@@ -236,7 +236,7 @@ pm run release\ does everything (no manual git)
 
 - **Repository**: https://github.com/Life-Experimentalist/Code-Ledger
 - **Website**: https://codeledger.vkrishna04.me
-- **Support**: krishnalsh2004@gmail.com
+- **Support**: github@vkrishna04.me
 
 ---
 
