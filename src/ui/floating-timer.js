@@ -53,7 +53,7 @@ export function createFloatingTimer(slug = "", opts = {}) {
     right: position.right,
     zIndex: "2147483647",
     background: "rgba(10,10,20,0.92)",
-    border: "1px solid rgba(6,182,212,0.3)",
+    border: "1px solid color-mix(in srgb, var(--cl-accent, #06b6d4) 30%, transparent)",
     borderRadius: "10px",
     padding: "6px 10px",
     display: "flex",
@@ -62,7 +62,7 @@ export function createFloatingTimer(slug = "", opts = {}) {
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
     fontSize: "13px",
     color: "#e2e8f0",
-    boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(6,182,212,0.1)",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, var(--cl-accent, #06b6d4) 10%, transparent)",
     userSelect: "none",
     cursor: "grab",
     transition: "opacity 0.2s",
@@ -75,7 +75,7 @@ export function createFloatingTimer(slug = "", opts = {}) {
 
   const display = document.createElement("span");
   display.id = "cl-timer-display";
-  display.style.cssText = "min-width:46px;font-variant-numeric:tabular-nums;letter-spacing:0.05em;color:#06b6d4;font-weight:600;";
+  display.style.cssText = "min-width:46px;font-variant-numeric:tabular-nums;letter-spacing:0.05em;color:var(--cl-accent, #06b6d4);font-weight:600;";
   display.textContent = fmt(state.elapsed);
 
   const btnPlay = document.createElement("button");

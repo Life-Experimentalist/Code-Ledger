@@ -417,6 +417,26 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
   const simRef = useRef({ nodes: [], edges: [], alpha: 0, raf: null });
   const transformRef = useRef({ tx: 0, ty: 0, scale: 1 });
   const dragRef = useRef(null);
+
+  // Map from graph node ID → original problem object so modals get full data
+  const rawProblemByNodeId = useMemo(() => {
+    const map = new Map();
+    for (const p of (problems || [])) {
+      const nodeId = `problem:${p.platform}:${p.titleSlug || p.id}`;
+      map.set(nodeId, p);
+    }
+    return map;
+  }, [problems]);
+
+  // Resolve a graph node (which lacks code/aiReview/etc.) → full problem
+  function nodeToRawProblem(nodeOrProblem) {
+    if (!nodeOrProblem) return null;
+    if (nodeOrProblem.type === "problem") {
+      return rawProblemByNodeId.get(nodeOrProblem.id) || nodeOrProblem;
+    }
+    return nodeOrProblem;
+  }
+
   const [hovered, setHovered] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [selected, setSelected] = useState(null);
@@ -949,14 +969,6 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
   return html`
     <div class="flex flex-col gap-4 w-full h-full min-h-[600px]">
 
-      <!-- Quick nav to other views -->
-      ${onNavigate ? html`
-        <div class="flex gap-2 items-center">
-          <span class="text-[10px] text-slate-600 uppercase tracking-wider mr-1">Jump to:</span>
-          <button onClick=${() => onNavigate("solutions")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Solutions</button>
-          <button onClick=${() => onNavigate("analytics")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Analytics</button>
-        </div>
-      ` : ""}
 
       <!-- Toolbar -->
       <div class="flex items-center gap-3 flex-wrap">
@@ -1062,7 +1074,7 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
                 class="text-left px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-200"
                 onClick=${() => {
         setSelected(n);
-        if (n.type === "problem") setModalProblem(n);
+        if (n.type === "problem") setModalProblem(nodeToRawProblem(n));
       }}
               >${n.label} <span class="text-slate-500">${n.type}${n.platform ? ` · ${n.platform}` : ""}</span></button>
             `)}
@@ -1131,7 +1143,7 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
             <div class="flex items-center justify-between mb-3">
               ${selected.type === "problem" && selected.solved ? html`
                 <button
-                  onClick=${() => setModalProblem(selected)}
+                  onClick=${() => setModalProblem(nodeToRawProblem(selected))}
                   class="text-[10px] px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
                 >Expand ↗</button>
               ` : html`<span></span>`}
@@ -1152,8 +1164,9 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
       <${ProblemModal}
         problem=${modalProblem}
         onClose=${() => setModalProblem(null)}
-        problemList=${simRef.current.nodes.filter((node) => node.type === "problem")}
+        problemList=${problems || []}
         onNavigateProblem=${setModalProblem}
+        onNavigate=${onNavigate}
         onDelete=${(id) => {
       if (onProblemDelete) onProblemDelete(id);
       setModalProblem(null);

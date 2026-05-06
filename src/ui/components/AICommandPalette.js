@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { h } from "../../vendor/preact-bundle.js";
+import { h, useRef, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -16,6 +16,15 @@ export function AICommandPalette({
   emptyLabel = "No matches",
   style = {},
 }) {
+  const listRef = useRef(null);
+
+  // Scroll active item into view whenever activeIndex changes
+  useEffect(() => {
+    if (!listRef.current) return;
+    const active = listRef.current.querySelector("[data-active='true']");
+    if (active) active.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }, [activeIndex]);
+
   if (!visible) return null;
 
   return html`
@@ -24,12 +33,13 @@ export function AICommandPalette({
           <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">${title}</span>
           <span class="text-[10px] text-slate-600">${items.length} item${items.length === 1 ? "" : "s"}</span>
         </div>
-        <div class="max-h-56 overflow-y-auto">
+        <div ref=${listRef} class="max-h-56 overflow-y-auto">
           ${items.length === 0 ? html`
             <div class="px-3 py-3 text-sm text-slate-500">${emptyLabel}</div>
           ` : items.map((item, index) => html`
             <button
               type="button"
+              data-active=${index === activeIndex ? "true" : "false"}
               onMouseDown=${(e) => e.preventDefault()}
               onClick=${() => onSelect?.(item, index)}
               class="w-full text-left px-3 py-2 border-b border-slate-900/70 last:border-b-0 transition-colors ${index === activeIndex ? "bg-cyan-500/10 text-cyan-100" : "hover:bg-slate-900 text-slate-200"}"

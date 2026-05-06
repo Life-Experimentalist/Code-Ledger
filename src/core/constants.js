@@ -208,6 +208,8 @@ export const CONSTANTS = Object.freeze({
     AI_PROMPTS: "ai.prompts",
     SYNC_STATE: "sync.state",
     THEME: "ui.theme",
+    BEHAVIOR_BANK: "cl-behavior-bank",
+    ROLLING_BACKUPS: "cl-rolling-backups",
     // Optional per-user difficulty mapping for non-standard difficulty labels.
     // Stored shape: { "extra hard": "Hard", "school": "Easy" }
     DIFFICULTY_MAP: "difficulty.map",

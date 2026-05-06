@@ -79,6 +79,27 @@ function readEditorCode() {
   return "";
 }
 
+/** Reads test failure output from LeetCode's result panel. */
+function readTestFailures() {
+  try {
+    const resultLines = [];
+    // Runtime error / compile error banner
+    const errorBanner = document.querySelector('[data-e2e-locator="console-result"]');
+    if (errorBanner) resultLines.push(errorBanner.textContent.trim());
+    // Wrong answer / TLE detail blocks
+    document.querySelectorAll(".testcase-result-block, [data-e2e-locator='submission-result']").forEach((el) => {
+      const t = el.textContent.trim();
+      if (t) resultLines.push(t);
+    });
+    // stdout / stderr panels
+    document.querySelectorAll(".result-panel pre, .console-output pre").forEach((el) => {
+      const t = el.textContent.trim();
+      if (t) resultLines.push(t);
+    });
+    return resultLines.filter(Boolean).join("\n\n");
+  } catch { return ""; }
+}
+
 /** Reads page metadata — problem title and difficulty. */
 function readPageMeta() {
   const titleEl =
@@ -614,9 +635,9 @@ export function createFloatingAI(slug = "", opts = {}) {
     const text = input.value.trim();
     if (!text || pending) return;
 
-    const meta = readPageMeta();
     const code = (typeof platform.readEditorCode === "function" ? platform.readEditorCode({ slug, window, document }) : readEditorCode()) || "";
     const pageMeta = typeof platform.readPageMeta === "function" ? platform.readPageMeta({ slug, window, document }) : readPageMeta();
+    const errors = (typeof platform.readTestFailures === "function" ? platform.readTestFailures({ slug, window, document }) : readTestFailures()) || "";
     const baseContext = buildAIChatContext({
       surface: "floating-panel",
       text,
@@ -637,9 +658,10 @@ export function createFloatingAI(slug = "", opts = {}) {
       },
       attachedProblemSlugs: slug ? [slug] : [],
       attachedProblems: slug ? [{ slug, title: pageMeta.title || slug, platform: platform.chatPlatform || "leetcode", url: window.location.href }] : [],
+      errors,
     });
     const context = typeof platform.buildChatContext === "function"
-      ? platform.buildChatContext({ baseContext, text, pageMeta, code, slug, window, document })
+      ? platform.buildChatContext({ baseContext, text, pageMeta, code, errors, slug, window, document })
       : baseContext;
 
     // Expand variables in the input (e.g., /mycode → code block)

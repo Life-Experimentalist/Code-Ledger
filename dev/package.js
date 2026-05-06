@@ -1,51 +1,78 @@
 #!/usr/bin/env node
-import fs from "fs";
-import path from "path";
+/**
+ * Publish orchestrator — runs the full release build:
+ *   1. Compiles Tailwind CSS
+ *   2. Packages Chrome/Edge/Brave zip (src/ as-is)
+ *   3. Packages Firefox zip (side_panel stripped from manifest)
+ *   4. Packages source tarball (src + dev + docs + config files)
+ *
+ * Reads version from package.json (canonical source of truth).
+ * Usage: npm run publish
+ */
+
 import { execSync } from "child_process";
+import { createReadStream, createWriteStream, mkdirSync, readFileSync } from "fs";
+import { resolve, relative, join } from "path";
+import { createGzip } from "zlib";
+import { pipeline } from "stream/promises";
 
-function getVersion() {
-  const content = fs.readFileSync(
-    path.join("src", "core", "constants.js"),
-    "utf8",
+const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+const manifest = JSON.parse(readFileSync(join("src", "manifest.json"), "utf8"));
+const version = pkg.version;
+
+if (manifest.version !== version) {
+  console.error(
+    `Version mismatch: package.json has ${version} but src/manifest.json has ${manifest.version}.\n` +
+    `Update both to the same version before publishing.`
   );
-  const match = content.match(/VERSION:\s*['\"]([^'\"]+)['\"]/);
-  if (match && match[1]) return match[1];
-  return "1.0.0";
-}
-
-const VERSION = getVersion();
-const chromeDir = path.join(process.cwd(), "dist", "chromium");
-const firefoxDir = path.join(process.cwd(), "dist", "firefox");
-const releasesDir = path.join(process.cwd(), "releases");
-
-if (!fs.existsSync(chromeDir) || !fs.existsSync(firefoxDir)) {
-  console.error("Dist directories not found. Run `npm run build` first.");
   process.exit(1);
 }
 
-if (!fs.existsSync(releasesDir)) fs.mkdirSync(releasesDir, { recursive: true });
+console.log(`\nPublishing CodeLedger v${version}\n`);
 
-try {
-  console.log("Packaging Chromium extension...");
-  execSync(
-    `npx bestzip ${path.join(releasesDir, `codeledger-chromium-v${VERSION}.zip`)} *`,
-    { cwd: chromeDir, stdio: "inherit" },
-  );
+mkdirSync("releases", { recursive: true });
 
-  console.log("Packaging Firefox extension...");
-  execSync(
-    `npx bestzip ${path.join(releasesDir, `codeledger-firefox-v${VERSION}.zip`)} *`,
-    { cwd: firefoxDir, stdio: "inherit" },
-  );
-
-  console.log("Packaging source tarball...");
-  execSync(
-    `npx bestzip ${path.join(releasesDir, `codeledger-source-v${VERSION}.zip`)} src dev docs package.json .env.example .gitignore tsconfig.json`,
-    { cwd: process.cwd(), stdio: "inherit" },
-  );
-
-  console.log("Packaging complete. Releases are in", releasesDir);
-} catch (e) {
-  console.error("Packaging failed:", e.message);
-  process.exit(1);
+function run(cmd, label) {
+  console.log(`→ ${label}`);
+  try {
+    execSync(cmd, { stdio: "inherit" });
+  } catch (e) {
+    console.error(`Failed: ${label}`);
+    process.exit(1);
+  }
 }
+
+// 1. CSS build
+run("npm run build:css", "Compile Tailwind CSS");
+
+// 2. Chrome package
+run("node dev/package-chrome.js", `Package Chrome → releases/codeledger-chrome-v${version}.zip`);
+
+// 3. Firefox package
+run("node dev/package-firefox.js", `Package Firefox → releases/codeledger-firefox-v${version}.zip`);
+
+// 4. Source zip
+import AdmZip from "adm-zip";
+const sourceZip = new AdmZip();
+const sourceDirs = ["src", "dev", "docs", "worker"];
+const sourceFiles = ["package.json", "package-lock.json", "tsconfig.json", "tailwind.config.js", ".prettierrc"];
+
+for (const dir of sourceDirs) {
+  try { sourceZip.addLocalFolder(dir, dir); } catch (_) { /* skip missing dirs */ }
+}
+for (const file of sourceFiles) {
+  try { sourceZip.addLocalFile(file); } catch (_) { /* skip missing files */ }
+}
+
+const sourcePath = resolve(`releases/codeledger-source-v${version}.zip`);
+sourceZip.writeZip(sourcePath);
+console.log(`→ Source tarball → releases/codeledger-source-v${version}.zip`);
+
+console.log(`\nDone. Three artifacts in releases/:`);
+console.log(`  codeledger-chrome-v${version}.zip`);
+console.log(`  codeledger-firefox-v${version}.zip`);
+console.log(`  codeledger-source-v${version}.zip`);
+console.log(`\nNext steps:`);
+console.log(`  git commit -m "chore: release v${version}"`);
+console.log(`  git tag v${version}`);
+console.log(`  git push origin main v${version}   # triggers GitHub Actions release`);

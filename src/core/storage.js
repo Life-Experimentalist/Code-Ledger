@@ -62,6 +62,91 @@ export const Storage = {
     await browserStorage.local.set(payload);
   },
 
+  async getTheme() {
+    const res = await browserStorage.local.get(CONSTANTS.SK.THEME);
+    return res[CONSTANTS.SK.THEME] || null;
+  },
+
+  async setTheme(theme) {
+    await browserStorage.local.set({ [CONSTANTS.SK.THEME]: theme });
+  },
+
+  async getBehaviorBank() {
+    const res = await browserStorage.local.get(CONSTANTS.SK.BEHAVIOR_BANK);
+    return res[CONSTANTS.SK.BEHAVIOR_BANK] || {};
+  },
+
+  async setBehaviorBank(data) {
+    await browserStorage.local.set({ [CONSTANTS.SK.BEHAVIOR_BANK]: data });
+  },
+
+  async updateBehaviorRecord(slug, delta) {
+    const bank = await this.getBehaviorBank();
+    const existing = bank[slug] || {};
+    bank[slug] = { ...existing, ...delta };
+    await this.setBehaviorBank(bank);
+  },
+
+  // ── Backup store: { manual: [], scheduled: [], rolling: null } ──────────
+
+  async _getBackupStore() {
+    const res = await browserStorage.local.get(CONSTANTS.SK.ROLLING_BACKUPS);
+    const raw = res[CONSTANTS.SK.ROLLING_BACKUPS] || {};
+    // Migrate old array format (pre-3-type) → manual list
+    if (Array.isArray(raw)) return { manual: raw.slice(0, 10), scheduled: [], rolling: null };
+    return { manual: raw.manual || [], scheduled: raw.scheduled || [], rolling: raw.rolling || null };
+  },
+
+  async _saveBackupStore(store) {
+    await browserStorage.local.set({ [CONSTANTS.SK.ROLLING_BACKUPS]: store });
+  },
+
+  // Manual backups (up to 10, full CRUD)
+  async getManualBackups() { return (await this._getBackupStore()).manual; },
+
+  async addManualBackup(payload, name = "") {
+    const store = await this._getBackupStore();
+    store.manual.unshift({ id: `m-${Date.now()}`, ts: Date.now(), name, data: payload });
+    store.manual = store.manual.slice(0, 10);
+    await this._saveBackupStore(store);
+    return store.manual[0];
+  },
+
+  async deleteManualBackup(id) {
+    const store = await this._getBackupStore();
+    store.manual = store.manual.filter((b) => b.id !== id);
+    await this._saveBackupStore(store);
+  },
+
+  // Scheduled backups (event-driven triggers: on-solve, on-export)
+  async getScheduledBackups() { return (await this._getBackupStore()).scheduled; },
+
+  async addScheduledBackup(payload, trigger = "manual") {
+    const store = await this._getBackupStore();
+    store.scheduled.unshift({ id: `s-${Date.now()}`, ts: Date.now(), trigger, data: payload });
+    store.scheduled = store.scheduled.slice(0, 5);
+    await this._saveBackupStore(store);
+  },
+
+  async deleteScheduledBackup(id) {
+    const store = await this._getBackupStore();
+    store.scheduled = store.scheduled.filter((b) => b.id !== id);
+    await this._saveBackupStore(store);
+  },
+
+  // Rolling backup: single always-current snapshot
+  async getRollingBackup() { return (await this._getBackupStore()).rolling; },
+
+  async updateRollingBackup(payload) {
+    const store = await this._getBackupStore();
+    store.rolling = { ts: Date.now(), data: payload };
+    await this._saveBackupStore(store);
+  },
+
+  // Legacy compat (used by PanelBackups before redesign)
+  async getRollingBackups() { return await this.getManualBackups(); },
+  async addRollingBackup(payload) { await this.addManualBackup(payload); },
+
   async getAIPrompts() {
     const res = await browserStorage.local.get(CONSTANTS.SK.AI_PROMPTS);
     return normalizeAIPrompts(res[CONSTANTS.SK.AI_PROMPTS] || {});
@@ -213,6 +298,17 @@ export const Storage = {
     const commitKey = String(problemCommitKey || "").trim();
     if (!commitKey) return;
     map[commitKey] = Date.now();
+    await browserStorage.local.set({ [key]: map });
+  },
+
+  async markPendingProblemKeys(problemCommitKeys = []) {
+    const key = "cl.pending.problemkeys";
+    const map = await this.getPendingProblemKeys();
+    const now = Date.now();
+    for (const raw of problemCommitKeys) {
+      const commitKey = String(raw || "").trim();
+      if (commitKey) map[commitKey] = now;
+    }
     await browserStorage.local.set({ [key]: map });
   },
 

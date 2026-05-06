@@ -8,6 +8,51 @@
 
 ---
 
+## Inbox:
+
+
+## Sprint: UI Polish + Publish Pipeline (2026-05-06)
+
+### Shipped — v1.1.0
+
+| Area                | Change                                                                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Code tab            | Syntax highlighting for 10 languages via `src/lib/syntax-highlight.js` — keywords, strings, comments, numbers, types — all inline-styled, no CDN                                                                |
+| Code tab            | `cleanCode()` strips Monaco's U+00B7/U+200C whitespace-visualization chars from display and clipboard copy                                                                                                      |
+| Mermaid             | Replaced CDN-blocked script injection with `mermaid.ink` image rendering + "View in Mermaid Live" fallback link                                                                                                 |
+| Mermaid             | Flowcharts/graphs without explicit direction or with LR/RL are rewritten to TD (top-down) by default                                                                                                            |
+| AI chat             | `AICommandPalette` ArrowDown/ArrowUp now scrolls active item into view (was stuck at top of list)                                                                                                               |
+| Extension handshake | `presence-marker.js` dispatches `CODELEDGER_HANDSHAKE` CustomEvent with browser-specific library URL — works on Chrome, Edge, Brave, Firefox                                                                    |
+| Extension handshake | `landing.js` listens for the CustomEvent, caches result in `sessionStorage` to prevent flicker on reload                                                                                                        |
+| Landing page        | FAQ section, stats strip (0 servers see your code), browser badges, JSON-LD structured data, extended OG/Twitter meta                                                                                           |
+| Landing page        | Dynamic install button: shows "Get Extension" when not installed, "Open Library" (extension URL) when detected                                                                                                  |
+| Versioning          | Extension bumped to **v1.1.0** in `manifest.json` and `package.json`                                                                                                                                            |
+| Packaging           | `dev/package-chrome.js` and `dev/package-firefox.js` now read version from `package.json` dynamically; Firefox build strips `side_panel` key                                                                    |
+| Publish pipeline    | `.github/workflows/release.yml` — triggers on `v*.*.*` tags, validates manifest version matches tag, builds CSS+dist, packages both browsers, extracts CHANGELOG section, creates GitHub Release with both ZIPs |
+| Docs                | `docs/CHANGELOG.md` created with Keep a Changelog format                                                                                                                                                        |
+
+---
+
+## Sprint: Settings + AI Chat Overhaul (2026-05-05–06)
+
+### Shipped
+
+| Area            | Change                                                                                        |
+| --------------- | --------------------------------------------------------------------------------------------- |
+| Settings panels | Complete rewrite of PanelAI, PanelGit, PanelPlatforms — properly wired to storage             |
+| Settings panels | PanelBackups: restore button per scheduled snapshot, `schedBackupOnExport` trigger            |
+| ModelSelector   | Fixed `TypeError: onSelect is not a function` — added `onSelect = () => {}` default           |
+| AI providers    | First-run defaults: all AI providers disabled until user adds a key (`_defaultsApplied` flag) |
+| KaTeX           | Replaced CDN loading (CSP-blocked) with `katex-stub.js` inline renderer                       |
+| Markdown        | Fixed double-escaping (`&lt;=` showing literally) — stash-before-escape ordering              |
+| Markdown        | Added table support with `<thead>/<tbody>`, inline formatting inside cells                    |
+| QoL toggles     | `qolEnabled`, `floatingTimerEnabled`, `floatingAIEnabled` settings wired to actual injection  |
+| Backup triggers | `schedBackupOnSolve` and `schedBackupOnExport` triggers implemented in service-worker         |
+| LeetCode        | Profile/progress sync URL buttons in PanelPlatforms                                           |
+| Git panel       | Sync button → RESYNC_ALL message; pending count display                                       |
+
+---
+
 ## Sprint: Comprehensive Overhaul (2026-05-05)
 
 Goal: contributor-friendly codebase with robust MVP (LeetCode solve → GitHub commit).
@@ -30,10 +75,10 @@ Goal: contributor-friendly codebase with robust MVP (LeetCode solve → GitHub c
 | Code cleanup        | Removed `_formatHints` (always returned `""`), legacy `checkSubmission`/`fetchGraphQL`/`getProblemMetadata` shims, `cl-row-sync` DOM cleanup guard                                                  |
 | Docs                | `FEATURE_REQUESTS.md` — moved completed items out of In Progress / Pending; removed "done" bug                                                                                                      |
 | Docs                | This file created                                                                                                                                                                                   |
-| Canonical endpoint  | `CONSTANTS.URLS.CANONICAL_MAP` → `codeledger.vkrishna04.me/api/data/canonical-map.json` primary; `CANONICAL_MAP_RAW` GitHub raw as fallback; `canonical-mapper.js` iterates both URLs              |
-| Settings overhaul   | CF/GFG/LeetCode handlers all expose `getSettingsSchema()`; `telemetry.js` key mismatch fixed (`telemetryOptIn`); notifications gated on `settings.notifications`                                   |
-| Analytics drilldown | Difficulty donut, language pie, platform cards, topic cards all clickable → scrollable problem list overlay; clicking problem opens `ProblemModal`; nav buttons to Solutions + Graph on all views  |
-| Multi-lang modal    | `siblings` array in `ProblemModal` — same `titleSlug` (different language) or same `canonical.id` (cross-platform); "Also solved as" strip renders per-sibling pill with favicon + lang name       |
+| Canonical endpoint  | `CONSTANTS.URLS.CANONICAL_MAP` → `codeledger.vkrishna04.me/api/data/canonical-map.json` primary; `CANONICAL_MAP_RAW` GitHub raw as fallback; `canonical-mapper.js` iterates both URLs               |
+| Settings overhaul   | CF/GFG/LeetCode handlers all expose `getSettingsSchema()`; `telemetry.js` key mismatch fixed (`telemetryOptIn`); notifications gated on `settings.notifications`                                    |
+| Analytics drilldown | Difficulty donut, language pie, platform cards, topic cards all clickable → scrollable problem list overlay; clicking problem opens `ProblemModal`; nav buttons to Solutions + Graph on all views   |
+| Multi-lang modal    | `siblings` array in `ProblemModal` — same `titleSlug` (different language) or same `canonical.id` (cross-platform); "Also solved as" strip renders per-sibling pill with favicon + lang name        |
 
 ---
 

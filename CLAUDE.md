@@ -48,6 +48,20 @@ node dev/import-profile/leetcode-importer.js --github-token=TOKEN --repo=owner/r
 node dev/import-profile/gfg-importer.js --github-token=TOKEN --repo=owner/repo
 ```
 
+### Release (automated)
+```bash
+npm run release             # validates, builds zips, commits, tags, pushes all in one command
+npm run release -- --dry-run   # preview what would happen (no git changes)
+```
+
+Or manually:
+```bash
+npm run publish             # clean → build:css → build:dist → zip Chrome + Firefox + source
+git commit -m "chore: release vX.Y.Z"
+git tag vX.Y.Z
+git push origin main vX.Y.Z   # triggers .github/workflows/release.yml
+```
+
 ### Smoke test (post-deploy)
 ```bash
 curl -sf https://codeledger.vkrishna04.me/api/health
@@ -249,3 +263,29 @@ The `problem:solved` event payload (emitted by platform handlers, consumed by se
 ```
 
 The `files` array drives the git commit. If absent, SW builds a fallback single-file path: `topics/{topic}/{titleSlug}/{lang}.{ext}`. The SW always appends `index.json` as the last file in the commit.
+
+---
+
+## Versioning & Changelog
+
+Version is canonical in **two places that must always match**:
+- `src/manifest.json` → `"version"`
+- `package.json` → `"version"`
+
+**Source of truth for releases:** `package.json`. The CI release pipeline validates they match before tagging.
+
+### Release checklist
+1. Add a `## [x.y.z] — YYYY-MM-DD` section to `docs/CHANGELOG.md` (Added / Fixed / Changed / Removed / Security).
+2. Bump version in **both** `src/manifest.json` and `package.json` to the same version.
+3. Run `npm run release` (validates, builds, commits, tags, pushes all at once).
+   - Or `npm run release -- --dry-run` to preview first.
+4. GitHub Actions (`.github/workflows/release.yml`) triggers automatically on tag push → creates GitHub Release with attached zips.
+
+### CHANGELOG sections
+- **Added** — new features or capabilities
+- **Fixed** — bug fixes
+- **Changed** — behaviour changes in existing features
+- **Removed** — removed features or APIs
+- **Security** — vulnerabilities fixed (always document these)
+
+When landing a feature mid-sprint, add it under `## [Unreleased]` at the top of the file. Promote to a numbered section at release time.

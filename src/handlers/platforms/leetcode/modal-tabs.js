@@ -7,6 +7,7 @@
  */
 
 import { modalTabRegistry } from "../../../core/modal-tab-registry.js";
+import { highlightCode, cleanCode } from "../../../lib/syntax-highlight.js";
 
 const IS_EXTENSION = !!globalThis.chrome?.runtime?.id;
 
@@ -40,8 +41,31 @@ modalTabRegistry.register("leetcode", [
               </div>
             </div>
           `}
+          ${problem.constraints ? html`
+            <div class="mt-3 border-t border-white/5 pt-3">
+              <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-1">Constraints</p>
+              <pre class="text-xs text-slate-400 font-mono whitespace-pre-wrap leading-relaxed bg-black/30 rounded-lg p-2 border border-white/5">${problem.constraints}</pre>
+            </div>
+          ` : ""}
+          ${problem.similar?.length ? html`
+            <div class="mt-3 border-t border-white/5 pt-3">
+              <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-2">Similar Problems</p>
+              <div class="flex flex-col gap-1">
+                ${problem.similar.slice(0, 5).map(s => {
+                  const sUrl = `https://leetcode.com/problems/${s.titleSlug}/`;
+                  const sDiffClass = { Easy: "text-emerald-400", Medium: "text-amber-400", Hard: "text-rose-400" }[s.difficulty] || "text-slate-400";
+                  return html`
+                    <a href=${sUrl} target="_blank" rel="noopener"
+                       class="flex items-center justify-between py-1 px-2 rounded hover:bg-white/5 transition-colors no-underline group">
+                      <span class="text-xs text-slate-300 group-hover:text-cyan-300">${s.title || s.titleSlug}</span>
+                      <span class="text-[10px] ${sDiffClass} ml-2 shrink-0">${s.difficulty || ""}</span>
+                    </a>`;
+                })}
+              </div>
+            </div>
+          ` : ""}
           ${problem.hints?.length ? html`
-            <div class="mt-2">
+            <div class="mt-3 border-t border-white/5 pt-3">
               <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-2">Hints</p>
               ${problem.hints.map((h, i) => html`
                 <details class="mb-1 group">
@@ -59,6 +83,8 @@ modalTabRegistry.register("leetcode", [
     label: "Code",
     show: (p) => !!p.code,
     render(problem, { html, langName, copied, copyCode }) {
+      const rawLang = problem.lang?.slug || problem.lang?.name || problem.language || "";
+      const highlighted = highlightCode(problem.code || "// No code saved for this problem.", rawLang);
       return html`
         <div class="flex flex-col gap-2">
           <div class="flex justify-between items-center">
@@ -68,7 +94,8 @@ modalTabRegistry.register("leetcode", [
               class="text-[10px] px-2.5 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
             >${copied ? "✓ Copied" : "Copy"}</button>
           </div>
-          <pre class="text-xs text-slate-300 leading-relaxed overflow-x-auto bg-black/50 rounded-xl border border-white/5 p-4 whitespace-pre font-mono m-0">${problem.code || "// No code saved for this problem."}</pre>
+          <pre class="text-xs leading-relaxed overflow-x-auto bg-black/50 rounded-xl border border-white/5 p-4 whitespace-pre font-mono m-0"
+               dangerouslySetInnerHTML=${{ __html: highlighted }}></pre>
         </div>`;
     },
   },
@@ -112,7 +139,7 @@ modalTabRegistry.register("leetcode", [
   ...(IS_EXTENSION ? [{
     id: "chat",
     label: "Ask AI",
-    render(problem, { html, chatMessages, chatInput, setChatInput, sendChat, chatPending, chatError, AIMarkdownRenderer, MultiLineAIChatInput, openAIChatsView, onClearChat }) {
+    render(problem, { html, chatMessages, chatInput, setChatInput, sendChat, chatPending, chatError, AIMarkdownRenderer, MultiLineAIChatInput, ModelStatusBar, openAIChatsView, onClearChat, settings }) {
       return html`
         <div class="flex flex-col gap-3 h-full">
           <div class="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0 max-h-[340px]">
@@ -143,7 +170,10 @@ modalTabRegistry.register("leetcode", [
             ` : ""}
             ${chatError ? html`<p class="text-xs text-rose-400 px-1">${chatError}</p>` : ""}
           </div>
-          <div class="shrink-0">
+          <div class="shrink-0 flex flex-col gap-2">
+            <div class="flex justify-end">
+              <${ModelStatusBar} settings=${settings} />
+            </div>
             <${MultiLineAIChatInput}
               value=${chatInput}
               onChange=${setChatInput}

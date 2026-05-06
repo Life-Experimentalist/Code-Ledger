@@ -1,0 +1,45 @@
+/* CodeLedger CSS custom property fallbacks.
+ * These defaults match the current material-dark palette.
+ * Overridden at runtime by theme-engine.js setThemeVariables().
+ * Referenced by: floating-ai, floating-timer, injected content-script buttons.
+ */
+:root {
+  --cl-accent: #22d3ee;
+  --cl-accent-hover: #06b6d4;
+  --cl-bg: #030712;
+  --cl-surface: #0f172a;
+  --cl-card: #1e293b;
+  --cl-text: #e5e7eb;
+  --cl-text-muted: #6b7280;
+  --cl-border: #1e293b;
+
+  /* Palette aliases (used by existing library/popup Tailwind classes) */
+  --primary-color: #22d3ee;
+  --primary-hover: #06b6d4;
+  --bg-primary: #030712;
+  --bg-secondary: #0f172a;
+  --bg-card: #1e293b;
+  --text-primary: #e5e7eb;
+  --text-muted: #6b7280;
+  --border-color: #1e293b;
+}
+
+[data-theme="light"] {
+  --cl-accent: #0969da;
+  --cl-accent-hover: #0550ae;
+  --cl-bg: #ffffff;
+  --cl-surface: #f6f8fa;
+  --cl-card: #ffffff;
+  --cl-text: #1f2328;
+  --cl-text-muted: #9198a1;
+  --cl-border: #d0d7de;
+
+  --primary-color: #0969da;
+  --primary-hover: #0550ae;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-card: #ffffff;
+  --text-primary: #1f2328;
+  --text-muted: #9198a1;
+  --border-color: #d0d7de;
+}

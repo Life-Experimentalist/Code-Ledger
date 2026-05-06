@@ -113,6 +113,7 @@ export function AnalyticsView({ problems, onNavigate }) {
   const [userMap, setUserMap] = useState({});
   const [modalProblem, setModalProblem] = useState(null);
   const [drilldown, setDrilldown] = useState(null); // { label, problems[] }
+  const [modalProblemList, setModalProblemList] = useState([]); // list to navigate within modal
   useEffect(() => {
     let m = true;
     loadUserDifficultyMap()
@@ -349,14 +350,6 @@ export function AnalyticsView({ problems, onNavigate }) {
   return html`
     <div class="flex flex-col gap-6 w-full pb-10">
 
-      <!-- Quick nav to other views -->
-      ${onNavigate ? html`
-        <div class="flex gap-2 items-center">
-          <span class="text-[10px] text-slate-600 uppercase tracking-wider mr-1">Jump to:</span>
-          <button onClick=${() => onNavigate("solutions")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Solutions</button>
-          <button onClick=${() => onNavigate("graph")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Graph</button>
-        </div>
-      ` : ""}
 
       <!-- Quick stats row -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -576,7 +569,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                     return html`
                       <button
                         class="w-full text-left px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.07] hover:border-cyan-500/20 transition-colors"
-                        onClick=${() => { setModalProblem(p); setDrilldown(null); }}
+                        onClick=${() => { setModalProblem(p); setModalProblemList(drilldown.problems); setDrilldown(null); }}
                       >
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-sm text-slate-200 leading-snug truncate">${p.title || p.titleSlug}</span>
@@ -597,9 +590,10 @@ export function AnalyticsView({ problems, onNavigate }) {
 
       <${ProblemModal}
         problem=${modalProblem}
-        onClose=${() => setModalProblem(null)}
-        problemList=${problems}
+        onClose=${() => { setModalProblem(null); setModalProblemList([]); }}
+        problemList=${modalProblemList.length ? modalProblemList : problems}
         onNavigateProblem=${setModalProblem}
+        onNavigate=${onNavigate}
       />
     </div>
   `;

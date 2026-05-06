@@ -222,14 +222,6 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
   return html`
     <div class="flex flex-col gap-6 w-full">
 
-      <!-- Quick nav to other views -->
-      ${onNavigate ? html`
-        <div class="flex gap-2 items-center">
-          <span class="text-[10px] text-slate-600 uppercase tracking-wider mr-1">Jump to:</span>
-          <button onClick=${() => onNavigate("analytics")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Analytics</button>
-          <button onClick=${() => onNavigate("graph")} class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-300 transition-colors">Graph</button>
-        </div>
-      ` : ""}
 
       <!-- Platform hub -->
       <div class="grid grid-cols-3 gap-4">
@@ -391,6 +383,7 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
         problemList=${filtered}
         onNavigateProblem=${handleSelectProblem}
         onOpenGraphProblem=${onOpenGraphProblem}
+        onNavigate=${onNavigate}
       />
     </div>
   `;

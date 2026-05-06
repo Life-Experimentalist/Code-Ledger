@@ -221,7 +221,9 @@ Be concise. Max 200 words.`;
 
     // QoL buttons on problem pages
     if (page.type === PAGE_TYPES.PROBLEM) {
-      setTimeout(() => injectQoL(), 1500);
+      Storage.getSettings().then((s) => {
+        if (s.qolEnabled !== false) setTimeout(() => injectQoL(), 1500);
+      }).catch(() => { setTimeout(() => injectQoL(), 1500); });
     }
 
     // AI panel on problem and submission pages
@@ -259,6 +261,7 @@ Be concise. Max 200 words.`;
   _startAIPanel(slug) {
     Storage.getSettings().then((settings) => {
       if (settings.leetcode_ai_panel === false) return;
+      if (settings.floatingAIEnabled === false) return;
       if (this._aiPanel && this._aiPanelSlug === slug) return;
       this._stopAIPanel();
       this._aiPanelSlug = slug;
@@ -330,8 +333,15 @@ Be concise. Max 200 words.`;
 
     // Re-inject QoL on problem pages
     if (page.type === PAGE_TYPES.PROBLEM) {
-      import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
-      setTimeout(() => injectQoL(), 1500);
+      Storage.getSettings().then((s) => {
+        if (s.qolEnabled !== false) {
+          import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
+          setTimeout(() => injectQoL(), 1500);
+        }
+      }).catch(() => {
+        import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
+        setTimeout(() => injectQoL(), 1500);
+      });
       this._startAIPanel(page.slug);
     } else if (page.type === PAGE_TYPES.SUBMISSION) {
       if (page.slug) this._startAIPanel(page.slug);
@@ -810,24 +820,20 @@ Be concise. Max 200 words.`;
         }
       }
 
-      // ── Phase 5: Emit problem:solved (skipCommit=true — saved to IndexedDB, no git) ──
+      // ── Phase 5: Send all problems as one atomic BULK_IMPORT to avoid concurrent write races ──
       show(`Importing ${picks.length} submissions…`);
-      let imported = 0;
 
-      for (const sub of picks) {
+      const bulkProblems = picks.map((sub) => {
         const lang = resolveLang(sub.lang || sub.langName);
         const tags = tagsMap[sub.titleSlug] || [];
         const topic = resolvePrimaryTopic(tags);
         const title = titleMap[sub.titleSlug] || sub.title || sub.titleSlug;
-
-        // Build file list when code is available so the record is commit-ready
         const files = [];
         if (sub.code) {
           const base = `topics/${topic}/${sub.titleSlug}/`;
           files.push({ path: `${base}${lang.verbose.replace(/\s+/g, "_")}.${lang.ext}`, content: sub.code });
         }
-
-        eventBus.emit("problem:solved", {
+        return {
           id: `${sub.titleSlug}::${lang.slug}`,
           submissionId: sub.id || null,
           platform: "leetcode",
@@ -848,16 +854,14 @@ Be concise. Max 200 words.`;
           hints: hintsMap[sub.titleSlug] || null,
           acRate: acRateMap[sub.titleSlug] ?? null,
           similar: similarMap[sub.titleSlug] || null,
-          hasSimilar: similarMap[sub.titleSlug] ? (similarMap[sub.titleSlug].length > 0 ? true : false) : null, // explicit mark: queried and none|some found
-          skipCommit: true,
-        });
+          hasSimilar: (similarMap[sub.titleSlug]?.length > 0) || null,
+        };
+      });
 
-        imported++;
-        if (imported % 10 === 0) {
-          show(`Importing… ${imported}/${picks.length}`);
-          await new Promise((r) => setTimeout(r, 25)); // yield to SW message queue
-        }
-      }
+      const result = await new Promise((resolve) => {
+        runtime.sendMessage({ type: "BULK_IMPORT", problems: bulkProblems }, (res) => resolve(res || {}));
+      });
+      const imported = result.saved ?? bulkProblems.length;
 
       show(`Done! Imported ${imported} submissions. Use "Sync to GitHub" to commit them.`);
       btn.textContent = `✓ Imported ${imported} solves`;

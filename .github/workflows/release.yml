@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # triggers on v1.1.0, v2.0.0-rc.1, etc.
+
+permissions:
+  contents: write   # needed to create GitHub Releases and upload assets
+
+jobs:
+  build-and-release:
+    name: Build & publish extension packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node / npm setup ────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Derive version from git tag ──────────────────────────────────────
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"           # e.g. v1.1.0
+          VERSION="${TAG#v}"                 # strip leading 'v'
+          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # ── Validate manifest version matches tag ────────────────────────────
+      - name: Validate manifest version
+        run: |
+          MANIFEST_VER=$(node -p "JSON.parse(require('fs').readFileSync('src/manifest.json','utf8')).version")
+          TAG_VER="${{ steps.version.outputs.version }}"
+          if [ "$MANIFEST_VER" != "$TAG_VER" ]; then
+            echo "::error::manifest.json version ($MANIFEST_VER) does not match tag ($TAG_VER)"
+            exit 1
+          fi
+          echo "Versions match: $MANIFEST_VER"
+
+      # ── Build ────────────────────────────────────────────────────────────
+      - name: Build CSS
+        run: npm run build:css
+
+      - name: Build distribution
+        run: npm run build:dist
+
+      # ── Package Chrome + Firefox ─────────────────────────────────────────
+      - name: Package Chrome extension
+        run: node dev/package-chrome.js
+
+      - name: Package Firefox extension
+        run: node dev/package-firefox.js
+
+      # ── Locate built archives ────────────────────────────────────────────
+      - name: List dist artifacts
+        run: ls -lh *.zip dist/*.zip 2>/dev/null || ls -lh
+
+      # ── Generate release notes from CHANGELOG ────────────────────────────
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extract section for this version from CHANGELOG.md
+          NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/{if(/^## \[/ && !/^## \[$VERSION\]/) exit; print}" docs/CHANGELOG.md | tail -n +2)
+          if [ -z "$NOTES" ]; then
+            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for full details."
+          fi
+          # Write to file to preserve newlines
+          echo "$NOTES" > /tmp/release_notes.md
+          echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
+
+      # ── Create GitHub Release ────────────────────────────────────────────
+      - name: Create GitHub Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "CodeLedger ${{ steps.version.outputs.tag }}"
+          body_path: ${{ steps.release_notes.outputs.notes_file }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
+          files: |
+            codeledger-chrome-v*.zip
+            codeledger-firefox-v*.zip
+
+      # ── Summary ─────────────────────────────────────────────────────────
+      - name: Print release URL
+        run: echo "Release published at ${{ steps.release.outputs.url }}"

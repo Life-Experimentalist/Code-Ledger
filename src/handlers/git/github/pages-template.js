@@ -16,6 +16,10 @@ export function getPagesHtml() {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CodeLedger — DSA Stats</title>
+  <meta name="description" content="DSA problem solutions tracked by CodeLedger — GitHub-backed, AI-reviewed, owned by you." />
+  <meta property="og:title" content="CodeLedger — DSA Stats" />
+  <meta property="og:description" content="DSA solutions committed automatically to GitHub." />
+  <meta property="og:type" content="website" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -104,6 +108,28 @@ export function getPagesHtml() {
     #loading { display: flex; align-items: center; justify-content: center; min-height: 50vh; color: var(--muted); font-size: .85rem; letter-spacing: .05em; }
     #err { color: var(--hard); font-size: .85rem; padding: 2rem; text-align: center; max-width: 600px; margin: 0 auto; display: none; }
     .footer { font-size: .6rem; color: var(--muted); text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+    /* All-problems table */
+    .search-row { display: flex; gap: .625rem; margin-bottom: .875rem; align-items: center; flex-wrap: wrap; }
+    .search-input { flex: 1; min-width: 160px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 8px; padding: .45rem .75rem; color: var(--text); font-size: .75rem; outline: none; }
+    .search-input:focus { border-color: rgba(6,182,212,.4); }
+    .filter-sel { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 8px; padding: .45rem .625rem; color: var(--text); font-size: .75rem; outline: none; cursor: pointer; }
+    .filter-sel:focus { border-color: rgba(6,182,212,.4); }
+    table.all-t { width: 100%; border-collapse: collapse; font-size: .72rem; }
+    table.all-t th { font-size: .52rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 700; text-align: left; padding: .4rem .625rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    table.all-t td { padding: .5rem .625rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    table.all-t tr:last-child td { border-bottom: 0; }
+    table.all-t tr:hover td { background: rgba(255,255,255,.02); }
+    .prob-link { color: var(--text); }
+    .prob-link:hover { color: var(--cyan); }
+    .src-link { color: var(--muted); font-size: .65rem; margin-left: .35rem; }
+    .src-link:hover { color: var(--cyan); }
+    .plat-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: .3rem; vertical-align: middle; }
+    #all-count { font-size: .65rem; color: var(--muted); margin-left: auto; }
+    .pagination { display: flex; gap: .35rem; align-items: center; margin-top: .75rem; flex-wrap: wrap; }
+    .pg-btn { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 6px; padding: .25rem .6rem; color: var(--muted); font-size: .65rem; cursor: pointer; }
+    .pg-btn:hover, .pg-btn.active { background: rgba(6,182,212,.1); border-color: rgba(6,182,212,.35); color: var(--cyan); }
+    .pg-btn:disabled { opacity: .3; cursor: default; }
   </style>
 </head>
 <body>
@@ -177,6 +203,33 @@ export function getPagesHtml() {
           <tbody id="rt"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-label">All Problems</div>
+      <div class="search-row">
+        <input class="search-input" id="s-q" type="search" placeholder="Search title, tag, or language…" />
+        <select class="filter-sel" id="s-diff">
+          <option value="">All Difficulties</option>
+          <option value="Easy">Easy</option>
+          <option value="Medium">Medium</option>
+          <option value="Hard">Hard</option>
+        </select>
+        <select class="filter-sel" id="s-plat">
+          <option value="">All Platforms</option>
+          <option value="leetcode">LeetCode</option>
+          <option value="geeksforgeeks">GeeksForGeeks</option>
+          <option value="codeforces">Codeforces</option>
+        </select>
+        <span id="all-count"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="all-t">
+          <thead><tr><th>#</th><th>Problem</th><th>Difficulty</th><th>Language</th><th>Platform</th><th>Date</th></tr></thead>
+          <tbody id="all-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pg"></div>
     </div>
 
     <div class="footer" id="ft">Tracked by <a href="https://codeledger.vkrishna04.me" target="_blank" rel="noreferrer">CodeLedger</a></div>
@@ -318,6 +371,95 @@ export function getPagesHtml() {
       return Object.keys(map).map(function(k) { return [k, map[k]]; }).sort(function(a, b) { return b[1] - a[1]; });
     }
 
+    var ALL_PROBLEMS = [];
+    var ALL_REPO_URL = '';
+    var PG_SIZE = 50;
+    var pg_cur = 0;
+
+    function fileUrl(problem) {
+      if (!ALL_REPO_URL || !problem.files || !problem.files.length) return '';
+      return ALL_REPO_URL + '/blob/main/' + problem.files[0].path;
+    }
+
+    function repoFileUrl(problem) {
+      // Reconstruct path from the problem shape used by path-builder
+      if (!ALL_REPO_URL) return '';
+      var slug = problem.titleSlug || problem.id || '';
+      var langName = (problem.lang && (problem.lang.verbose || problem.lang.name)) || 'Solution';
+      var ext = (problem.lang && problem.lang.ext) || 'txt';
+      var topic = (problem.tags && problem.tags[0]) || problem.topic || 'Uncategorized';
+      var path = 'topics/' + topic + '/' + slug + '/' + langName.replace(/\s+/g, '_') + '.' + ext;
+      return ALL_REPO_URL + '/blob/main/' + path;
+    }
+
+    function filterProblems() {
+      var q = (document.getElementById('s-q').value || '').toLowerCase();
+      var diff = document.getElementById('s-diff').value;
+      var plat = document.getElementById('s-plat').value;
+      return ALL_PROBLEMS.filter(function(p) {
+        if (diff && p.difficulty !== diff) return false;
+        if (plat && (p.platform || '').toLowerCase() !== plat) return false;
+        if (q) {
+          var hay = [p.title, p.titleSlug, p.platform, p.difficulty,
+            (p.lang && p.lang.name), (p.tags || []).join(' ')].join(' ').toLowerCase();
+          if (hay.indexOf(q) === -1) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderAllTable() {
+      var filtered = filterProblems();
+      var total = filtered.length;
+      var start = pg_cur * PG_SIZE;
+      var page = filtered.slice(start, start + PG_SIZE);
+
+      document.getElementById('all-count').textContent = total + ' problem' + (total !== 1 ? 's' : '');
+
+      var rows = '';
+      for (var i = 0; i < page.length; i++) {
+        var p = page[i];
+        var idx = start + i + 1;
+        var lang = (p.lang && p.lang.name) ? p.lang.name : (p.language || (p.lang && p.lang.ext) || '—');
+        var platColor = platformColor(p.platform);
+        var pUrl = problemUrl(p);
+        var fUrl = repoFileUrl(p);
+        var ts = p.timestamp ? (p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000) : 0;
+        var dateStr = ts ? new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+        rows += '<tr>'
+          + '<td style="color:var(--muted);font-variant-numeric:tabular-nums">' + idx + '</td>'
+          + '<td><a class="prob-link" href="' + escHtml(pUrl) + '" target="_blank" rel="noreferrer">' + escHtml(p.title || p.titleSlug || '—') + '</a>'
+          + (fUrl ? '<a class="src-link" href="' + escHtml(fUrl) + '" target="_blank" rel="noreferrer" title="View code in repo">[src]</a>' : '')
+          + '</td>'
+          + '<td>' + diffBadge(p.difficulty) + '</td>'
+          + '<td style="color:var(--muted)">' + escHtml(lang) + '</td>'
+          + '<td><span class="plat-dot" style="background:' + platColor + '"></span>' + escHtml(p.platform || '—') + '</td>'
+          + '<td style="color:var(--muted);white-space:nowrap">' + dateStr + '</td>'
+          + '</tr>';
+      }
+      document.getElementById('all-body').innerHTML = rows || '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:1.5rem">No problems match the current filter.</td></tr>';
+
+      // Pagination
+      var totalPages = Math.ceil(total / PG_SIZE);
+      var pgEl = document.getElementById('pg');
+      if (totalPages <= 1) { pgEl.innerHTML = ''; return; }
+      var pgHtml = '<button class="pg-btn" onclick="changePage(' + (pg_cur - 1) + ')"' + (pg_cur === 0 ? ' disabled' : '') + '>&#8249;</button>';
+      var lo = Math.max(0, pg_cur - 2), hi = Math.min(totalPages - 1, pg_cur + 2);
+      for (var pi = lo; pi <= hi; pi++) {
+        pgHtml += '<button class="pg-btn' + (pi === pg_cur ? ' active' : '') + '" onclick="changePage(' + pi + ')">' + (pi + 1) + '</button>';
+      }
+      pgHtml += '<button class="pg-btn" onclick="changePage(' + (pg_cur + 1) + ')"' + (pg_cur >= totalPages - 1 ? ' disabled' : '') + '>&#8250;</button>';
+      pgEl.innerHTML = pgHtml;
+    }
+
+    function changePage(n) { pg_cur = n; renderAllTable(); }
+
+    function bindFilters() {
+      ['s-q', 's-diff', 's-plat'].forEach(function(id) {
+        document.getElementById(id).addEventListener('input', function() { pg_cur = 0; renderAllTable(); });
+      });
+    }
+
     async function main() {
       try {
         var res = await fetch('./index.json');
@@ -328,6 +470,7 @@ export function getPagesHtml() {
 
         // Repo link
         var repo = getRepoUrl();
+        ALL_REPO_URL = repo.url;
         var rl = document.getElementById('repo-link');
         rl.href = repo.url;
         rl.textContent = repo.label + ' ↗';
@@ -403,6 +546,11 @@ export function getPagesHtml() {
           var dateStr = upd.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
           document.getElementById('ft').innerHTML = 'Last synced: ' + dateStr + ' · <a href="https://codeledger.vkrishna04.me" target="_blank" rel="noreferrer">CodeLedger</a>';
         }
+
+        // All-problems table
+        ALL_PROBLEMS = problems.slice().sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
+        bindFilters();
+        renderAllTable();
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('app').style.display = 'block';

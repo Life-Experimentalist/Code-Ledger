@@ -10,8 +10,13 @@ import { AICommandPalette } from "./AICommandPalette.js";
 import { CHAT_COMMANDS, AI_MENTION_OPTIONS, getCommandSuggestions, getMentionSuggestions } from "../../lib/chat-variables.js";
 
 /**
- * Multi-line AI chat input with variable support
- * Variables: /mycode, /problem, /errors, /submission, /hints, /similar, /constraints
+ * Multi-line AI chat input with / command and @ mention support.
+ *
+ * Dropdown rules:
+ *  - Opens when the token immediately before the cursor starts with / or @
+ *  - Stays open while that token persists (backspace removes chars, dropdown updates)
+ *  - Closes on Escape, Enter-select, click-select, or when no trigger token
+ *  - Only native DOM events drive the dropdown — no effect on the value prop change
  */
 export function MultiLineAIChatInput({
   value,
@@ -24,98 +29,111 @@ export function MultiLineAIChatInput({
   mentionItems = AI_MENTION_OPTIONS,
 }) {
   const textareaRef = useRef(null);
-  const [showVariableHint, setShowVariableHint] = useState(false);
-  const [matchedVars, setMatchedVars] = useState([]);
-  const [suggestionState, setSuggestionState] = useState({ visible: false, mode: "command", query: "", items: [], activeIndex: 0, start: 0, end: 0, position: null });
+  // Store latest commandItems/mentionItems in refs so native listeners always see fresh values
+  const commandItemsRef = useRef(commandItems);
+  const mentionItemsRef = useRef(mentionItems);
+  useEffect(() => { commandItemsRef.current = commandItems; }, [commandItems]);
+  useEffect(() => { mentionItemsRef.current = mentionItems; }, [mentionItems]);
 
-  const updateSuggestionState = (text, cursor) => {
+  const [suggestionState, setSuggestionState] = useState({
+    visible: false, mode: "command", query: "", items: [],
+    activeIndex: 0, start: 0, end: 0, position: null,
+  });
+  // Track whether we're in a suggestion session to correctly handle backspace
+  const tokenActiveRef = useRef(false);
+
+  // ── Core dropdown logic ───────────────────────────────────────────────────
+
+  function computeSuggestions(text, cursor) {
+    const beforeCursor = text.slice(0, cursor);
+    // Match a / or @ token starting at a word boundary right before the cursor
+    const tokenMatch = beforeCursor.match(/(^|\s)([\/@][^\s]*)$/);
+    if (!tokenMatch) return null;
+
+    const token = tokenMatch[2];
+    const prefix = token[0];
+    const query = token.slice(1).toLowerCase();
+    const all = prefix === "/"
+      ? getCommandSuggestions(query).filter((i) => commandItemsRef.current.some((d) => d.id === i.id))
+      : getMentionSuggestions(query).filter((i) => mentionItemsRef.current.some((d) => d.id === i.id));
+
+    const tokenStart = cursor - token.length;
+    return { prefix, query, items: all, start: tokenStart, end: cursor };
+  }
+
+  function showSuggestions(text, cursor) {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const beforeCursor = text.slice(0, cursor);
-    const tokenMatch = beforeCursor.match(/(^|\s)([\/\@][^\s]*)$/);
-    if (!tokenMatch) {
+    const result = computeSuggestions(text, cursor);
+
+    if (!result) {
+      tokenActiveRef.current = false;
       setSuggestionState((prev) => prev.visible ? { ...prev, visible: false } : prev);
       return;
     }
 
-    const token = tokenMatch[2] || "";
-    const prefix = token[0];
-    const query = token.slice(1).toLowerCase();
+    tokenActiveRef.current = true;
     const rect = textarea.getBoundingClientRect();
-    const items = prefix === "/"
-      ? getCommandSuggestions(query).filter((item) => commandItems.some((def) => def.id === item.id))
-      : getMentionSuggestions(query).filter((item) => mentionItems.some((def) => def.id === item.id));
-
     setSuggestionState({
       visible: true,
-      mode: prefix === "/" ? "command" : "mention",
-      query,
-      items,
+      mode: result.prefix === "/" ? "command" : "mention",
+      query: result.query,
+      items: result.items,
       activeIndex: 0,
-      start: cursor - token.length,
-      end: cursor,
-      position: {
-        left: rect.left,
-        width: rect.width,
-        top: Math.max(8, rect.top - 12),
-      },
+      start: result.start,
+      end: result.end,
+      position: { left: rect.left, width: rect.width, top: Math.max(8, rect.top - 12) },
     });
-  };
+  }
 
-  const replaceToken = (insertText) => {
+  function hideSuggestions() {
+    tokenActiveRef.current = false;
+    setSuggestionState((prev) => ({ ...prev, visible: false }));
+  }
+
+  // ── Token replacement on select ───────────────────────────────────────────
+
+  function replaceToken(insertText, tokenStart, tokenEnd) {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const currentValue = value || "";
-    const { start, end } = suggestionState;
-    const nextValue = `${currentValue.slice(0, start)}${insertText}${currentValue.slice(end)}`;
-    onChange?.(nextValue);
-    setSuggestionState((prev) => ({ ...prev, visible: false }));
+    const currentVal = textarea.value;
+    const nextVal = `${currentVal.slice(0, tokenStart)}${insertText}${currentVal.slice(tokenEnd)}`;
+    onChange?.(nextVal);
+    hideSuggestions();
+    // Restore cursor after Preact's controlled value update settles
     requestAnimationFrame(() => {
-      const nextCursor = start + insertText.length;
       textarea.focus();
-      textarea.selectionStart = textarea.selectionEnd = nextCursor;
+      const pos = tokenStart + insertText.length;
+      textarea.selectionStart = textarea.selectionEnd = pos;
     });
-  };
+  }
 
-  // Monitor input for variable hints (e.g., "/" triggers suggestion)
+  // ── Native event listeners (only place that drives the dropdown) ──────────
+
   useEffect(() => {
-    if (!textareaRef.current) return;
     const textarea = textareaRef.current;
+    if (!textarea) return;
 
     function onInput() {
-      const text = textarea.value;
-      const lines = text.split("\n");
-      const currentLine = lines[lines.length - 1];
-      const lastWord = currentLine.split(/\s/).pop() || "";
+      // Use textarea.value directly — this is the real DOM value, always up to date
+      showSuggestions(textarea.value, textarea.selectionStart ?? textarea.value.length);
+    }
 
-      if (lastWord.startsWith("/")) {
-        const query = lastWord.slice(1).toLowerCase();
-        const matches = availableVariables.filter((v) => v.startsWith(query));
-        setMatchedVars(matches);
-        setShowVariableHint(matches.length > 0);
-      } else {
-        setShowVariableHint(false);
-      }
-
-      updateSuggestionState(text, textarea.selectionStart ?? text.length);
+    function onClick() {
+      // Re-evaluate on click in case cursor moved into/out of a token
+      showSuggestions(textarea.value, textarea.selectionStart ?? textarea.value.length);
     }
 
     textarea.addEventListener("input", onInput);
-    textarea.addEventListener("click", onInput);
-    textarea.addEventListener("keyup", onInput);
+    textarea.addEventListener("click", onClick);
     return () => {
       textarea.removeEventListener("input", onInput);
-      textarea.removeEventListener("click", onInput);
-      textarea.removeEventListener("keyup", onInput);
+      textarea.removeEventListener("click", onClick);
     };
-  }, [availableVariables]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — refs keep commandItems/mentionItems fresh
 
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const cursor = textarea.selectionStart ?? (value || "").length;
-    updateSuggestionState(value || "", cursor);
-  }, [value, commandItems, mentionItems]);
+  // ── Keyboard handling ─────────────────────────────────────────────────────
 
   function handleKeyDown(e) {
     if (suggestionState.visible && suggestionState.items.length > 0) {
@@ -131,45 +149,53 @@ export function MultiLineAIChatInput({
       }
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        const selected = suggestionState.items[suggestionState.activeIndex];
-        if (selected) {
-          replaceToken(suggestionState.mode === "command" ? `/${selected.id} ` : `@${selected.id} `);
-          return;
+        const sel = suggestionState.items[suggestionState.activeIndex];
+        if (sel) {
+          const insert = suggestionState.mode === "command" ? `/${sel.id} ` : `@${sel.id} `;
+          replaceToken(insert, suggestionState.start, suggestionState.end);
         }
+        return;
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        setSuggestionState((prev) => ({ ...prev, visible: false }));
+        hideSuggestions();
+        return;
+      }
+      // Tab also selects current suggestion
+      if (e.key === "Tab" && suggestionState.items.length > 0) {
+        e.preventDefault();
+        const sel = suggestionState.items[suggestionState.activeIndex];
+        if (sel) {
+          const insert = suggestionState.mode === "command" ? `/${sel.id} ` : `@${sel.id} `;
+          replaceToken(insert, suggestionState.start, suggestionState.end);
+        }
         return;
       }
     }
 
-    // Ctrl+Enter to send
+    // Tab indent (only when no suggestion active)
+    if (e.key === "Tab" && !suggestionState.visible) {
+      e.preventDefault();
+      const ta = textareaRef.current;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const nextVal = (value || "").substring(0, start) + "  " + (value || "").substring(end);
+      onChange?.(nextVal);
+      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 2; });
+      return;
+    }
+
+    // Ctrl/Cmd+Enter sends
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       onSend?.();
-      return;
-    }
-
-    // Tab for indent (not blur)
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const textarea = textareaRef.current;
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const newValue = value.substring(0, start) + "\t" + value.substring(end);
-      onChange?.(newValue);
-      // Move cursor after inserted tab
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 1;
-      }, 0);
-      return;
     }
   }
 
-  function insertVariable(varName) {
-    replaceToken(`/${varName} `);
-  }
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const cmdLabel = suggestionState.mode === "command" ? "Commands" : "Mentions";
+  const cmdEmpty = suggestionState.mode === "command" ? "No matching commands." : "No matching tags.";
 
   return html`
     <div class="relative w-full">
@@ -178,43 +204,43 @@ export function MultiLineAIChatInput({
         value=${value}
         onChange=${(e) => onChange?.(e.target.value)}
         onKeyDown=${handleKeyDown}
-        placeholder="Type your question... (Ctrl+Enter to send, Tab for indent)"
+        placeholder="Type your question… (Ctrl+Enter to send, / for commands, @ for mentions)"
         disabled=${disabled}
-        class="w-full min-h-20 max-h-40 p-3 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 resize-none focus:border-cyan-500 focus:outline-none transition-colors"
+        class="w-full min-h-20 max-h-48 p-3 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 resize-none focus:border-cyan-500 focus:outline-none transition-colors text-sm leading-relaxed"
       ></textarea>
 
       <${AICommandPalette}
-        visible=${suggestionState.visible}
+        visible=${suggestionState.visible && suggestionState.items.length > 0}
         items=${suggestionState.items}
         activeIndex=${suggestionState.activeIndex}
-        title=${suggestionState.mode === "command" ? "Commands" : "Tags"}
-        emptyLabel=${suggestionState.mode === "command" ? "No commands match." : "No tags match."}
-        style=${suggestionState.position ? { left: `${suggestionState.position.left}px`, top: `${Math.max(8, suggestionState.position.top - 8)}px`, width: `${suggestionState.position.width}px`, transform: "translateY(-100%)" } : {}}
-        onSelect=${(item) => replaceToken(suggestionState.mode === "command" ? `/${item.id} ` : `@${item.id} `)}
+        title=${cmdLabel}
+        emptyLabel=${cmdEmpty}
+        style=${suggestionState.position ? {
+          left: `${suggestionState.position.left}px`,
+          top: `${Math.max(8, suggestionState.position.top - 8)}px`,
+          width: `${suggestionState.position.width}px`,
+          transform: "translateY(-100%)",
+        } : {}}
+        onSelect=${(item) => {
+          const insert = suggestionState.mode === "command" ? `/${item.id} ` : `@${item.id} `;
+          replaceToken(insert, suggestionState.start, suggestionState.end);
+        }}
       />
 
-      <!-- Variable hint dropdown -->
-      ${showVariableHint && html`
-        <div class="absolute bottom-full left-0 mb-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg overflow-hidden z-10">
-          ${matchedVars.map(
-    (varName) => html`
-              <button
-                onClick=${() => insertVariable(varName)}
-                class="block w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
-              >
-                /${varName}
-              </button>
-            `
-  )}
-        </div>
-      `}
-
-      <!-- Hint text -->
-      <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-        <span>Ctrl+Enter to send • Type / for commands • Type @ for tags</span>
+      <!-- Hint row -->
+      <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-3">
+        <span>Ctrl+Enter to send</span>
+        <span class="text-slate-700">·</span>
+        <span>/ commands</span>
+        <span class="text-slate-700">·</span>
+        <span>@ mentions</span>
         <div class="flex gap-1 flex-wrap ml-auto">
-          ${availableVariables.slice(0, 3).map((v) => html` <code class="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[10px]">/${v}</code> `)}
-          ${availableVariables.length > 3 && html` <code class="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[10px]">+${availableVariables.length - 3} more</code> `}
+          ${availableVariables.slice(0, 4).map((v) => html`
+            <code class="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-[10px]">/${v}</code>
+          `)}
+          ${availableVariables.length > 4 ? html`
+            <code class="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-[10px]">+${availableVariables.length - 4}</code>
+          ` : ""}
         </div>
       </div>
     </div>

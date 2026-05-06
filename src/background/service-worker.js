@@ -20,6 +20,10 @@ async function init() {
   await initDebug();
   coreDebug.log("Background starting...");
 
+  // First-run defaults: disable all AI providers and non-GitHub git providers.
+  // Only runs once — subsequent startups detect the flag and skip.
+  await applyFirstRunDefaults();
+
   // Register handlers
   initializeHandlers();
 
@@ -31,6 +35,27 @@ async function init() {
   });
 
   coreDebug.log("Background initialized");
+}
+
+async function applyFirstRunDefaults() {
+  try {
+    const settings = await Storage.getSettings();
+    if (settings._defaultsApplied) return;
+    const updates = { _defaultsApplied: true };
+    // Disable all AI providers — user must explicitly enable after adding a key
+    Object.keys(CONSTANTS.AI_PROVIDERS || {}).forEach((id) => {
+      if (!(`${id}_enabled` in settings)) {
+        updates[`${id}_enabled`] = false;
+      }
+    });
+    // Default git provider to GitHub (already the code default, but make it explicit)
+    if (!settings.gitProvider) updates.gitProvider = "github";
+    // Default: auto-review off until user has configured an AI provider
+    if (!("autoReview" in settings)) updates.autoReview = false;
+    await Storage.setSettings({ ...settings, ...updates });
+  } catch (e) {
+    // Non-fatal — defaults will apply via UI
+  }
 }
 
 function getProblemCommitKey(problem = {}) {
@@ -225,6 +250,12 @@ async function handleSolved(data) {
             message: `${data.title || titleSlug} saved to GitHub.`,
           });
         } catch (_) { }
+      }
+
+      // Scheduled backup on solve (if enabled)
+      if (settings.schedBackupOnSolve) {
+        const allP = await Storage.getAllProblems().catch(() => []);
+        Storage.addScheduledBackup({ problems: allP, settings }, "on-solve").catch(() => { });
       }
 
       // Fire-and-forget: rename files to canonical paths if needed
@@ -454,6 +485,22 @@ async function handleResyncAll(mode = "bulk") {
   return { committed: missing.length };
 }
 
+async function handleBulkImport(problems = []) {
+  if (!problems.length) return { saved: 0 };
+  const pendingKeys = [];
+  for (const data of problems) {
+    const existing = await Storage.getProblem(data.id).catch(() => null);
+    if (existing?.manuallyEdited) continue;
+    await Storage.saveProblem(data).catch(() => {});
+    const key = getProblemCommitKey(data);
+    if (key) pendingKeys.push(key);
+  }
+  if (pendingKeys.length) {
+    await Storage.markPendingProblemKeys(pendingKeys).catch(() => {});
+  }
+  return { saved: pendingKeys.length };
+}
+
 async function handleAIChat(messages, context = {}) {
   const settings = await Storage.getSettings();
   const contextParts = [];
@@ -541,6 +588,13 @@ try {
         .then((result) => sendResponse({ ok: true, ...result }))
         .catch((e) => sendResponse({ ok: false, error: e.message }));
       return true; // async response
+    }
+
+    if (msg && msg.type === "BULK_IMPORT") {
+      handleBulkImport(msg.problems || [])
+        .then((result) => sendResponse({ ok: true, ...result }))
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
+      return true;
     }
 
     if (msg && msg.type === "REFRESH_METADATA") {

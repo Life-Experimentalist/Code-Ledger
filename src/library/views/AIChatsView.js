@@ -9,7 +9,9 @@ const html = htm.bind(h);
 
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
-import { CHAT_COMMANDS, AI_MENTION_OPTIONS } from "../../lib/chat-variables.js";
+import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
+import { AIPromptModeSelector, PROMPT_MODE_PREFIXES } from "../../ui/components/AIPromptModeSelector.js";
+import { CHAT_COMMANDS, AI_MENTION_OPTIONS, expandChatVariables } from "../../lib/chat-variables.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { getAllChats, searchChats, deleteChat, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 
@@ -57,6 +59,7 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
   const [replyText, setReplyText] = useState("");
   const [replyPending, setReplyPending] = useState(false);
   const [replyError, setReplyError] = useState("");
+  const [promptMode, setPromptMode] = useState("tutor");
   const [prefillHandled, setPrefillHandled] = useState(false);
   const [prefillChatSlug, setPrefillChatSlug] = useState("");
 
@@ -207,13 +210,21 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
   };
 
   const sendNewChat = async () => {
-    const text = composeText.trim();
-    if (!text || sending) return;
+    const rawText = composeText.trim();
+    if (!rawText || sending) return;
 
     setSending(true);
     setComposeError("");
     try {
       const primary = selectedAttachments[0] || null;
+      const modePrefix = PROMPT_MODE_PREFIXES[promptMode] || "";
+      const text = await expandChatVariables(modePrefix + rawText, {
+        problem: primary,
+        userCode: primary?.code || "",
+        hints: primary?.hints || [],
+        similar: primary?.similar || [],
+        constraints: primary?.constraints || "",
+      });
       const context = buildAIChatContext({
         surface: "library-chat",
         problem: primary,
@@ -278,8 +289,21 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
   };
 
   const sendReplyToSelectedChat = async () => {
-    const text = replyText.trim();
-    if (!selectedChat || !text || replyPending) return;
+    const rawText = replyText.trim();
+    if (!selectedChat || !rawText || replyPending) return;
+
+    const primaryAttachment = selectedChat.attachedProblems?.[0]
+      || (selectedChat.problemSlug ? problemIndex.get(selectedChat.problemSlug) : null)
+      || null;
+
+    const modePrefix = PROMPT_MODE_PREFIXES[promptMode] || "";
+    const text = await expandChatVariables(modePrefix + rawText, {
+      problem: primaryAttachment,
+      userCode: primaryAttachment?.code || "",
+      hints: primaryAttachment?.hints || [],
+      similar: primaryAttachment?.similar || [],
+      constraints: primaryAttachment?.constraints || "",
+    });
 
     const userMessage = { role: "user", content: text, timestamp: Date.now() };
     const baseMessages = Array.isArray(selectedChat.messages) ? selectedChat.messages : [];
@@ -289,10 +313,6 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
     setReplyError("");
 
     try {
-      const primaryAttachment = selectedChat.attachedProblems?.[0]
-        || (selectedChat.problemSlug ? problemIndex.get(selectedChat.problemSlug) : null)
-        || null;
-
       const context = buildAIChatContext({
         surface: "library-chat",
         problem: primaryAttachment,
@@ -429,7 +449,11 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
               </div>
 
               <div class="flex flex-col gap-3 min-h-0">
-                <label class="text-[10px] uppercase tracking-[0.2em] text-slate-500">Your message</label>
+                <div class="flex items-center justify-between">
+                  <label class="text-[10px] uppercase tracking-[0.2em] text-slate-500">Your message</label>
+                  <${ModelStatusBar} settings=${settings} />
+                </div>
+                <${AIPromptModeSelector} mode=${promptMode} onChange=${setPromptMode} />
                 <${MultiLineAIChatInput}
                   value=${composeText}
                   onChange=${setComposeText}
@@ -550,6 +574,10 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
                 </div>
 
                 <div class="border-t border-slate-700 pt-3 flex flex-col gap-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <${AIPromptModeSelector} mode=${promptMode} onChange=${setPromptMode} />
+                    <${ModelStatusBar} settings=${settings} />
+                  </div>
                   <${MultiLineAIChatInput}
                     value=${replyText}
                     onChange=${setReplyText}

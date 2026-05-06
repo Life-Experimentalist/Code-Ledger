@@ -65,7 +65,7 @@ Be concise. Max 200 words.`;
 
     if (page.type === 'problem') {
       Storage.getSettings().then((s) => {
-        if (s.cf_timer !== false) {
+        if (s.cf_timer !== false && s.floatingTimerEnabled !== false) {
           this._timer.startFloating(page.slug || 'cf');
         }
       }).catch(() => { });

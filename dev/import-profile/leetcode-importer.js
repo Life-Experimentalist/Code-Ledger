@@ -425,14 +425,19 @@ async function run() {
   );
   console.log(`Committed: ${newSha}`);
 
-  // Update index.json
+  // Update index.json — format compatible with the extension's handleResyncAll
   try {
+    const problemRecords = picks.map((p) => ({
+      titleSlug: p.titleSlug,
+      lang:      { name: p.lang, slug: p.lang, ext: langExt(p.lang) },
+      platform:  "leetcode",
+    }));
     const indexContent = JSON.stringify(
       {
-        importedAt:  new Date().toISOString(),
-        totalFiles:  files.length,
-        source:      "leetcode",
-        files:       files.map((f) => f.path),
+        updatedAt:  new Date().toISOString(),
+        source:     "leetcode-cli-importer",
+        stats:      { total: problemRecords.length },
+        problems:   problemRecords,
       },
       null,
       2,

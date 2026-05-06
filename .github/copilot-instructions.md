@@ -254,3 +254,30 @@ export class MyHandler extends BasePlatformHandler {
 - Selectors: `dom-selectors.js` alongside each platform handler
 - Page detection: `page-detector.js` alongside each platform handler
 
+## Versioning & Release
+
+Version is maintained in two canonical places that **must always match**:
+- `src/manifest.json` → `"version"` field
+- `package.json` → `"version"` field
+
+**Source of truth:** `package.json`. The release pipeline validates they match.
+
+### Release workflow
+
+1. Update `docs/CHANGELOG.md` — add a `## [x.y.z] — YYYY-MM-DD` section above the previous release.
+2. Bump version in both `src/manifest.json` AND `package.json` to the new version.
+3. Run `npm run publish` — builds CSS + dist, creates Chrome zip, Firefox zip (strips `side_panel`), and source zip in `releases/`.
+4. Commit everything (`git commit -m "chore: release vX.Y.Z"`).
+5. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z` — this triggers `.github/workflows/release.yml` which creates the GitHub Release and attaches the zips.
+
+### CHANGELOG format
+
+Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) with sections:
+- **Added** — new features
+- **Fixed** — bug fixes
+- **Changed** — changes in existing functionality
+- **Removed** — deprecated features removed
+- **Security** — security fixes (always include these)
+
+When implementing a feature, append to the relevant section in `docs/CHANGELOG.md` under `[Unreleased]` if the release hasn't been cut yet.
+

@@ -2,41 +2,69 @@
 
 ## Supported Versions
 
-The latest release on `main` is supported for security fixes.
+| Version | Supported |
+|---------|-----------|
+| Latest (`main`) | ✅ Actively supported |
+| Previous minor | ⚠️ Critical fixes only |
+| Older releases | ❌ No longer supported |
+
+We recommend always running the latest release from the [Chrome Web Store](https://chrome.google.com/webstore/detail/codeledger/) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/codeledger/).
 
 ## Reporting a Vulnerability
 
-Please report vulnerabilities privately to the maintainers.
+**Do not open a public GitHub issue for security vulnerabilities.**
 
-Include:
-- Affected component(s)
-- Reproduction steps
-- Impact assessment
-- Suggested fix (if available)
+Report privately via email: **krishnalsh2004@gmail.com**
 
-Please do not open public issues for undisclosed vulnerabilities.
+Use the subject line: `[CodeLedger Security] <brief description>`
 
-## Response Targets
+### What to include
 
-Best effort targets:
-- Initial acknowledgement: within 72 hours
-- Triage update: within 7 days
-- Fix timeline: based on severity and complexity
+- **Component**: which part of the extension or worker is affected (e.g., OAuth handler, git-engine, storage)
+- **Reproduction steps**: minimal, step-by-step instructions to trigger the issue
+- **Impact**: what an attacker could achieve (data exfiltration, token theft, commit injection, etc.)
+- **Affected version**: extension version from `src/manifest.json`
+- **Suggested fix** *(optional)*: if you have a patch or a mitigation in mind
+
+### What to expect
+
+| Milestone | Target |
+|-----------|--------|
+| Initial acknowledgement | Within 72 hours |
+| Triage decision (valid / invalid / need more info) | Within 7 days |
+| Fix ETA communicated | Within 14 days of confirmed validity |
+| Public disclosure | After patch is released (coordinated with reporter) |
+
+We will credit researchers by name (or handle) in the release notes unless they prefer to remain anonymous.
 
 ## Scope
 
 Security reports are especially relevant for:
-- OAuth and token handling
-- Storage of secrets/API keys
-- GitHub integration and commit pipeline
-- Worker endpoints and auth flows
-- Supply chain/dependency vulnerabilities
+
+- **OAuth and token handling** — GitHub OAuth flow through the Cloudflare Worker; token storage and retrieval paths
+- **Secret and API key storage** — AI provider keys, GitHub PATs stored in `chrome.storage.local`
+- **Git commit pipeline** — tree API calls, commit integrity, ability to forge commits or modify other repos
+- **Worker endpoints** — Cloudflare Worker routes (`/api/auth/*`, `/api/webhook/*`, `/api/admin/*`)
+- **Content script isolation** — XSS from problem pages injected into extension UI
+- **Supply chain** — compromised CDN dependencies (`esm.sh`, `mermaid.ink`)
+- **Cross-origin message handling** — `postMessage` validation for OAuth callback
+
+## Out of Scope
+
+The following are **not** in scope for the security policy:
+
+- Self-XSS (requires the user to paste malicious code into their own browser)
+- Denial-of-service against third-party services (LeetCode, GitHub API, Cloudflare)
+- Vulnerabilities in the user's own GitHub repository content
+- Issues requiring physical access to the user's device
 
 ## Safe Harbor
 
-Good-faith security research is welcome. Please avoid:
-- Privacy violations
-- Service disruption
-- Destructive exploitation
+CodeLedger welcomes good-faith security research. We will not pursue legal action against researchers who:
 
-We appreciate responsible disclosure and collaboration.
+- Act in good faith and give us reasonable time to respond before any public disclosure
+- Avoid accessing, modifying, or deleting data that does not belong to them
+- Do not disrupt service availability or degrade user experience
+- Do not violate user privacy (do not access other users' tokens or data)
+
+We treat responsible disclosure as a contribution to the project.

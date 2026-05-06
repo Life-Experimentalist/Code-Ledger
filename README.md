@@ -1,130 +1,175 @@
 <div align="center">
-  <h1>CodeLedger</h1>
-  <p><strong>Your DSA Journey, Committed.</strong></p>
-  <p>Single GitHub repo. Every problem. Every language. Owned entirely by you.</p>
+
+<img src="./src/assets/images/icon-transparent.png" width="72px" height="72px" alt="CodeLedger icon" />
+
+# CodeLedger
+
+**Every problem you solve, committed to your GitHub — automatically.**
+
+*LeetCode · GeeksForGeeks · Codeforces · AI review · Analytics · Knowledge graph*
+
+<br/>
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Chrome](https://img.shields.io/badge/Chrome-install-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/) [![Firefox](https://img.shields.io/badge/Firefox-install-red?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/) [![Views](https://counter.vkrishna04.me/api/views/codeledger/badge?style=flat-square&color=blueviolet&label=views)](https://counter.vkrishna04.me) [![Installs](https://counter.vkrishna04.me/api/views/codeledger-install/badge?style=flat-square&color=purple&label=installs)](https://counter.vkrishna04.me)
+
+<br/>
+
+<img src="./src/assets/images/social%20preview.png" width="100%" alt="CodeLedger social preview" />
+
 </div>
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Firefox](https://img.shields.io/badge/Firefox-supported-red?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/) [![Chrome](https://img.shields.io/badge/Chrome-supported-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/) [![Platforms](https://img.shields.io/badge/platforms-3%2B-teal?style=flat-square)](docs/ADDING_PLATFORM_HANDLER.md) [![Views](https://counter.vkrishna04.me/api/views/codeledger/badge?style=flat-square&color=blueviolet&label=views)](https://counter.vkrishna04.me) [![Installs](https://counter.vkrishna04.me/api/views/codeledger-install/badge?style=flat-square&color=purple&label=installs)](https://counter.vkrishna04.me)
+<br/>
 
-## 🌟 Why CodeLedger exists
+## The problem it solves
 
-**Situation:** DSA practice is scattered across 5+ platforms. Solutions get lost. Progress is invisible to recruiters. There's no single view of what you've built.
+You grind DSA problems across five different platforms. Your solutions disappear into their servers. Your GitHub contribution graph looks empty even though you've been coding every day. When someone asks to see your work, you have nothing to show them.
 
-**Task:** Unify all platforms into one developer-owned, Git-backed record of every DSA problem ever solved — searchable, graphable, AI-reviewable, and automatically visible on your GitHub contribution graph.
+**CodeLedger fixes that.** Install the extension, connect your GitHub, and every accepted solution you submit gets committed to a repo you own — code, problem description, AI review, and all. Zero extra steps.
 
-**Action:** A plugin-based MV3 browser extension where the core has zero website-specific logic. Each platform is a self-contained handler. Every solve triggers a single atomic Git commit via the Tree API. Cross-browser sync uses the repo's own index.json as the source of truth — like MALSync but for DSA. Community-voted canonical mappings (SponsorBlock model) unify the same problem across platforms. AI review with round-robin key pools and fallback provider chains. Knowledge graph built from your solved problems.
+<br/>
 
-**Result:** One repo. Every problem. Every language. Visible on your GitHub profile. Owned entirely by you. Shareable on your portfolio. No servers.
+## What you get
 
-## ✨ Core Features
+| | |
+|---|---|
+| **⚡ Zero-click commits** | Every accepted submission is committed to your GitHub the instant it's accepted — code file + problem README in one atomic git commit. |
+| **🤖 Instant AI review** | Connect any API key and get time/space complexity analysis, hints, and optimization suggestions committed alongside your code. Supports Gemini, OpenAI, Claude, DeepSeek, Ollama, and OpenRouter. |
+| **📊 Dashboard** | A GitHub-style heatmap, topic radar, difficulty breakdown, and solve velocity chart — all built from your own data, no third-party accounts. |
+| **🕸️ Knowledge graph** | A force-directed graph of everything you've solved, linked by topic. See your strengths and gaps at a glance. |
+| **🌍 Multi-platform** | LeetCode, GeeksForGeeks, and Codeforces work out of the box. Bulk-import your entire LeetCode history in one click. |
+| **💬 AI chat panel** | A floating chat on every problem page. Ask about complexity, request hints, paste errors — all with your code pre-loaded via `/mycode`. |
+| **🔒 100% yours** | Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping. One repo, everything in it. |
 
-*   **⚡ Zero-Click Atomic Commits:** Submit a successful solution and CodeLedger instantly commits it (Code, Hint, and README) straight to your GitHub via a background Service Worker using the GitHub Trees API.
-*   **🌍 Multi-Platform Sync:** Supports LeetCode, GeeksForGeeks, and Codeforces out-of-the-box.
-*   **🧠 Automated AI Code Reviews:** Plug in an API key to receive instant time/space complexity analysis and hints for optimization directly in your repo.
-*   **📊 Unified Analytics Dashboard:** A gorgeous, centralized dashboard (`/library`) giving you visual insights into your topic mastery, GitHub-style consistency map, and tailored problem recommendations.
-*   **🕵️ Incognito Awareness:** CodeLedger detects Incognito mode and strictly pauses syncing to respect your privacy.
-*   **🛡️ 100% Data Ownership:** All data is pushed to your GitHub or stored locally in `chrome.storage.local`. No centralized database scraping.
+<br/>
 
-## 🏗️ Architecture
+## See it in action
 
-CodeLedger operates as an event-driven standard MV3 Extension composed of Content Scripts injected into specific platforms, a robust Service Worker for background orchestration, and a local UI/Analytics dashboard.
+> After you solve a problem on LeetCode, your repo gets a commit like this — automatically:
 
-```mermaid
-graph TD
-    classDef platform fill:#2f363d,stroke:#fff,stroke-width:1px,color:#fff;
-    classDef worker fill:#005bea,stroke:#fff,stroke-width:1px,color:#fff;
-    classDef git fill:#2dba4e,stroke:#fff,stroke-width:1px,color:#fff;
-    classDef ui fill:#ffa116,stroke:#fff,stroke-width:1px,color:#fff;
+```
+[Array] Two Sum solved
 
-    A[LeetCode]:::platform -->|DOM Observer| C(Content Script)
-    B[GeeksForGeeks]:::platform -->|DOM Observer| C(Content Script)
-    K[Codeforces]:::platform -->|DOM Observer| C(Content Script)
-
-    C -->|problem:solved event| D{Service Worker}:::worker
-
-    D -->|1. Store| E[(Local chrome.storage)]
-    D -->|2. Analyze| F[AI Reviewer <br> Gemini/OpenAI]
-    D -->|3. Structure| G[Canonical Mapper]
-    G -->|Atomic Commit| H[GitHub Repository]:::git
-
-    E -->|Read Data| I[Analytics Dashboard]:::ui
+topics/Array/two-sum/
+├── Python3.py          ← your code, clean
+├── README.md           ← problem statement + your runtime/memory
+└── (ai-review.md)      ← if you have an AI key configured
 ```
 
-### GitHub App Setup (Self-Hosting OAuth)
+Your GitHub contribution graph fills up. Your profile becomes a living portfolio. Recruiters see consistent, real work.
 
-If you are a developer compiling the extension from source and do not want to use the public codeledger.vkrishna04.me OAuth bridge, you must register your own GitHub App.
+<br/>
 
-1. Go to **GitHub Developer Settings** -> **GitHub Apps** -> **New GitHub App**.
-2. **GitHub App name:** `CodeLedger Dev` (or similar).
-3. **Homepage URL:** (Optional, your GitHub profile/repo URL).
-4. **Callback URL:** If using a web-backend like Cloudflare Workers, use `https://<your-worker-url>.workers.dev/api/auth/github/callback`. For Chrome Extension direct flows, use `https://<extension-id>.chromiumapp.org/`.
-5. **Webhook:** Disable Webhook (Active: false).
-6. **Permissions:**
-   * **Repository Permissions:**
-     * `Contents`: **Read & Write** (Required to read existing trees and commit code files).
-     * `Administration`: **Read & Write** (Required to create the repository if it doesn't exist).
-7. **Create GitHub App**.
-8. **Client Secret:** Generate a new Client Secret and keep it safe alongside the Client ID.
+## Install
 
-Update your Cloudflare Worker or backend using these credentials.
+**Chrome / Edge / Brave**
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Extension
-    participant CFWorker as Cloudflare Worker (codeledger.vkrishna04.me)
-    participant GitHub as GitHub OAuth API
-
-    User->>Extension: Clicks "Connect GitHub"
-    Extension->>CFWorker: Opens popup to /api/auth/github
-    CFWorker->>GitHub: Redirects user to GitHub Authorize URI
-    GitHub-->>User: Prompts for permission (repo scope)
-    User->>GitHub: Approves access
-    GitHub->>CFWorker: Redirect with ?code=xyz
-    CFWorker->>GitHub: Exchange code + client_secret for access_token
-    GitHub-->>CFWorker: Returns access_token
-    CFWorker->>Extension: window.opener.postMessage({ token })
-    Extension-->>User: Authentication successful, closes popup!
+```
+chrome://extensions  →  Developer mode ON  →  Load unpacked  →  select the src/ folder
 ```
 
-## 🚀 Getting Started
-
-### 1. Installation
-
-**Chrome / Edge / Brave (Chromium)**
-1. Go to `chrome://extensions/`
-2. Enable **Developer mode** in the top right.
-3. Click **Load unpacked** and select the `/dist/unpacked` directory inside this project.
+Or install directly from the **[Chrome Web Store →](https://chrome.google.com/webstore/detail/codeledger/)**
 
 **Firefox**
-1. Go to `about:debugging#/runtime/this-firefox`
-2. Click **Load Temporary Add-on** and select the `manifest.json` from the `/dist/unpacked` folder.
 
-### 2. Configuration
-
-1. Click the **CodeLedger** icon in your browser toolbar to open the popup.
-2. Under **Git Integration**, click **Connect** to securely acquire an OAuth token.
-3. Set your **Repository Name** (e.g., `CodeLedger-Sync`). The extension will automatically create and initialize this repo if it doesn't exist.
-4. *(Optional)* Provide an API key under the AI Providers section to unlock automated Big-O reviews.
-
-## 🛠️ Development
-
-Build tools are managed via standard NPM scripts utilizing `tsx` for high-speed builds.
-
-```bash
-# Install dependencies
-npm install
-
-# Start development build watcher (auto-syncs to /dist/unpacked)
-npm run watch
-
-# Create production zip builds for Chrome & Firefox
-npm run build
+```
+about:debugging  →  Load Temporary Add-on  →  select src/manifest.json
 ```
 
-The UI is built utilizing **Preact** without a compiler (using `htm`) and styled with **Tailwind CSS**, keeping the extension footprint extremely small.
+Or install from **[Firefox Add-ons →](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)**
 
-## 🤝 Contributing
+<br/>
 
-We welcome pull requests! Whether it's adding support for a new platform (like HackerRank or AtCoder) or a new AI provider provider, check out our [Architecture Guide](docs/ARCHITECTURE.md) to understand the Base Handler abstract classes.
+## Setup (2 minutes)
 
+1. Click the **CodeLedger** icon in your toolbar.
+2. Click **Connect GitHub** — authorize via OAuth (handled securely through our Cloudflare Worker at `codeledger.vkrishna04.me`, no token ever touches our servers beyond the handshake).
+3. Set a **repo name** (e.g. `my-dsa-solutions`). CodeLedger creates and initializes it automatically.
+4. Solve a problem. Check your GitHub. That's it.
+
+> **Optional:** Add an AI provider API key under Settings → AI to unlock code reviews. You can use your own key — BYOK, zero lock-in.
+
+<br/>
+
+## Supported AI providers
+
+| Provider | Notes |
+|----------|-------|
+| Google Gemini | Default — free tier available |
+| OpenAI (GPT-4o, o3-mini, …) | Bring your own key |
+| Anthropic Claude | Bring your own key |
+| DeepSeek | Bring your own key |
+| Ollama | Local models, no API key needed |
+| OpenRouter | Access 100+ models with one key |
+
+The extension tries providers in order and falls back automatically if one fails.
+
+<br/>
+
+## For developers
+
+```bash
+npm install
+npm run build:css        # compile Tailwind → src/ui/styles/compiled.css
+npm run lint             # tsc type-check (run before any PR)
+npm run publish          # full release build → releases/
+```
+
+Load unpacked from **`src/`** at `chrome://extensions`.
+
+### Adding a platform
+
+1. Create `src/handlers/platforms/{name}/index.js` extending `BasePlatformHandler`
+2. Create `dom-selectors.js`, `page-detector.js` alongside it
+3. Add the hostname in `src/content/handler-loader.js`
+4. Run `node dev/generate-manifest-domains.js`
+
+See [docs/ADDING_PLATFORM_HANDLER.md](docs/ADDING_PLATFORM_HANDLER.md) for the full contract.
+
+### Self-hosting the OAuth worker
+
+The extension uses a Cloudflare Worker to handle the GitHub OAuth exchange so your Client Secret is never in the extension. If you want to run your own:
+
+1. Register a GitHub App at **GitHub → Settings → Developer settings → GitHub Apps**.
+   - Homepage URL: anything
+   - Callback URL: `https://<your-worker>.workers.dev/api/auth/github/callback`
+   - Permissions: **Repository contents** (Read & Write), **Administration** (Read & Write)
+2. Deploy `worker/` to Cloudflare with `npx wrangler deploy` and set the secrets listed in [CLAUDE.md](CLAUDE.md).
+3. Update `CONSTANTS.URLS.AUTH_WORKER` in `src/core/constants.js` to point to your worker.
+
+<br/>
+
+## Architecture
+
+```
+src/
+├── background/service-worker.js   ← orchestrates everything: storage, AI, git
+├── content/handler-loader.js      ← matches the current hostname → loads the right handler
+├── handlers/
+│   ├── platforms/                 ← leetcode, geeksforgeeks, codeforces
+│   ├── ai/                        ← gemini, openai, claude, deepseek, ollama, openrouter
+│   └── git/github/                ← Trees API commit engine + GitHub Pages template
+├── core/
+│   ├── constants.js               ← single source of truth for URLs, keys, storage key names
+│   └── storage.js                 ← unified abstraction over IndexedDB + chrome.storage
+└── library/                       ← the dashboard (works in sidebar and as a standalone web app)
+```
+
+The extension has **no bundler, no transpiler** — pure ES6 modules, Preact + htm from a vendor shim, Tailwind pre-compiled. This keeps the footprint tiny and the CSP simple.
+
+<br/>
+
+## Contributing
+
+Read [CONTRIBUTING.md](.github/CONTRIBUTING.md) before opening a PR. The short version:
+
+- All extension API calls go through `src/lib/browser-compat.js` — never touch `chrome.*` or `browser.*` directly anywhere else.
+- Use `createDebugger()` from `src/lib/debug.js` instead of `console.log`.
+- Run `npm run lint` before pushing.
+
+See [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md) for what's planned and what's open for contribution.
+
+<br/>
+
+## License
+
+[Apache 2.0](LICENSE.md) — fork it, self-host it, own your data.

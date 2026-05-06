@@ -20,7 +20,7 @@ const html = htm.bind(h);
 
 function fmtDateLabel(dateStr) {
   try {
-    const d = new Date(dateStr + "T00:00:00Z");
+    const d = new Date(dateStr + "T12:00:00");
     return d.toLocaleDateString(undefined, {
       weekday: "short",
       year: "numeric",

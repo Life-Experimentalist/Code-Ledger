@@ -8,11 +8,14 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
+import { cleanCode } from "../../lib/syntax-highlight.js";
 import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
+import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
 import { modalTabRegistry } from "../../core/modal-tab-registry.js";
+import { expandChatVariables } from "../../lib/chat-variables.js";
 // Side-effect: registers LeetCode tabs into modalTabRegistry
 import "../../handlers/platforms/leetcode/modal-tabs.js";
 
@@ -93,7 +96,7 @@ const DIFF_CLASS = {
 
 const CHAT_KEY = (slug) => `cl-chat-${slug}`;
 
-export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList = [], onNavigateProblem, onOpenGraphProblem }) {
+export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList = [], onNavigateProblem, onOpenGraphProblem, onNavigate }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [copied, setCopied] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
@@ -102,6 +105,11 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const [chatError, setChatError] = useState("");
   const [chatId, setChatId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [settings, setSettings] = useState({});
+
+  useEffect(() => {
+    Storage.getSettings().then(setSettings).catch(() => {});
+  }, []);
 
   // Reset tab and load chat history when problem changes
   useEffect(() => {
@@ -153,7 +161,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const copyCode = async () => {
     if (!problem.code) return;
     try {
-      await navigator.clipboard.writeText(problem.code);
+      await navigator.clipboard.writeText(cleanCode(problem.code));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (_) { }
@@ -205,8 +213,16 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   }, [problem, refreshing, onUpdate, problemUrl]);
 
   const sendChat = async () => {
-    const text = chatInput.trim();
-    if (!text || chatPending) return;
+    const rawText = chatInput.trim();
+    if (!rawText || chatPending) return;
+
+    const text = await expandChatVariables(rawText, {
+      problem,
+      userCode: problem.code || "",
+      hints: problem.hints || [],
+      similar: problem.similar || [],
+      constraints: problem.constraints || "",
+    });
 
     const userMsg = { role: "user", content: text, ts: Date.now() };
     const updatedMsgs = [...chatMessages, userMsg];
@@ -333,14 +349,30 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            ${onOpenGraphProblem ? html`
+            ${onNavigate ? html`
+              <button
+                onClick=${() => { onClose(); onNavigate("solutions"); }}
+                class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-slate-300 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                title="Go to Solutions list"
+              >Solutions</button>
+              <button
+                onClick=${() => { onClose(); onNavigate("analytics"); }}
+                class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-violet-300 bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
+                title="Go to Analytics"
+              >Analytics</button>
+              <button
+                onClick=${() => { onClose(); onNavigate("graph"); }}
+                class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors"
+                title="Go to Knowledge Graph"
+              >Graph</button>
+            ` : onOpenGraphProblem ? html`
               <button
                 onClick=${() => onOpenGraphProblem(problem)}
                 class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors"
                 title="Open this problem in the graph"
               >Graph ↗</button>
-                        ` : ""}
-                        ${problem.submissionsUrl || (problem.platform === "leetcode" && problem.titleSlug) ? html`
+            ` : ""}
+            ${problem.submissionsUrl || (problem.platform === "leetcode" && problem.titleSlug) ? html`
                           <a
                             href=${problem.submissionsUrl || `https://leetcode.com/problems/${problem.titleSlug}/submissions/`}
                             target="_blank"
@@ -474,7 +506,8 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
               refreshing, handleRefreshData, problemUrl, meta,
               langName, copied, copyCode,
               chatMessages, chatInput, setChatInput, sendChat, chatPending, chatError,
-              AIMarkdownRenderer, MultiLineAIChatInput, openAIChatsView, onClearChat, chatId,
+              AIMarkdownRenderer, MultiLineAIChatInput, ModelStatusBar, openAIChatsView, onClearChat, chatId,
+              settings,
             };
             return renderer(problem, ctx);
           })()}

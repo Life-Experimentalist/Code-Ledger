@@ -1,7 +1,8 @@
 {
   "name": "codeledger",
-  "version": "1.0.0",
-  "description": "CodeLedger is a universal browser extension that atomically commits your solved Data Structures and Algorithms problems (from LeetCode, GeeksForGeeks, etc.) to your own GitHub repository.",
+  "version": "1.1.0",
+  "displayName": "CodeLedger",
+  "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
   "author": "VKrishna04",
   "license": "Apache-2.0",
   "repository": {
@@ -9,19 +10,26 @@
     "url": "https://github.com/Life-Experimentalist/Code-Ledger.git"
   },
   "homepage": "https://codeledger.vkrishna04.me/",
+  "bugs": {
+    "url": "https://github.com/Life-Experimentalist/Code-Ledger/issues"
+  },
   "keywords": [
     "leetcode",
     "geeksforgeeks",
     "codeforces",
     "dsa",
+    "competitive-programming",
     "browser-extension",
-    "chrome",
-    "firefox",
+    "chrome-extension",
+    "firefox-addon",
     "github",
     "git",
-    "automation"
+    "automation",
+    "manifest-v3",
+    "ai-code-review",
+    "analytics",
+    "knowledge-graph"
   ],
-  "displayName": "Code Ledger",
   "packageManager": "npm@24.15.10",
   "engines": {
     "node": ">=18.0.0",
@@ -51,6 +59,7 @@
     "package:chrome": "npm run build && node dev/package-chrome.js",
     "package:firefox": "npm run build && node dev/package-firefox.js",
     "publish": "npm run clean && npm run build && node dev/package.js",
+    "release": "node dev/release.js",
     "lint": "tsc --noEmit",
     "validate:openapi": "node dev/validate-openapi.js",
     "deploy:worker": "cd worker && npx wrangler pages deploy public"

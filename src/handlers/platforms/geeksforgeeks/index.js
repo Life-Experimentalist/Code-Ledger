@@ -89,7 +89,7 @@ Be concise. Max 200 words.`;
     const page = detectPage(window.location.pathname);
     if (page.type === PAGE_TYPES.PROBLEM) {
       Storage.getSettings().then((s) => {
-        if (s.gfg_timer !== false) {
+        if (s.gfg_timer !== false && s.floatingTimerEnabled !== false) {
           this._timer.startFloating(page.slug || "gfg");
         }
       }).catch(() => { });

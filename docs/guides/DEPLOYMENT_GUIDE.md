@@ -121,7 +121,7 @@ Your GitHub App (`CodeLedger Dev`) should be configured with:
      - `Members` (read) — optional, for org-wide insights
 4. **Events:** `push`, `pull_request`, `issues`, `workflow_run`
 
-> For details, see [GITHUB_APP_SETUP.md](docs/GITHUB_APP_SETUP.md).
+> For details, see [GITHUB_APP_SETUP.md](../GITHUB_APP_SETUP.md).
 
 ---
 
@@ -360,6 +360,6 @@ cd worker && npm ci && npm run dev
 ---
 
 For more details, see:
-- [GITHUB_APP_SETUP.md](docs/GITHUB_APP_SETUP.md)
-- [OPENAPI.yaml](docs/OPENAPI.yaml)
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [GITHUB_APP_SETUP.md](../GITHUB_APP_SETUP.md)
+- [OPENAPI.yaml](../OPENAPI.yaml)
+- [ARCHITECTURE.md](../ARCHITECTURE.md)

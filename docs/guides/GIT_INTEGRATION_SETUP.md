@@ -215,10 +215,10 @@ When testing OAuth:
 ## Important Links
 
 - OAuth Testing Guide: [OAUTH_TESTING_GUIDE.md](./OAUTH_TESTING_GUIDE.md)
-- Git Provider Selector: [src/core/git-provider-selector.js](./src/core/git-provider-selector.js)
+- Git Provider Selector: [src/core/git-provider-selector.js](../../src/core/git-provider-selector.js)
 - Diagnostic Tool: `node dev/diagnose.js`
-- GitHub Handler: [src/handlers/git/github/index.js](./src/handlers/git/github/index.js)
-- LeetCode Handler: [src/handlers/platforms/leetcode/index.js](./src/handlers/platforms/leetcode/index.js)
+- GitHub Handler: [src/handlers/git/github/index.js](../../src/handlers/git/github/index.js)
+- LeetCode Handler: [src/handlers/platforms/leetcode/index.js](../../src/handlers/platforms/leetcode/index.js)
 
 ---
 

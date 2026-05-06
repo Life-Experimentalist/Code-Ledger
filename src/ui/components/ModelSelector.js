@@ -14,7 +14,7 @@ export function ModelSelector({
   providerId,
   apiKey,
   selectedModel,
-  onSelect,
+  onSelect = () => {},
   endpoint,
   providerEnabled = true,
   onToggleEnabled = () => {},

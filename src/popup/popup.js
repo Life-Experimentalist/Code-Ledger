@@ -9,6 +9,10 @@ import { htm } from "../vendor/preact-bundle.js";
 const html = htm.bind(h);
 import { Storage } from "../core/storage.js";
 import { tabs, runtime } from "../lib/browser-compat.js";
+import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
+
+applyThemeFromStorage().catch(() => {});
+setupThemeListener();
 
 function PopupApp() {
   const [stats, setStats] = useState({ total: 0, easy: 0, medium: 0, hard: 0 });

@@ -10,12 +10,14 @@ const html = htm.bind(h);
 
 import { Storage } from "../core/storage.js";
 import { CONSTANTS } from "../core/constants.js";
+import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
 import { getQueryParam, updateQueryParams } from "../core/url-state.js";
 import { initializeHandlers } from "../handlers/init.js";
 import { ProblemsView } from "./views/ProblemsView.js";
 import { AnalyticsView } from "./views/AnalyticsView.js";
 import { GraphView } from "./views/GraphView.js";
 import { SettingsView } from "./views/SettingsView.js";
+import { SettingsPageView } from "./views/SettingsPageView.js";
 import { CanonicalView } from "./views/CanonicalView.js";
 import { AIChatsView } from "./views/AIChatsView.js";
 import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
@@ -23,6 +25,10 @@ import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js
 import { DuplicateDetectionModal, findDuplicates } from "./components/DuplicateDetectionModal.js";
 
 initializeHandlers();
+
+// Apply saved theme before first render so there's no flash of default styles
+applyThemeFromStorage().catch(() => {});
+setupThemeListener();
 
 function LibraryApp() {
   const [problems, setProblems] = useState([]);
@@ -325,7 +331,7 @@ function LibraryApp() {
     if (activeTab === "canonical")
       return html`<${CanonicalView} problems=${enrichedProblems} />`;
     if (activeTab === "settings")
-      return html`<${SettingsView} settings=${settings} onSettingsChange=${handleSettingsChange} onSetupRepo=${handleSetupRepo} />`;
+      return html`<${SettingsPageView} settings=${settings} onSettingsChange=${handleSettingsChange} onSetupRepo=${handleSetupRepo} />`;
 
     return html`<p class="text-slate-400">Unknown view</p>`;
   };
