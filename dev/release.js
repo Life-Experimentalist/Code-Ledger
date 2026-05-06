@@ -81,21 +81,14 @@ if (!isDryRun) {
   console.log("   (dry-run: skipped)");
 }
 
-// 5. Commit
-console.log(`\n→ Committing...`);
-const commitMsg = `chore: release ${tag}`;
-const cmd = `git commit -m "${commitMsg}"`;
-if (!isDryRun) {
-  try {
-    execSync(cmd, { stdio: "inherit" });
-    console.log(`   ✓ Committed: ${commitMsg}`);
-  } catch (e) {
-    console.error("❌ Commit failed");
-    process.exit(1);
-  }
-} else {
-  console.log(`   (dry-run) would run: ${cmd}`);
-}
+// 5. Skip commit (build artifacts aren't tracked in git)
+console.log(`\n→ Tagging release...`);
+// Note: No commit needed since:
+// - manifest.json version already updated
+// - package.json auto-synced by build.js
+// - build artifacts (zips) are not tracked in git
+// - working tree is clean
+console.log(`   ℹ Working directory already clean`);
 
 // 6. Tag
 console.log(`\n→ Creating tag...`);
