@@ -7,29 +7,28 @@ const DIST_DIR = "./dist";
 const RELEASES_DIR = "./releases";
 const SKIP_CSS = process.argv.includes("--skip-css"); // Check for --skip-css argument
 
-// Function to safely extract version without needing full node execution wrapper
+// Function to read version from manifest.json (single source of truth)
 function getVersion() {
-  const content = fs.readFileSync(
-    path.join(SRC_DIR, "core", "constants.js"),
-    "utf8",
-  );
-  const match = content.match(/VERSION:\s*['"]([^'"]+)['"]/);
-  if (match && match[1]) {
-    return match[1];
+  try {
+    const manifestPath = path.join(SRC_DIR, "manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    return manifest.version || "1.0.0";
+  } catch (e) {
+    console.warn("Could not read manifest.json:", e.message);
+    return "1.0.0";
   }
-  return "1.0.0";
 }
 
 const VERSION = getVersion();
 
-// Sync package.json version to the constants source-of-truth
+// Sync package.json version from manifest.json (source of truth)
 try {
   const pkgPath = path.join(process.cwd(), "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
   if (pkg.version !== VERSION) {
     pkg.version = VERSION;
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-    console.log("Synchronized package.json version to", VERSION);
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+    console.log(`✓ Synced package.json version to ${VERSION} (from manifest.json)`);
   }
 } catch (e) {
   console.warn("Could not sync package.json version:", e.message);
