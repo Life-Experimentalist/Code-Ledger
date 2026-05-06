@@ -3,8 +3,11 @@
  * Automated release orchestrator.
  *
  * Validates, builds, commits, tags, and pushes a release in one command.
- * Usage: npm run release
- *        npm run release -- --dry-run
+ *
+ * Usage:
+ *   npm run release              # Normal release
+ *   npm run release -- --dry-run # Preview without git changes
+ *   npm run release -- --retry   # Retry if previous run failed (deletes and recreates tag)
  */
 
 import { execSync } from "child_process";
@@ -13,6 +16,7 @@ import { join } from "path";
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
+const isRetry = args.includes("--retry");
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const manifest = JSON.parse(readFileSync(join("src", "manifest.json"), "utf8"));
@@ -60,11 +64,40 @@ try {
 
 // 3. Check if tag already exists
 console.log("\n→ Checking if tag exists...");
+let tagExists = false;
 try {
   execSync(`git rev-parse ${tag}`, { stdio: "pipe" });
-  console.error(`❌ Tag ${tag} already exists`);
-  process.exit(1);
+  tagExists = true;
 } catch (e) {
+  // Tag doesn't exist, which is what we want
+}
+
+if (tagExists) {
+  if (isRetry) {
+    console.log(`   ⚠ Tag ${tag} exists. Retrying...`);
+    console.log(`\n→ Cleaning up previous tag...`);
+    try {
+      // Delete local tag
+      execSync(`git tag -d ${tag}`, { stdio: "pipe" });
+      console.log(`   ✓ Deleted local tag ${tag}`);
+
+      // Try to delete remote tag (might not exist if previous push failed)
+      try {
+        execSync(`git push origin :${tag}`, { stdio: "pipe" });
+        console.log(`   ✓ Deleted remote tag ${tag}`);
+      } catch (e) {
+        console.log(`   ℹ Remote tag ${tag} not found (first time pushing)`);
+      }
+    } catch (e) {
+      console.error(`❌ Failed to clean up tag ${tag}`);
+      process.exit(1);
+    }
+  } else {
+    console.error(`❌ Tag ${tag} already exists`);
+    console.error(`   Use: npm run release -- --retry`);
+    process.exit(1);
+  }
+} else {
   console.log(`   ✓ Tag ${tag} does not exist yet`);
 }
 
