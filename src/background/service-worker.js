@@ -15,6 +15,7 @@ import { expandChatVariables } from "../lib/chat-variables.js";
 import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
 import { buildProblemFiles, problemBase, LAYOUT_VERSION } from "../core/path-builder.js";
 import { buildCommitMessage, COMMIT_TYPES, resolveCommitType } from "../core/commit-messages.js";
+import { migrateRepo, resetRepo, detectRepoLayoutVersion } from "./migration-manager.js";
 
 // Init background
 async function init() {
@@ -622,6 +623,27 @@ try {
         .then((result) => sendResponse({ ok: true, ...result }))
         .catch((e) => sendResponse({ ok: false, error: e.message }));
       return true; // async response
+    }
+
+    if (msg && msg.type === "MIGRATE_REPO") {
+      migrateRepo()
+        .then(result => sendResponse({ ok: true, ...result }))
+        .catch(e  => sendResponse({ ok: false, error: e.message }));
+      return true;
+    }
+
+    if (msg && msg.type === "RESET_REPO") {
+      resetRepo()
+        .then(result => sendResponse({ ok: true, ...result }))
+        .catch(e  => sendResponse({ ok: false, error: e.message }));
+      return true;
+    }
+
+    if (msg && msg.type === "DETECT_LAYOUT_VERSION") {
+      detectRepoLayoutVersion()
+        .then(v => sendResponse({ ok: true, version: v }))
+        .catch(e => sendResponse({ ok: false, error: e.message }));
+      return true;
     }
 
     if (msg && msg.type === "BULK_IMPORT") {
