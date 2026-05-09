@@ -30,3 +30,14 @@ codeledger.zip
 
 # Graphify cache
 graphify-out/cache/*
+
+# Personal / launch artifacts (keep locally, not in repo)
+LINKEDIN_POST.md
+FINAL_RELEASE_SUMMARY.md
+LAUNCH_COMPLETE.md
+PRE_LAUNCH_CHECKLIST.md
+RELEASE_QUICK_START.md
+docs/DEBUG_COMMIT_ON_ACCEPT.md
+docs/PROGRESS.md
+docs/VERSION_TIMING.md
+docs/NEXT_PHASE_ROADMAP.md
