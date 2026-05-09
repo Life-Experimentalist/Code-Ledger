@@ -9,6 +9,9 @@ const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
+import { registry } from "../../core/handler-registry.js";
+import { importFromRepo, applyImport } from "../../background/sync-engine.js";
+import { ConflictResolutionModal } from "../components/ConflictResolutionModal.js";
 
 const DEFAULT_COMMIT_TPL = CONSTANTS.COMMIT_MESSAGE_TEMPLATE;
 const DEFAULT_REPO = CONSTANTS.DEFAULT_REPO_NAME;
@@ -19,12 +22,15 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
   const [msg, setMsg] = useState({ text: "", ok: true });
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncCount, setSyncCount] = useState(null);
+  const [importData,    setImportData]    = useState(null);
+  const [importing,     setImporting]     = useState(false);
+  const [importMsg,     setImportMsg]     = useState("");
 
   useEffect(() => {
     Storage.getAuthToken("github").then((t) => setOauthToken(t || "")).catch(() => {});
-    // Load pending sync count
     loadSyncCount();
-  }, []);
+  // Re-read auth token whenever parent settings update (catches post-OAuth refresh)
+  }, [settings]);
 
   const loadSyncCount = () => {
     if (typeof chrome === "undefined" || !chrome.runtime?.id) return;
@@ -45,6 +51,14 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
   const commitTpl  = settings?.commitMessageTemplate || DEFAULT_COMMIT_TPL;
   const gitEnabled = settings?.gitEnabled !== false;
   const gitProvider = settings?.gitProvider || "github";
+
+  const handleConnect = () => {
+    const authUrl = `${CONSTANTS.URLS.AUTH_WORKER}/auth/github`;
+    const popup = window.open(authUrl, "OAuth", "width=600,height=700");
+    if (!popup) alert("Please allow popups for this page to connect GitHub.");
+    // library.js handleOAuthMessage picks up the CODELEDGER_AUTH response,
+    // saves the token, and shows the repo onboarding wizard automatically.
+  };
 
   const unlinkGitHub = async () => {
     if (!confirm("Unlink GitHub account? This removes the OAuth token but keeps your repo settings.")) return;
@@ -80,6 +94,31 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
       flash("Sync failed: " + e.message, false);
     } finally {
       setSyncBusy(false);
+    }
+  };
+
+  const handleImport = async () => {
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const git   = registry.getGitProvider(settings.gitProvider || "github");
+      const token = await git.getToken();
+      const owner = settings.github_owner || settings.github_username || "";
+      const repo  = settings.github_repo  || settings.gitRepo         || "";
+      const { remoteOnly, conflicts } = await importFromRepo(owner, repo, token);
+
+      if (conflicts.length > 0) {
+        setImportData({ remoteOnly, conflicts });
+      } else {
+        await applyImport(remoteOnly);
+        setImportMsg(`Imported ${remoteOnly.length} new problem${remoteOnly.length !== 1 ? "s" : ""}`);
+        const s = await Storage.getSettings();
+        await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+      }
+    } catch (e) {
+      setImportMsg(`Import failed: ${e.message}`);
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -153,7 +192,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
           : html`
             <p class="text-sm text-slate-400">No GitHub account connected.</p>
             <button
-              onClick=${() => onSetupRepo?.()}
+              onClick=${handleConnect}
               class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-sm rounded-lg transition-colors"
             >Connect GitHub →</button>
           `
@@ -194,9 +233,9 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
             ${repoOwner}/${repoName}
           </a>
         `}
-        ${onSetupRepo && !oauthToken && html`
+        ${!oauthToken && html`
           <button
-            onClick=${() => onSetupRepo?.()}
+            onClick=${handleConnect}
             class="text-xs text-slate-500 hover:text-slate-300 transition-colors"
           >Run setup wizard →</button>
         `}
@@ -261,6 +300,46 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
           >Reset</button>
         </div>
       </div>
+      ${(settings._pendingConflicts > 0) ? html`
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <span class="text-amber-400 text-sm">⚠ ${settings._pendingConflicts} conflict${settings._pendingConflicts !== 1 ? "s" : ""} detected during background sync.</span>
+          <button onClick=${handleImport} class="text-xs text-amber-300 underline hover:no-underline">Resolve now</button>
+        </div>
+      ` : ""}
+
+      ${(repoName) ? html`
+        <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
+          <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Import</h3>
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-slate-200">Import from repository</p>
+              <p class="text-xs text-slate-500">Pull all problems from your connected repo into the local library.</p>
+            </div>
+            <button
+              onClick=${handleImport}
+              disabled=${importing}
+              class="px-4 py-2 rounded-xl text-sm font-medium bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors disabled:opacity-50"
+            >${importing ? "Importing…" : "Import"}</button>
+          </div>
+          ${importMsg ? html`<p class="text-xs text-cyan-400">${importMsg}</p>` : ""}
+        </div>
+      ` : ""}
+
+      ${importData ? html`
+        <${ConflictResolutionModal}
+          conflicts=${importData.conflicts}
+          remoteOnly=${importData.remoteOnly}
+          providerName="GitHub"
+          onResolve=${async (resolved) => {
+            await applyImport(resolved);
+            setImportData(null);
+            setImportMsg(`Imported ${resolved.length} problem${resolved.length !== 1 ? "s" : ""}`);
+            const s = await Storage.getSettings();
+            await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+          }}
+          onCancel=${() => setImportData(null)}
+        />
+      ` : ""}
     </div>
   `;
 }
