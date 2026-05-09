@@ -7,6 +7,7 @@ import { h, useState, useEffect, useRef, useCallback, useMemo } from "../../vend
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 import { buildKnowledgeGraph, DIFFICULTY_COLOR, PLATFORM_COLOR } from "../../core/knowledge-graph.js";
+import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { ProblemModal } from "../components/ProblemModal.js";
 
 /* ── Force simulation constants ─────────────────────────────────────── */
@@ -450,7 +451,9 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
   const [filterDifficultyGraph, setFilterDifficultyGraph] = useState("All");
   const [filterPlatformGraph, setFilterPlatformGraph] = useState("All");
   const [filterTopicGraph, setFilterTopicGraph] = useState("All");
-  const [layoutMode, setLayoutMode] = useState("layered");
+  const VALID_LAYOUTS = new Set(["layered", "circular", "force"]);
+  const initLayout = getQueryParam("graphLayout", "layered");
+  const [layoutMode, setLayoutMode] = useState(VALID_LAYOUTS.has(initLayout) ? initLayout : "layered");
   const filterSolvedRef = useRef(false);
   const graphSearchRef = useRef("");
   const filterDifficultyRef = useRef("All");
@@ -462,6 +465,19 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
   const fitViewRef = useRef(null);
   // Counts for toolbar (read-only, derived from simRef)
   const [stats, setStats] = useState({ topics: 0, solved: 0, suggested: 0 });
+
+  // Filtered problem list for modal (respects graph filters but not filterSolved)
+  const graphFilteredProblems = useMemo(() => {
+    let out = problems || [];
+    if (filterDifficultyGraph !== "All") out = out.filter(p => p.difficulty === filterDifficultyGraph);
+    if (filterPlatformGraph   !== "All") out = out.filter(p => p.platform   === filterPlatformGraph);
+    if (filterTopicGraph      !== "All") out = out.filter(p => (p.tags || []).includes(filterTopicGraph) || p.topic === filterTopicGraph);
+    if (graphSearch) {
+      const q = graphSearch.toLowerCase();
+      out = out.filter(p => (p.title || "").toLowerCase().includes(q) || (p.titleSlug || "").toLowerCase().includes(q));
+    }
+    return out;
+  }, [problems, filterDifficultyGraph, filterPlatformGraph, filterTopicGraph, graphSearch]);
 
   /* ── fitView ─────────────────────────────────────────────────────── */
   const fitView = useCallback(() => {
@@ -921,7 +937,10 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
               <div class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
                 ${topicProblems.map((problem) => html`
                   <button
-                    onClick=${() => setModalProblem(problem)}
+                    onClick=${() => {
+          setModalProblem(problem);
+          updateQueryParams({ problem: problem.id || problem.titleSlug });
+        }}
                     class="text-left px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-500/20 transition-colors"
                   >
                     <div class="flex items-center justify-between gap-2">
@@ -996,7 +1015,7 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
         <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 text-xs text-slate-400">
           ${GRAPH_LAYOUT_MODES.map((mode) => html`
             <button
-              onClick=${() => setLayoutMode(mode.id)}
+              onClick=${() => { setLayoutMode(mode.id); updateQueryParams({ graphLayout: mode.id }); }}
               class="px-2 py-1 rounded-md transition-colors ${layoutMode === mode.id
       ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
       : "text-slate-500 hover:text-slate-300 hover:bg-white/5"}"
@@ -1103,7 +1122,11 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
                 class="text-left px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-200"
                 onClick=${() => {
         setSelected(n);
-        if (n.type === "problem") setModalProblem(nodeToRawProblem(n));
+        if (n.type === "problem") {
+          const problem = nodeToRawProblem(n);
+          setModalProblem(problem);
+          updateQueryParams({ problem: problem.id || problem.titleSlug });
+        }
       }}
               >${n.label} <span class="text-slate-500">${n.type}${n.platform ? ` · ${n.platform}` : ""}</span></button>
             `)}
@@ -1172,7 +1195,11 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
             <div class="flex items-center justify-between mb-3">
               ${selected.type === "problem" && selected.solved ? html`
                 <button
-                  onClick=${() => setModalProblem(nodeToRawProblem(selected))}
+                  onClick=${() => {
+          const problem = nodeToRawProblem(selected);
+          setModalProblem(problem);
+          updateQueryParams({ problem: problem.id || problem.titleSlug });
+        }}
                   class="text-[10px] px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
                 >Expand ↗</button>
               ` : html`<span></span>`}
@@ -1192,8 +1219,8 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
 
       <${ProblemModal}
         problem=${modalProblem}
-        onClose=${() => setModalProblem(null)}
-        problemList=${problems || []}
+        onClose=${() => { setModalProblem(null); updateQueryParams({ problem: null }); }}
+        problemList=${graphFilteredProblems}
         onNavigateProblem=${setModalProblem}
         onNavigate=${onNavigate}
         onDelete=${(id) => {
