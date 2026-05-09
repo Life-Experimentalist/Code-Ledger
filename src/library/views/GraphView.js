@@ -585,6 +585,7 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
     if (match) {
       setSelected(match);
       setModalProblem(match);
+      updateQueryParams({ problem: match.id || match.titleSlug });
       setTimeout(() => fitViewRef.current?.(), 20);
     }
     onFocusProblemHandled?.();
@@ -1221,7 +1222,7 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
         problem=${modalProblem}
         onClose=${() => { setModalProblem(null); updateQueryParams({ problem: null }); }}
         problemList=${graphFilteredProblems}
-        onNavigateProblem=${setModalProblem}
+        onNavigateProblem=${(prob) => { setModalProblem(prob); updateQueryParams({ problem: prob.id || prob.titleSlug }); }}
         onNavigate=${onNavigate}
         onDelete=${(id) => {
       if (onProblemDelete) onProblemDelete(id);
