@@ -15,7 +15,7 @@ import { expandChatVariables } from "../lib/chat-variables.js";
 import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
 import { buildProblemFiles, problemBase, LAYOUT_VERSION } from "../core/path-builder.js";
 import { buildCommitMessage, COMMIT_TYPES, resolveCommitType } from "../core/commit-messages.js";
-import { migrateRepo, resetRepo, detectRepoLayoutVersion } from "./migration-manager.js";
+import { migrateRepo, resetRepo, detectRepoLayoutVersion, migrateProblemIds } from "./migration-manager.js";
 
 // Init background
 async function init() {
@@ -25,6 +25,9 @@ async function init() {
   // First-run defaults: disable all AI providers and non-GitHub git providers.
   // Only runs once — subsequent startups detect the flag and skip.
   await applyFirstRunDefaults();
+
+  // Migrate existing problem IDs to platform-scoped format (lc/gfg/cf prefix).
+  migrateProblemIds().catch(e => coreDebug.error("migrateProblemIds failed", e));
 
   // Register handlers
   initializeHandlers();

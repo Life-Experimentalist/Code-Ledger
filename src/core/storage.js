@@ -256,6 +256,14 @@ export const Storage = {
     return res[key] || {};
   },
 
+  async _raw() {
+    return browserStorage.local.get(null);
+  },
+
+  async _setRaw(key, value) {
+    return browserStorage.local.set({ [key]: value });
+  },
+
   async markSlugLangCommitted(titleSlug, langName) {
     const key = "cl.committed.sluglangs";
     const map = await this.getCommittedSlugLangs();

@@ -13,11 +13,76 @@ import { buildCommitMessage, COMMIT_TYPES } from "../core/commit-messages.js";
 import { Storage } from "../core/storage.js";
 import { registry } from "../core/handler-registry.js";
 import { createDebugger } from "../lib/debug.js";
+import { CONSTANTS } from "../core/constants.js";
 
 const dbg = createDebugger("MigrationManager");
 
 // Matches old layout: topics/{topic}/{slug}/...
 const OLD_LAYOUT_RE = /^topics\/[^/]+\/[^/]+\//;
+
+/**
+ * One-time migration: rekey problem records to platform-scoped ids.
+ * Old formats handled:
+ *   "two-sum"        → "lc-two-sum" / "gfg-two-sum" / "cf-two-sum"
+ *   "two-sum::py"    → "lc-two-sum"   (LeetCode bulk import style — strip ::lang suffix)
+ *   null / ""        → "gfg-{titleSlug}" (GFG bug fallback — use titleSlug)
+ *
+ * Idempotent: records already matching /^(lc|gfg|cf)-/ are skipped.
+ * When multiple old records collapse to the same new id, keeps the one with the latest timestamp.
+ */
+export async function migrateProblemIds() {
+  const ALREADY_MIGRATED = /^(lc|gfg|cf)-/;
+  const problems = await Storage.getAllProblems();
+  const toMigrate = problems.filter(p => !ALREADY_MIGRATED.test(p.id || ""));
+  if (toMigrate.length === 0) return;
+
+  dbg.log(`migrateProblemIds: migrating ${toMigrate.length} records`);
+
+  // Group by new id — keep the record with the latest timestamp when multiple collapse
+  const byNewId = new Map();
+  for (const p of toMigrate) {
+    const rawId = String(p.id || p.titleSlug || "unknown");
+    // Strip ::lang suffix if present (LeetCode bulk import format)
+    const titleSlug = rawId.includes("::") ? rawId.split("::")[0] : rawId;
+    const platform  = p.platform || "unknown";
+    const newId     = CONSTANTS.makeProblemId(platform, titleSlug);
+    const existing  = byNewId.get(newId);
+    if (!existing || (p.timestamp || 0) > (existing.timestamp || 0)) {
+      byNewId.set(newId, { ...p, id: newId, titleSlug });
+    }
+  }
+
+  // Delete old records
+  const oldIds = toMigrate.map(p => p.id || p.titleSlug).filter(Boolean);
+  for (const oldId of oldIds) {
+    await Storage.deleteProblem(oldId).catch(() => {});
+  }
+  // Insert rekeyed records
+  for (const [, record] of byNewId) {
+    await Storage.saveProblem(record);
+  }
+
+  // Migrate committedSlugLangs map: rekey from "slug::lang" to "newId::lang"
+  const SLUG_LANG_KEY = "cl.committed.sluglangs";
+  const all = await Storage._raw().catch(() => ({}));
+  const oldMap = all[SLUG_LANG_KEY] || {};
+  if (Object.keys(oldMap).length > 0) {
+    const newMap = {};
+    for (const [k, v] of Object.entries(oldMap)) {
+      const parts = k.split("::");
+      const rawSlug = parts[0];
+      const lang    = parts.slice(1).join("::");
+      if (!rawSlug) continue;
+      // Find the migrated record whose old titleSlug matches
+      const migrated = [...byNewId.values()].find(p => p.titleSlug === rawSlug);
+      const newKey   = migrated ? `${migrated.id}::${lang}` : k;
+      newMap[newKey] = v;
+    }
+    await Storage._setRaw(SLUG_LANG_KEY, newMap).catch(() => {});
+  }
+
+  dbg.log(`migrateProblemIds: done — ${byNewId.size} records rekeyed`);
+}
 
 async function _getGitContext() {
   const settings = await Storage.getSettings();
