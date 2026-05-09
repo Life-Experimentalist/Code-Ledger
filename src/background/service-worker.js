@@ -13,7 +13,8 @@ import { CONSTANTS } from "../core/constants.js";
 import { buildConversationSystemPrompt } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
 import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
-import { buildProblemFiles, problemBase } from "../core/path-builder.js";
+import { buildProblemFiles, problemBase, LAYOUT_VERSION } from "../core/path-builder.js";
+import { buildCommitMessage, COMMIT_TYPES, resolveCommitType } from "../core/commit-messages.js";
 
 // Init background
 async function init() {
@@ -26,6 +27,22 @@ async function init() {
 
   // Register handlers
   initializeHandlers();
+
+  // Detect extension updates and flag migration if needed
+  try {
+    const manifest  = chrome.runtime.getManifest();
+    const settings  = await Storage.getSettings();
+    const lastVer   = settings.lastKnownVersion || "";
+    const curVer    = manifest.version;
+    if (lastVer !== curVer) {
+      const updates = { lastKnownVersion: curVer };
+      if (lastVer && lastVer !== curVer) updates.extensionUpdated = true;
+      await Storage.setSettings({ ...settings, ...updates });
+      coreDebug.log(`Extension updated: ${lastVer || "first run"} → ${curVer}`);
+    }
+  } catch (e) {
+    coreDebug.warn("Version check failed:", e.message);
+  }
 
   // Set up event listeners
   eventBus.on("problem:solved", handleSolved);
@@ -193,10 +210,11 @@ async function handleSolved(data) {
     coreDebug.log("skipCommit flag set — skipping git commit for bulk import", titleSlug);
     return;
   }
-  if (gitEnabled && alreadyCommitted) {
+  const forceCommit = !!data.forceCommit;
+  if (gitEnabled && alreadyCommitted && !forceCommit) {
     coreDebug.log("Already committed submission event — skipping auto-commit.", submissionCommitKey);
   }
-  if (gitEnabled && !alreadyCommitted) {
+  if (gitEnabled && (forceCommit || !alreadyCommitted)) {
     try {
       const git = registry.getGitProvider(settings.gitProvider || "github");
 
@@ -224,9 +242,10 @@ async function handleSolved(data) {
       });
 
       const pendingCount = pendingProblems.length || 1;
+      const commitType  = forceCommit ? COMMIT_TYPES.UPDATE : COMMIT_TYPES.SOLVED;
       const commitMsg = pendingCount > 1
-        ? "chore: sync " + pendingCount + " pending problem(s) [CodeLedger]"
-        : `[${data.topic}] ${data.title} solved`;
+        ? buildCommitMessage(COMMIT_TYPES.CHORE, { count: pendingCount })
+        : buildCommitMessage(commitType, data);
       const commitOpts = data.timestamp ? { date: new Date(data.timestamp) } : {};
       await git.commit(
         filesToCommit,
@@ -358,13 +377,28 @@ async function performPendingRenames() {
 async function buildIndexJson() {
   const problems = await Storage.getAllProblems();
   const stats = {
-    total: problems.length,
-    easy: problems.filter((p) => p.difficulty === "Easy").length,
+    total:  problems.length,
+    easy:   problems.filter((p) => p.difficulty === "Easy").length,
     medium: problems.filter((p) => p.difficulty === "Medium").length,
-    hard: problems.filter((p) => p.difficulty === "Hard").length,
+    hard:   problems.filter((p) => p.difficulty === "Hard").length,
+    byPlatform: problems.reduce((acc, p) => {
+      const plat = p.platform || "unknown";
+      acc[plat] = (acc[plat] || 0) + 1;
+      return acc;
+    }, {}),
+    byLang: problems.reduce((acc, p) => {
+      const lang = p.lang?.name || p.lang?.slug || "unknown";
+      acc[lang] = (acc[lang] || 0) + 1;
+      return acc;
+    }, {}),
   };
 
-  return JSON.stringify({ updatedAt: new Date().toISOString(), stats, problems }, null, 2);
+  return JSON.stringify({
+    updatedAt: new Date().toISOString(),
+    layoutVersion: LAYOUT_VERSION,
+    stats,
+    problems,
+  }, null, 2);
 }
 
 /** Counts how many local problems are missing from the remote repo, without committing. */
@@ -403,7 +437,7 @@ async function handleResyncCount() {
  * mode="bulk"       — one atomic commit for all missing problems (default, rate-limit safe).
  * mode="individual" — one commit per problem with correct backdated timestamps.
  */
-async function handleResyncAll(mode = "bulk") {
+async function handleResyncAll(mode = "bulk", commitType = "chore") {
   const settings = await Storage.getSettings();
   const git = registry.getGitProvider(settings.gitProvider || "github");
   if (!git) throw new Error("No git provider configured");
@@ -462,7 +496,7 @@ async function handleResyncAll(mode = "bulk") {
     filesToCommit.push({ path: "index.json", content: await buildIndexJson() });
     await git.commit(
       filesToCommit,
-      "chore: sync " + missing.length + " problem(s) [CodeLedger]",
+      buildCommitMessage(resolveCommitType(commitType), { count: missing.length, platform: "LeetCode" }),
       repoName,
       { date: new Date() },
     );
@@ -584,7 +618,7 @@ try {
     }
 
     if (msg && msg.type === "RESYNC_ALL") {
-      handleResyncAll(msg.mode || "bulk")
+      handleResyncAll(msg.mode || "bulk", msg.commitType || "chore")
         .then((result) => sendResponse({ ok: true, ...result }))
         .catch((e) => sendResponse({ ok: false, error: e.message }));
       return true; // async response
