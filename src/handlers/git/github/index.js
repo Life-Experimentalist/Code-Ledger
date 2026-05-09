@@ -7,7 +7,7 @@
 import { BaseGitHandler } from "../../_base/BaseGitHandler.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
-import { getPagesHtml, getActionsWorkflow } from "./pages-template.js";
+import { getPagesHtml, getActionsWorkflow, getRepoReadme } from "./pages-template.js";
 
 export class GitHubHandler extends BaseGitHandler {
   constructor() {
@@ -176,8 +176,8 @@ export class GitHubHandler extends BaseGitHandler {
     // Always recover missing infrastructure files so accidental deletions are self-healing.
     // Skip the check on mirror commits (opts.isMirror) to avoid redundant API calls.
     if (!opts.isMirror) {
-      const recovered = await this._getMissingInfraFiles(owner, name, branch, token, settings);
-      treeItems.push(...recovered);
+      const infraFiles = await this._buildInfraFiles(owner, name, branch, token, settings);
+      treeItems.push(...infraFiles);
     }
 
     // 5. Create tree
@@ -245,32 +245,26 @@ export class GitHubHandler extends BaseGitHandler {
   }
 
   /**
-   * Returns tree items for any infrastructure files missing from the repo.
-   * Called on every commit so the repo is self-healing after accidental deletes.
+   * Returns tree items for infra files that should always be present and up-to-date.
+   * Uses always-write semantics: GitHub Trees API deduplicates identical blobs by SHA,
+   * so including unchanged content never creates a spurious diff.
    */
-  async _getMissingInfraFiles(owner, name, branch, token, settings) {
-    const candidates = [
-      { path: "index.html", content: () => getPagesHtml(), skip: settings?.github_pages === false },
-      { path: ".github/workflows/update-stats.yml", content: () => getActionsWorkflow(), skip: false },
-    ];
+  async _buildInfraFiles(owner, name, branch, token, settings) {
+    const items = [];
 
-    const results = await Promise.all(
-      candidates.map(async ({ path, content, skip }) => {
-        if (skip) return null;
-        // If this path is already in our commit, no need to check
-        try {
-          await this.apiFetch(`/repos/${owner}/${name}/contents/${encodeURIComponent(path)}?ref=${branch}`, token);
-          return null; // file exists
-        } catch (e) {
-          if (e.status === 404) {
-            this.dbg.log(`Recovering missing infra file: ${path}`);
-            return { path, mode: "100644", type: "blob", content: content() };
-          }
-          return null; // other error — skip silently
-        }
-      }),
-    );
-    return results.filter(Boolean);
+    // index.html — GitHub Pages dashboard (always regenerate so template stays current)
+    if (settings?.github_pages !== false) {
+      items.push({ path: "index.html", mode: "100644", type: "blob", content: getPagesHtml() });
+    }
+
+    // .github/workflows/update-stats.yml
+    items.push({ path: ".github/workflows/update-stats.yml", mode: "100644", type: "blob", content: getActionsWorkflow() });
+
+    // Root README.md
+    const pagesUrl = settings?.github_pages_url || `https://${owner}.github.io/${name}/`;
+    items.push({ path: "README.md", mode: "100644", type: "blob", content: getRepoReadme(owner, name, pagesUrl) });
+
+    return items;
   }
 
   /** Enables GitHub Pages on the given repo (serves from branch root). */

@@ -642,3 +642,38 @@ export function getActionsWorkflow() {
   ];
   return lines.join(nl);
 }
+
+/**
+ * Returns a root README.md for the user's CodeLedger repo.
+ * pagesUrl is the GitHub Pages URL (or custom domain if configured).
+ */
+export function getRepoReadme(owner, repo, pagesUrl) {
+  const url = pagesUrl || `https://${owner}.github.io/${repo}/`;
+  return `# CodeLedger — DSA Solutions
+
+> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — your DSA journey, committed.
+
+**📊 Live Stats:** [${url}](${url})
+
+---
+
+## Structure
+
+\`\`\`
+problems/
+  {problem-slug}/
+    {problem-slug}.py      ← solution (one file per language)
+    {problem-slug}.js
+    README.md              ← problem statement + your stats
+    hints.md               ← hints (if enabled)
+\`\`\`
+
+## Stats
+
+See [the live dashboard](${url}) for difficulty breakdown, solve heatmap, and recent solutions.
+
+---
+
+*Managed by [CodeLedger](https://codeledger.vkrishna04.me) — never manually edited.*
+`;
+}
