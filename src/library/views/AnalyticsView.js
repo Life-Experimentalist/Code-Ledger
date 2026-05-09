@@ -8,6 +8,7 @@ import { useMemo, useState, useEffect, useCallback } from "../../vendor/preact-b
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 import { ProblemModal } from "../components/ProblemModal.js";
+import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 
 import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
@@ -569,7 +570,12 @@ export function AnalyticsView({ problems, onNavigate }) {
                     return html`
                       <button
                         class="w-full text-left px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.07] hover:border-cyan-500/20 transition-colors"
-                        onClick=${() => { setModalProblem(p); setModalProblemList(drilldown.problems); setDrilldown(null); }}
+                        onClick=${() => {
+                          setModalProblem(p);
+                          setModalProblemList(drilldown.problems);
+                          setDrilldown(null);
+                          updateQueryParams({ problem: p.id || p.titleSlug });
+                        }}
                       >
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-sm text-slate-200 leading-snug truncate">${p.title || p.titleSlug}</span>
@@ -590,7 +596,7 @@ export function AnalyticsView({ problems, onNavigate }) {
 
       <${ProblemModal}
         problem=${modalProblem}
-        onClose=${() => { setModalProblem(null); setModalProblemList([]); }}
+        onClose=${() => { setModalProblem(null); setModalProblemList([]); updateQueryParams({ problem: null }); }}
         problemList=${modalProblemList.length ? modalProblemList : problems}
         onNavigateProblem=${setModalProblem}
         onNavigate=${onNavigate}

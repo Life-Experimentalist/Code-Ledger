@@ -88,7 +88,7 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
 
   const handleSelectProblem = (problem) => {
     setSelectedProblem(problem);
-    updateQueryParams({ problem: problem.titleSlug || problem.id });
+    updateQueryParams({ problem: problem.id || problem.titleSlug });
   };
 
   const handleCloseModal = () => {
