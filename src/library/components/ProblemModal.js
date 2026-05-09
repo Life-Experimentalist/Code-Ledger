@@ -141,6 +141,17 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
     return () => window.removeEventListener("keydown", onKey);
   }, [problem, onClose]);
 
+  // Arrow key navigation (← prev, → next)
+  useEffect(() => {
+    if (!problem || !canNavigate) return;
+    const onKey = (e) => {
+      if (e.key === "ArrowLeft")  { e.preventDefault(); onNavigateProblem?.(problemList[(problemIndex - 1 + problemList.length) % problemList.length]); }
+      if (e.key === "ArrowRight") { e.preventDefault(); onNavigateProblem?.(problemList[(problemIndex + 1) % problemList.length]); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [problem, canNavigate, problemIndex, problemList, onNavigateProblem]);
+
   if (!problem) return null;
 
   const meta = PLATFORM_META[problem.platform] || {
