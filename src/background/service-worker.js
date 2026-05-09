@@ -258,7 +258,7 @@ async function handleSolved(data) {
         commitOpts,
       );
       await Storage.markSubmissionCommitted(submissionCommitKey).catch(() => { });
-      await Storage.markSlugLangCommitted(titleSlug, langName).catch(() => { });
+      await Storage.markSlugLangCommitted(data.id || titleSlug, langName).catch(() => { });
       await Storage.clearPendingProblemKeys(
         pendingProblems.map((p) => getProblemCommitKey(p)).filter(Boolean),
       ).catch(() => { });

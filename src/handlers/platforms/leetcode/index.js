@@ -13,6 +13,7 @@ import { Storage } from "../../../core/storage.js";
 import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
+import { CONSTANTS } from "../../../core/constants.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
 import { runtime, tabs } from "../../../lib/browser-compat.js";
 
@@ -205,7 +206,7 @@ Be concise. Max 200 words.`;
       const merged = {
         ...(existing || {}),
         platform: "leetcode",
-        id: String(slug),
+        id: CONSTANTS.makeProblemId("leetcode", slug),
         title: meta?.title || existing?.title || slug,
         titleSlug: slug,
         difficulty: normalizeDifficulty(meta?.difficulty || existing?.difficulty || ""),
@@ -887,7 +888,7 @@ Be concise. Max 200 words.`;
         }
 
         return {
-          id:             `${sub.titleSlug}::${lang.slug}`,
+          id:             CONSTANTS.makeProblemId("leetcode", sub.titleSlug),
           submissionId:   sub.id || null,
           platform:       "leetcode",
           title,
@@ -1196,7 +1197,7 @@ Be concise. Max 200 words.`;
 
       eventBus.emit("problem:solved", {
         platform: "leetcode",
-        id: `${slug}::${lang.slug}`,
+        id: CONSTANTS.makeProblemId("leetcode", slug),
         forceCommit: isManual,
         submissionId: submission.id || null,
         title: meta?.title || submission.question?.title || slug,

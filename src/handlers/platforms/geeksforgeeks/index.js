@@ -14,6 +14,7 @@ import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
+import { CONSTANTS } from "../../../core/constants.js";
 
 const dbg = createDebugger("GFG");
 
@@ -105,7 +106,7 @@ Be concise. Max 200 words.`;
             const meta = this._extractMetadata(slug);
             const problem = {
               platform: "geeksforgeeks",
-              id: String(slug),
+              id: CONSTANTS.makeProblemId("geeksforgeeks", String(slug)),
               title: meta.title || slug,
               titleSlug: slug,
               difficulty: meta.difficulty || null,
@@ -211,7 +212,7 @@ Be concise. Max 200 words.`;
 
       eventBus.emit("problem:solved", {
         platform: "geeksforgeeks",
-        id: meta.platformId || null,
+        id: CONSTANTS.makeProblemId("geeksforgeeks", slug),
         title: meta.title || slug,
         titleSlug: slug,
         difficulty: meta.difficulty || null,

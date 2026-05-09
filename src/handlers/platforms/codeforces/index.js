@@ -8,6 +8,7 @@ import { SELECTORS } from './dom-selectors.js';
 import { detectPage } from './page-detector.js';
 import { registerPlatformPrompt } from '../../../core/ai-prompts.js';
 import { Storage } from '../../../core/storage.js';
+import { CONSTANTS } from '../../../core/constants.js';
 
 export class CodeforcesHandler extends BasePlatformHandler {
   constructor() {
@@ -89,7 +90,7 @@ Be concise. Max 200 words.`;
     await Storage.saveProblem({
       ...(existing || {}),
       platform: 'codeforces',
-      id: String(slug),
+      id: CONSTANTS.makeProblemId("codeforces", String(slug)),
       title: existing?.title || titleText,
       titleSlug: slug,
       tags: existing?.tags || [],
