@@ -265,7 +265,7 @@ export function AnalyticsView({ problems, onNavigate }) {
     } else if (section === "topic") {
       openDrilldown(sectionFilter, (p) => (p.tags || []).includes(sectionFilter) || p.topic === sectionFilter);
     }
-  }, [problems?.length]);
+  }, [problems?.length, userMap]);
 
   const chartData = useMemo(() => {
     const sortedTopics = Object.entries(stats.topics).sort(
@@ -610,7 +610,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                           setModalProblem(p);
                           setModalProblemList(drilldown.problems);
                           setDrilldown(null);
-                          updateQueryParams({ problem: p.id || p.titleSlug });
+                          updateQueryParams({ section: null, sectionFilter: null, problem: p.id || p.titleSlug });
                         }}
                       >
                         <div class="flex items-center justify-between gap-2">
