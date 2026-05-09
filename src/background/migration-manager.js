@@ -82,18 +82,18 @@ export async function migrateRepo() {
     const canonical = p.canonical || null;
     const lang      = p.lang || { ext: "txt" };
     newFiles.push({
-      path:    solutionPath(p.titleSlug || p.id, p.platform || "unknown", lang, canonical, settings),
+      path:    solutionPath(p.id || p.titleSlug, p.platform || "unknown", lang, canonical, settings),
       content: p.code,
     });
     if (p.readmeContent) {
       newFiles.push({
-        path:    readmePath(p.titleSlug || p.id, canonical, settings),
+        path:    readmePath(p.id || p.titleSlug, canonical, settings),
         content: p.readmeContent,
       });
     }
     if (p.hintsContent) {
       newFiles.push({
-        path:    hintsPath(p.titleSlug || p.id, canonical, settings),
+        path:    hintsPath(p.id || p.titleSlug, canonical, settings),
         content: p.hintsContent,
       });
     }
@@ -149,13 +149,13 @@ export async function resetRepo() {
     if (!p.code) continue;
     const canonical = p.canonical || null;
     const lang      = p.lang || { ext: "txt" };
-    const solPath   = solutionPath(p.titleSlug || p.id, p.platform || "unknown", lang, canonical, settings);
+    const solPath   = solutionPath(p.id || p.titleSlug, p.platform || "unknown", lang, canonical, settings);
     desiredFiles.set(solPath, p.code);
     if (p.readmeContent) {
-      desiredFiles.set(readmePath(p.titleSlug || p.id, canonical, settings), p.readmeContent);
+      desiredFiles.set(readmePath(p.id || p.titleSlug, canonical, settings), p.readmeContent);
     }
     if (p.hintsContent) {
-      desiredFiles.set(hintsPath(p.titleSlug || p.id, canonical, settings), p.hintsContent);
+      desiredFiles.set(hintsPath(p.id || p.titleSlug, canonical, settings), p.hintsContent);
     }
   }
 

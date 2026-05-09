@@ -92,7 +92,7 @@ function getProblemFiles(problem = {}, settings = {}) {
   if (problem.code) {
     const lang = problem.lang || { verbose: "Solution", name: "solution", ext: "txt" };
     const canonical = problem.canonical || null;
-    const slug = problem.titleSlug || String(problem.id || "unknown");
+    const slug = problem.id || problem.titleSlug || "unknown";
     const root = (settings?.problems_dir || "problems").replace(/\/+$/, "");
     const dir  = canonical?.canonicalId || slug;
     const verbose = (lang.verbose || lang.name || "Solution").replace(/\s+/g, "_");
@@ -153,7 +153,7 @@ async function handleSolved(data) {
 
   // Detect canonical path migration — schedule rename if stored base differs from new base
   if (data.canonical?.id && data._storedBasePath) {
-    const expectedBase = problemBase(data.titleSlug || data.id, { canonicalId: data.canonical.id }, settings);
+    const expectedBase = problemBase(data.id || data.titleSlug, { canonicalId: data.canonical.id }, settings);
     if (data._storedBasePath !== expectedBase) {
       await Storage.markRenameNeeded(data.id, { oldBase: data._storedBasePath, newBase: expectedBase }).catch(() => { });
     }

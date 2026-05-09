@@ -13,10 +13,10 @@
 /** Increment when the directory layout changes. Stored in index.json. */
 export const LAYOUT_VERSION = 2;
 
-/** Base directory for a problem. Directory name is always titleSlug (or canonicalId if set). */
-export function problemBase(titleSlug, canonical, settings = {}) {
+/** Base directory for a problem. Directory name is always id (or canonicalId if set). */
+export function problemBase(id, canonical, settings = {}) {
   const root = (settings?.problems_dir || "problems").replace(/\/+$/, "");
-  const dir  = canonical?.canonicalId || titleSlug;
+  const dir  = canonical?.canonicalId || id;
   return `${root}/${dir}`;
 }
 
@@ -29,9 +29,9 @@ export function problemBase(titleSlug, canonical, settings = {}) {
  * The file is ALWAYS named after the problem slug, not the language verbose name.
  * Multiple languages for the same problem produce sibling files: two-sum.py, two-sum.js.
  */
-export function solutionPath(titleSlug, platform, lang, canonical, settings = {}) {
-  const base = problemBase(titleSlug, canonical, settings);
-  const slug = canonical?.canonicalId || titleSlug;
+export function solutionPath(id, platform, lang, canonical, settings = {}) {
+  const base = problemBase(id, canonical, settings);
+  const slug = canonical?.canonicalId || id;
   const ext  = lang.ext || "txt";
   if (canonical?.canonicalId) {
     return `${base}/${platform}/${slug}.${ext}`;
@@ -40,13 +40,13 @@ export function solutionPath(titleSlug, platform, lang, canonical, settings = {}
 }
 
 /** README is always at the problem base, never inside a platform subdir. */
-export function readmePath(titleSlug, canonical, settings = {}) {
-  return `${problemBase(titleSlug, canonical, settings)}/README.md`;
+export function readmePath(id, canonical, settings = {}) {
+  return `${problemBase(id, canonical, settings)}/README.md`;
 }
 
 /** Hints file is always at the problem base, never inside a platform subdir. */
-export function hintsPath(titleSlug, canonical, settings = {}) {
-  return `${problemBase(titleSlug, canonical, settings)}/hints.md`;
+export function hintsPath(id, canonical, settings = {}) {
+  return `${problemBase(id, canonical, settings)}/hints.md`;
 }
 
 /**
@@ -62,23 +62,24 @@ export function buildProblemFiles(problem, settings = {}) {
   const lang      = problem.lang || { verbose: "Solution", name: "solution", ext: "txt" };
   const ext       = lang.ext || "txt";
   const normalLang = { verbose: lang.verbose || lang.name || "Solution", name: lang.name || "solution", ext };
+  const id        = problem.id || problem.titleSlug || "unknown";   // platform-scoped
   const files = [];
 
   if (problem.code) {
     files.push({
-      path: solutionPath(problem.titleSlug || problem.id, problem.platform || "unknown", normalLang, canonical, settings),
+      path: solutionPath(id, problem.platform || "unknown", normalLang, canonical, settings),
       content: problem.code,
     });
   }
   if (problem.readmeContent) {
     files.push({
-      path: readmePath(problem.titleSlug || problem.id, canonical, settings),
+      path: readmePath(id, canonical, settings),
       content: problem.readmeContent,
     });
   }
   if (problem.hintsContent) {
     files.push({
-      path: hintsPath(problem.titleSlug || problem.id, canonical, settings),
+      path: hintsPath(id, canonical, settings),
       content: problem.hintsContent,
     });
   }
