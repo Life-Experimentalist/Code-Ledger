@@ -137,13 +137,27 @@ Be concise. Max 200 words.`;
           advanced: true,
         },
 
-        // ── UI Features ────────────────────────────────────────────
+        // ── UI / Quality of Life ───────────────────────────────────
         {
           key: "leetcode_ai_panel",
           label: "Floating AI assistant",
           type: "toggle",
           default: true,
           description: "Show a floating AI chat panel for instant code feedback on problem pages.",
+        },
+        {
+          key: "leetcode_copy_btn",
+          label: "Copy code button",
+          type: "toggle",
+          default: true,
+          description: "Inject a copy-to-clipboard button into the editor toolbar.",
+        },
+        {
+          key: "leetcode_paste_btn",
+          label: "Paste without auto-indent button",
+          type: "toggle",
+          default: true,
+          description: "Inject a paste button that bypasses Monaco's auto-indentation.",
         },
 
         // ── Import (Advanced) ──────────────────────────────────────
@@ -226,7 +240,8 @@ Be concise. Max 200 words.`;
     // QoL buttons on problem pages
     if (page.type === PAGE_TYPES.PROBLEM) {
       Storage.getSettings().then((s) => {
-        if (s.qolEnabled !== false) setTimeout(() => injectQoL(), 1500);
+        const opts = { showCopy: s.leetcode_copy_btn !== false, showPaste: s.leetcode_paste_btn !== false };
+        if (opts.showCopy || opts.showPaste) setTimeout(() => injectQoL(opts), 1500);
       }).catch(() => { setTimeout(() => injectQoL(), 1500); });
     }
 
@@ -335,10 +350,9 @@ Be concise. Max 200 words.`;
     if (page.type === PAGE_TYPES.PROBLEM) {
       this._setupSubmitHook(); // re-hook after React re-renders the submit button
       Storage.getSettings().then((s) => {
-        if (s.qolEnabled !== false) {
-          import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
-          setTimeout(() => injectQoL(), 1500);
-        }
+        import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
+        const opts = { showCopy: s.leetcode_copy_btn !== false, showPaste: s.leetcode_paste_btn !== false };
+        setTimeout(() => injectQoL(opts), 1500);
       }).catch(() => {
         import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
         setTimeout(() => injectQoL(), 1500);

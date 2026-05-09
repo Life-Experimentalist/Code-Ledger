@@ -317,7 +317,9 @@ export function createFloatingAI(slug = "", opts = {}) {
     overflowY: "auto",
   });
   inputRow.style.position = "relative";
-  inputRow.insertBefore(autocompleteEl, input);
+  // Append autocomplete to inputRow before input so absolute positioning works;
+  // input is not yet a child at this point, so insertBefore would throw.
+  inputRow.appendChild(autocompleteEl);
 
   function showAutocomplete(query) {
     const cmds = CHAT_COMMANDS.filter(c =>

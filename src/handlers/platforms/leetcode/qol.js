@@ -12,6 +12,7 @@ async function copyToClipboard(text) {
     return true;
   } catch (_) { }
 
+  // execCommand fallback (deprecated but still works in most content-script contexts)
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.setAttribute("readonly", "true");
@@ -100,8 +101,58 @@ function findEditorToolbar() {
   );
 }
 
+/**
+ * Strip Monaco's whitespace-visualization characters from code so clipboard
+ * output is clean and runnable.
+ */
+function cleanCode(code) {
+  return code
+    .replace(/·/g, " ")   // middle dot → regular space
+    .replace(/‌/g, "")    // ZWNJ → remove
+    .replace(/ /g, " ");  // NBSP → regular space
+}
+
+/**
+ * Get code from the Monaco editor.
+ * Tries the active editor first (most reliable), then falls back to the first
+ * non-empty model, then to DOM line scraping.
+ */
 function getEditorCode() {
-  return window.monaco?.editor?.getModels()?.[0]?.getValue() ?? "";
+  // Prefer the active editor's model — most reliable on LeetCode
+  const activeCode = window.monaco?.editor?.getActiveCodeEditor?.()?.getModel?.()?.getValue?.();
+  if (activeCode) return cleanCode(activeCode);
+
+  // Fallback: first editor in the list
+  const editors = window.monaco?.editor?.getEditors?.();
+  if (editors?.length) {
+    for (const ed of editors) {
+      const val = ed.getModel?.()?.getValue?.();
+      if (val) return cleanCode(val);
+    }
+  }
+
+  // Fallback: first non-empty model
+  const models = window.monaco?.editor?.getModels?.();
+  if (models?.length) {
+    for (const m of models) {
+      const val = m.getValue?.();
+      if (val) return cleanCode(val);
+    }
+  }
+
+  // Last resort: scrape visible DOM lines
+  const lines = [...document.querySelectorAll(".view-line")].map(l => l.textContent).join("\n");
+  return lines ? cleanCode(lines) : "";
+}
+
+/** Show a brief error flash on the button then restore original HTML. */
+function flashError(btn, orig) {
+  btn.innerHTML = `<div class="relative text-[14px] p-[1px] text-rose-400 flex items-center justify-center">
+    <svg class="h-3.5 w-3.5" viewBox="0 0 384 512" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+      <path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3l105.4 105.3c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256l105.3-105.4z"/>
+    </svg>
+  </div>`;
+  setTimeout(() => { btn.innerHTML = orig; }, 1500);
 }
 
 /** Build the copy SVG button element. */
@@ -119,9 +170,11 @@ function makeCopyBtn() {
 
   btn.onclick = async () => {
     const code = getEditorCode();
-    if (!code) return;
-
     const orig = btn.innerHTML;
+    if (!code) {
+      flashError(btn, orig);
+      return;
+    }
     const success = await copyToClipboard(code);
     if (success) {
       btn.innerHTML = `<div class="relative text-[14px] p-[1px] text-emerald-500 flex items-center justify-center">
@@ -130,6 +183,8 @@ function makeCopyBtn() {
         </svg>
       </div>`;
       setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    } else {
+      flashError(btn, orig);
     }
   };
   return btn;
@@ -169,39 +224,56 @@ let _qolRetryTimer = null;
 /**
  * Inject QoL buttons into the LeetCode editor toolbar.
  * Uses a retry loop since LeetCode's React renders the toolbar asynchronously.
+ *
+ * @param {{ showCopy?: boolean, showPaste?: boolean }} opts
  */
-export function injectQoL() {
+export function injectQoL(opts = {}) {
+  const showCopy  = opts.showCopy  !== false;
+  const showPaste = opts.showPaste !== false;
+
   if (_qolRetryTimer) { clearTimeout(_qolRetryTimer); _qolRetryTimer = null; }
 
-  if (
-    document.getElementById("cl-code-copy") &&
-    document.getElementById("cl-code-paste") &&
-    document.getElementById("cl-code-copy").isConnected
-  ) {
+  // If neither button is enabled, clean up and bail
+  if (!showCopy && !showPaste) {
+    ["cl-code-copy", "cl-code-paste"].forEach(id => document.getElementById(id)?.remove());
+    _qolInjected = false;
+    return;
+  }
+
+  // Check if the enabled buttons are already correctly injected
+  const copyOk  = !showCopy  || (document.getElementById("cl-code-copy")  && document.getElementById("cl-code-copy").isConnected);
+  const pasteOk = !showPaste || (document.getElementById("cl-code-paste") && document.getElementById("cl-code-paste").isConnected);
+  if (copyOk && pasteOk) {
     _qolInjected = true;
     return;
   }
 
   const toolbar = findEditorToolbar();
 
+  // Remove stale disconnected buttons
   ["cl-code-copy", "cl-code-paste"].forEach((id) => {
     const el = document.getElementById(id);
     if (el && !el.isConnected) el.remove();
   });
 
   if (toolbar) {
-    if (!document.getElementById("cl-code-copy")) {
-      const copyBtn = makeCopyBtn();
-      const pasteBtn = makePasteBtn();
-      toolbar.insertBefore(copyBtn, toolbar.firstChild);
-      toolbar.insertBefore(pasteBtn, copyBtn.nextSibling);
+    if (showCopy && !document.getElementById("cl-code-copy")) {
+      toolbar.insertBefore(makeCopyBtn(), toolbar.firstChild);
     }
+    if (showPaste && !document.getElementById("cl-code-paste")) {
+      const copyEl = document.getElementById("cl-code-copy");
+      const ref = copyEl ? copyEl.nextSibling : toolbar.firstChild;
+      toolbar.insertBefore(makePasteBtn(), ref);
+    }
+    // Remove buttons that were disabled after being injected
+    if (!showCopy)  document.getElementById("cl-code-copy")?.remove();
+    if (!showPaste) document.getElementById("cl-code-paste")?.remove();
     _qolInjected = true;
     return;
   }
 
   if (!_qolInjected) {
-    _qolRetryTimer = setTimeout(() => injectQoL(), 800);
+    _qolRetryTimer = setTimeout(() => injectQoL(opts), 800);
   }
 }
 
