@@ -168,6 +168,12 @@ export const CONSTANTS = Object.freeze({
     },
   },
 
+  PLATFORM_CODE: {
+    leetcode: "lc",
+    geeksforgeeks: "gfg",
+    codeforces: "cf",
+  },
+
   CANONICAL_VOTES_REQUIRED: 5,
   CANONICAL_AI_CONFIDENCE_AUTO: 0.9,
   CANONICAL_AI_CONFIDENCE_REVIEW: 0.7,
@@ -245,4 +251,10 @@ export const CONSTANTS = Object.freeze({
 
   PORTFOLIO_DSA_SECTION_ID: "dsa-stats",
   PORTFOLIO_INDEX_JSON_FIELD: "dsaIndexUrl",
+
+  /** Returns the platform-scoped unique id, e.g. "lc-two-sum". */
+  makeProblemId(platform, titleSlug) {
+    const code = this.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
+    return `${code}-${titleSlug}`;
+  },
 });
