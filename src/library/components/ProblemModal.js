@@ -108,7 +108,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const [settings, setSettings] = useState({});
 
   useEffect(() => {
-    Storage.getSettings().then(setSettings).catch(() => {});
+    Storage.getSettings().then(setSettings).catch(() => { });
   }, []);
 
   // Reset tab and load chat history when problem changes
@@ -141,11 +141,15 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
     return () => window.removeEventListener("keydown", onKey);
   }, [problem, onClose]);
 
+  const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+  const problemIndex = problemList.findIndex((entry) => (entry?.id || entry?.titleSlug) === (problem?.id || problem?.titleSlug));
+  const canNavigate = problemList.length > 1 && problemIndex >= 0;
+
   // Arrow key navigation (← prev, → next)
   useEffect(() => {
     if (!problem || !canNavigate) return;
     const onKey = (e) => {
-      if (e.key === "ArrowLeft")  { e.preventDefault(); onNavigateProblem?.(problemList[(problemIndex - 1 + problemList.length) % problemList.length]); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); onNavigateProblem?.(problemList[(problemIndex - 1 + problemList.length) % problemList.length]); }
       if (e.key === "ArrowRight") { e.preventDefault(); onNavigateProblem?.(problemList[(problemIndex + 1) % problemList.length]); }
     };
     window.addEventListener("keydown", onKey);
@@ -177,10 +181,6 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
       setTimeout(() => setCopied(false), 2000);
     } catch (_) { }
   };
-
-  const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
-  const problemIndex = problemList.findIndex((entry) => (entry?.id || entry?.titleSlug) === (problem?.id || problem?.titleSlug));
-  const canNavigate = problemList.length > 1 && problemIndex >= 0;
 
   // Siblings: same problem solved in a different language or on a different platform
   const siblings = problemList.filter((p) => {
@@ -461,10 +461,10 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
           <div class="flex items-center gap-2 px-5 pt-3 shrink-0 flex-wrap">
             <span class="text-[10px] uppercase tracking-wider text-slate-600 shrink-0">Also solved as</span>
             ${siblings.map(sib => {
-              const sibMeta = PLATFORM_META[sib.platform] || { label: sib.platform || "?", favicon: null };
-              const sibLang = sib.lang?.name || sib.language || "?";
-              const isSamePlatform = sib.platform === problem.platform;
-              return html`
+    const sibMeta = PLATFORM_META[sib.platform] || { label: sib.platform || "?", favicon: null };
+    const sibLang = sib.lang?.name || sib.language || "?";
+    const isSamePlatform = sib.platform === problem.platform;
+    return html`
                 <button
                   onClick=${() => onNavigateProblem?.(sib)}
                   class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 hover:border-white/20 transition-colors"
@@ -476,7 +476,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
                   <span class="font-mono text-cyan-400/80">${sibLang}</span>
                 </button>
               `;
-            })}
+  })}
           </div>
         ` : ""}
 
@@ -497,31 +497,31 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
         <!-- ── Tab content ── -->
         <div class="flex-1 overflow-y-auto p-5 min-h-0">
           ${(() => {
-            const renderer = modalTabRegistry.getRenderer(problem.platform || "leetcode", activeTab);
-            if (!renderer) return html`<p class="text-slate-500 text-sm">No content.</p>`;
-            const onClearChat = async () => {
-              setChatMessages([]);
-              setChatError("");
-              if (chatId) {
-                await updateAIChat(chatId, [], {
-                  problemTitle: problem.title || "",
-                  problemTags: Array.isArray(problem.tags) ? problem.tags : [],
-                  attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
-                  attachedProblems: problem.titleSlug ? [{ slug: problem.titleSlug, title: problem.title || problem.titleSlug, platform: problem.platform || "leetcode", url: problemUrl }] : [],
-                  surface: "problem-modal", requestType: "", usedCommands: [], requestTemplate: "",
-                }).catch(() => {});
-              }
-            };
-            const ctx = {
-              html, isExtension, onClose, onUpdate, onDelete,
-              refreshing, handleRefreshData, problemUrl, meta,
-              langName, copied, copyCode,
-              chatMessages, chatInput, setChatInput, sendChat, chatPending, chatError,
-              AIMarkdownRenderer, MultiLineAIChatInput, ModelStatusBar, openAIChatsView, onClearChat, chatId,
-              settings,
-            };
-            return renderer(problem, ctx);
-          })()}
+      const renderer = modalTabRegistry.getRenderer(problem.platform || "leetcode", activeTab);
+      if (!renderer) return html`<p class="text-slate-500 text-sm">No content.</p>`;
+      const onClearChat = async () => {
+        setChatMessages([]);
+        setChatError("");
+        if (chatId) {
+          await updateAIChat(chatId, [], {
+            problemTitle: problem.title || "",
+            problemTags: Array.isArray(problem.tags) ? problem.tags : [],
+            attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
+            attachedProblems: problem.titleSlug ? [{ slug: problem.titleSlug, title: problem.title || problem.titleSlug, platform: problem.platform || "leetcode", url: problemUrl }] : [],
+            surface: "problem-modal", requestType: "", usedCommands: [], requestTemplate: "",
+          }).catch(() => { });
+        }
+      };
+      const ctx = {
+        html, isExtension, onClose, onUpdate, onDelete,
+        refreshing, handleRefreshData, problemUrl, meta,
+        langName, copied, copyCode,
+        chatMessages, chatInput, setChatInput, sendChat, chatPending, chatError,
+        AIMarkdownRenderer, MultiLineAIChatInput, ModelStatusBar, openAIChatsView, onClearChat, chatId,
+        settings,
+      };
+      return renderer(problem, ctx);
+    })()}
         </div>
 
         <!-- ── Footer ── -->
@@ -546,20 +546,20 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
 // ── EditTab sub-component — manages its own edit/delete state ───────────────
 
 function EditTab({ problem, onUpdate, onDelete, onClose }) {
-  const [title, setTitle]           = useState(problem.title || "");
+  const [title, setTitle] = useState(problem.title || "");
   const [difficulty, setDifficulty] = useState(problem.difficulty || "Unknown");
-  const [tags, setTags]             = useState(() => {
+  const [tags, setTags] = useState(() => {
     const t = Array.isArray(problem.tags) && problem.tags.length > 0
       ? problem.tags.join(", ")
       : problem.topic && problem.topic !== "Untagged" ? problem.topic : "";
     return t;
   });
-  const [notes, setNotes]           = useState(problem.notes || "");
-  const [saving, setSaving]         = useState(false);
-  const [saved, setSaved]           = useState(false);
-  const [error, setError]           = useState("");
+  const [notes, setNotes] = useState(problem.notes || "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting]     = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const save = async () => {
     setSaving(true); setError("");
@@ -579,7 +579,7 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
       const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
       const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
       const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
-      if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => {});
+      if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => { });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
       onUpdate?.(updated);
@@ -610,7 +610,7 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
         <label class="text-[11px] uppercase tracking-wider text-slate-500">Difficulty</label>
         <select value=${difficulty} onChange=${e => setDifficulty(e.target.value)}
           class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
-          ${["Easy","Medium","Hard","Unknown"].map(d => html`<option value=${d}>${d}</option>`)}
+          ${["Easy", "Medium", "Hard", "Unknown"].map(d => html`<option value=${d}>${d}</option>`)}
         </select>
       </div>
 
@@ -627,13 +627,13 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
         <span class="text-[10px] uppercase tracking-wider text-slate-500">Metadata</span>
         <div class="grid grid-cols-3 gap-2 text-xs">
           ${[
-            ["Platform", problem.platform],
-            ["Language", problem.lang?.name],
-            ["Runtime", problem.runtime],
-            ["Memory", problem.memory],
-            ["Accept Rate", problem.acRate ? (typeof problem.acRate === "number" ? problem.acRate.toFixed(1) : problem.acRate) + "%" : null],
-            ["Solved", problem.timestamp ? new Date(problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp).toLocaleDateString() : null],
-          ].map(([label, val]) => val ? html`
+      ["Platform", problem.platform],
+      ["Language", problem.lang?.name],
+      ["Runtime", problem.runtime],
+      ["Memory", problem.memory],
+      ["Accept Rate", problem.acRate ? (typeof problem.acRate === "number" ? problem.acRate.toFixed(1) : problem.acRate) + "%" : null],
+      ["Solved", problem.timestamp ? new Date(problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp).toLocaleDateString() : null],
+    ].map(([label, val]) => val ? html`
             <div class="bg-white/3 rounded p-2">
               <span class="text-slate-500 text-[10px]">${label}</span>
               <p class="text-slate-300 mt-0.5">${val}</p>

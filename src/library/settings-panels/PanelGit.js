@@ -102,6 +102,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
     setImportMsg("");
     try {
       const git   = registry.getGitProvider(settings.gitProvider || "github");
+      if (!git) { setImportMsg("Git provider not available. Try reloading."); setImporting(false); return; }
       const token = await git.getToken();
       const owner = settings.github_owner || settings.github_username || "";
       const repo  = settings.github_repo  || settings.gitRepo         || "";

@@ -111,29 +111,6 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
         <p class="text-xs text-slate-500 mb-4">Developer tools, diagnostics, and maintenance operations.</p>
       </div>
 
-      <!-- LeetCode QoL -->
-      <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
-        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">LeetCode Quality-of-Life</h3>
-        <${ToggleRow}
-          settingKey="qolEnabled"
-          label="Copy / Paste buttons"
-          desc="Injects Copy and Paste buttons into the LeetCode editor toolbar (no auto-indent on paste)."
-          defaultOn=${true}
-        />
-        <${ToggleRow}
-          settingKey="floatingTimerEnabled"
-          label="Floating solve timer"
-          desc="Shows a draggable stopwatch that records how long you spend on each problem."
-          defaultOn=${true}
-        />
-        <${ToggleRow}
-          settingKey="floatingAIEnabled"
-          label="Floating AI assistant"
-          desc="Shows the AI chat bubble on LeetCode, GeeksForGeeks, and Codeforces problem pages."
-          defaultOn=${true}
-        />
-      </div>
-
       <!-- Tracking & privacy -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Tracking & Privacy</h3>

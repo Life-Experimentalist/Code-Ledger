@@ -143,37 +143,53 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                 <div class="pt-1 border-t border-white/5 space-y-3">
                   <p class="text-[11px] text-slate-500 uppercase tracking-widest font-medium">LeetCode Settings</p>
 
-                  <label class="flex items-start gap-3 cursor-pointer">
-                    <div class="flex-1">
-                      <p class="text-xs text-slate-300">Submission polling</p>
-                      <p class="text-[10px] text-slate-600">Poll for accepted verdict after you click Submit (catches submissions that don't trigger the solve event).</p>
-                    </div>
-                    <button
-                      onClick=${() => onSettingsChange("leetcode_submission_poll", settings?.leetcode_submission_poll !== false ? false : true)}
-                      class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-                        ${settings?.leetcode_submission_poll !== false ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
-                    >
-                      <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
-                        ${settings?.leetcode_submission_poll !== false ? "translate-x-4" : "translate-x-0.5"}">
-                      </span>
-                    </button>
-                  </label>
+                  ${[
+                    { key: "leetcode_submission_poll", label: "Submission polling", desc: "Poll for accepted verdict after you click Submit (catches submissions that don't trigger the solve event)." },
+                    { key: "notifications", label: "Notifications on commit", desc: "Show a browser notification each time a solution is committed." },
+                  ].map(({ key, label, desc }) => html`
+                    <label key=${key} class="flex items-start gap-3 cursor-pointer">
+                      <div class="flex-1">
+                        <p class="text-xs text-slate-300">${label}</p>
+                        <p class="text-[10px] text-slate-600">${desc}</p>
+                      </div>
+                      <button
+                        onClick=${() => onSettingsChange(key, settings?.[key] !== false ? false : true)}
+                        class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
+                          ${settings?.[key] !== false ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
+                      >
+                        <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
+                          ${settings?.[key] !== false ? "translate-x-4" : "translate-x-0.5"}">
+                        </span>
+                      </button>
+                    </label>
+                  `)}
+                </div>
 
-                  <label class="flex items-start gap-3 cursor-pointer">
-                    <div class="flex-1">
-                      <p class="text-xs text-slate-300">Notifications on commit</p>
-                      <p class="text-[10px] text-slate-600">Show a browser notification each time a solution is committed.</p>
-                    </div>
-                    <button
-                      onClick=${() => onSettingsChange("notifications", settings?.notifications !== false ? false : true)}
-                      class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-                        ${settings?.notifications !== false ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
-                    >
-                      <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
-                        ${settings?.notifications !== false ? "translate-x-4" : "translate-x-0.5"}">
-                      </span>
-                    </button>
-                  </label>
+                <div class="pt-1 border-t border-white/5 space-y-3">
+                  <p class="text-[11px] text-slate-500 uppercase tracking-widest font-medium">Quality of Life</p>
+
+                  ${[
+                    { key: "leetcode_copy_btn", label: "Copy code button", desc: "Adds a copy button to the editor toolbar that copies your code cleanly (strips Monaco whitespace markers)." },
+                    { key: "leetcode_paste_btn", label: "Paste without auto-indent button", desc: "Adds a paste button that bypasses Monaco's auto-indentation for clean clipboard pastes." },
+                    { key: "floatingTimerEnabled", label: "Floating solve timer", desc: "Shows a draggable stopwatch that records how long you spend on each problem.", defaultOn: true },
+                    { key: "floatingAIEnabled", label: "Floating AI assistant", desc: "Shows the AI chat panel on problem pages.", defaultOn: true },
+                  ].map(({ key, label, desc, defaultOn = true }) => html`
+                    <label key=${key} class="flex items-start gap-3 cursor-pointer">
+                      <div class="flex-1">
+                        <p class="text-xs text-slate-300">${label}</p>
+                        <p class="text-[10px] text-slate-600">${desc}</p>
+                      </div>
+                      <button
+                        onClick=${() => onSettingsChange(key, settings?.[key] !== undefined ? !settings[key] : !defaultOn)}
+                        class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
+                          ${(settings?.[key] !== undefined ? !!settings[key] : defaultOn) ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
+                      >
+                        <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
+                          ${(settings?.[key] !== undefined ? !!settings[key] : defaultOn) ? "translate-x-4" : "translate-x-0.5"}">
+                        </span>
+                      </button>
+                    </label>
+                  `)}
                 </div>
               `}
             `}

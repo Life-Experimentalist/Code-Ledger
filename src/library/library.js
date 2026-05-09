@@ -10,6 +10,7 @@ const html = htm.bind(h);
 
 import { Storage } from "../core/storage.js";
 import { CONSTANTS } from "../core/constants.js";
+import { initDebug, setDebug } from "../lib/debug.js";
 import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
 import { getQueryParam, updateQueryParams } from "../core/url-state.js";
 import { initializeHandlers } from "../handlers/init.js";
@@ -25,6 +26,7 @@ import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js
 import { DuplicateDetectionModal, findDuplicates } from "./components/DuplicateDetectionModal.js";
 
 initializeHandlers();
+initDebug().catch(() => {});
 
 // Apply saved theme before first render so there's no flash of default styles
 applyThemeFromStorage().catch(() => {});
@@ -302,6 +304,7 @@ function LibraryApp() {
         await Storage.setSettings(next);
         if (key === "debugMode") {
           await Storage.setDebugEnabled(value);
+          setDebug(value); // update live state in this page without reload
         }
       } catch (e) {
         // noop
