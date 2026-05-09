@@ -269,7 +269,7 @@ Be concise. Max 200 words.`;
       if (this._aiPanel && this._aiPanelSlug === slug) return;
       this._stopAIPanel();
       this._aiPanelSlug = slug;
-      this._aiPanel = createFloatingAI(slug, { position: { bottom: "70px", right: "20px" } });
+      this._aiPanel = createFloatingAI(slug, { position: { bottom: "110px", right: "20px" } });
     }).catch(() => { });
   }
 
@@ -837,38 +837,64 @@ Be concise. Max 200 words.`;
       // ── Phase 5: Send all problems as one atomic BULK_IMPORT to avoid concurrent write races ──
       show(`Importing ${picks.length} submissions…`);
 
+      const settings = await Storage.getSettings();
       const bulkProblems = picks.map((sub) => {
-        const lang = resolveLang(sub.lang || sub.langName);
-        const tags = tagsMap[sub.titleSlug] || [];
-        const topic = resolvePrimaryTopic(tags);
-        const title = titleMap[sub.titleSlug] || sub.title || sub.titleSlug;
+        const lang    = resolveLang(sub.lang || sub.langName);
+        const tags    = tagsMap[sub.titleSlug] || [];
+        const topic   = resolvePrimaryTopic(tags);
+        const title   = titleMap[sub.titleSlug] || sub.title || sub.titleSlug;
+        const difficulty = diffMap[sub.titleSlug] || "Unknown";
+        const canonical  = null; // bulk import has no canonical mapping
+
         const files = [];
         if (sub.code) {
-          const base = `topics/${topic}/${sub.titleSlug}/`;
-          files.push({ path: `${base}${lang.verbose.replace(/\s+/g, "_")}.${lang.ext}`, content: sub.code });
+          files.push({
+            path:    solutionPath(sub.titleSlug, "leetcode", lang, canonical, settings),
+            content: sub.code,
+          });
         }
+
+        const readmeContent = (descMap[sub.titleSlug] || sub.code)
+          ? this._buildBulkReadme(sub, {
+              title,
+              difficulty,
+              tags,
+              acRate:   acRateMap[sub.titleSlug] ?? null,
+              similar:  similarMap[sub.titleSlug] || [],
+              descHtml: descMap[sub.titleSlug] || null,
+            })
+          : null;
+
+        if (readmeContent) {
+          files.push({
+            path:    readmePath(sub.titleSlug, canonical, settings),
+            content: readmeContent,
+          });
+        }
+
         return {
-          id: `${sub.titleSlug}::${lang.slug}`,
-          submissionId: sub.id || null,
-          platform: "leetcode",
+          id:             `${sub.titleSlug}::${lang.slug}`,
+          submissionId:   sub.id || null,
+          platform:       "leetcode",
           title,
-          titleSlug: sub.titleSlug,
-          difficulty: diffMap[sub.titleSlug] || "Unknown",
-          lang: { name: lang.verbose, ext: lang.ext, slug: lang.slug },
+          titleSlug:      sub.titleSlug,
+          difficulty,
+          lang:           { name: lang.verbose, ext: lang.ext, slug: lang.slug },
           tags,
           topic,
-          code: sub.code || "",
+          code:           sub.code || "",
+          readmeContent:  readmeContent || null,
           files,
-          timestamp: sub.timestamp,
-          runtime: sub.runtime || null,
-          memory: sub.memory || null,
-          runtimePct: sub.runtimePct || null,
-          memoryPct: sub.memoryPct || null,
+          timestamp:      sub.timestamp,
+          runtime:        sub.runtime || null,
+          memory:         sub.memory  || null,
+          runtimePct:     sub.runtimePct  || null,
+          memoryPct:      sub.memoryPct   || null,
           problemStatement: descMap[sub.titleSlug] || null,
-          hints: hintsMap[sub.titleSlug] || null,
-          acRate: acRateMap[sub.titleSlug] ?? null,
-          similar: similarMap[sub.titleSlug] || null,
-          hasSimilar: (similarMap[sub.titleSlug]?.length > 0) || null,
+          hints:          hintsMap[sub.titleSlug] || null,
+          acRate:         acRateMap[sub.titleSlug] ?? null,
+          similar:        similarMap[sub.titleSlug] || null,
+          hasSimilar:     (similarMap[sub.titleSlug]?.length > 0) || null,
         };
       });
 
@@ -877,10 +903,50 @@ Be concise. Max 200 words.`;
       });
       const imported = result.saved ?? bulkProblems.length;
 
-      show(`Done! Imported ${imported} submissions. Use "Sync to GitHub" to commit them.`);
+      show(`Done! Imported ${imported} submissions.`);
       btn.textContent = `✓ Imported ${imported} solves`;
       btn.style.color = "#34d399";
       btn.style.borderColor = "rgba(52,211,153,0.4)";
+
+      if (imported > 0) {
+        const commitBtn = document.createElement("button");
+        commitBtn.style.cssText =
+          "display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;" +
+          "font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:8px;" +
+          "border:1px solid rgba(6,182,212,0.4);color:#67e8f9;background:rgba(6,182,212,0.08);transition:background 0.2s;";
+        commitBtn.innerHTML =
+          `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg>` +
+          ` Commit ${imported} to GitHub`;
+        commitBtn.onmouseenter = () => { commitBtn.style.background = "rgba(6,182,212,0.18)"; };
+        commitBtn.onmouseleave = () => { commitBtn.style.background = "rgba(6,182,212,0.08)"; };
+        commitBtn.addEventListener("click", async () => {
+          commitBtn.disabled = true;
+          commitBtn.textContent = "⏳ Committing…";
+          show("Committing to GitHub…");
+          try {
+            const result = await new Promise((resolve) => {
+              runtime.sendMessage({
+                type: "RESYNC_ALL",
+                mode: "bulk",
+                commitType: "comprehensive-update",
+              }, (res) => resolve(res || {}));
+            });
+            if (result.ok) {
+              show(`✓ Committed ${result.committed ?? imported} problems to GitHub.`);
+              commitBtn.textContent = `✓ Committed ${result.committed ?? imported}`;
+              commitBtn.style.color = "#34d399";
+            } else {
+              throw new Error(result.error || "Unknown error");
+            }
+          } catch (e) {
+            dbg.error("Bulk commit failed", e);
+            show(`Commit failed: ${e.message}`);
+            commitBtn.textContent = "↺ Retry";
+            commitBtn.disabled = false;
+          }
+        });
+        btn.parentElement?.appendChild(commitBtn);
+      }
     } catch (e) {
       dbg.error("Profile import failed", e);
       show(`Import failed: ${e.message}`);
@@ -1117,6 +1183,7 @@ Be concise. Max 200 words.`;
       eventBus.emit("problem:solved", {
         platform: "leetcode",
         id: `${slug}::${lang.slug}`,
+        forceCommit: isManual,
         submissionId: submission.id || null,
         title: meta?.title || submission.question?.title || slug,
         titleSlug: slug,
@@ -1236,6 +1303,48 @@ Be concise. Max 200 words.`;
       ...similar.map(q => `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`),
       "",
     ].join("\n");
+  }
+
+  /** Build a README.md string for a bulk-imported problem. */
+  _buildBulkReadme(sub, { title, difficulty, tags, acRate, similar, descHtml }) {
+    const tagStr  = tags.length ? tags.map(t => `\`${t}\``).join(", ") : "—";
+    const simList = (similar || []).filter(q => !q.isPaidOnly).slice(0, 5);
+    const parts   = [
+      `# ${title}`,
+      "",
+      `**Difficulty:** ${difficulty || "?"}  |  **Acceptance:** ${acRate != null ? acRate.toFixed(1) + "%" : "?"}`,
+      "",
+      `**Tags:** ${tagStr}`,
+      "",
+    ];
+    if (descHtml) {
+      parts.push(
+        "## Problem",
+        "",
+        descHtml
+          .replace(/<[^>]+>/g, "")
+          .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+          .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+          .replace(/\n{3,}/g, "\n\n")
+          .trim(),
+        "",
+      );
+    }
+    if (sub.runtime || sub.memory) {
+      const perf = [];
+      if (sub.runtime) perf.push(`Runtime: ${sub.runtime}`);
+      if (sub.memory)  perf.push(`Memory: ${sub.memory}`);
+      parts.push("## My Submission", "", ...perf.map(p => `- ${p}`), "");
+    }
+    if (simList.length) {
+      parts.push(
+        "## Similar Problems",
+        "",
+        ...simList.map(q => `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`),
+        "",
+      );
+    }
+    return parts.join("\n");
   }
 
   /* ── GraphQL + metadata ──────────────────────────────────────────── */
