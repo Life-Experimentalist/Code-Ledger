@@ -68,7 +68,7 @@ export function ConflictResolutionModal({ conflicts, remoteOnly = [], onResolve,
             const diffs = diffSummary(c.local, c.remote);
             const choice = choices[i];
             return html`
-              <div key=${c.local.id || i} class="border border-white/8 rounded-xl overflow-hidden">
+              <div key=${c.local.id || i} class="border border-white/10 rounded-xl overflow-hidden">
                 <div class="px-4 py-2.5 bg-white/[0.02] flex items-center justify-between">
                   <span class="text-sm font-medium text-slate-200">${c.local.title || c.local.id}</span>
                   <span class="text-[10px] text-slate-500">differs: ${diffs.join(", ") || "timestamps only"}</span>
@@ -89,7 +89,7 @@ export function ConflictResolutionModal({ conflicts, remoteOnly = [], onResolve,
                         <div class="text-[11px] text-slate-400 space-y-0.5">
                           <div>${p.difficulty || "?"} · ${p.lang?.name || "?"}</div>
                           <div class="text-slate-600">${new Date(p.timestamp || 0).toLocaleDateString()}</div>
-                          ${p.code ? html`<div class="font-mono text-[10px] text-slate-600 truncate max-w-[220px]">${p.code.slice(0, 60)}…</div>` : ""}
+                          ${p.code ? html`<div class="font-mono text-[10px] text-slate-600 truncate max-w-[220px]">${p.code.slice(0, 60)}${p.code.length > 60 ? "…" : ""}</div>` : ""}
                         </div>
                       </button>
                     `;
