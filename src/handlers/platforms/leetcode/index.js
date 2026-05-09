@@ -71,6 +71,9 @@ export class LeetCodeHandler extends BasePlatformHandler {
     this._aiPanel = null;
     this._aiPanelSlug = null;
     this._submissionPollTimer = null;
+    this._syncBtnObserver = null;
+    this._submitHookObserver = null;
+    this._resultPollTimer = null;
     // Wire native timer reader into the shared PlatformTimer instance
     this._timer.getNativeElapsed = () => this._getElapsedSeconds();
     registerPlatformPrompt("leetcode", this.getDefaultPrompt());
@@ -161,6 +164,7 @@ Be concise. Max 200 words.`;
     dbg.log("LeetCode handler active on", window.location.pathname);
     this._setupMutationObserver();
     this._setupSyncButtons();
+    this._setupSubmitHook();
     await this._handlePageSpecific();
   }
 
@@ -310,18 +314,14 @@ Be concise. Max 200 words.`;
     let lastPath = window.location.pathname;
 
     this.mutationObserver = new MutationObserver(() => {
-      // Detect SPA navigation
       const currentPath = window.location.pathname;
       if (currentPath !== lastPath) {
         lastPath = currentPath;
         this._onNavigate(currentPath);
       }
-
-      // Debounce submission check — 600ms lets result banners settle without missing them
-      clearTimeout(_debounceTimer);
-      _debounceTimer = setTimeout(() => this._checkSubmission(), 600);
     });
-    this.mutationObserver.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
+    // childList + subtree is enough to catch SPA route changes; no need for characterData/attributes
+    this.mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   /** Called when LeetCode SPA navigates to a new page. */
@@ -333,6 +333,7 @@ Be concise. Max 200 words.`;
 
     // Re-inject QoL on problem pages
     if (page.type === PAGE_TYPES.PROBLEM) {
+      this._setupSubmitHook(); // re-hook after React re-renders the submit button
       Storage.getSettings().then((s) => {
         if (s.qolEnabled !== false) {
           import("./qol.js").then(({ resetQoL }) => resetQoL()).catch(() => { });
@@ -395,6 +396,7 @@ Be concise. Max 200 words.`;
     }
     // Hide both buttons on other pages
     else {
+      if (this._syncBtnObserver) { this._syncBtnObserver.disconnect(); this._syncBtnObserver = null; }
       if (detailSyncBtn) detailSyncBtn.remove();
       if (listSyncBtn) listSyncBtn.remove();
     }
@@ -403,27 +405,39 @@ Be concise. Max 200 words.`;
   _injectDetailSyncBtn(page) {
     if (document.getElementById("cl-sync-btn")) return;
 
-    // Find the submission-page action button row (contains "Back" / "Solution" buttons).
-    // Same approach as the LeetHub reference: .flex.flex-none.gap-2 excluding centered/space-between rows.
-    const btnRow =
-      document.querySelector(".flex.flex-none.gap-2:not(.justify-center):not(.justify-between)") ||
-      document.querySelector(".flex.gap-2:not(.justify-center):not(.justify-between)");
+    const findRow = () => {
+      const row =
+        document.querySelector(".flex.flex-none.gap-2:not(.justify-center):not(.justify-between)") ||
+        document.querySelector(".flex.gap-2:not(.justify-center):not(.justify-between)");
+      return row && row.offsetParent ? row : null;
+    };
 
-    if (!btnRow || !btnRow.offsetParent) {
-      setTimeout(() => this._injectDetailSyncBtn(page), 1200);
-      return;
-    }
+    const inject = (row) => {
+      if (document.getElementById("cl-sync-btn")) return;
+      const btn = document.createElement("button");
+      btn.id = "cl-sync-btn";
+      btn.title = "Sync this submission to CodeLedger";
+      btn.className =
+        "group whitespace-nowrap focus:outline-none flex items-center justify-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors";
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`;
+      btn.addEventListener("click", () => this._manualSync(page, btn));
+      row.appendChild(btn);
+    };
 
-    if (document.getElementById("cl-sync-btn")) return;
+    const row = findRow();
+    if (row) { inject(row); return; }
 
-    const btn = document.createElement("button");
-    btn.id = "cl-sync-btn";
-    btn.title = "Sync this submission to CodeLedger";
-    btn.className =
-      "group whitespace-nowrap focus:outline-none flex items-center justify-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors";
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`;
-    btn.addEventListener("click", () => this._manualSync(page, btn));
-    btnRow.appendChild(btn);
+    // Button row not in DOM yet — watch for it immediately via MutationObserver
+    // instead of a fixed setTimeout so the button appears as soon as the row renders.
+    if (this._syncBtnObserver) this._syncBtnObserver.disconnect();
+    this._syncBtnObserver = new MutationObserver(() => {
+      const r = findRow();
+      if (!r) return;
+      this._syncBtnObserver.disconnect();
+      this._syncBtnObserver = null;
+      inject(r);
+    });
+    this._syncBtnObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   _injectSubmissionListSyncBtn(page) {
@@ -881,6 +895,100 @@ Be concise. Max 200 words.`;
     return match ? match[1] : "";
   }
 
+  /**
+   * Watch for the submit button to appear, then hook its click + Ctrl/Cmd+Enter.
+   * This mirrors the LeetHub reference approach: trigger result polling on submit,
+   * rather than passively scanning all DOM mutations for "Accepted" text.
+   */
+  _setupSubmitHook() {
+    if (this._submitHookObserver) {
+      this._submitHookObserver.disconnect();
+      this._submitHookObserver = null;
+    }
+
+    const hookBtn = (btn) => {
+      if (btn._clHooked) return;
+      btn._clHooked = true;
+      btn.addEventListener("click", () => this._onSubmitFired());
+    };
+
+    // Hook keyboard shortcut on the editor textarea (Ctrl+Enter / Cmd+Enter)
+    const hookKeyboard = () => {
+      const textarea = document.querySelector(
+        ".monaco-editor .inputarea.monaco-mouse-cursor-text"
+      );
+      if (textarea && !textarea._clHooked) {
+        textarea._clHooked = true;
+        textarea.addEventListener("keydown", (e) => {
+          const isMac = navigator.platform.toUpperCase().includes("MAC");
+          if (e.key === "Enter" && (isMac ? e.metaKey : e.ctrlKey)) {
+            this._onSubmitFired();
+          }
+        });
+      }
+    };
+
+    // Try to hook immediately (page may already be rendered)
+    const tryHook = () => {
+      const btn = document.querySelector('[data-e2e-locator="console-submit-button"]');
+      if (btn) hookBtn(btn);
+      hookKeyboard();
+    };
+    tryHook();
+
+    // Watch for button to appear (LeetCode renders it asynchronously)
+    this._submitHookObserver = new MutationObserver(() => tryHook());
+    this._submitHookObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  /** Called immediately after the user triggers a submission. */
+  _onSubmitFired() {
+    // Cancel any previous result poll
+    if (this._resultPollTimer) {
+      clearInterval(this._resultPollTimer);
+      this._resultPollTimer = null;
+    }
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 30; // 30 s timeout
+
+    this._resultPollTimer = setInterval(() => {
+      attempts++;
+      if (attempts > MAX_ATTEMPTS) {
+        clearInterval(this._resultPollTimer);
+        this._resultPollTimer = null;
+        return;
+      }
+
+      // Wait for the result element to appear (any result — WA, TLE, Accepted…)
+      const resultEl = document.querySelector('[data-e2e-locator="submission-result"]');
+      if (!resultEl) return;
+
+      // Result is visible — stop polling
+      clearInterval(this._resultPollTimer);
+      this._resultPollTimer = null;
+
+      // Only process accepted submissions
+      if (!/accepted/i.test(resultEl.textContent || "")) {
+        dbg.log("Submission result not Accepted — skipping", resultEl.textContent?.trim());
+        return;
+      }
+
+      dbg.log("Accepted result detected via submit hook");
+      const page = detectPage(window.location.pathname);
+      this._processSubmission(page, false).catch((e) => dbg.error("processSubmission failed", e));
+    }, 1000);
+  }
+
+  _getCodeFromMonaco() {
+    try {
+      const code = window.monaco?.editor?.getModels()?.[0]?.getValue();
+      return (typeof code === "string" && code.trim()) ? code : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /* ── Automatic submission detection ──────────────────────────────── */
   async _checkSubmission() {
     if (this._processingLock) return;
@@ -949,6 +1057,8 @@ Be concise. Max 200 words.`;
         const res = await this._gql(QUERIES.SUBMISSION_DETAIL, { submissionId: +page.submissionId });
         submission = res.data?.submissionDetails;
         slug = submission?.question?.titleSlug || slug;
+        // Auto-detection: skip non-accepted submissions (statusCode 10 = Accepted)
+        if (!isManual && submission?.statusCode !== 10) return;
       } else {
         // Problem page: find the latest accepted submission
         const listRes = await this._gql(QUERIES.SUBMISSION_LIST, {
@@ -969,6 +1079,12 @@ Be concise. Max 200 words.`;
         const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, { submissionId: +latest.id });
         submission = detailRes.data?.submissionDetails;
         if (!submission) return;
+
+        // Monaco has the live editor content — use it when GraphQL returns empty code
+        if (!submission.code) {
+          const monacoCode = this._getCodeFromMonaco();
+          if (monacoCode) submission = { ...submission, code: monacoCode };
+        }
 
         sessionStorage.setItem(dedupKey, String(latest.id));
       }

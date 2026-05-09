@@ -51,6 +51,7 @@ export const QUERIES = {
         code
         timestamp
         statusCode
+        notes
         lang {
           name
           verboseName

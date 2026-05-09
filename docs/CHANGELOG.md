@@ -6,6 +6,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.2.0] — 2026-05-10
+
+### Fixed
+- **LeetCode: non-accepted submissions could auto-sync** — submission detail pages now check `statusCode === 10` (Accepted) before auto-committing; WA / TLE / Runtime Error submissions are silently skipped. Manual "Sync to Ledger" still works on any submission.
+- **LeetCode: sync button appearance delay** — replaced the 1200 ms `setTimeout` retry with a `MutationObserver` that injects the button the instant the action button row enters the DOM; button now appears as soon as the page renders.
+- **LeetCode: Monaco code extraction** — added `_getCodeFromMonaco()` fallback (`window.monaco.editor.getModels()[0].getValue()`) for cases where GraphQL returns an empty code field.
+- **LeetCode: copy button only copied visible lines** — `qol.js` copy button now uses the Monaco model API as primary source, getting the full file regardless of scroll position; DOM `.view-line` scraping kept as fallback for edge cases.
+- **LeetCode: copy button produced dirty code** — both the copy button and `_getCodeFromMonaco()` now strip whitespace-visualization characters Monaco injects (`U+00B7` middle dot, `U+200C` ZWNJ, `U+00A0` NBSP) so clipboard output is clean, runnable code.
+- **Graph: scroll zoom snaps to min/max** — replaced binary 0.9/1.1 zoom step with `Math.exp(−deltaY × 0.001)`, making trackpad pinch-to-zoom smooth and proportional while keeping single mouse-wheel notch at ≈ 9.5 % per step.
+
+### Added
+- **Graph: zoom buttons** — `+` and `−` buttons in the toolbar for click-to-zoom (centered on canvas), grouped with the existing Fit view (▣) button.
+
+---
+
 ## [1.1.0] — 2026-05-07
 
 ### Added

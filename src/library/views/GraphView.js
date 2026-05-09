@@ -846,17 +846,33 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
     dragRef.current = null;
   }, []);
 
+  const zoomBy = useCallback((factor) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const { w, h } = getLogicalSize(canvas);
+    const mx = w / 2, my = h / 2;
+    const t = transformRef.current;
+    const clamped = Math.min(Math.max(t.scale * factor, 0.05), 5);
+    const actual = clamped / t.scale;
+    t.tx = mx + (t.tx - mx) * actual;
+    t.ty = my + (t.ty - my) * actual;
+    t.scale = clamped;
+  }, []);
+
   const onWheel = useCallback((e) => {
     e.preventDefault();
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    // Proportional zoom: deltaY magnitude drives factor so trackpad scrolls smoothly
+    // instead of snapping in 10% steps. exp(-0.001 * 100) ≈ 0.905 matches one mouse notch.
+    const raw = Math.max(-200, Math.min(200, e.deltaY));
+    const factor = Math.exp(-raw * 0.001);
     const t = transformRef.current;
-    t.tx = mx + (t.tx - mx) * delta;
-    t.ty = my + (t.ty - my) * delta;
-    t.scale = Math.min(Math.max(t.scale * delta, 0.05), 5);
+    t.tx = mx + (t.tx - mx) * factor;
+    t.ty = my + (t.ty - my) * factor;
+    t.scale = Math.min(Math.max(t.scale * factor, 0.05), 5);
   }, []);
 
   useEffect(() => {
@@ -1043,10 +1059,23 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
           <input type="checkbox" checked=${filterSolved} onChange=${(e) => setFilterSolved(e.target.checked)} />
           Solved only
         </label>
-        <button
-          onClick=${fitView}
-          class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-colors"
-        >▣ Fit view</button>
+        <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-0.5">
+          <button
+            onClick=${() => zoomBy(1.25)}
+            title="Zoom in"
+            class="text-xs px-2.5 py-1 rounded-md text-slate-300 hover:bg-white/10 transition-colors leading-none"
+          >+</button>
+          <button
+            onClick=${fitView}
+            title="Fit all nodes into view"
+            class="text-xs px-2.5 py-1 rounded-md text-slate-400 hover:bg-white/10 transition-colors"
+          >▣</button>
+          <button
+            onClick=${() => zoomBy(0.8)}
+            title="Zoom out"
+            class="text-xs px-2.5 py-1 rounded-md text-slate-300 hover:bg-white/10 transition-colors leading-none"
+          >−</button>
+        </div>
         <button
           onClick=${reLayout}
           class="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-colors"
@@ -1158,7 +1187,7 @@ export function GraphView({ problems, focusProblem = null, onFocusProblemHandled
       </div>
 
       <p class="text-[10px] text-slate-600 text-center">
-        Drag nodes · scroll to zoom · hover to preview · click to pin · layout modes above · ▣ Fit view · ↺ Re-layout
+        Drag nodes · scroll or +/− to zoom · ▣ fit view · hover to preview · click to pin · double-click drag to move a cluster
       </p>
 
       <${ProblemModal}

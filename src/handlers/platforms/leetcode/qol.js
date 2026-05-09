@@ -100,6 +100,10 @@ function findEditorToolbar() {
   );
 }
 
+function getEditorCode() {
+  return window.monaco?.editor?.getModels()?.[0]?.getValue() ?? "";
+}
+
 /** Build the copy SVG button element. */
 function makeCopyBtn() {
   const btn = document.createElement("button");
@@ -114,13 +118,7 @@ function makeCopyBtn() {
   </div>`;
 
   btn.onclick = async () => {
-    let code = "";
-    const lines = document.querySelectorAll(".view-line");
-    if (lines.length > 0) {
-      code = Array.from(lines).map((l) => l.textContent.replace(/ /g, " ")).join("\n");
-    } else {
-      code = document.querySelector(".monaco-editor")?.textContent || "";
-    }
+    const code = getEditorCode();
     if (!code) return;
 
     const orig = btn.innerHTML;
