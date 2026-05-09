@@ -62,6 +62,93 @@ async function _importData(file) {
   return data.problems.length;
 }
 
+function MigrationPanel() {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function _sendMsg(type, extra = {}) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type, ...extra }, (res) => resolve(res || {}));
+      } catch {
+        resolve({ ok: false, error: "Extension context unavailable." });
+      }
+    });
+  }
+
+  const doDetect = async () => {
+    setBusy(true);
+    setStatus("");
+    try {
+      const res = await _sendMsg("DETECT_LAYOUT_VERSION");
+      if (res.ok) {
+        setStatus(res.version == null
+          ? "No repo index found — nothing to detect yet."
+          : `Repo is on layout v${res.version}. Current: v2.`);
+      } else {
+        setStatus(`Detection failed: ${res.error}`);
+      }
+    } finally { setBusy(false); }
+  };
+
+  const doMigrate = async () => {
+    setBusy(true);
+    setStatus("Migrating repo layout… this may take a moment.");
+    try {
+      const res = await _sendMsg("MIGRATE_REPO");
+      if (res.ok) {
+        setStatus(`Migration complete: ${res.migrated} files updated, ${res.deleted} old files removed.`);
+      } else {
+        setStatus(`Migration failed: ${res.error}`);
+      }
+    } finally { setBusy(false); }
+  };
+
+  const doReset = async () => {
+    const confirmed = window.confirm(
+      "Full repo rebuild will re-commit ALL problems and delete any stray files.\n\nThis may take several minutes. Continue?"
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setStatus("Rebuilding repo from scratch… please wait.");
+    try {
+      const res = await _sendMsg("RESET_REPO");
+      if (res.ok) {
+        setStatus(`Rebuild complete: ${res.committed} files committed, ${res.deleted} stray files removed.`);
+      } else {
+        setStatus(`Rebuild failed: ${res.error}`);
+      }
+    } finally { setBusy(false); }
+  };
+
+  return html`
+    <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5">
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Repo Migration</h3>
+      <p class="text-[11px] text-slate-500 mb-4">
+        Migrate your GitHub repo to the current file layout, or do a full rebuild if things are broken.
+      </p>
+      <div class="flex flex-wrap gap-3 items-center">
+        <button
+          onClick=${doDetect}
+          disabled=${busy}
+          class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >Check layout version</button>
+        <button
+          onClick=${doMigrate}
+          disabled=${busy}
+          class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >${busy ? "Working…" : "Migrate to v2 layout"}</button>
+        <button
+          onClick=${doReset}
+          disabled=${busy}
+          class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 text-rose-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >Full rebuild (slow)</button>
+      </div>
+      ${status ? html`<p class="mt-3 text-xs ${status.includes("failed") || status.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">${status}</p>` : ""}
+    </div>
+  `;
+}
+
 function BackupRestorePanel() {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -946,6 +1033,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
           >
             ${section.icon ? html`<span>${section.icon}</span>` : ""}
             ${section.title || section.label}
+            ${section.underConstruction ? html`<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded">Under Construction</span>` : ""}
           </h3>
           ${isGitProvider
         ? html`
@@ -1528,7 +1616,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               <div class="space-y-6">
                 ${standardSections.map((section) => renderSection(section))}
                 ${activeTab === "git" ? html`<${BackupRestorePanel} /><${MirrorsPanel} />` : ""}
-                                ${activeTab === "git" ? html`<${MaintenancePanel} problems=${problems} />` : ""}
+                ${activeTab === "git" ? html`<${MigrationPanel} />` : ""}
+                ${activeTab === "git" ? html`<${MaintenancePanel} problems=${problems} />` : ""}
                 ${activeTab === "general" ? html`<${DifficultyMapPanel} />` : ""}
               </div>
             `}
