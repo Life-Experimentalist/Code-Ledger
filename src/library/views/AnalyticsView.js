@@ -221,8 +221,9 @@ export function AnalyticsView({ problems, onNavigate }) {
     return s;
   }, [problems, userMap]);
 
-  const openDrilldown = useCallback((label, filterFn) => {
-    setDrilldown({ label, problems: problems.filter(filterFn) });
+  const openDrilldown = useCallback((label, filterFn, sectionType) => {
+    setDrilldown({ label, problems: problems.filter(filterFn), sectionType });
+    if (sectionType) updateQueryParams({ section: sectionType, sectionFilter: label });
   }, [problems]);
 
   const handleDifficultyClick = useCallback((label) => {
@@ -230,20 +231,41 @@ export function AnalyticsView({ problems, onNavigate }) {
       const cat = mapDifficulty(p.difficulty, userMap);
       if (label === "Unknown") return !cat || cat === "Unknown";
       return cat === label;
-    });
+    }, "difficulty");
   }, [openDrilldown, userMap]);
 
   const handleLangClick = useCallback((label) => {
-    openDrilldown(label, (p) => normalizeLang(p.lang?.name || p.language || "") === label);
+    openDrilldown(label, (p) => normalizeLang(p.lang?.name || p.language || "") === label, "language");
   }, [openDrilldown]);
 
   const handlePlatformClick = useCallback((label) => {
-    openDrilldown(label, (p) => (PLATFORM_META[p.platform]?.name || p.platform) === label);
+    openDrilldown(label, (p) => (PLATFORM_META[p.platform]?.name || p.platform) === label, "platform");
   }, [openDrilldown]);
 
   const handleTopicClick = useCallback((topic) => {
-    openDrilldown(topic, (p) => (p.tags || []).includes(topic) || p.topic === topic);
+    openDrilldown(topic, (p) => (p.tags || []).includes(topic) || p.topic === topic, "topic");
   }, [openDrilldown]);
+
+  useEffect(() => {
+    if (!problems?.length) return;
+    const section = getQueryParam("section");
+    const sectionFilter = getQueryParam("sectionFilter");
+    if (!section || !sectionFilter) return;
+
+    if (section === "difficulty") {
+      openDrilldown(sectionFilter, (p) => {
+        const cat = mapDifficulty(p.difficulty, userMap);
+        if (sectionFilter === "Unknown") return !cat || cat === "Unknown";
+        return cat === sectionFilter;
+      });
+    } else if (section === "language") {
+      openDrilldown(sectionFilter, (p) => normalizeLang(p.lang?.name || p.language || "") === sectionFilter);
+    } else if (section === "platform") {
+      openDrilldown(sectionFilter, (p) => (PLATFORM_META[p.platform]?.name || p.platform) === sectionFilter);
+    } else if (section === "topic") {
+      openDrilldown(sectionFilter, (p) => (p.tags || []).includes(sectionFilter) || p.topic === sectionFilter);
+    }
+  }, [problems?.length]);
 
   const chartData = useMemo(() => {
     const sortedTopics = Object.entries(stats.topics).sort(
@@ -553,14 +575,28 @@ export function AnalyticsView({ problems, onNavigate }) {
       </div>
       <!-- Drilldown panel -->
       ${drilldown ? html`
-        <div class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick=${(e) => { if (e.target === e.currentTarget) setDrilldown(null); }}>
+        <div class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4" onClick=${(e) => { if (e.target === e.currentTarget) { setDrilldown(null); updateQueryParams({ section: null, sectionFilter: null }); } }}>
           <div class="bg-[#0d0d14] border border-white/10 rounded-2xl w-full max-w-lg max-h-[70vh] flex flex-col shadow-2xl">
             <div class="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
               <div class="flex flex-col">
                 <span class="text-sm font-bold text-white">${drilldown.label}</span>
                 <span class="text-[11px] text-slate-500">${drilldown.problems.length} problem${drilldown.problems.length !== 1 ? "s" : ""}</span>
               </div>
-              <button onClick=${() => setDrilldown(null)} class="text-slate-500 hover:text-white text-xl leading-none px-1">✕</button>
+              <div class="flex items-center gap-2">
+                ${drilldown.problems.length > 0 ? html`
+                  <button
+                    class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20 transition-colors"
+                    onClick=${() => {
+                      const first = drilldown.problems[0];
+                      setModalProblem(first);
+                      setModalProblemList(drilldown.problems);
+                      setDrilldown(null);
+                      updateQueryParams({ section: null, sectionFilter: null, problem: first?.id || first?.titleSlug });
+                    }}
+                  >Browse ←→</button>
+                ` : ""}
+                <button onClick=${() => { setDrilldown(null); updateQueryParams({ section: null, sectionFilter: null }); }} class="text-slate-500 hover:text-white text-xl leading-none px-1">✕</button>
+              </div>
             </div>
             <div class="overflow-y-auto flex-1 px-3 py-3 flex flex-col gap-1.5">
               ${drilldown.problems.length === 0
