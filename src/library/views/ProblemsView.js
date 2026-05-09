@@ -58,13 +58,13 @@ const SORT_OPTIONS = [
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
 
 export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblemDelete, settings, onOpenGraphProblem, onNavigate }) {
-  const [filterDifficulty, setFilterDifficulty] = useState("All");
-  const [filterPlatform, setFilterPlatform] = useState("All");
-  const [filterLanguage, setFilterLanguage] = useState("All");
-  const [filterTag, setFilterTag] = useState("All");
+  const [filterDifficulty, setFilterDifficulty] = useState(getQueryParam("difficulty", "All"));
+  const [filterPlatform, setFilterPlatform] = useState(getQueryParam("platform", "All"));
+  const [filterLanguage, setFilterLanguage] = useState(getQueryParam("language", "All"));
+  const [filterTag, setFilterTag] = useState(getQueryParam("tag", "All"));
   const [filterOverview, setFilterOverview] = useState("All");
-  const [query, setQuery] = useState(searchQuery || "");
-  const [sortBy, setSortBy] = useState("newest");
+  const [query, setQuery] = useState(searchQuery || getQueryParam("q", ""));
+  const [sortBy, setSortBy] = useState(getQueryParam("sort", "newest"));
   const [selectedProblem, setSelectedProblem] = useState(null);
 
   const handleProblemUpdate = (updated) => {
@@ -97,6 +97,16 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
   };
 
   useEffect(() => { setQuery(searchQuery || ""); }, [searchQuery]);
+
+  useEffect(() => {
+    updateQueryParams({
+      difficulty: filterDifficulty !== "All" ? filterDifficulty : null,
+      platform:   filterPlatform   !== "All" ? filterPlatform   : null,
+      language:   filterLanguage   !== "All" ? filterLanguage   : null,
+      tag:        filterTag        !== "All" ? filterTag        : null,
+      sort:       sortBy           !== "newest" ? sortBy        : null,
+    });
+  }, [filterDifficulty, filterPlatform, filterLanguage, filterTag, sortBy]);
 
   function tokenizeSearch(value) {
     const raw = String(value || "").trim();
