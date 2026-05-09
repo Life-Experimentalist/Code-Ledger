@@ -12,7 +12,7 @@ import { buildAIChatContext } from "../lib/ai-chat-context.js";
 import { parseMarkdown } from "./components/AIMarkdownRenderer.js";
 import { Storage } from "../core/storage.js";
 
-import { expandChatVariables, getUsedCommands } from "../lib/chat-variables.js";
+import { expandChatVariables, getUsedCommands, CHAT_COMMANDS } from "../lib/chat-variables.js";
 const DEFAULT_PLATFORM = {
   id: "leetcode",
   label: "AI Assistant",
@@ -260,10 +260,10 @@ export function createFloatingAI(slug = "", opts = {}) {
     flexShrink: "0",
   });
 
-  const input = document.createElement("input");
+  const input = document.createElement("textarea");
   input.id = "cl-ai-input";
-  input.type = "text";
-  input.placeholder = "Ask about complexity, approach…";
+  input.rows = 1;
+  input.placeholder = "Ask… (Enter to send, Shift+Enter for newline, / for commands)";
   Object.assign(input.style, {
     flex: "1",
     background: "rgba(255,255,255,0.05)",
@@ -273,9 +273,14 @@ export function createFloatingAI(slug = "", opts = {}) {
     fontSize: "12px",
     color: "#e2e8f0",
     minWidth: "0",
+    resize: "none",
+    overflow: "hidden",
+    lineHeight: "1.4",
+    maxHeight: "120px",
+    overflowY: "auto",
+    fontFamily: "inherit",
     transition: "border-color 0.15s",
   });
-  input.setAttribute("placeholder", "Ask about complexity, approach…");
 
   const sendBtn = document.createElement("button");
   sendBtn.id = "cl-ai-send";
@@ -291,6 +296,71 @@ export function createFloatingAI(slug = "", opts = {}) {
     flexShrink: "0",
     transition: "background 0.15s",
   });
+
+  // Command autocomplete dropdown
+  const autocompleteEl = document.createElement("div");
+  autocompleteEl.id = "cl-ai-autocomplete";
+  Object.assign(autocompleteEl.style, {
+    position: "absolute",
+    bottom: "100%",
+    left: "0",
+    right: "0",
+    marginBottom: "4px",
+    background: "rgba(10,10,20,0.97)",
+    border: "1px solid rgba(6,182,212,0.25)",
+    borderRadius: "10px",
+    boxShadow: "0 -8px 32px rgba(0,0,0,0.5)",
+    display: "none",
+    flexDirection: "column",
+    zIndex: "2",
+    maxHeight: "180px",
+    overflowY: "auto",
+  });
+  inputRow.style.position = "relative";
+  inputRow.insertBefore(autocompleteEl, input);
+
+  function showAutocomplete(query) {
+    const cmds = CHAT_COMMANDS.filter(c =>
+      !query || c.id.startsWith(query) || c.label?.toLowerCase().includes(query),
+    );
+    if (!cmds.length) { hideAutocomplete(); return; }
+    autocompleteEl.innerHTML = "";
+    cmds.forEach(cmd => {
+      const item = document.createElement("div");
+      Object.assign(item.style, {
+        padding: "6px 12px",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "baseline",
+        gap: "10px",
+        fontSize: "11px",
+        borderBottom: "1px solid rgba(255,255,255,0.04)",
+      });
+      item.innerHTML = `<span style="color:#06b6d4;font-family:monospace;font-weight:700;flex-shrink:0">/${cmd.id}</span><span style="color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cmd.description || cmd.label || ""}</span>`;
+      item.addEventListener("mouseenter", () => { item.style.background = "rgba(6,182,212,0.1)"; });
+      item.addEventListener("mouseleave", () => { item.style.background = ""; });
+      item.addEventListener("mousedown", e => {
+        e.preventDefault();
+        const val       = input.value;
+        const lastSlash = val.lastIndexOf("/");
+        input.value     = val.slice(0, lastSlash) + "/" + cmd.id + " ";
+        hideAutocomplete();
+        autoGrow();
+        input.focus();
+      });
+      autocompleteEl.appendChild(item);
+    });
+    autocompleteEl.style.display = "flex";
+  }
+
+  function hideAutocomplete() {
+    autocompleteEl.style.display = "none";
+  }
+
+  function autoGrow() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 120) + "px";
+  }
 
   inputRow.appendChild(input);
   inputRow.appendChild(sendBtn);
@@ -637,7 +707,7 @@ export function createFloatingAI(slug = "", opts = {}) {
 
     const code = (typeof platform.readEditorCode === "function" ? platform.readEditorCode({ slug, window, document }) : readEditorCode()) || "";
     const pageMeta = typeof platform.readPageMeta === "function" ? platform.readPageMeta({ slug, window, document }) : readPageMeta();
-    const errors = (typeof platform.readTestFailures === "function" ? platform.readTestFailures({ slug, window, document }) : readTestFailures()) || "";
+    const rawErrors = (typeof platform.readTestFailures === "function" ? platform.readTestFailures({ slug, window, document }) : readTestFailures()) || "";
     const baseContext = buildAIChatContext({
       surface: "floating-panel",
       text,
@@ -658,17 +728,17 @@ export function createFloatingAI(slug = "", opts = {}) {
       },
       attachedProblemSlugs: slug ? [slug] : [],
       attachedProblems: slug ? [{ slug, title: pageMeta.title || slug, platform: platform.chatPlatform || "leetcode", url: window.location.href }] : [],
-      errors,
+      errors: rawErrors,
     });
     const context = typeof platform.buildChatContext === "function"
-      ? platform.buildChatContext({ baseContext, text, pageMeta, code, errors, slug, window, document })
+      ? platform.buildChatContext({ baseContext, text, pageMeta, code, errors: rawErrors, slug, window, document })
       : baseContext;
 
     // Expand variables in the input (e.g., /mycode → code block)
     const expandedText = await expandChatVariables(text, {
       problem: context.problem || {},
       userCode: code || "",
-      errors: context.errors || "",
+      errors: rawErrors,  // raw string — bypass normalizeList in buildAIChatContext
       submission: context.submission || {},
       hints: context.hints || [],
       similar: context.similar || [],
@@ -681,6 +751,7 @@ export function createFloatingAI(slug = "", opts = {}) {
     const userMsg = { role: "user", content: expandedText };
     messages = [...messages, userMsg];
     input.value = "";
+    autoGrow();
     pending = true;
     sendBtn.disabled = true;
     renderMessages();
@@ -777,8 +848,27 @@ export function createFloatingAI(slug = "", opts = {}) {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      hideAutocomplete();
       sendMessage();
     }
+    if (e.key === "Escape") {
+      hideAutocomplete();
+    }
+  });
+
+  input.addEventListener("input", () => {
+    autoGrow();
+    const val   = input.value;
+    const match = val.match(/\/(\w*)$/);
+    if (match) {
+      showAutocomplete(match[1]);
+    } else {
+      hideAutocomplete();
+    }
+  });
+
+  input.addEventListener("blur", () => {
+    setTimeout(hideAutocomplete, 150);
   });
 
   // ── Drag support ────────────────────────────────────────────────────────────

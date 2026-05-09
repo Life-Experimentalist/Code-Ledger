@@ -95,11 +95,16 @@ export async function expandChatVariables(text, context = {}) {
         expanded = expanded.replace(/\/problem/g, problemText);
     }
 
-    // /errors → test case errors
+    // /errors → test failures (string from readTestFailures, or structured array)
     if (expanded.includes("/errors")) {
-        const errorText = errors?.length
-            ? `**Test Case Errors:**\n${errors.map((e) => `- ${e.testCase}: ${e.error}`).join("\n")}`
-            : "(no errors - all tests passed)";
+        let errorText;
+        if (typeof errors === "string" && errors.trim()) {
+            errorText = `**Test Failures:**\n${errors.trim()}`;
+        } else if (Array.isArray(errors) && errors.length > 0) {
+            errorText = `**Test Failures:**\n${errors.map(e => `- ${e.testCase || ""}: ${e.error || e}`).join("\n")}`;
+        } else {
+            errorText = "(no errors — all tests passed)";
+        }
         expanded = expanded.replace(/\/errors/g, errorText);
     }
 
