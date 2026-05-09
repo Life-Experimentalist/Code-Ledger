@@ -114,3 +114,54 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+x-extension-urls:
+  description: >
+    Browser extension internal URL params (library.html page, not HTTP endpoints).
+    All params use window.history.replaceState — no page reload occurs on change.
+  base: chrome-extension://{ext-id}/library/library.html
+  params:
+    tab:
+      values: [solutions, analytics, graph, ai-chats, canonical, settings, search]
+      description: Active top-level view
+    settingsTab:
+      values: [general, ai, git, platforms, backups, advanced]
+      description: Active settings panel tab (only when tab=settings)
+    problem:
+      format: "{platformCode}-{titleSlug}"
+      example: "lc-two-sum"
+      description: Open ProblemModal for this problem id
+    q:
+      description: Search query (solutions view)
+    difficulty:
+      values: [Easy, Medium, Hard]
+      description: Difficulty filter (solutions view)
+    platform:
+      values: [leetcode, geeksforgeeks, codeforces]
+      description: Platform filter (solutions view)
+    language:
+      description: Language filter, matches lang.name (solutions view)
+    sort:
+      values: [newest, oldest, diff-asc, diff-desc, title, platform, tags]
+      description: Sort order (solutions view)
+    tag:
+      description: Tag/topic filter (solutions view)
+    section:
+      values: [difficulty, language, platform, topic]
+      description: Open analytics drill-down panel (only when tab=analytics)
+    sectionFilter:
+      description: Value for the section filter, e.g. "Python" or "Hard"
+    graphLayout:
+      values: [layered, circular, force]
+      description: Graph layout mode (only when tab=graph)
+  examples:
+    - url: "library.html?tab=settings&settingsTab=git"
+      description: Open settings directly on the Git tab
+    - url: "library.html?tab=solutions&difficulty=Hard&platform=leetcode"
+      description: Solutions filtered to hard LeetCode problems
+    - url: "library.html?tab=solutions&problem=lc-two-sum"
+      description: Open Two Sum modal (LeetCode)
+    - url: "library.html?tab=analytics&section=language&sectionFilter=Python"
+      description: Analytics with Python drill-down panel open
+    - url: "library.html?tab=graph&graphLayout=force&problem=lc-two-sum"
+      description: Graph in force layout with Two Sum modal open
