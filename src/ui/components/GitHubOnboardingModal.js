@@ -9,6 +9,8 @@ import { htm } from "../../vendor/preact-bundle.js";
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
 import { getPagesHtml } from "../../handlers/git/github/pages-template.js";
+import { importFromRepo, applyImport } from "../../background/sync-engine.js";
+import { ConflictResolutionModal } from "../../library/components/ConflictResolutionModal.js";
 const html = htm.bind(h);
 const dbg = createDebugger("GitHubOnboarding");
 
@@ -56,6 +58,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   const [userRepos, setUserRepos] = useState([]);
   const [reposLoading, setReposLoading] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState("");
+  const [importData, setImportData] = useState(null); // { remoteOnly, conflicts }
 
   // On every open, decide which step to start from
   useEffect(() => {
@@ -228,6 +231,25 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
       await saveRepoConfig(repoData.owner.login, repoData.name);
       setFinalRepo(repoData.name);
+
+      // If repo has data, import it (mandatory)
+      if (Array.isArray(contents) && contents.some(f => f.name === "index.json")) {
+        setProgress("Reading existing problems from repository…");
+        try {
+          const { remoteOnly, conflicts } = await importFromRepo(repoData.owner.login, repoData.name, token);
+          if (conflicts.length > 0) {
+            setImportData({ remoteOnly, conflicts });
+            setBusy(false);
+            return;
+          }
+          await applyImport(remoteOnly);
+          setProgress(`Imported ${remoteOnly.length} problem${remoteOnly.length !== 1 ? "s" : ""} from repository`);
+        } catch (e) {
+          dbg.warn("Import failed during onboarding:", e.message);
+          // Non-fatal — continue to done
+        }
+      }
+
       setProgress("Repository linked!");
       setStep("done");
     } catch (e) {
@@ -261,6 +283,25 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   const canClose = !busy && step !== "check";
 
   return html`
+    ${importData ? html`
+      <${ConflictResolutionModal}
+        conflicts=${importData.conflicts}
+        remoteOnly=${importData.remoteOnly}
+        providerName="GitHub"
+        onResolve=${async (resolved) => {
+          setBusy(true);
+          await applyImport(resolved);
+          setImportData(null);
+          setProgress("Import complete!");
+          setStep("done");
+          setBusy(false);
+        }}
+        onCancel=${() => {
+          setImportData(null);
+          setStep("done");
+        }}
+      />
+    ` : ""}
     <div
       class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick=${(e) => e.target === e.currentTarget && canClose && onComplete()}
