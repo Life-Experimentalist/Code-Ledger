@@ -6,6 +6,7 @@
 import { h, useState } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
+import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 
 import { PanelGeneral } from "../settings-panels/PanelGeneral.js";
 import { PanelAI } from "../settings-panels/PanelAI.js";
@@ -24,7 +25,9 @@ const NAV_ITEMS = [
 ];
 
 export function SettingsPageView({ settings, onSettingsChange, onSetupRepo }) {
-  const [activePanel, setActivePanel] = useState("general");
+  const VALID_PANELS = new Set(["general", "ai", "git", "platforms", "backups", "advanced"]);
+  const initPanel = getQueryParam("settingsTab", "general");
+  const [activePanel, setActivePanel] = useState(VALID_PANELS.has(initPanel) ? initPanel : "general");
 
   function renderPanel() {
     const props = { settings, onSettingsChange, onSetupRepo };
@@ -46,7 +49,7 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo }) {
         ${NAV_ITEMS.map(({ id, emoji, label }) => html`
           <button
             key=${id}
-            onClick=${() => setActivePanel(id)}
+            onClick=${() => { setActivePanel(id); updateQueryParams({ settingsTab: id }); }}
             class="flex items-center gap-1.5 px-3 py-2.5 rounded-t-lg text-sm font-medium whitespace-nowrap transition-colors border-b-2
               ${activePanel === id
                 ? "border-cyan-500 text-cyan-200 bg-cyan-500/5"
