@@ -10,7 +10,7 @@
  * Convert a files array + optional deletes list into GitHub tree items.
  * Deletions are represented by sha:null as required by the Trees API.
  *
- * @param {Array<{path: string, content: string}>} files
+ * @param {Array<{path:string, content:string}>} files
  * @param {string[]} [deletes]
  * @returns {object[]} tree items ready for POST /git/trees
  */
@@ -32,21 +32,15 @@ export function buildTreeItems(files, deletes = []) {
 /**
  * Build the commit payload for POST /git/commits.
  *
- * @param {string} message
- * @param {string} treeSha
- * @param {string} parentSha
+ * @param {string} message       Commit message (may include co-author trailer)
+ * @param {string} treeSha       SHA of the new tree
+ * @param {string} parentSha     SHA of the parent commit
  * @param {object} [opts]
- * @param {Date|string|number} [opts.date] - backdating timestamp
- * @param {object} [user]  - { name, login, email } from getCurrentUser
- * @returns {object} commit payload
+ * @param {Date|string|number} [opts.date]  Backdate the author/committer timestamp
+ * @param {object} [user]        { name, login, email } from getCurrentUser
+ * @returns {object}             Payload for POST /git/commits
  */
-export function buildCommitPayload(
-    message,
-    treeSha,
-    parentSha,
-    opts = {},
-    user = {}
-) {
+export function buildCommitPayload(message, treeSha, parentSha, opts = {}, user = {}) {
     const payload = {
         message,
         tree: treeSha,
@@ -55,11 +49,9 @@ export function buildCommitPayload(
 
     if (opts.date) {
         const iso = new Date(opts.date).toISOString();
-        const authorName = user.name || user.login || "CodeLedger";
-        const authorEmail =
-            user.email ||
-            `${user.login || "codeledger"}@users.noreply.github.com`;
-        payload.author = { name: authorName, email: authorEmail, date: iso };
+        const name = user.name || user.login || "CodeLedger";
+        const email = user.email || `${user.login || "codeledger"}@users.noreply.github.com`;
+        payload.author = { name, email, date: iso };
         payload.committer = { ...payload.author };
     }
 
