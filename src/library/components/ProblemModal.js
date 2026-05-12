@@ -532,7 +532,7 @@ export function ProblemModal({
             dbg.log(
                 `Requesting AI review for problem ${problem.id || problem.titleSlug}`
             );
-            const TIMEOUT_MS = 45000;
+            const TIMEOUT_MS = 90000;
             const result = await new Promise((resolve, reject) => {
                 let settled = false;
                 const timer = setTimeout(() => {

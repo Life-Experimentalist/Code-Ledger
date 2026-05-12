@@ -342,8 +342,10 @@ async function generateAIReview(problem = {}, settings = null) {
         }
 
         try {
-            // Wrap review call with timeout to avoid hanging on slow providers
-            const TIMEOUT_MS = 45000;
+            // Wrap review call with timeout to avoid hanging on slow providers.
+            // Keep below the ProblemModal's 90s total timeout so the fallback
+            // chain has a chance to run if the first provider stalls.
+            const TIMEOUT_MS = 30000;
             dbg.log(
                 `generateAIReview(): calling ${providerId} with ${TIMEOUT_MS}ms timeout`
             );
@@ -1751,16 +1753,21 @@ async function handleRegenerateAIReview(problem = {}) {
     const updated = { ...problem, aiReview: review };
     await Storage.saveProblem(updated);
     dbg.log(`handleRegenerateAIReview(): saved review via ${providerId}`);
-    const commitResult = await commitUpdatedProblem(updated, settings);
-    dbg.log(
-        `handleRegenerateAIReview(): complete - committed=${commitResult?.committed || 0}`
-    );
-    return {
-        problem: updated,
-        review,
-        providerId,
-        committed: commitResult?.committed || 0,
-    };
+    // Commit asynchronously so the UI gets the review immediately without
+    // waiting for GitHub API round-trips.
+    commitUpdatedProblem(updated, settings)
+        .then((r) =>
+            dbg.log(
+                `handleRegenerateAIReview(): background commit done, committed=${r?.committed || 0}`
+            )
+        )
+        .catch((e) =>
+            dbg.warn(
+                `handleRegenerateAIReview(): background commit failed (non-fatal):`,
+                e?.message
+            )
+        );
+    return { problem: updated, review, providerId };
 }
 
 /**
