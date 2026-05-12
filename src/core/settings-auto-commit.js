@@ -44,7 +44,7 @@ export async function needsSettingsCommit() {
     try {
         const settings = await Storage.getSettings();
         const needs = settings[SETTINGS_COMMIT_KEY] === true;
-        dbg.log(`needsSettingsCommit(): ${needs ? 'yes' : 'no'}`);
+        dbg.log(`needsSettingsCommit(): ${needs ? "yes" : "no"}`);
         return needs;
     } catch (e) {
         return false;
@@ -102,14 +102,25 @@ export async function forceCommitSettingsNow() {
         if (!git) throw new Error("No git provider configured");
 
         const cfg = await getConfigFileForCommit();
-        if (!cfg) return { committed: false, message: "No pending settings to commit" };
+        if (!cfg)
+            return {
+                committed: false,
+                message: "No pending settings to commit",
+            };
 
-        const repo = (settings.github_repo || settings.gitRepo || CONSTANTS.DEFAULT_REPO_NAME).replace(/\s+/g, "-");
+        const repo = (
+            settings.github_repo ||
+            settings.gitRepo ||
+            CONSTANTS.DEFAULT_REPO_NAME
+        ).replace(/\s+/g, "-");
 
         await git.commit(
             [cfg],
-            buildCommitMessage(COMMIT_TYPES.MAINTENANCE, { detail: "settings: force commit", count: 1 }),
-            repo,
+            buildCommitMessage(COMMIT_TYPES.MAINTENANCE, {
+                detail: "settings: force commit",
+                count: 1,
+            }),
+            repo
         );
 
         await clearSettingsCommitFlag();
@@ -170,7 +181,7 @@ function _hashPortableSettings(settings) {
     const str = JSON.stringify(portable);
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash = (hash << 5) - hash + str.charCodeAt(i);
         hash |= 0;
     }
     return Math.abs(hash).toString(36);

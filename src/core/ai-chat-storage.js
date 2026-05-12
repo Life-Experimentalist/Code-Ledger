@@ -34,8 +34,13 @@ async function initDB() {
         request.onupgradeneeded = (e) => {
             const newDB = e.target.result;
             if (!newDB.objectStoreNames.contains(STORE_NAME)) {
-                const store = newDB.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
-                store.createIndex("problemSlug", "problemSlug", { unique: false });
+                const store = newDB.createObjectStore(STORE_NAME, {
+                    keyPath: "id",
+                    autoIncrement: true,
+                });
+                store.createIndex("problemSlug", "problemSlug", {
+                    unique: false,
+                });
                 store.createIndex("createdAt", "createdAt", { unique: false });
                 store.createIndex("updatedAt", "updatedAt", { unique: false });
             }
@@ -50,12 +55,20 @@ function normalizeChatRecord(record = {}) {
         platform: record.platform || "leetcode",
         messages: Array.isArray(record.messages) ? record.messages : [],
         problemTitle: record.problemTitle || "",
-        problemTags: Array.isArray(record.problemTags) ? record.problemTags : [],
-        attachedProblemSlugs: Array.isArray(record.attachedProblemSlugs) ? record.attachedProblemSlugs : [],
-        attachedProblems: Array.isArray(record.attachedProblems) ? record.attachedProblems : [],
+        problemTags: Array.isArray(record.problemTags)
+            ? record.problemTags
+            : [],
+        attachedProblemSlugs: Array.isArray(record.attachedProblemSlugs)
+            ? record.attachedProblemSlugs
+            : [],
+        attachedProblems: Array.isArray(record.attachedProblems)
+            ? record.attachedProblems
+            : [],
         surface: record.surface || "problem-modal",
         requestType: record.requestType || "",
-        usedCommands: Array.isArray(record.usedCommands) ? record.usedCommands : [],
+        usedCommands: Array.isArray(record.usedCommands)
+            ? record.usedCommands
+            : [],
         requestTemplate: record.requestTemplate || "",
         summary: record.summary || "",
         createdAt: record.createdAt || Date.now(),
@@ -68,8 +81,16 @@ function normalizeChatRecord(record = {}) {
  * The optional `meta` object lets callers centralize chats across the modal,
  * floating panel, and library view without duplicating storage logic.
  */
-export async function saveAIChat(problemSlug, problemURL, messages, platform = "leetcode", meta = {}) {
-    dbg.log(`saveAIChat(): ${platform} problem ${problemSlug} (${(messages || []).length} messages)`);
+export async function saveAIChat(
+    problemSlug,
+    problemURL,
+    messages,
+    platform = "leetcode",
+    meta = {}
+) {
+    dbg.log(
+        `saveAIChat(): ${platform} problem ${problemSlug} (${(messages || []).length} messages)`
+    );
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], "readwrite");
@@ -145,14 +166,24 @@ export async function getChatsByProblem(problemSlug) {
             scanRequest.onsuccess = () => {
                 const all = scanRequest.result || [];
                 all.forEach((chat) => {
-                    const attachments = Array.isArray(chat.attachedProblemSlugs) ? chat.attachedProblemSlugs : [];
-                    if (attachments.some((item) => String(item || "").toLowerCase() === slug)) {
-                        if (!attached.some((item) => item.id === chat.id)) attached.push(chat);
+                    const attachments = Array.isArray(chat.attachedProblemSlugs)
+                        ? chat.attachedProblemSlugs
+                        : [];
+                    if (
+                        attachments.some(
+                            (item) => String(item || "").toLowerCase() === slug
+                        )
+                    ) {
+                        if (!attached.some((item) => item.id === chat.id))
+                            attached.push(chat);
                     }
                 });
                 resolve(attached.sort((a, b) => b.createdAt - a.createdAt));
             };
-            scanRequest.onerror = () => resolve((primary || []).sort((a, b) => b.createdAt - a.createdAt));
+            scanRequest.onerror = () =>
+                resolve(
+                    (primary || []).sort((a, b) => b.createdAt - a.createdAt)
+                );
         };
     });
 }
@@ -191,7 +222,9 @@ export async function getAllChats() {
         const request = store.getAll();
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
-            resolve((request.result || []).sort((a, b) => b.createdAt - a.createdAt));
+            resolve(
+                (request.result || []).sort((a, b) => b.createdAt - a.createdAt)
+            );
         };
     });
 }
@@ -205,17 +238,57 @@ export async function searchChats(query) {
     const allChats = await getAllChats();
     const lowerQuery = query.toLowerCase();
     return allChats.filter((chat) => {
-        const matchesURL = String(chat.problemURL || "").toLowerCase().includes(lowerQuery);
-        const matchesSlug = String(chat.problemSlug || "").toLowerCase().includes(lowerQuery);
-        const matchesTitle = String(chat.problemTitle || "").toLowerCase().includes(lowerQuery);
-        const matchesTag = (chat.problemTags || []).some((tag) => String(tag || "").toLowerCase().includes(lowerQuery));
-        const matchesAttachment = (chat.attachedProblemSlugs || []).some((slug) => String(slug || "").toLowerCase().includes(lowerQuery));
-        const matchesMessage = (chat.messages || []).some((m) => String(m.content || "").toLowerCase().includes(lowerQuery));
-        const matchesSurface = String(chat.surface || "").toLowerCase().includes(lowerQuery);
-        const matchesRequestType = String(chat.requestType || "").toLowerCase().includes(lowerQuery);
-        const matchesTemplate = String(chat.requestTemplate || "").toLowerCase().includes(lowerQuery);
-        const matchesCommands = (chat.usedCommands || []).some((command) => String(command || "").toLowerCase().includes(lowerQuery));
-        return matchesURL || matchesSlug || matchesTitle || matchesTag || matchesAttachment || matchesMessage || matchesSurface || matchesRequestType || matchesTemplate || matchesCommands;
+        const matchesURL = String(chat.problemURL || "")
+            .toLowerCase()
+            .includes(lowerQuery);
+        const matchesSlug = String(chat.problemSlug || "")
+            .toLowerCase()
+            .includes(lowerQuery);
+        const matchesTitle = String(chat.problemTitle || "")
+            .toLowerCase()
+            .includes(lowerQuery);
+        const matchesTag = (chat.problemTags || []).some((tag) =>
+            String(tag || "")
+                .toLowerCase()
+                .includes(lowerQuery)
+        );
+        const matchesAttachment = (chat.attachedProblemSlugs || []).some(
+            (slug) =>
+                String(slug || "")
+                    .toLowerCase()
+                    .includes(lowerQuery)
+        );
+        const matchesMessage = (chat.messages || []).some((m) =>
+            String(m.content || "")
+                .toLowerCase()
+                .includes(lowerQuery)
+        );
+        const matchesSurface = String(chat.surface || "")
+            .toLowerCase()
+            .includes(lowerQuery);
+        const matchesRequestType = String(chat.requestType || "")
+            .toLowerCase()
+            .includes(lowerQuery);
+        const matchesTemplate = String(chat.requestTemplate || "")
+            .toLowerCase()
+            .includes(lowerQuery);
+        const matchesCommands = (chat.usedCommands || []).some((command) =>
+            String(command || "")
+                .toLowerCase()
+                .includes(lowerQuery)
+        );
+        return (
+            matchesURL ||
+            matchesSlug ||
+            matchesTitle ||
+            matchesTag ||
+            matchesAttachment ||
+            matchesMessage ||
+            matchesSurface ||
+            matchesRequestType ||
+            matchesTemplate ||
+            matchesCommands
+        );
     });
 }
 
@@ -277,15 +350,22 @@ const DELETED_PATHS_KEY = "_deletedChatPaths";
 
 async function _addDeletedChatPath(path) {
     const settings = await Storage.getSettings();
-    const existing = Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
+    const existing = Array.isArray(settings[DELETED_PATHS_KEY])
+        ? settings[DELETED_PATHS_KEY]
+        : [];
     if (!existing.includes(path)) {
-        await Storage.setSettings({ ...settings, [DELETED_PATHS_KEY]: [...existing, path] });
+        await Storage.setSettings({
+            ...settings,
+            [DELETED_PATHS_KEY]: [...existing, path],
+        });
     }
 }
 
 export async function getDeletedChatPaths() {
     const settings = await Storage.getSettings();
-    return Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
+    return Array.isArray(settings[DELETED_PATHS_KEY])
+        ? settings[DELETED_PATHS_KEY]
+        : [];
 }
 
 export async function clearDeletedChatPaths() {
@@ -298,7 +378,8 @@ export async function getPendingSyncChats() {
     return new Promise((resolve) => {
         const tx = db.transaction([STORE_NAME], "readonly");
         const req = tx.objectStore(STORE_NAME).getAll();
-        req.onsuccess = () => resolve((req.result || []).filter(c => c._pendingSync === true));
+        req.onsuccess = () =>
+            resolve((req.result || []).filter((c) => c._pendingSync === true));
         req.onerror = () => resolve([]);
     });
 }
@@ -311,7 +392,10 @@ export async function markChatSynced(chatId, githubPath) {
         const req = store.get(chatId);
         req.onsuccess = () => {
             const chat = req.result;
-            if (!chat) { resolve(); return; }
+            if (!chat) {
+                resolve();
+                return;
+            }
             chat._pendingSync = false;
             chat._githubPath = githubPath;
             store.put(chat);
@@ -327,7 +411,13 @@ export async function importChatsLocal(items) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], "readwrite");
         const store = tx.objectStore(STORE_NAME);
-        items.forEach(item => store.add({ ...normalizeChatRecord(item), _githubPath: item._githubPath, _pendingSync: false }));
+        items.forEach((item) =>
+            store.add({
+                ...normalizeChatRecord(item),
+                _githubPath: item._githubPath,
+                _pendingSync: false,
+            })
+        );
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
     });

@@ -24,7 +24,7 @@ export const ENHANCED_SELECTORS = {
             // Original selectors
             '[data-e2e-locator="submission-result"]',
             '[data-e2e-locator="console-result"]',
-            '.text-green-s',
+            ".text-green-s",
             'span[class*="text-green"]',
             '[class*="accepted"]',
             '[class*="Accepted"]',
@@ -71,7 +71,11 @@ export function querySubmissionResult(context = document) {
             if (el) {
                 // Verify element is visible
                 const style = window.getComputedStyle(el);
-                if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
+                if (
+                    style.display !== "none" &&
+                    style.visibility !== "hidden" &&
+                    style.opacity !== "0"
+                ) {
                     return el;
                 }
             }
@@ -106,7 +110,9 @@ export function getSubmissionVerdict() {
     if (!resultEl) return null;
 
     const text = resultEl.textContent || "";
-    const match = text.match(/Accepted|Wrong Answer|Time Limit Exceeded|Runtime Error|Memory Limit Exceeded|Compile Error|Output Limit Exceeded/i);
+    const match = text.match(
+        /Accepted|Wrong Answer|Time Limit Exceeded|Runtime Error|Memory Limit Exceeded|Compile Error|Output Limit Exceeded/i
+    );
     return match ? match[0] : null;
 }
 

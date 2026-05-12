@@ -61,9 +61,13 @@ async function _openDB() {
         req.onupgradeneeded = (evt) => {
             const db = evt.target.result;
             if (!db.objectStoreNames.contains(QUEUE_STORE)) {
-                const store = db.createObjectStore(QUEUE_STORE, { keyPath: "id" });
+                const store = db.createObjectStore(QUEUE_STORE, {
+                    keyPath: "id",
+                });
                 store.createIndex("statusIndex", "status", { unique: false });
-                store.createIndex("problemIdIndex", "problemId", { unique: false });
+                store.createIndex("problemIdIndex", "problemId", {
+                    unique: false,
+                });
             }
         };
     });
@@ -121,16 +125,25 @@ export async function getNextPendingReview() {
                 const items = req.result || [];
                 const now = Date.now();
                 // Skip items whose retry cooldown hasn't elapsed yet
-                const ready = items.filter(i => !i.nextRetryAt || i.nextRetryAt <= now);
+                const ready = items.filter(
+                    (i) => !i.nextRetryAt || i.nextRetryAt <= now
+                );
                 // Sort by priority (lower = higher priority), then by createdAt
                 ready.sort((a, b) => {
-                    if (a.priority !== b.priority) return a.priority - b.priority;
+                    if (a.priority !== b.priority)
+                        return a.priority - b.priority;
                     return a.createdAt - b.createdAt;
                 });
                 db.close();
                 const picked = ready[0] || null;
-                if (picked) dbg.log(`getNextPendingReview: selected ${picked.id} for problem ${picked.problemId}`);
-                else dbg.log(`getNextPendingReview: no ready items (${items.length - ready.length} in backoff)`);
+                if (picked)
+                    dbg.log(
+                        `getNextPendingReview: selected ${picked.id} for problem ${picked.problemId}`
+                    );
+                else
+                    dbg.log(
+                        `getNextPendingReview: no ready items (${items.length - ready.length} in backoff)`
+                    );
                 resolve(picked);
             };
             req.onerror = () => {
@@ -215,7 +228,7 @@ export async function markFailedWithRetry(itemId, error) {
                     // Schedule retry with exponential backoff
                     const backoffMs = Math.min(
                         RETRY_BASE_DELAY_MS * Math.pow(2, nextRetryCount - 1),
-                        RETRY_MAX_DELAY_MS,
+                        RETRY_MAX_DELAY_MS
                     );
                     const updateReq = store.put({
                         ...item,
@@ -228,7 +241,9 @@ export async function markFailedWithRetry(itemId, error) {
                     });
                     updateReq.onsuccess = () => {
                         db.close();
-                        dbg.log(`Review ${itemId} scheduled retry ${nextRetryCount}/${MAX_RETRIES} after ${backoffMs}ms`);
+                        dbg.log(
+                            `Review ${itemId} scheduled retry ${nextRetryCount}/${MAX_RETRIES} after ${backoffMs}ms`
+                        );
                         resolve(true);
                     };
                     updateReq.onerror = () => {
@@ -263,10 +278,14 @@ export async function getQueueStats() {
             req.onsuccess = () => {
                 const items = req.result || [];
                 const stats = {
-                    pending: items.filter((i) => i.status === STATUS.PENDING).length,
-                    processing: items.filter((i) => i.status === STATUS.PROCESSING).length,
+                    pending: items.filter((i) => i.status === STATUS.PENDING)
+                        .length,
+                    processing: items.filter(
+                        (i) => i.status === STATUS.PROCESSING
+                    ).length,
                     done: items.filter((i) => i.status === STATUS.DONE).length,
-                    failed: items.filter((i) => i.status === STATUS.FAILED).length,
+                    failed: items.filter((i) => i.status === STATUS.FAILED)
+                        .length,
                     total: items.length,
                 };
                 db.close();
@@ -274,7 +293,13 @@ export async function getQueueStats() {
             };
             req.onerror = () => {
                 db.close();
-                resolve({ pending: 0, processing: 0, done: 0, failed: 0, total: 0 });
+                resolve({
+                    pending: 0,
+                    processing: 0,
+                    done: 0,
+                    failed: 0,
+                    total: 0,
+                });
             };
         });
     } catch (e) {
@@ -299,7 +324,9 @@ export async function getPendingReviewsForProblem(problemId) {
             const req = problemIdx.getAll(problemId);
             req.onsuccess = () => {
                 const items = req.result || [];
-                const pending = items.filter((i) => [STATUS.PENDING, STATUS.PROCESSING].includes(i.status));
+                const pending = items.filter((i) =>
+                    [STATUS.PENDING, STATUS.PROCESSING].includes(i.status)
+                );
                 db.close();
                 resolve(pending);
             };

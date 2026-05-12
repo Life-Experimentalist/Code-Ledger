@@ -57,11 +57,13 @@ export function PanelBehaviorBank() {
             });
 
             if (entry.platform) {
-                stats.platforms[entry.platform] = (stats.platforms[entry.platform] || 0) + 1;
+                stats.platforms[entry.platform] =
+                    (stats.platforms[entry.platform] || 0) + 1;
             }
 
             if (entry.lang) {
-                stats.languages[entry.lang] = (stats.languages[entry.lang] || 0) + 1;
+                stats.languages[entry.lang] =
+                    (stats.languages[entry.lang] || 0) + 1;
             }
 
             // Use first tag as "topic"
@@ -72,7 +74,9 @@ export function PanelBehaviorBank() {
         });
 
         if (stats.totalSolves > 0) {
-            stats.avgTimePerSolve = Math.round(stats.totalTime / stats.totalSolves);
+            stats.avgTimePerSolve = Math.round(
+                stats.totalTime / stats.totalSolves
+            );
         }
 
         return stats;
@@ -115,7 +119,9 @@ export function PanelBehaviorBank() {
             const text = await file.text();
             const imported = JSON.parse(text);
             if (typeof imported !== "object" || imported === null) {
-                throw new Error("Invalid behavior bank format: must be a JSON object");
+                throw new Error(
+                    "Invalid behavior bank format: must be a JSON object"
+                );
             }
 
             // Optionally merge with existing or replace
@@ -143,7 +149,8 @@ export function PanelBehaviorBank() {
     };
 
     const handleClear = async () => {
-        if (!confirm("Clear all behavior bank data? This cannot be undone.")) return;
+        if (!confirm("Clear all behavior bank data? This cannot be undone."))
+            return;
         try {
             setLoading(true);
             setMsg("Clearing behavior bank…");
@@ -179,128 +186,198 @@ export function PanelBehaviorBank() {
     };
 
     return html`
-    <div class="flex flex-col gap-6 w-full max-w-4xl">
-      <!-- Header -->
-      <div class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl">
-        <h2 class="text-xl font-light text-white mb-1">Behavior Bank</h2>
-        <p class="text-sm text-slate-400 mb-6">
-          Track your coding patterns: solve history, platforms, languages, and topics.
-        </p>
+        <div class="flex flex-col gap-6 w-full max-w-4xl">
+            <!-- Header -->
+            <div class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl">
+                <h2 class="text-xl font-light text-white mb-1">
+                    Behavior Bank
+                </h2>
+                <p class="text-sm text-slate-400 mb-6">
+                    Track your coding patterns: solve history, platforms,
+                    languages, and topics.
+                </p>
 
-        <!-- Aggregate Stats -->
-        ${stats.totalProblems > 0
-            ? html`
-              <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
-                  <p class="text-xs text-slate-400 mb-1">Problems Solved</p>
-                  <p class="text-lg font-semibold text-white">${stats.totalProblems}</p>
-                </div>
-                <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
-                  <p class="text-xs text-slate-400 mb-1">Total Solves</p>
-                  <p class="text-lg font-semibold text-white">${stats.totalSolves}</p>
-                </div>
-                <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
-                  <p class="text-xs text-slate-400 mb-1">Total Time</p>
-                  <p class="text-lg font-semibold text-white">${formatTime(stats.totalTime)}</p>
-                </div>
-                <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
-                  <p class="text-xs text-slate-400 mb-1">Avg per Solve</p>
-                  <p class="text-lg font-semibold text-white">${formatTime(stats.avgTimePerSolve)}</p>
-                </div>
-              </div>
-            `
-            : html`
-              <p class="text-sm text-slate-400 mb-6 py-4">
-                No behavior data yet. Start solving problems to build your behavior bank!
-              </p>
-            `}
+                <!-- Aggregate Stats -->
+                ${stats.totalProblems > 0
+                    ? html`
+                          <div class="grid grid-cols-2 gap-3 mb-6">
+                              <div
+                                  class="p-3 bg-white/5 border border-white/10 rounded-lg"
+                              >
+                                  <p class="text-xs text-slate-400 mb-1">
+                                      Problems Solved
+                                  </p>
+                                  <p class="text-lg font-semibold text-white">
+                                      ${stats.totalProblems}
+                                  </p>
+                              </div>
+                              <div
+                                  class="p-3 bg-white/5 border border-white/10 rounded-lg"
+                              >
+                                  <p class="text-xs text-slate-400 mb-1">
+                                      Total Solves
+                                  </p>
+                                  <p class="text-lg font-semibold text-white">
+                                      ${stats.totalSolves}
+                                  </p>
+                              </div>
+                              <div
+                                  class="p-3 bg-white/5 border border-white/10 rounded-lg"
+                              >
+                                  <p class="text-xs text-slate-400 mb-1">
+                                      Total Time
+                                  </p>
+                                  <p class="text-lg font-semibold text-white">
+                                      ${formatTime(stats.totalTime)}
+                                  </p>
+                              </div>
+                              <div
+                                  class="p-3 bg-white/5 border border-white/10 rounded-lg"
+                              >
+                                  <p class="text-xs text-slate-400 mb-1">
+                                      Avg per Solve
+                                  </p>
+                                  <p class="text-lg font-semibold text-white">
+                                      ${formatTime(stats.avgTimePerSolve)}
+                                  </p>
+                              </div>
+                          </div>
+                      `
+                    : html`
+                          <p class="text-sm text-slate-400 mb-6 py-4">
+                              No behavior data yet. Start solving problems to
+                              build your behavior bank!
+                          </p>
+                      `}
 
-        <!-- Top Platforms -->
-        ${topPlatforms.length > 0
-            ? html`
-              <div class="mb-6">
-                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">Top Platforms</h3>
-                <div class="grid grid-cols-2 gap-2">
-                  ${topPlatforms.map(
-                ([name, count]) => html`
-                      <div class="px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-slate-300">
-                        <span class="font-medium">${name}:</span> ${count}
-                      </div>
-                    `
-            )}
-                </div>
-              </div>
-            `
-            : ""}
+                <!-- Top Platforms -->
+                ${topPlatforms.length > 0
+                    ? html`
+                          <div class="mb-6">
+                              <h3
+                                  class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3"
+                              >
+                                  Top Platforms
+                              </h3>
+                              <div class="grid grid-cols-2 gap-2">
+                                  ${topPlatforms.map(
+                                      ([name, count]) => html`
+                                          <div
+                                              class="px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-slate-300"
+                                          >
+                                              <span class="font-medium"
+                                                  >${name}:</span
+                                              >
+                                              ${count}
+                                          </div>
+                                      `
+                                  )}
+                              </div>
+                          </div>
+                      `
+                    : ""}
 
-        <!-- Top Languages -->
-        ${topLanguages.length > 0
-            ? html`
-              <div class="mb-6">
-                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">Top Languages</h3>
-                <div class="grid grid-cols-3 gap-2">
-                  ${topLanguages.map(
-                ([name, count]) => html`
-                      <div class="px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-slate-300">
-                        <span class="font-medium">${name}:</span> ${count}
-                      </div>
-                    `
-            )}
-                </div>
-              </div>
-            `
-            : ""}
+                <!-- Top Languages -->
+                ${topLanguages.length > 0
+                    ? html`
+                          <div class="mb-6">
+                              <h3
+                                  class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3"
+                              >
+                                  Top Languages
+                              </h3>
+                              <div class="grid grid-cols-3 gap-2">
+                                  ${topLanguages.map(
+                                      ([name, count]) => html`
+                                          <div
+                                              class="px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-slate-300"
+                                          >
+                                              <span class="font-medium"
+                                                  >${name}:</span
+                                              >
+                                              ${count}
+                                          </div>
+                                      `
+                                  )}
+                              </div>
+                          </div>
+                      `
+                    : ""}
 
-        <!-- Top Topics -->
-        ${topTopics.length > 0
-            ? html`
-              <div class="mb-6">
-                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">Top 10 Topics</h3>
-                <div class="grid grid-cols-2 gap-2">
-                  ${topTopics.map(
-                ([topic, count]) => html`
-                      <div class="px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-slate-300 truncate">
-                        <span class="font-medium">${topic}:</span> ${count}
-                      </div>
-                    `
-            )}
-                </div>
-              </div>
-            `
-            : ""}
-      </div>
+                <!-- Top Topics -->
+                ${topTopics.length > 0
+                    ? html`
+                          <div class="mb-6">
+                              <h3
+                                  class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3"
+                              >
+                                  Top 10 Topics
+                              </h3>
+                              <div class="grid grid-cols-2 gap-2">
+                                  ${topTopics.map(
+                                      ([topic, count]) => html`
+                                          <div
+                                              class="px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-slate-300 truncate"
+                                          >
+                                              <span class="font-medium"
+                                                  >${topic}:</span
+                                              >
+                                              ${count}
+                                          </div>
+                                      `
+                                  )}
+                              </div>
+                          </div>
+                      `
+                    : ""}
+            </div>
 
-      <!-- Actions -->
-      <div class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl">
-        <h3 class="text-sm font-light text-white mb-4">Data Management</h3>
-        <div class="flex flex-wrap gap-3 mb-4">
-          <button
-            onClick=${handleExport}
-            disabled=${loading || stats.totalProblems === 0}
-            class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
-          >${loading ? "Processing…" : "Export as JSON"}</button>
-          <button
-            onClick=${handleImportClick}
-            disabled=${loading}
-            class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-200 text-xs rounded-lg transition-colors disabled:opacity-50"
-          >${loading ? "Processing…" : "Import from JSON"}</button>
-          <button
-            onClick=${handleClear}
-            disabled=${loading || stats.totalProblems === 0}
-            class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 text-rose-300 text-xs rounded-lg transition-colors disabled:opacity-50"
-          >${loading ? "Processing…" : "Clear Data"}</button>
+            <!-- Actions -->
+            <div class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl">
+                <h3 class="text-sm font-light text-white mb-4">
+                    Data Management
+                </h3>
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <button
+                        onClick=${handleExport}
+                        disabled=${loading || stats.totalProblems === 0}
+                        class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+                    >
+                        ${loading ? "Processing…" : "Export as JSON"}
+                    </button>
+                    <button
+                        onClick=${handleImportClick}
+                        disabled=${loading}
+                        class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+                    >
+                        ${loading ? "Processing…" : "Import from JSON"}
+                    </button>
+                    <button
+                        onClick=${handleClear}
+                        disabled=${loading || stats.totalProblems === 0}
+                        class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 text-rose-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+                    >
+                        ${loading ? "Processing…" : "Clear Data"}
+                    </button>
+                </div>
+                ${msg &&
+                html`
+                    <p
+                        class="text-xs ${msg.includes("Failed")
+                            ? "text-rose-400"
+                            : "text-emerald-400"}"
+                    >
+                        ${msg}
+                    </p>
+                `}
+                <input
+                    ref=${fileInputRef}
+                    type="file"
+                    accept=".json"
+                    style="display: none"
+                    onChange=${handleImportFile}
+                />
+            </div>
         </div>
-        ${msg && html`
-          <p class="text-xs ${msg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">${msg}</p>
-        `}
-        <input
-          ref=${fileInputRef}
-          type="file"
-          accept=".json"
-          style="display: none"
-          onChange=${handleImportFile}
-        />
-      </div>
-    </div>
-  `;
+    `;
 }

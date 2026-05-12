@@ -10,82 +10,106 @@ import { CONSTANTS } from "../../../core/constants.js";
 import { buildReviewPrompt } from "../../../core/ai-prompts.js";
 
 export class DeepSeekHandler extends BaseAIHandler {
-  constructor() {
-    super("deepseek", "DeepSeek");
-    this.keyPool = new APIKeyPool("deepseek");
-  }
-
-  getSettingsSchema() {
-    return {
-      id: this.id,
-      title: "DeepSeek (AI)",
-      order: 6,
-      fields: [
-        { key: "deepseek_enabled", label: "Enable DeepSeek", type: "toggle", default: false,
-          description: "Enable DeepSeek for AI code reviews." },
-        { key: "deepseek_keys", label: "API Keys", type: "text", default: "",
-          description: "Comma-separated API keys." },
-        { key: "deepseek_model", label: "Model", type: "text", default: "", advanced: true,
-          placeholder: "deepseek-coder" },
-        { key: "deepseek_endpoint", label: "Endpoint", type: "text", default: "", advanced: true },
-      ],
-    };
-  }
-
-  async review(code, problemContext) {
-    const settings = await Storage.getSettings();
-    const model =
-      problemContext?.aiModelOverride ||
-      settings.deepseek_model ||
-      settings.aiModel ||
-      CONSTANTS.AI_PROVIDERS.deepseek.defaultModel;
-
-    const prompts = await Storage.getAIPrompts();
-    const prompt = buildReviewPrompt(problemContext, code, prompts);
-
-    const endpoint =
-      settings.deepseek_endpoint ||
-      settings.aiEndpoint ||
-      CONSTANTS.AI_PROVIDERS.deepseek.endpoint;
-
-    const keyCount = await this.keyPool.getKeyCount();
-    if (!keyCount) throw new Error("No DeepSeek API key available.");
-
-    let lastErr = null;
-    for (let attempt = 0; attempt < keyCount; attempt++) {
-      // eslint-disable-next-line no-await-in-loop
-      const key = await this.keyPool.getNextKey();
-      if (!key) break;
-
-      try {
-        const res = await fetch(`${endpoint}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${key}`,
-          },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "user", content: prompt }],
-          }),
-        });
-
-        if (!res.ok) throw new Error(`DeepSeek API error: ${res.status}`);
-
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content || "";
-      } catch (err) {
-        lastErr = err;
-        this.keyPool.markFailed(key);
-        this.dbg.warn(
-          `DeepSeek key failed, trying next key (${attempt + 1}/${keyCount})`,
-        );
-      }
+    constructor() {
+        super("deepseek", "DeepSeek");
+        this.keyPool = new APIKeyPool("deepseek");
     }
 
-    this.dbg.error("DeepSeek review failed", lastErr);
-    throw (
-      lastErr || new Error("DeepSeek review failed with all available keys.")
-    );
-  }
+    getSettingsSchema() {
+        return {
+            id: this.id,
+            title: "DeepSeek (AI)",
+            order: 6,
+            fields: [
+                {
+                    key: "deepseek_enabled",
+                    label: "Enable DeepSeek",
+                    type: "toggle",
+                    default: false,
+                    description: "Enable DeepSeek for AI code reviews.",
+                },
+                {
+                    key: "deepseek_keys",
+                    label: "API Keys",
+                    type: "text",
+                    default: "",
+                    description: "Comma-separated API keys.",
+                },
+                {
+                    key: "deepseek_model",
+                    label: "Model",
+                    type: "text",
+                    default: "",
+                    advanced: true,
+                    placeholder: "deepseek-coder",
+                },
+                {
+                    key: "deepseek_endpoint",
+                    label: "Endpoint",
+                    type: "text",
+                    default: "",
+                    advanced: true,
+                },
+            ],
+        };
+    }
+
+    async review(code, problemContext) {
+        const settings = await Storage.getSettings();
+        const model =
+            problemContext?.aiModelOverride ||
+            settings.deepseek_model ||
+            settings.aiModel ||
+            CONSTANTS.AI_PROVIDERS.deepseek.defaultModel;
+
+        const prompts = await Storage.getAIPrompts();
+        const prompt = buildReviewPrompt(problemContext, code, prompts);
+
+        const endpoint =
+            settings.deepseek_endpoint ||
+            settings.aiEndpoint ||
+            CONSTANTS.AI_PROVIDERS.deepseek.endpoint;
+
+        const keyCount = await this.keyPool.getKeyCount();
+        if (!keyCount) throw new Error("No DeepSeek API key available.");
+
+        let lastErr = null;
+        for (let attempt = 0; attempt < keyCount; attempt++) {
+            // eslint-disable-next-line no-await-in-loop
+            const key = await this.keyPool.getNextKey();
+            if (!key) break;
+
+            try {
+                const res = await fetch(`${endpoint}/chat/completions`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${key}`,
+                    },
+                    body: JSON.stringify({
+                        model,
+                        messages: [{ role: "user", content: prompt }],
+                    }),
+                });
+
+                if (!res.ok)
+                    throw new Error(`DeepSeek API error: ${res.status}`);
+
+                const data = await res.json();
+                return data.choices?.[0]?.message?.content || "";
+            } catch (err) {
+                lastErr = err;
+                this.keyPool.markFailed(key);
+                this.dbg.warn(
+                    `DeepSeek key failed, trying next key (${attempt + 1}/${keyCount})`
+                );
+            }
+        }
+
+        this.dbg.error("DeepSeek review failed", lastErr);
+        throw (
+            lastErr ||
+            new Error("DeepSeek review failed with all available keys.")
+        );
+    }
 }

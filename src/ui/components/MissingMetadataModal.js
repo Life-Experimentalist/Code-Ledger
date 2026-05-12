@@ -9,129 +9,129 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("MissingMetadataModal");
 const IGNORED_METADATA_KEY = "metadata_ignored_ids";
 
-export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
-  const [busyMap, setBusyMap] = useState({});
-  const [ignoredIds, setIgnoredIds] = useState(new Set());
-  const [loading, setLoading] = useState(true);
+export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
+    const [busyMap, setBusyMap] = useState({});
+    const [ignoredIds, setIgnoredIds] = useState(new Set());
+    const [loading, setLoading] = useState(true);
 
-  // Load ignored IDs from storage on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const settings = await Storage.getSettings();
-        const ignored = settings[IGNORED_METADATA_KEY] || [];
-        setIgnoredIds(new Set(ignored));
-      } catch (e) {
-        dbg.warn("Failed to load ignored metadata:", e?.message);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  // Get missing metadata explanation for each problem
-  function getMissingReasons(p) {
-    const reasons = [];
-    const hasNoTags = !p.tags || p.tags.length === 0;
-    const hasNoDifficulty =
-      !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
-
-    if (hasNoTags) reasons.push("Missing tags");
-    if (hasNoDifficulty) reasons.push("Missing difficulty level");
-
-    return reasons;
-  }
-
-  const missing = (problems || [])
-    .filter((p) => {
-      const noTags = !p.tags || p.tags.length === 0;
-      const noDifficulty =
-        !p.difficulty ||
-        !["Easy", "Medium", "Hard"].includes(p.difficulty);
-      return noTags || noDifficulty;
-    })
-    .filter((p) => !ignoredIds.has(p.id)); // Exclude ignored
-
-  const ignored = (problems || []).filter((p) => ignoredIds.has(p.id));
-
-  async function queueRefreshOne(p) {
-    setBusyMap((m) => ({ ...m, [p.id]: true }));
-    try {
-      if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-        await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage(
-            { type: "REFRESH_METADATA", problems: [p] },
-            (resp) => {
-              if (chrome.runtime.lastError)
-                return reject(
-                  new Error(chrome.runtime.lastError.message)
-                );
-              if (resp?.ok) return resolve(resp);
-              return reject(
-                new Error(resp?.error || "refresh failed")
-              );
+    // Load ignored IDs from storage on mount
+    useEffect(() => {
+        (async () => {
+            try {
+                const settings = await Storage.getSettings();
+                const ignored = settings[IGNORED_METADATA_KEY] || [];
+                setIgnoredIds(new Set(ignored));
+            } catch (e) {
+                dbg.warn("Failed to load ignored metadata:", e?.message);
+            } finally {
+                setLoading(false);
             }
-          );
-        });
-      }
-    } catch (e) {
-      dbg.error("Metadata refresh failed:", e?.message || e);
-    } finally {
-      setBusyMap((m) => ({ ...m, [p.id]: false }));
+        })();
+    }, []);
+
+    // Get missing metadata explanation for each problem
+    function getMissingReasons(p) {
+        const reasons = [];
+        const hasNoTags = !p.tags || p.tags.length === 0;
+        const hasNoDifficulty =
+            !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
+
+        if (hasNoTags) reasons.push("Missing tags");
+        if (hasNoDifficulty) reasons.push("Missing difficulty level");
+
+        return reasons;
     }
-  }
 
-  async function toggleIgnore(problemId, ignore = true) {
-    const newIgnored = new Set(ignoredIds);
-    if (ignore) {
-      newIgnored.add(problemId);
-    } else {
-      newIgnored.delete(problemId);
+    const missing = (problems || [])
+        .filter((p) => {
+            const noTags = !p.tags || p.tags.length === 0;
+            const noDifficulty =
+                !p.difficulty ||
+                !["Easy", "Medium", "Hard"].includes(p.difficulty);
+            return noTags || noDifficulty;
+        })
+        .filter((p) => !ignoredIds.has(p.id)); // Exclude ignored
+
+    const ignored = (problems || []).filter((p) => ignoredIds.has(p.id));
+
+    async function queueRefreshOne(p) {
+        setBusyMap((m) => ({ ...m, [p.id]: true }));
+        try {
+            if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+                await new Promise((resolve, reject) => {
+                    chrome.runtime.sendMessage(
+                        { type: "REFRESH_METADATA", problems: [p] },
+                        (resp) => {
+                            if (chrome.runtime.lastError)
+                                return reject(
+                                    new Error(chrome.runtime.lastError.message)
+                                );
+                            if (resp?.ok) return resolve(resp);
+                            return reject(
+                                new Error(resp?.error || "refresh failed")
+                            );
+                        }
+                    );
+                });
+            }
+        } catch (e) {
+            dbg.error("Metadata refresh failed:", e?.message || e);
+        } finally {
+            setBusyMap((m) => ({ ...m, [p.id]: false }));
+        }
     }
-    setIgnoredIds(newIgnored);
 
-    try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({
-        ...settings,
-        [IGNORED_METADATA_KEY]: Array.from(newIgnored),
-      });
-    } catch (e) {
-      dbg.error("Failed to save ignored metadata:", e?.message);
+    async function toggleIgnore(problemId, ignore = true) {
+        const newIgnored = new Set(ignoredIds);
+        if (ignore) {
+            newIgnored.add(problemId);
+        } else {
+            newIgnored.delete(problemId);
+        }
+        setIgnoredIds(newIgnored);
+
+        try {
+            const settings = await Storage.getSettings();
+            await Storage.setSettings({
+                ...settings,
+                [IGNORED_METADATA_KEY]: Array.from(newIgnored),
+            });
+        } catch (e) {
+            dbg.error("Failed to save ignored metadata:", e?.message);
+        }
     }
-  }
 
-  async function ignoreAll() {
-    const toIgnore = new Set([...ignoredIds]);
-    missing.forEach((p) => toIgnore.add(p.id));
-    setIgnoredIds(toIgnore);
+    async function ignoreAll() {
+        const toIgnore = new Set([...ignoredIds]);
+        missing.forEach((p) => toIgnore.add(p.id));
+        setIgnoredIds(toIgnore);
 
-    try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({
-        ...settings,
-        [IGNORED_METADATA_KEY]: Array.from(toIgnore),
-      });
-    } catch (e) {
-      dbg.error("Failed to ignore all:", e?.message);
+        try {
+            const settings = await Storage.getSettings();
+            await Storage.setSettings({
+                ...settings,
+                [IGNORED_METADATA_KEY]: Array.from(toIgnore),
+            });
+        } catch (e) {
+            dbg.error("Failed to ignore all:", e?.message);
+        }
     }
-  }
 
-  async function unignoreAll() {
-    setIgnoredIds(new Set());
-    try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({
-        ...settings,
-        [IGNORED_METADATA_KEY]: [],
-      });
-    } catch (e) {
-      dbg.error("Failed to unignore all:", e?.message);
+    async function unignoreAll() {
+        setIgnoredIds(new Set());
+        try {
+            const settings = await Storage.getSettings();
+            await Storage.setSettings({
+                ...settings,
+                [IGNORED_METADATA_KEY]: [],
+            });
+        } catch (e) {
+            dbg.error("Failed to unignore all:", e?.message);
+        }
     }
-  }
 
-  if (loading) {
-    return html`
+    if (loading) {
+        return html`
             <div class="fixed inset-0 z-50 flex items-center justify-center">
                 <div
                     class="absolute inset-0 bg-black/50"
@@ -144,13 +144,14 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                 </div>
             </div>
         `;
-  }
+    }
 
-  return html`
+    return html`
         <div class="fixed inset-0 z-50 flex items-center justify-center">
             <div class="absolute inset-0 bg-black/50" onClick=${onClose}></div>
             <div
-                class="relative w-full max-w-4xl mx-4 bg-slate-900 p-6 rounded-lg border border-white/10 max-h-[80vh]" style="
+                class="relative w-full max-w-4xl mx-4 bg-slate-900 p-6 rounded-lg border border-white/10 max-h-[80vh]"
+                style="
   z-index: 10;          /* above overlay */
   width: 100%;
   max-width: var(--container-4xl);
@@ -169,8 +170,8 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                             problem${missing.length !== 1 ? "s" : ""} need
                             metadata
                             ${ignored.length > 0
-      ? ` • ${ignored.length} ignored`
-      : ""}
+                                ? ` • ${ignored.length} ignored`
+                                : ""}
                         </p>
                     </div>
                     <button
@@ -187,7 +188,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                 </p>
 
                 ${missing.length > 0 &&
-    html`
+                html`
                     <div
                         class="mb-6 p-4 bg-white/2 rounded-lg border border-white/5"
                     >
@@ -202,20 +203,23 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                                 Ignore All
                             </button>
                         </div>
-                        <div class="space-y-2 max-h-64" style=" overflow: scroll;">
-                        ${missing.map((p) => {
-      const reasons = getMissingReasons(p);
-      return html`
+                        <div
+                            class="space-y-2 max-h-64"
+                            style=" overflow: scroll;"
+                        >
+                            ${missing.map((p) => {
+                                const reasons = getMissingReasons(p);
+                                return html`
                                     <div
                                         class="p-3 bg-white/1 rounded border border-white/3 flex items-center gap-3"
                                     >
                                         <input
                                             type="checkbox"
                                             onChange=${(e) =>
-          toggleIgnore(
-            p.id,
-            e.target.checked
-          )}
+                                                toggleIgnore(
+                                                    p.id,
+                                                    e.target.checked
+                                                )}
                                             class="w-4 h-4"
                                             title="Ignore this problem"
                                         />
@@ -242,22 +246,22 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                                             disabled=${busyMap[p.id]}
                                             class="px-2 py-1 text-xs rounded whitespace-nowrap
                                                 ${busyMap[p.id]
-          ? "bg-slate-700/50 text-slate-400"
-          : "bg-blue-600/20 hover:bg-blue-600/40 text-blue-200 transition-colors"}
+                                                ? "bg-slate-700/50 text-slate-400"
+                                                : "bg-blue-600/20 hover:bg-blue-600/40 text-blue-200 transition-colors"}
                                             "
                                         >
                                             ${busyMap[p.id]
-          ? "Queued…"
-          : "Refresh"}
+                                                ? "Queued…"
+                                                : "Refresh"}
                                         </button>
                                     </div>
                                 `;
-    })}
+                            })}
                         </div>
                     </div>
                 `}
                 ${ignored.length > 0 &&
-    html`
+                html`
                     <div
                         class="p-4 bg-white/2 rounded-lg border border-white/5"
                     >
@@ -276,8 +280,8 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                         </div>
                         <div class="space-y-2 max-h-32 overflow-auto">
                             ${ignored.map((p) => {
-      const reasons = getMissingReasons(p);
-      return html`
+                                const reasons = getMissingReasons(p);
+                                return html`
                                     <div
                                         class="p-2 bg-white/1 rounded border border-white/3 flex items-center gap-2 opacity-60"
                                     >
@@ -285,10 +289,10 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                                             type="checkbox"
                                             checked
                                             onChange=${(e) =>
-          toggleIgnore(
-            p.id,
-            e.target.checked
-          )}
+                                                toggleIgnore(
+                                                    p.id,
+                                                    e.target.checked
+                                                )}
                                             class="w-4 h-4"
                                             title="Un-ignore this problem"
                                         />
@@ -305,13 +309,13 @@ export function MissingMetadataModal({ problems = [], onClose = () => { } }) {
                                         </div>
                                     </div>
                                 `;
-    })}
+                            })}
                         </div>
                     </div>
                 `}
                 ${missing.length === 0 &&
-    ignored.length === 0 &&
-    html`
+                ignored.length === 0 &&
+                html`
                     <div
                         class="p-4 bg-white/2 rounded-lg text-center text-sm text-slate-400"
                     >

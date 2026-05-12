@@ -11,40 +11,40 @@
 const TOPIC_WEIGHTS = {
     // Core Algorithms & Techniques (highest priority)
     "Dynamic Programming": 1,
-    "Greedy": 2,
-    "Recursion": 3,
-    "Backtracking": 4,
+    Greedy: 2,
+    Recursion: 3,
+    Backtracking: 4,
     "Divide and Conquer": 5,
     "Bit Manipulation": 6,
-    "Math": 7,
-    "Geometry": 8,
+    Math: 7,
+    Geometry: 8,
 
     // Data Structures
     "Hash Table": 10,
     "Linked List": 11,
-    "Stack": 12,
-    "Queue": 13,
+    Stack: 12,
+    Queue: 13,
     "Heap (Priority Queue)": 14,
-    "Trie": 15,
+    Trie: 15,
     "Binary Search Tree": 16,
     "Segment Tree": 17,
     "Binary Indexed Tree": 18,
-    "Graph": 19,
+    Graph: 19,
     "Union Find": 20,
 
     // Fundamental Techniques
     "Two Pointers": 30,
     "Sliding Window": 31,
     "Binary Search": 32,
-    "Sorting": 33,
+    Sorting: 33,
 
     // Lower Priority - Usually secondary classification
-    "Array": 100,
-    "String": 101,
-    "Tree": 102,
-    "Design": 103,
-    "Database": 104,
-    "Shell": 105,
+    Array: 100,
+    String: 101,
+    Tree: 102,
+    Design: 103,
+    Database: 104,
+    Shell: 105,
 };
 
 /**

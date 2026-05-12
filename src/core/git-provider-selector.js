@@ -22,24 +22,24 @@ const GIT_PROVIDER_PRIORITY = ["github", "gitlab", "bitbucket"];
  * @returns {string} The ID of the selected git provider
  */
 export function getActiveGitProvider(settings = {}) {
-  let selected = null;
-  for (const providerId of GIT_PROVIDER_PRIORITY) {
-    const provider = registry.getGitProvider(providerId);
-    if (!provider) continue;
+    let selected = null;
+    for (const providerId of GIT_PROVIDER_PRIORITY) {
+        const provider = registry.getGitProvider(providerId);
+        if (!provider) continue;
 
-    // Check if provider is enabled (default to enabled if not specified)
-    const enabledKey = `${providerId}_enabled`;
-    const isEnabled = settings[enabledKey] !== false;
+        // Check if provider is enabled (default to enabled if not specified)
+        const enabledKey = `${providerId}_enabled`;
+        const isEnabled = settings[enabledKey] !== false;
 
-    if (isEnabled) {
-      selected = providerId;
-      break;
+        if (isEnabled) {
+            selected = providerId;
+            break;
+        }
     }
-  }
 
-  const result = selected || GIT_PROVIDER_PRIORITY[0];
-  dbg.log(`getActiveGitProvider(): selected ${result}`);
-  return result;
+    const result = selected || GIT_PROVIDER_PRIORITY[0];
+    dbg.log(`getActiveGitProvider(): selected ${result}`);
+    return result;
 }
 
 /**
@@ -47,18 +47,18 @@ export function getActiveGitProvider(settings = {}) {
  * @returns {Array<{id: string, name: string, enabled: boolean}>}
  */
 export async function getAvailableGitProviders() {
-  dbg.log(`getAvailableGitProviders(): fetching available providers`);
-  const settings = await Storage.getSettings();
-  return GIT_PROVIDER_PRIORITY.map((id) => ({
-    id,
-    name:
-      {
-        github: "GitHub",
-        gitlab: "GitLab",
-        bitbucket: "Bitbucket",
-      }[id] || id,
-    enabled: settings[`${id}_enabled`] !== false,
-  }));
+    dbg.log(`getAvailableGitProviders(): fetching available providers`);
+    const settings = await Storage.getSettings();
+    return GIT_PROVIDER_PRIORITY.map((id) => ({
+        id,
+        name:
+            {
+                github: "GitHub",
+                gitlab: "GitLab",
+                bitbucket: "Bitbucket",
+            }[id] || id,
+        enabled: settings[`${id}_enabled`] !== false,
+    }));
 }
 
 /**
@@ -66,10 +66,10 @@ export async function getAvailableGitProviders() {
  * @returns {Promise<any>} The git provider handler
  */
 export async function getActiveGitProviderInstance() {
-  dbg.log(`getActiveGitProviderInstance(): getting provider instance`);
-  const settings = await Storage.getSettings();
-  const providerId = getActiveGitProvider(settings);
-  return registry.getGitProvider(providerId);
+    dbg.log(`getActiveGitProviderInstance(): getting provider instance`);
+    const settings = await Storage.getSettings();
+    const providerId = getActiveGitProvider(settings);
+    return registry.getGitProvider(providerId);
 }
 
 /**
@@ -78,15 +78,15 @@ export async function getActiveGitProviderInstance() {
  * @returns {Promise<{valid: boolean, error?: string}>}
  */
 export async function validateGitProvider(providerId) {
-  dbg.log(`validateGitProvider(): ${providerId}`);
-  const provider = registry.getGitProvider(providerId);
-  if (!provider) {
-    return { valid: false, error: `Provider ${providerId} not found` };
-  }
+    dbg.log(`validateGitProvider(): ${providerId}`);
+    const provider = registry.getGitProvider(providerId);
+    if (!provider) {
+        return { valid: false, error: `Provider ${providerId} not found` };
+    }
 
-  if (typeof provider.validate === "function") {
-    return await provider.validate();
-  }
+    if (typeof provider.validate === "function") {
+        return await provider.validate();
+    }
 
-  return { valid: true };
+    return { valid: true };
 }

@@ -4,7 +4,7 @@
  */
 
 export const QUERIES = {
-  QUESTION: `
+    QUESTION: `
     query questionData($titleSlug: String!) {
       question(titleSlug: $titleSlug) {
         questionId
@@ -39,7 +39,7 @@ export const QUERIES = {
     }
   `,
 
-  SUBMISSION_DETAIL: `
+    SUBMISSION_DETAIL: `
     query submissionDetails($submissionId: Int!) {
       submissionDetails(submissionId: $submissionId) {
         runtime
@@ -66,7 +66,7 @@ export const QUERIES = {
     }
   `,
 
-  SUBMISSION_LIST: `
+    SUBMISSION_LIST: `
     query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!, $status: Int) {
       questionSubmissionList(
         offset: $offset
@@ -96,8 +96,8 @@ export const QUERIES = {
     }
   `,
 
-  // Fetches the currently logged-in user's username
-  GLOBAL_DATA: `
+    // Fetches the currently logged-in user's username
+    GLOBAL_DATA: `
     query globalData {
       userStatus {
         isSignedIn
@@ -108,8 +108,8 @@ export const QUERIES = {
     }
   `,
 
-  // Daily challenge — for QoL banner
-  DAILY_CHALLENGE: `
+    // Daily challenge — for QoL banner
+    DAILY_CHALLENGE: `
     query questionOfToday {
       activeDailyCodingChallengeQuestion {
         date

@@ -1,21 +1,21 @@
 // Minimal web library UI for CodeLedger PWA.
 // Shows the library if the extension is present, otherwise shows install/connect options.
 document.addEventListener("DOMContentLoaded", async () => {
-  const root = document.getElementById("root");
-  const configResp = await fetch("/config.json").catch(() => null);
-  const config = configResp && configResp.ok ? await configResp.json() : {};
+    const root = document.getElementById("root");
+    const configResp = await fetch("/config.json").catch(() => null);
+    const config = configResp && configResp.ok ? await configResp.json() : {};
 
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
 
-  function renderNotInstalled() {
-    root.innerHTML = `
+    function renderNotInstalled() {
+        root.innerHTML = `
       <div style="padding:40px; text-align:center;">
         <img src="/assets/og-image.png" style="width:120px;height:120px;object-fit:contain;margin-bottom:12px" alt="CodeLedger" />
         <h1 style="font-size:32px;margin:8px 0;color:#fff">CodeLedger Library (Web)</h1>
@@ -31,13 +31,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       </div>
     `;
-  }
+    }
 
-  function renderInstalled(marker) {
-    const source = marker.getAttribute("data-source") || "unknown";
-    const browser = marker.getAttribute("data-browser") || "";
-    const safeBrowser = escapeHtml(browser);
-    root.innerHTML = `
+    function renderInstalled(marker) {
+        const source = marker.getAttribute("data-source") || "unknown";
+        const browser = marker.getAttribute("data-browser") || "";
+        const safeBrowser = escapeHtml(browser);
+        root.innerHTML = `
       <div style="padding:16px;">
         <header style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#0a0a0f;border-bottom:1px solid rgba(255,255,255,0.05)">
           <div style="display:flex;gap:12px;align-items:center">
@@ -56,59 +56,61 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `;
 
-    document.getElementById("open-extension").addEventListener("click", () => {
-      // Signal extension to open library via window messaging - extension should listen for this message.
-      window.postMessage({ type: "codeledger:open-library" }, "*");
-    });
-    document.getElementById("open-web").addEventListener("click", () => {
-      // Render a simple local problems view (reads from IndexedDB)
-      renderLocalProblemsView();
-    });
-  }
-
-  async function renderLocalProblemsView() {
-    // Try to read IndexedDB (same name as extension) and list problems, fallback to a placeholder
-    try {
-      const openDB = indexedDB.open("codeledger");
-      openDB.onupgradeneeded = () => {
-        /* no-op */
-      };
-      openDB.onerror = () => {
-        throw new Error("db-open");
-      };
-      openDB.onsuccess = async () => {
-        const db = openDB.result;
-        const tx = db.transaction("problems", "readonly");
-        const store = tx.objectStore("problems");
-        const req = store.getAll();
-        req.onsuccess = () => {
-          const items = req.result || [];
-          const list =
-            items
-              .map(
-                (i) =>
-                  `<li style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)"><strong>${i.title || i.id}</strong> <span style="color:#94a3b8">${i.platform || ""} ${i.language ? "• " + i.language : ""}</span></li>`,
-              )
-              .join("") ||
-            '<li style="padding:8px;color:#94a3b8">No problems found locally.</li>';
-          document.querySelector("main").innerHTML =
-            `<h3 style="color:#fff">Local Library</h3><ul style="list-style:none;padding:0;margin-top:12px">${list}</ul>`;
-        };
-        req.onerror = () => {
-          document.querySelector("main").innerHTML =
-            '<p style="color:#94a3b8">Unable to read local library.</p>';
-        };
-      };
-    } catch (e) {
-      document.querySelector("main").innerHTML =
-        '<p style="color:#94a3b8">Local library unavailable (IndexedDB not accessible).</p>';
+        document
+            .getElementById("open-extension")
+            .addEventListener("click", () => {
+                // Signal extension to open library via window messaging - extension should listen for this message.
+                window.postMessage({ type: "codeledger:open-library" }, "*");
+            });
+        document.getElementById("open-web").addEventListener("click", () => {
+            // Render a simple local problems view (reads from IndexedDB)
+            renderLocalProblemsView();
+        });
     }
-  }
 
-  // Detect extension marker
-  setTimeout(() => {
-    const marker = document.getElementById("codeledger-present");
-    if (marker) renderInstalled(marker);
-    else renderNotInstalled();
-  }, 200);
+    async function renderLocalProblemsView() {
+        // Try to read IndexedDB (same name as extension) and list problems, fallback to a placeholder
+        try {
+            const openDB = indexedDB.open("codeledger");
+            openDB.onupgradeneeded = () => {
+                /* no-op */
+            };
+            openDB.onerror = () => {
+                throw new Error("db-open");
+            };
+            openDB.onsuccess = async () => {
+                const db = openDB.result;
+                const tx = db.transaction("problems", "readonly");
+                const store = tx.objectStore("problems");
+                const req = store.getAll();
+                req.onsuccess = () => {
+                    const items = req.result || [];
+                    const list =
+                        items
+                            .map(
+                                (i) =>
+                                    `<li style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)"><strong>${i.title || i.id}</strong> <span style="color:#94a3b8">${i.platform || ""} ${i.language ? "• " + i.language : ""}</span></li>`
+                            )
+                            .join("") ||
+                        '<li style="padding:8px;color:#94a3b8">No problems found locally.</li>';
+                    document.querySelector("main").innerHTML =
+                        `<h3 style="color:#fff">Local Library</h3><ul style="list-style:none;padding:0;margin-top:12px">${list}</ul>`;
+                };
+                req.onerror = () => {
+                    document.querySelector("main").innerHTML =
+                        '<p style="color:#94a3b8">Unable to read local library.</p>';
+                };
+            };
+        } catch (e) {
+            document.querySelector("main").innerHTML =
+                '<p style="color:#94a3b8">Local library unavailable (IndexedDB not accessible).</p>';
+        }
+    }
+
+    // Detect extension marker
+    setTimeout(() => {
+        const marker = document.getElementById("codeledger-present");
+        if (marker) renderInstalled(marker);
+        else renderNotInstalled();
+    }, 200);
 });

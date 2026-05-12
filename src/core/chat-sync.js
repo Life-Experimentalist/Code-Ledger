@@ -10,7 +10,13 @@
  */
 
 import { createDebugger } from "../lib/debug.js";
-import { getAllChats, getPendingSyncChats, markChatSynced, getDeletedChatPaths, clearDeletedChatPaths } from "./ai-chat-storage.js";
+import {
+    getAllChats,
+    getPendingSyncChats,
+    markChatSynced,
+    getDeletedChatPaths,
+    clearDeletedChatPaths,
+} from "./ai-chat-storage.js";
 
 const dbg = createDebugger("ChatSync");
 
@@ -26,14 +32,19 @@ export function buildChatMarkdown(chat) {
     const date = new Date(chat.createdAt || Date.now()).toISOString();
 
     // Build problems list — combine problemSlug + attachedProblemSlugs, dedupe
-    const problems = Array.from(new Set([
-        ...(chat.problemSlug ? [chat.problemSlug] : []),
-        ...(Array.isArray(chat.attachedProblemSlugs) ? chat.attachedProblemSlugs : []),
-    ])).filter(Boolean);
+    const problems = Array.from(
+        new Set([
+            ...(chat.problemSlug ? [chat.problemSlug] : []),
+            ...(Array.isArray(chat.attachedProblemSlugs)
+                ? chat.attachedProblemSlugs
+                : []),
+        ])
+    ).filter(Boolean);
 
-    const problemsYaml = problems.length > 0
-        ? `\nproblems: [${problems.map(p => `"${p}"`).join(", ")}]`
-        : "\nproblems: []";
+    const problemsYaml =
+        problems.length > 0
+            ? `\nproblems: [${problems.map((p) => `"${p}"`).join(", ")}]`
+            : "\nproblems: []";
 
     const providerLine = chat.provider ? `\nprovider: ${chat.provider}` : "";
     const modelLine = chat.model ? `\nmodel: ${chat.model}` : "";
@@ -44,11 +55,14 @@ export function buildChatMarkdown(chat) {
     const messages = Array.isArray(chat.messages) ? chat.messages : [];
     if (messages.length === 0) return frontmatter + "_No messages._\n";
 
-    const body = messages.map(msg => {
-        const role = msg.role === "assistant" ? "### Assistant" : "### User";
-        const content = String(msg.content || "").trim();
-        return `${role}\n\n${content}`;
-    }).join("\n\n---\n\n");
+    const body = messages
+        .map((msg) => {
+            const role =
+                msg.role === "assistant" ? "### Assistant" : "### User";
+            const content = String(msg.content || "").trim();
+            return `${role}\n\n${content}`;
+        })
+        .join("\n\n---\n\n");
 
     return frontmatter + body + "\n";
 }
@@ -60,8 +74,13 @@ export function buildChatMarkdown(chat) {
  * @returns {string}
  */
 export function chatFilePath(chat) {
-    const ts = new Date(chat.createdAt || Date.now()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const shortId = String(chat.id || Math.random().toString(36).slice(2, 8)).toString().slice(-6);
+    const ts = new Date(chat.createdAt || Date.now())
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .slice(0, 19);
+    const shortId = String(chat.id || Math.random().toString(36).slice(2, 8))
+        .toString()
+        .slice(-6);
     return `chats/${ts}-${shortId}.md`;
 }
 
@@ -85,27 +104,35 @@ export async function flushPendingChatSync(owner, repo, git) {
 
         if (pending.length === 0 && deletedPaths.length === 0) return;
 
-        dbg.log(`flushPendingChatSync(): ${pending.length} to upsert, ${deletedPaths.length} to delete`);
+        dbg.log(
+            `flushPendingChatSync(): ${pending.length} to upsert, ${deletedPaths.length} to delete`
+        );
 
-        const files = pending.map(chat => {
+        const files = pending.map((chat) => {
             const path = chat._githubPath || chatFilePath(chat);
-            return { path, content: buildChatMarkdown(chat), _chatId: chat.id, _path: path };
+            return {
+                path,
+                content: buildChatMarkdown(chat),
+                _chatId: chat.id,
+                _path: path,
+            };
         });
 
-        const commitMsg = pending.length > 0
-            ? `chore: sync ${pending.length} AI chat${pending.length > 1 ? "s" : ""}`
-            : `chore: remove ${deletedPaths.length} deleted chat${deletedPaths.length > 1 ? "s" : ""}`;
+        const commitMsg =
+            pending.length > 0
+                ? `chore: sync ${pending.length} AI chat${pending.length > 1 ? "s" : ""}`
+                : `chore: remove ${deletedPaths.length} deleted chat${deletedPaths.length > 1 ? "s" : ""}`;
 
         await git.commit(
-            files.map(f => ({ path: f.path, content: f.content })),
+            files.map((f) => ({ path: f.path, content: f.content })),
             commitMsg,
             repo,
-            { ownerOverride: owner, deletes: deletedPaths },
+            { ownerOverride: owner, deletes: deletedPaths }
         );
 
         // Mark synced and clear tombstones
         await Promise.all([
-            ...files.map(f => markChatSynced(f._chatId, f._path)),
+            ...files.map((f) => markChatSynced(f._chatId, f._path)),
             clearDeletedChatPaths(),
         ]);
 
@@ -140,7 +167,10 @@ export function parseChatMarkdown(content, filePath = "") {
     const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
     if (fmMatch) {
         const fm = fmMatch[1];
-        const get = (key) => { const m = fm.match(new RegExp(`^${key}:\\s*"?([^"\\n]+)"?`, "m")); return m ? m[1].trim() : ""; };
+        const get = (key) => {
+            const m = fm.match(new RegExp(`^${key}:\\s*"?([^"\\n]+)"?`, "m"));
+            return m ? m[1].trim() : "";
+        };
         chat.title = get("title");
         chat.date = get("date");
         chat.provider = get("provider");
@@ -149,7 +179,10 @@ export function parseChatMarkdown(content, filePath = "") {
 
         const probMatch = fm.match(/^problems:\s*\[([^\]]*)\]/m);
         if (probMatch) {
-            chat.problems = probMatch[1].split(",").map(s => s.trim().replace(/"/g, "")).filter(Boolean);
+            chat.problems = probMatch[1]
+                .split(",")
+                .map((s) => s.trim().replace(/"/g, ""))
+                .filter(Boolean);
         }
     }
 
@@ -159,8 +192,13 @@ export function parseChatMarkdown(content, filePath = "") {
     for (const section of sections) {
         const userMatch = section.match(/^### User\n\n([\s\S]*)/);
         const assistantMatch = section.match(/^### Assistant\n\n([\s\S]*)/);
-        if (userMatch) chat.messages.push({ role: "user", content: userMatch[1].trim() });
-        else if (assistantMatch) chat.messages.push({ role: "assistant", content: assistantMatch[1].trim() });
+        if (userMatch)
+            chat.messages.push({ role: "user", content: userMatch[1].trim() });
+        else if (assistantMatch)
+            chat.messages.push({
+                role: "assistant",
+                content: assistantMatch[1].trim(),
+            });
     }
 
     return chat;
@@ -177,7 +215,13 @@ export function parseChatMarkdown(content, filePath = "") {
  * @param {Function} importFn - `(chats: object[]) => Promise<void>`
  * @returns {Promise<number>} count of imported chats
  */
-export async function importChatsFromRepo(owner, repo, token, getContentsFn, importFn) {
+export async function importChatsFromRepo(
+    owner,
+    repo,
+    token,
+    getContentsFn,
+    importFn
+) {
     try {
         let dirListing;
         try {
@@ -189,23 +233,36 @@ export async function importChatsFromRepo(owner, repo, token, getContentsFn, imp
 
         if (!Array.isArray(dirListing)) return 0;
 
-        const mdFiles = dirListing.filter(f => f.type === "file" && f.name.endsWith(".md"));
+        const mdFiles = dirListing.filter(
+            (f) => f.type === "file" && f.name.endsWith(".md")
+        );
         if (mdFiles.length === 0) return 0;
 
         // Get existing githubPaths to skip already-synced chats
         const localChats = await getAllChats();
-        const knownPaths = new Set(localChats.map(c => c._githubPath).filter(Boolean));
+        const knownPaths = new Set(
+            localChats.map((c) => c._githubPath).filter(Boolean)
+        );
 
-        const toImport = mdFiles.filter(f => !knownPaths.has(f.path));
+        const toImport = mdFiles.filter((f) => !knownPaths.has(f.path));
         if (toImport.length === 0) return 0;
 
-        dbg.log(`importChatsFromRepo(): fetching ${toImport.length} new chat(s)`);
+        dbg.log(
+            `importChatsFromRepo(): fetching ${toImport.length} new chat(s)`
+        );
 
         const imported = [];
         for (const file of toImport) {
             try {
-                const fileData = await getContentsFn(owner, repo, file.path, token);
-                const raw = fileData?.content ? atob(fileData.content.replace(/\n/g, "")) : "";
+                const fileData = await getContentsFn(
+                    owner,
+                    repo,
+                    file.path,
+                    token
+                );
+                const raw = fileData?.content
+                    ? atob(fileData.content.replace(/\n/g, ""))
+                    : "";
                 if (!raw) continue;
                 const parsed = parseChatMarkdown(raw, file.path);
                 imported.push({
@@ -221,17 +278,24 @@ export async function importChatsFromRepo(owner, repo, token, getContentsFn, imp
                     surface: parsed.surface || "problem-modal",
                     _githubPath: file.path,
                     _pendingSync: false,
-                    createdAt: parsed.date ? new Date(parsed.date).getTime() : Date.now(),
+                    createdAt: parsed.date
+                        ? new Date(parsed.date).getTime()
+                        : Date.now(),
                     updatedAt: Date.now(),
                 });
             } catch (e) {
-                dbg.warn(`importChatsFromRepo(): failed to import ${file.path}:`, e?.message);
+                dbg.warn(
+                    `importChatsFromRepo(): failed to import ${file.path}:`,
+                    e?.message
+                );
             }
         }
 
         if (imported.length > 0) {
             await importFn(imported);
-            dbg.log(`importChatsFromRepo(): ✓ imported ${imported.length} chat(s)`);
+            dbg.log(
+                `importChatsFromRepo(): ✓ imported ${imported.length} chat(s)`
+            );
         }
         return imported.length;
     } catch (e) {

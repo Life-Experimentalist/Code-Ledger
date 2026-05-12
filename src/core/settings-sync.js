@@ -65,7 +65,9 @@ export async function fetchGitHubConfig(owner, repo, token, gitProvider) {
         return config;
     } catch (e) {
         if (e.message && e.message.includes("404")) {
-            dbg.log("GitHub config does not exist yet (expected for new repos)");
+            dbg.log(
+                "GitHub config does not exist yet (expected for new repos)"
+            );
             return {};
         }
         dbg.warn("Failed to fetch GitHub config:", e?.message);
@@ -82,7 +84,13 @@ export async function fetchGitHubConfig(owner, repo, token, gitProvider) {
  * @param {object} gitProvider - GitHub provider instance
  * @returns {Promise<{committed: boolean, sha: string}>}
  */
-export async function saveGitHubConfig(owner, repo, token, settings, gitProvider) {
+export async function saveGitHubConfig(
+    owner,
+    repo,
+    token,
+    settings,
+    gitProvider
+) {
     try {
         if (!gitProvider) throw new Error("Git provider not available");
 
@@ -145,7 +153,9 @@ export async function syncSettingsFromGitHub() {
         const repo = settings.github_repo || settings.gitRepo;
 
         if (!token || !owner || !repo) {
-            dbg.log("Cannot sync settings: missing GitHub token or repo config");
+            dbg.log(
+                "Cannot sync settings: missing GitHub token or repo config"
+            );
             return { synced: 0, message: "GitHub not configured" };
         }
 
@@ -156,7 +166,12 @@ export async function syncSettingsFromGitHub() {
             throw new Error("GitHub provider not registered");
         }
 
-        const remoteConfig = await fetchGitHubConfig(owner, repo, token, gitProvider);
+        const remoteConfig = await fetchGitHubConfig(
+            owner,
+            repo,
+            token,
+            gitProvider
+        );
         if (!remoteConfig || Object.keys(remoteConfig).length === 0) {
             return { synced: 0, message: "No remote config found" };
         }
@@ -177,7 +192,13 @@ export async function syncSettingsFromGitHub() {
             dbg.log(`Synced ${syncedCount} settings from GitHub`);
         }
 
-        return { synced: syncedCount, message: syncedCount > 0 ? `Synced ${syncedCount} setting(s)` : "Already up-to-date" };
+        return {
+            synced: syncedCount,
+            message:
+                syncedCount > 0
+                    ? `Synced ${syncedCount} setting(s)`
+                    : "Already up-to-date",
+        };
     } catch (e) {
         dbg.error("Settings sync from GitHub failed:", e?.message);
         throw e;
@@ -206,9 +227,18 @@ export async function syncSettingsToGitHub() {
             throw new Error("GitHub provider not registered");
         }
 
-        const result = await saveGitHubConfig(owner, repo, token, settings, gitProvider);
+        const result = await saveGitHubConfig(
+            owner,
+            repo,
+            token,
+            settings,
+            gitProvider
+        );
         dbg.log("Settings synced to GitHub");
-        return { committed: result.committed, message: "Settings synced to GitHub" };
+        return {
+            committed: result.committed,
+            message: "Settings synced to GitHub",
+        };
     } catch (e) {
         dbg.error("Settings sync to GitHub failed:", e?.message);
         throw e;
@@ -226,7 +256,10 @@ export async function autoSyncSettings() {
 
         // Fetch remote config and merge (non-blocking)
         syncSettingsFromGitHub().catch((e) => {
-            dbg.warn("Auto-sync from GitHub failed (non-blocking):", e?.message);
+            dbg.warn(
+                "Auto-sync from GitHub failed (non-blocking):",
+                e?.message
+            );
         });
     } catch (e) {
         dbg.warn("Auto-sync failed:", e?.message);

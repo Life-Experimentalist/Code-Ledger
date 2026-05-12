@@ -39,7 +39,7 @@ export async function apiFetch(url, token, options = {}) {
         if (!res.ok) {
             const errRes = await res.json().catch(() => ({}));
             const err = new Error(
-                `GitHub API Error: ${errRes.message || res.statusText}`,
+                `GitHub API Error: ${errRes.message || res.statusText}`
             );
             err.status = res.status;
             throw err;

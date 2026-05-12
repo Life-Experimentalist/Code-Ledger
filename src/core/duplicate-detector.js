@@ -17,7 +17,9 @@ function normalizeCode(code = "") {
     return code
         .split("\n")
         .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith("//") && !line.startsWith("#"))
+        .filter(
+            (line) => line && !line.startsWith("//") && !line.startsWith("#")
+        )
         .join("\n")
         .toLowerCase();
 }
@@ -60,10 +62,13 @@ export function detectDuplicate(newProblem, allProblems = []) {
         // Check for exact code match (after normalization)
         const existingCodeNorm = normalizeCode(existing.code);
         if (newCodeNorm && newCodeNorm === existingCodeNorm) {
-            dbg.log(`Duplicate detected: ${newTitle} (${newLang}) matches ${existing.titleSlug}`);
+            dbg.log(
+                `Duplicate detected: ${newTitle} (${newLang}) matches ${existing.titleSlug}`
+            );
             return {
                 isDuplicate: true,
-                duplicateOf: existing.id || `${existing.platform}:${existing.titleSlug}`,
+                duplicateOf:
+                    existing.id || `${existing.platform}:${existing.titleSlug}`,
             };
         }
     }
@@ -78,7 +83,9 @@ export function detectDuplicate(newProblem, allProblems = []) {
  * @returns {Map<string, Object>} Map of problem.id -> { isDuplicate, duplicateOf }
  */
 export function detectDuplicateBatch(problems = [], allProblems = []) {
-    dbg.log(`detectDuplicateBatch(): checking ${problems.length} problems against ${allProblems.length} library items`);
+    dbg.log(
+        `detectDuplicateBatch(): checking ${problems.length} problems against ${allProblems.length} library items`
+    );
     const results = new Map();
     for (const problem of problems) {
         const result = detectDuplicate(problem, allProblems);

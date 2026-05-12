@@ -12,10 +12,16 @@
  */
 export function isAcceptedStatusVisible() {
     // Strategy 1: Check ARIA attributes (accessibility first)
-    const ariaStatus = document.querySelector('[role="status"], [role="alert"]');
+    const ariaStatus = document.querySelector(
+        '[role="status"], [role="alert"]'
+    );
     if (ariaStatus && /accepted/i.test(ariaStatus.textContent || "")) {
         const style = window.getComputedStyle(ariaStatus);
-        if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
+        if (
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0"
+        ) {
             return true;
         }
     }
@@ -40,7 +46,7 @@ export function isAcceptedStatusVisible() {
 
     // Strategy 3: Color-based indicators (green text for accept)
     const colorSelectors = [
-        '.text-green-s',
+        ".text-green-s",
         'span[class*="text-green"]',
         '[class*="success"]',
         '[class*="accepted"]',
@@ -50,7 +56,11 @@ export function isAcceptedStatusVisible() {
         const el = document.querySelector(selector);
         if (el && /accepted/i.test(el.textContent || "")) {
             const style = window.getComputedStyle(el);
-            if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
+            if (
+                style.display !== "none" &&
+                style.visibility !== "hidden" &&
+                style.opacity !== "0"
+            ) {
                 return true;
             }
         }
@@ -133,7 +143,9 @@ export function getSubmissionVerdict() {
 
     // Try to extract just the verdict line
     const text = resultEl.textContent || "";
-    const match = text.match(/Accepted|Wrong Answer|Time Limit Exceeded|Runtime Error|Memory Limit Exceeded|Compile Error|Output Limit Exceeded/i);
+    const match = text.match(
+        /Accepted|Wrong Answer|Time Limit Exceeded|Runtime Error|Memory Limit Exceeded|Compile Error|Output Limit Exceeded/i
+    );
     return match ? match[0] : null;
 }
 

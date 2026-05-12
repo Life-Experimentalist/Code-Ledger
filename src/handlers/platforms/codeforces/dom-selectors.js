@@ -4,29 +4,29 @@
  */
 
 export const SELECTORS = {
-  version: '2025-04-24',
+    version: "2025-04-24",
 
-  page: {
-    isProblemPage: '.problem-statement',
-  },
+    page: {
+        isProblemPage: ".problem-statement",
+    },
 
-  problem: {
-    title:       '.title',
-    description: '.problem-statement',
-    tags:        '.tag-box',
-  },
+    problem: {
+        title: ".title",
+        description: ".problem-statement",
+        tags: ".tag-box",
+    },
 
-  submission: {
-    successIndicator: '.verdict-accepted',
-    code:     '#program-source-text',
-    language: '.source-and-history .language',
-    runtime:  '.time-consumed',
-    memory:   '.memory-consumed',
-  },
+    submission: {
+        successIndicator: ".verdict-accepted",
+        code: "#program-source-text",
+        language: ".source-and-history .language",
+        runtime: ".time-consumed",
+        memory: ".memory-consumed",
+    },
 
-  qol: {
-    editorContainer:  '#editor',
-  },
+    qol: {
+        editorContainer: "#editor",
+    },
 };
 
-export const DOMAINS = ['codeforces.com'];
+export const DOMAINS = ["codeforces.com"];

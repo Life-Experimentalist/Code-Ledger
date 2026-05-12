@@ -10,8 +10,17 @@
 import { Storage } from "./storage.js";
 import { canonicalMapper } from "./canonical-mapper.js";
 import { createDebugger } from "../lib/debug.js";
-import { saveInsight, getInsights, deleteInsight, buildKnowledgeContext } from "./memory/knowledge-bank.js";
-import { getAllChats, deleteChat, getChatsByProblem } from "./ai-chat-storage.js";
+import {
+    saveInsight,
+    getInsights,
+    deleteInsight,
+    buildKnowledgeContext,
+} from "./memory/knowledge-bank.js";
+import {
+    getAllChats,
+    deleteChat,
+    getChatsByProblem,
+} from "./ai-chat-storage.js";
 
 const dbg = createDebugger("MCPTools");
 
@@ -22,7 +31,14 @@ const dbg = createDebugger("MCPTools");
 export async function queryProblems(filters = {}) {
     try {
         const allProblems = (await Storage.getAllProblems()) || [];
-        const { platform, difficulty, topic, minSolveTime, maxSolveTime, limit = 20 } = filters;
+        const {
+            platform,
+            difficulty,
+            topic,
+            minSolveTime,
+            maxSolveTime,
+            limit = 20,
+        } = filters;
 
         let results = allProblems;
 
@@ -40,10 +56,14 @@ export async function queryProblems(filters = {}) {
             });
         }
         if (minSolveTime !== undefined) {
-            results = results.filter((p) => (p.elapsedSeconds || 0) >= minSolveTime);
+            results = results.filter(
+                (p) => (p.elapsedSeconds || 0) >= minSolveTime
+            );
         }
         if (maxSolveTime !== undefined) {
-            results = results.filter((p) => (p.elapsedSeconds || 0) <= maxSolveTime);
+            results = results.filter(
+                (p) => (p.elapsedSeconds || 0) <= maxSolveTime
+            );
         }
 
         return {
@@ -107,14 +127,20 @@ export async function getNextProblemSuggestion() {
         const topicStats = {};
         allProblems.forEach((p) => {
             const topic = (p.tags && p.tags[0]) || "uncategorized";
-            topicStats[topic] = topicStats[topic] || { count: 0, avgTime: 0, totalTime: 0 };
+            topicStats[topic] = topicStats[topic] || {
+                count: 0,
+                avgTime: 0,
+                totalTime: 0,
+            };
             topicStats[topic].count += 1;
             topicStats[topic].totalTime += p.elapsedSeconds || 0;
         });
 
         Object.keys(topicStats).forEach((topic) => {
             if (topicStats[topic].count > 0) {
-                topicStats[topic].avgTime = Math.round(topicStats[topic].totalTime / topicStats[topic].count);
+                topicStats[topic].avgTime = Math.round(
+                    topicStats[topic].totalTime / topicStats[topic].count
+                );
             }
         });
 
@@ -125,22 +151,25 @@ export async function getNextProblemSuggestion() {
             .map(([topic, stats]) => ({ topic, ...stats }));
 
         // Suggest problem from weakest topic
-        const suggestion = weakestTopics.length > 0
-            ? allProblems.find((p) => (p.tags && p.tags[0]) === weakestTopics[0].topic)
-            : allProblems[0];
+        const suggestion =
+            weakestTopics.length > 0
+                ? allProblems.find(
+                      (p) => (p.tags && p.tags[0]) === weakestTopics[0].topic
+                  )
+                : allProblems[0];
 
         return {
             ok: true,
             weakTopics: weakestTopics,
             suggested: suggestion
                 ? {
-                    id: suggestion.id,
-                    title: suggestion.title,
-                    platform: suggestion.platform,
-                    difficulty: suggestion.difficulty,
-                    topic: weakestTopics[0]?.topic || "general",
-                    rationale: `You have only solved ${weakestTopics[0]?.count || 0} problems in ${weakestTopics[0]?.topic || "this topic"}. Strengthening this area will improve your overall performance.`,
-                }
+                      id: suggestion.id,
+                      title: suggestion.title,
+                      platform: suggestion.platform,
+                      difficulty: suggestion.difficulty,
+                      topic: weakestTopics[0]?.topic || "general",
+                      rationale: `You have only solved ${weakestTopics[0]?.count || 0} problems in ${weakestTopics[0]?.topic || "this topic"}. Strengthening this area will improve your overall performance.`,
+                  }
                 : null,
         };
     } catch (e) {
@@ -167,16 +196,17 @@ export async function analyzeCodeQuality(code, problemId) {
             code: {
                 lineCount: code.split("\n").length,
                 hasComments: /\/\/|\/\*/.test(code),
-                hasTypeAnnotations: /:\s*(int|str|bool|list|dict|void|function)/i.test(code),
+                hasTypeAnnotations:
+                    /:\s*(int|str|bool|list|dict|void|function)/i.test(code),
                 estimatedComplexity: estimateComplexity(code),
                 edgeCasesDetected: detectEdgeCases(code),
             },
             problem: problem
                 ? {
-                    title: problem.title,
-                    difficulty: problem.difficulty,
-                    constraints: "See problem statement for full constraints",
-                }
+                      title: problem.title,
+                      difficulty: problem.difficulty,
+                      constraints: "See problem statement for full constraints",
+                  }
                 : null,
             suggestions: generateSuggestions(code, problem),
         };
@@ -216,7 +246,10 @@ export async function getTrendAnalysis(days = 30) {
             .map(([date, stats]) => ({
                 date,
                 problemsSolved: stats.count,
-                avgTimePerProblem: stats.count > 0 ? Math.round(stats.totalTime / stats.count) : 0,
+                avgTimePerProblem:
+                    stats.count > 0
+                        ? Math.round(stats.totalTime / stats.count)
+                        : 0,
                 topTopics: Object.entries(stats.topics)
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 3)
@@ -238,7 +271,15 @@ export async function getTrendAnalysis(days = 30) {
             ok: true,
             period: `Last ${days} days`,
             totalSolves: recent.length,
-            averageTimePerSolve: recent.length > 0 ? Math.round(recent.reduce((s, p) => s + (p.elapsedSeconds || 0), 0) / recent.length) : 0,
+            averageTimePerSolve:
+                recent.length > 0
+                    ? Math.round(
+                          recent.reduce(
+                              (s, p) => s + (p.elapsedSeconds || 0),
+                              0
+                          ) / recent.length
+                      )
+                    : 0,
             daily: dailyData,
             platforms: platformDist,
             difficulties: difficultyDist,
@@ -272,7 +313,9 @@ export async function findSimilarProblems(problemId, limit = 5) {
                 if (p.platform === targetProblem.platform) score += 1;
 
                 // Shared tags +1 per tag
-                const commonTags = (p.tags || []).filter((t) => (targetProblem.tags || []).includes(t)).length;
+                const commonTags = (p.tags || []).filter((t) =>
+                    (targetProblem.tags || []).includes(t)
+                ).length;
                 score += commonTags;
 
                 return { ...p, similarity: score };
@@ -319,10 +362,13 @@ export async function getUserProfileContext() {
 
         allProblems.forEach((p) => {
             platformDist[p.platform] = (platformDist[p.platform] || 0) + 1;
-            if (p.lang) languageDist[p.lang.name || p.lang] = (languageDist[p.lang.name || p.lang] || 0) + 1;
+            if (p.lang)
+                languageDist[p.lang.name || p.lang] =
+                    (languageDist[p.lang.name || p.lang] || 0) + 1;
             const topic = (p.tags && p.tags[0]) || "uncategorized";
             topicDist[topic] = (topicDist[topic] || 0) + 1;
-            difficultyDist[p.difficulty || "unknown"] = (difficultyDist[p.difficulty || "unknown"] || 0) + 1;
+            difficultyDist[p.difficulty || "unknown"] =
+                (difficultyDist[p.difficulty || "unknown"] || 0) + 1;
             totalTime += p.elapsedSeconds || 0;
         });
 
@@ -351,7 +397,10 @@ export async function getUserProfileContext() {
             profile: {
                 totalProblems: allProblems.length,
                 totalTime,
-                averageTimePerProblem: allProblems.length > 0 ? Math.round(totalTime / allProblems.length) : 0,
+                averageTimePerProblem:
+                    allProblems.length > 0
+                        ? Math.round(totalTime / allProblems.length)
+                        : 0,
                 topPlatforms,
                 topLanguages,
                 topTopics,
@@ -368,24 +417,32 @@ export async function getUserProfileContext() {
 // ===== Internal Helpers =====
 
 function estimateComplexity(code) {
-    const hasNestedLoop = /for.*for|while.*while|for.*while|while.*for/.test(code);
-    const hasRecursion = /function.*{[\s\S]*?\(/.test(code) || /def.*:[\s\S]*?\(/.test(code);
+    const hasNestedLoop = /for.*for|while.*while|for.*while|while.*for/.test(
+        code
+    );
+    const hasRecursion =
+        /function.*{[\s\S]*?\(/.test(code) || /def.*:[\s\S]*?\(/.test(code);
     const hasSort = /sort|sorted/.test(code);
 
     if (hasNestedLoop) return "O(n²) or worse (nested loops)";
-    if (hasRecursion) return "Likely exponential or linear (recursion detected)";
+    if (hasRecursion)
+        return "Likely exponential or linear (recursion detected)";
     if (hasSort) return "O(n log n) (sort detected)";
     return "O(n) or better (linear scan)";
 }
 
 function detectEdgeCases(code) {
     const cases = [];
-    if (/length.*===?.*0|empty|null|undefined/.test(code)) cases.push("Empty input");
+    if (/length.*===?.*0|empty|null|undefined/.test(code))
+        cases.push("Empty input");
     if (/length.*===?.*1|single/.test(code)) cases.push("Single element");
-    if (/===?\s*null|===?\s*undefined/.test(code)) cases.push("Null/undefined check");
+    if (/===?\s*null|===?\s*undefined/.test(code))
+        cases.push("Null/undefined check");
     if (/negative|< 0/.test(code)) cases.push("Negative values");
     if (/overflow|MAX|MIN/.test(code)) cases.push("Integer overflow");
-    return cases.length > 0 ? cases : ["No explicit edge case handling detected"];
+    return cases.length > 0
+        ? cases
+        : ["No explicit edge case handling detected"];
 }
 
 function generateSuggestions(code, problem) {
@@ -396,26 +453,46 @@ function generateSuggestions(code, problem) {
     }
 
     if (code.split("\n").length > 100) {
-        suggestions.push("Consider breaking the solution into smaller helper functions");
+        suggestions.push(
+            "Consider breaking the solution into smaller helper functions"
+        );
     }
 
     if (/\.includes|\.indexOf|\.find/.test(code) && code.includes("for")) {
-        suggestions.push("Consider using a Set or Map instead of nested loop searches for better performance");
+        suggestions.push(
+            "Consider using a Set or Map instead of nested loop searches for better performance"
+        );
     }
 
-    if (!detectEdgeCases(code).some((c) => c !== "No explicit edge case handling detected")) {
-        suggestions.push("Add explicit edge case handling for empty inputs, null values, and boundary conditions");
+    if (
+        !detectEdgeCases(code).some(
+            (c) => c !== "No explicit edge case handling detected"
+        )
+    ) {
+        suggestions.push(
+            "Add explicit edge case handling for empty inputs, null values, and boundary conditions"
+        );
     }
 
-    return suggestions.length > 0 ? suggestions : ["Code looks clean. Consider testing edge cases thoroughly."];
+    return suggestions.length > 0
+        ? suggestions
+        : ["Code looks clean. Consider testing edge cases thoroughly."];
 }
 
 // ── Knowledge Bank tools ──────────────────────────────────────────────────────
 
 export async function rememberInsight({ topic, content, tags }) {
     try {
-        const id = await saveInsight({ topic: topic || "general", content, tags });
-        return { ok: true, id, message: `Remembered: "${content}" under topic "${topic || "general"}"` };
+        const id = await saveInsight({
+            topic: topic || "general",
+            content,
+            tags,
+        });
+        return {
+            ok: true,
+            id,
+            message: `Remembered: "${content}" under topic "${topic || "general"}"`,
+        };
     } catch (e) {
         return { ok: false, error: String(e) };
     }
@@ -453,9 +530,16 @@ export async function getKnowledgeContext() {
 export async function setRoadmap({ name, problems }) {
     try {
         const settings = await Storage.getSettings();
-        const roadmap = { name: name || "My Roadmap", problems: Array.isArray(problems) ? problems : [], createdAt: Date.now() };
+        const roadmap = {
+            name: name || "My Roadmap",
+            problems: Array.isArray(problems) ? problems : [],
+            createdAt: Date.now(),
+        };
         await Storage.setSettings({ ...settings, _activeRoadmap: roadmap });
-        return { ok: true, message: `Roadmap "${roadmap.name}" saved with ${roadmap.problems.length} problems.` };
+        return {
+            ok: true,
+            message: `Roadmap "${roadmap.name}" saved with ${roadmap.problems.length} problems.`,
+        };
     } catch (e) {
         return { ok: false, error: String(e) };
     }
@@ -465,19 +549,35 @@ export async function getRoadmapProgress() {
     try {
         const settings = await Storage.getSettings();
         const roadmap = settings._activeRoadmap;
-        if (!roadmap) return { ok: true, roadmap: null, message: "No active roadmap set. Share one with 'set-roadmap'." };
+        if (!roadmap)
+            return {
+                ok: true,
+                roadmap: null,
+                message: "No active roadmap set. Share one with 'set-roadmap'.",
+            };
         const allProblems = await Storage.getAllProblems();
-        const solvedSlugs = new Set(allProblems.map(p => p.titleSlug || p.id));
+        const solvedSlugs = new Set(
+            allProblems.map((p) => p.titleSlug || p.id)
+        );
         const total = roadmap.problems.length;
-        const done = roadmap.problems.filter(p => {
-            const slug = typeof p === "string" ? p : (p.slug || p.titleSlug || p.id || "");
+        const done = roadmap.problems.filter((p) => {
+            const slug =
+                typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
             return solvedSlugs.has(slug);
         }).length;
-        const nextProblem = roadmap.problems.find(p => {
-            const slug = typeof p === "string" ? p : (p.slug || p.titleSlug || p.id || "");
+        const nextProblem = roadmap.problems.find((p) => {
+            const slug =
+                typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
             return !solvedSlugs.has(slug);
         });
-        return { ok: true, roadmap: roadmap.name, total, done, remaining: total - done, nextProblem: nextProblem || null };
+        return {
+            ok: true,
+            roadmap: roadmap.name,
+            total,
+            done,
+            remaining: total - done,
+            nextProblem: nextProblem || null,
+        };
     } catch (e) {
         return { ok: false, error: String(e) };
     }
@@ -491,7 +591,17 @@ export async function getChats({ problemSlug, limit }) {
             ? await getChatsByProblem(problemSlug)
             : await getAllChats();
         const sliced = (chats || []).slice(0, limit || 20);
-        return { ok: true, count: sliced.length, chats: sliced.map(c => ({ id: c.id, title: c.meta?.title || c.meta?.summary || "(untitled)", problemSlug: c.problemSlug, createdAt: c.createdAt, messageCount: (c.messages || []).length })) };
+        return {
+            ok: true,
+            count: sliced.length,
+            chats: sliced.map((c) => ({
+                id: c.id,
+                title: c.meta?.title || c.meta?.summary || "(untitled)",
+                problemSlug: c.problemSlug,
+                createdAt: c.createdAt,
+                messageCount: (c.messages || []).length,
+            })),
+        };
     } catch (e) {
         return { ok: false, error: String(e) };
     }
@@ -513,7 +623,12 @@ export async function openProblem({ url, platform }) {
     // This tool returns the URL for the caller to open.
     const cleanUrl = String(url || "").trim();
     if (!cleanUrl) return { ok: false, error: "url is required" };
-    return { ok: true, action: "open_url", url: cleanUrl, platform: platform || "leetcode" };
+    return {
+        ok: true,
+        action: "open_url",
+        url: cleanUrl,
+        platform: platform || "leetcode",
+    };
 }
 
 /**
@@ -523,16 +638,32 @@ export const MCP_TOOLS = [
     {
         id: "query-problems",
         name: "Query Problems",
-        description: "Search for problems by platform, difficulty, topic, or solve time",
+        description:
+            "Search for problems by platform, difficulty, topic, or solve time",
         parameters: {
             type: "object",
             properties: {
-                platform: { type: "string", description: "Platform filter (e.g., 'leetcode')" },
-                difficulty: { type: "string", enum: ["Easy", "Medium", "Hard"] },
+                platform: {
+                    type: "string",
+                    description: "Platform filter (e.g., 'leetcode')",
+                },
+                difficulty: {
+                    type: "string",
+                    enum: ["Easy", "Medium", "Hard"],
+                },
                 topic: { type: "string", description: "Topic/tag filter" },
-                minSolveTime: { type: "number", description: "Minimum solve time in seconds" },
-                maxSolveTime: { type: "number", description: "Maximum solve time in seconds" },
-                limit: { type: "number", description: "Max results to return (default 20)" },
+                minSolveTime: {
+                    type: "number",
+                    description: "Minimum solve time in seconds",
+                },
+                maxSolveTime: {
+                    type: "number",
+                    description: "Maximum solve time in seconds",
+                },
+                limit: {
+                    type: "number",
+                    description: "Max results to return (default 20)",
+                },
             },
         },
         handler: (args) => queryProblems(args),
@@ -544,7 +675,10 @@ export const MCP_TOOLS = [
         parameters: {
             type: "object",
             properties: {
-                problemId: { type: "string", description: "Problem ID to analyze" },
+                problemId: {
+                    type: "string",
+                    description: "Problem ID to analyze",
+                },
             },
             required: ["problemId"],
         },
@@ -553,7 +687,8 @@ export const MCP_TOOLS = [
     {
         id: "get-next-suggestion",
         name: "Get Next Problem Suggestion",
-        description: "Analyze weak topics and suggest the next best problem to solve",
+        description:
+            "Analyze weak topics and suggest the next best problem to solve",
         parameters: {
             type: "object",
             properties: {},
@@ -563,12 +698,16 @@ export const MCP_TOOLS = [
     {
         id: "analyze-code-quality",
         name: "Analyze Code Quality",
-        description: "Analyze code for complexity, edge cases, and improvement opportunities",
+        description:
+            "Analyze code for complexity, edge cases, and improvement opportunities",
         parameters: {
             type: "object",
             properties: {
                 code: { type: "string", description: "Code to analyze" },
-                problemId: { type: "string", description: "Optional problem context" },
+                problemId: {
+                    type: "string",
+                    description: "Optional problem context",
+                },
             },
             required: ["code"],
         },
@@ -577,11 +716,15 @@ export const MCP_TOOLS = [
     {
         id: "get-trend-analysis",
         name: "Get Trend Analysis",
-        description: "Analyze solving trends over time, platform distribution, and difficulty progression",
+        description:
+            "Analyze solving trends over time, platform distribution, and difficulty progression",
         parameters: {
             type: "object",
             properties: {
-                days: { type: "number", description: "Number of days to analyze (default 30)" },
+                days: {
+                    type: "number",
+                    description: "Number of days to analyze (default 30)",
+                },
             },
         },
         handler: (args) => getTrendAnalysis(args.days),
@@ -589,12 +732,19 @@ export const MCP_TOOLS = [
     {
         id: "find-similar-problems",
         name: "Find Similar Problems",
-        description: "Find problems similar to a given problem based on tags, difficulty, and platform",
+        description:
+            "Find problems similar to a given problem based on tags, difficulty, and platform",
         parameters: {
             type: "object",
             properties: {
-                problemId: { type: "string", description: "Problem ID to find similar problems for" },
-                limit: { type: "number", description: "Max similar problems to return (default 5)" },
+                problemId: {
+                    type: "string",
+                    description: "Problem ID to find similar problems for",
+                },
+                limit: {
+                    type: "number",
+                    description: "Max similar problems to return (default 5)",
+                },
             },
             required: ["problemId"],
         },
@@ -603,7 +753,8 @@ export const MCP_TOOLS = [
     {
         id: "get-user-profile",
         name: "Get User Profile",
-        description: "Get comprehensive user profile: solved problems, weak topics, platform distribution, preferred languages",
+        description:
+            "Get comprehensive user profile: solved problems, weak topics, platform distribution, preferred languages",
         parameters: {
             type: "object",
             properties: {},
@@ -614,13 +765,25 @@ export const MCP_TOOLS = [
     {
         id: "remember",
         name: "Remember Insight",
-        description: "Save a note, preference, or observation to the user's persistent knowledge bank",
+        description:
+            "Save a note, preference, or observation to the user's persistent knowledge bank",
         parameters: {
             type: "object",
             properties: {
-                topic: { type: "string", description: "Topic category (e.g. 'trees', 'learning-style', 'roadmap')" },
-                content: { type: "string", description: "The insight or note to remember" },
-                tags: { type: "array", items: { type: "string" }, description: "Optional tags" },
+                topic: {
+                    type: "string",
+                    description:
+                        "Topic category (e.g. 'trees', 'learning-style', 'roadmap')",
+                },
+                content: {
+                    type: "string",
+                    description: "The insight or note to remember",
+                },
+                tags: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Optional tags",
+                },
             },
             required: ["content"],
         },
@@ -629,12 +792,19 @@ export const MCP_TOOLS = [
     {
         id: "recall",
         name: "Recall Insights",
-        description: "Retrieve stored insights from the knowledge bank, optionally filtered by topic",
+        description:
+            "Retrieve stored insights from the knowledge bank, optionally filtered by topic",
         parameters: {
             type: "object",
             properties: {
-                topic: { type: "string", description: "Filter by topic (omit for all)" },
-                limit: { type: "number", description: "Max results (default 20)" },
+                topic: {
+                    type: "string",
+                    description: "Filter by topic (omit for all)",
+                },
+                limit: {
+                    type: "number",
+                    description: "Max results (default 20)",
+                },
             },
         },
         handler: (args) => recallInsights(args),
@@ -656,12 +826,17 @@ export const MCP_TOOLS = [
     {
         id: "set-roadmap",
         name: "Set Roadmap",
-        description: "Save a DSA study roadmap (list of problem slugs or objects with slug/title)",
+        description:
+            "Save a DSA study roadmap (list of problem slugs or objects with slug/title)",
         parameters: {
             type: "object",
             properties: {
                 name: { type: "string", description: "Roadmap name" },
-                problems: { type: "array", description: "Array of problem slugs or {slug, title, difficulty} objects" },
+                problems: {
+                    type: "array",
+                    description:
+                        "Array of problem slugs or {slug, title, difficulty} objects",
+                },
             },
             required: ["problems"],
         },
@@ -670,7 +845,8 @@ export const MCP_TOOLS = [
     {
         id: "get-roadmap-progress",
         name: "Get Roadmap Progress",
-        description: "Get progress on the active DSA roadmap: how many done, what's next",
+        description:
+            "Get progress on the active DSA roadmap: how many done, what's next",
         parameters: { type: "object", properties: {} },
         handler: () => getRoadmapProgress(),
     },
@@ -678,12 +854,19 @@ export const MCP_TOOLS = [
     {
         id: "get-chats",
         name: "Get Saved Chats",
-        description: "Retrieve saved AI chat conversations, optionally filtered by problem slug",
+        description:
+            "Retrieve saved AI chat conversations, optionally filtered by problem slug",
         parameters: {
             type: "object",
             properties: {
-                problemSlug: { type: "string", description: "Filter by problem slug (omit for all chats)" },
-                limit: { type: "number", description: "Max results (default 20)" },
+                problemSlug: {
+                    type: "string",
+                    description: "Filter by problem slug (omit for all chats)",
+                },
+                limit: {
+                    type: "number",
+                    description: "Max results (default 20)",
+                },
             },
         },
         handler: (args) => getChats(args),
@@ -691,7 +874,8 @@ export const MCP_TOOLS = [
     {
         id: "delete-chat",
         name: "Delete Chat",
-        description: "Permanently delete a saved chat by id (requires user confirmation before calling)",
+        description:
+            "Permanently delete a saved chat by id (requires user confirmation before calling)",
         parameters: {
             type: "object",
             properties: {
@@ -710,7 +894,11 @@ export const MCP_TOOLS = [
             type: "object",
             properties: {
                 url: { type: "string", description: "Full problem URL" },
-                platform: { type: "string", description: "Platform hint: leetcode|geeksforgeeks|codeforces" },
+                platform: {
+                    type: "string",
+                    description:
+                        "Platform hint: leetcode|geeksforgeeks|codeforces",
+                },
             },
             required: ["url"],
         },

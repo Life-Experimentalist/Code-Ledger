@@ -15,14 +15,14 @@
  * @returns {object[]} tree items ready for POST /git/trees
  */
 export function buildTreeItems(files, deletes = []) {
-    const items = (files || []).map(f => ({
+    const items = (files || []).map((f) => ({
         path: f.path,
         mode: "100644",
         type: "blob",
         content: f.content,
     }));
 
-    for (const delPath of (deletes || [])) {
+    for (const delPath of deletes || []) {
         items.push({ path: delPath, mode: "100644", type: "blob", sha: null });
     }
 
@@ -40,7 +40,13 @@ export function buildTreeItems(files, deletes = []) {
  * @param {object} [user]  - { name, login, email } from getCurrentUser
  * @returns {object} commit payload
  */
-export function buildCommitPayload(message, treeSha, parentSha, opts = {}, user = {}) {
+export function buildCommitPayload(
+    message,
+    treeSha,
+    parentSha,
+    opts = {},
+    user = {}
+) {
     const payload = {
         message,
         tree: treeSha,
@@ -50,7 +56,9 @@ export function buildCommitPayload(message, treeSha, parentSha, opts = {}, user 
     if (opts.date) {
         const iso = new Date(opts.date).toISOString();
         const authorName = user.name || user.login || "CodeLedger";
-        const authorEmail = user.email || `${user.login || "codeledger"}@users.noreply.github.com`;
+        const authorEmail =
+            user.email ||
+            `${user.login || "codeledger"}@users.noreply.github.com`;
         payload.author = { name: authorName, email: authorEmail, date: iso };
         payload.committer = { ...payload.author };
     }

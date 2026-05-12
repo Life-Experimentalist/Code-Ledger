@@ -46,11 +46,13 @@ export function generateProblemMarkdown(problem) {
     }
 
     // Format timestamp
-    const dateStr = timestamp ? new Date(timestamp).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    }) : "Unknown";
+    const dateStr = timestamp
+        ? new Date(timestamp).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+          })
+        : "Unknown";
 
     // Build markdown
     const lines = [
@@ -236,7 +238,12 @@ export function generateProblemsIndexMarkdown(problems) {
 
         for (const p of probs) {
             const mdFile = `${p.titleSlug}.md`;
-            const badge = p.difficulty === "Easy" ? "🟢" : p.difficulty === "Medium" ? "🟡" : "🔴";
+            const badge =
+                p.difficulty === "Easy"
+                    ? "🟢"
+                    : p.difficulty === "Medium"
+                      ? "🟡"
+                      : "🔴";
             lines.push(`- ${badge} [${p.title}](./${mdFile})`);
         }
 

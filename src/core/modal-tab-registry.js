@@ -22,38 +22,38 @@
  */
 
 class ModalTabRegistry {
-  constructor() {
-    this._tabs = new Map(); // platform → [{id, label, show, render}]
-  }
+    constructor() {
+        this._tabs = new Map(); // platform → [{id, label, show, render}]
+    }
 
-  /**
-   * Register tabs for a platform.
-   * Use platform = "*" for tabs that appear on all platforms.
-   * Platform-specific tabs are appended after global "*" tabs.
-   */
-  register(platform, tabs) {
-    this._tabs.set(platform, tabs);
-  }
+    /**
+     * Register tabs for a platform.
+     * Use platform = "*" for tabs that appear on all platforms.
+     * Platform-specific tabs are appended after global "*" tabs.
+     */
+    register(platform, tabs) {
+        this._tabs.set(platform, tabs);
+    }
 
-  /**
-   * Return the resolved tab list for a problem.
-   * Order: global "*" tabs first, then platform-specific tabs.
-   * Tabs with show(problem) === false are excluded.
-   */
-  getTabs(platform, problem) {
-    const global   = this._tabs.get("*")   || [];
-    const specific = this._tabs.get(platform) || [];
-    const all = [...global, ...specific];
-    return all.filter(tab => !tab.show || tab.show(problem));
-  }
+    /**
+     * Return the resolved tab list for a problem.
+     * Order: global "*" tabs first, then platform-specific tabs.
+     * Tabs with show(problem) === false are excluded.
+     */
+    getTabs(platform, problem) {
+        const global = this._tabs.get("*") || [];
+        const specific = this._tabs.get(platform) || [];
+        const all = [...global, ...specific];
+        return all.filter((tab) => !tab.show || tab.show(problem));
+    }
 
-  /** Return a tab's render function by id and platform. */
-  getRenderer(platform, tabId) {
-    const global   = this._tabs.get("*")   || [];
-    const specific = this._tabs.get(platform) || [];
-    const all = [...global, ...specific];
-    return all.find(t => t.id === tabId)?.render || null;
-  }
+    /** Return a tab's render function by id and platform. */
+    getRenderer(platform, tabId) {
+        const global = this._tabs.get("*") || [];
+        const specific = this._tabs.get(platform) || [];
+        const all = [...global, ...specific];
+        return all.find((t) => t.id === tabId)?.render || null;
+    }
 }
 
 export const modalTabRegistry = new ModalTabRegistry();
