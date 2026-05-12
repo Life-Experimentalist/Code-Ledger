@@ -515,7 +515,13 @@ export function ProblemModal({
     };
 
     const handleGenerateAIReview = async () => {
-        if (reviewBusy || !problem?.code) return;
+        if (reviewBusy) return;
+        if (!problem?.code) {
+            setReviewError(
+                "No code saved for this problem. Solve it on the platform first."
+            );
+            return;
+        }
         if (typeof chrome === "undefined" || !chrome.runtime?.id) {
             setReviewError("Extension not available.");
             return;
