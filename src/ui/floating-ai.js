@@ -14,12 +14,13 @@ import { Storage } from "../core/storage.js";
 
 import { expandChatVariables, getUsedCommands, CHAT_COMMANDS } from "../lib/chat-variables.js";
 const DEFAULT_PLATFORM = {
-  id: "leetcode",
+  id: "generic",
   label: "AI Assistant",
   chatPlatform: "leetcode",
   titleFallback: "",
-  readPageMeta: readLeetCodePageMeta,
+  readPageMeta: readGenericPageMeta,
   readEditorCode: readMonacoEditorCode,
+  readTestFailures: readGenericTestFailures,
   buildChatContext: null,
   openAIChatsPage: null,
 };
@@ -43,17 +44,12 @@ function readMonacoEditorCode() {
   return "";
 }
 
-function readLeetCodePageMeta() {
-  const titleEl =
-    document.querySelector('[data-e2e-locator="question-title"]') ||
-    document.querySelector('[data-cy="question-title"]') ||
-    document.querySelector("h1");
-  const diffEl =
-    document.querySelector('[data-e2e-locator="question-difficulty"]') ||
-    document.querySelector("div[diff]");
+function readGenericPageMeta() {
+  const titleEl = document.querySelector("h1") || document.querySelector("h2");
+  const title = titleEl?.textContent?.trim() || document.title || "";
   return {
-    title: titleEl?.textContent?.trim() || "",
-    difficulty: diffEl?.textContent?.trim() || "",
+    title,
+    difficulty: "",
   };
 }
 
@@ -79,40 +75,16 @@ function readEditorCode() {
   return "";
 }
 
-/** Reads test failure output from LeetCode's result panel. */
-function readTestFailures() {
+/** Reads generic failure-like output in a platform-agnostic way. */
+function readGenericTestFailures() {
   try {
     const resultLines = [];
-    // Runtime error / compile error banner
-    const errorBanner = document.querySelector('[data-e2e-locator="console-result"]');
-    if (errorBanner) resultLines.push(errorBanner.textContent.trim());
-    // Wrong answer / TLE detail blocks
-    document.querySelectorAll(".testcase-result-block, [data-e2e-locator='submission-result']").forEach((el) => {
-      const t = el.textContent.trim();
-      if (t) resultLines.push(t);
+    document.querySelectorAll("pre, .console-output, [role='alert']").forEach((el) => {
+      const t = (el.textContent || "").trim();
+      if (t && t.length > 4) resultLines.push(t);
     });
-    // stdout / stderr panels
-    document.querySelectorAll(".result-panel pre, .console-output pre").forEach((el) => {
-      const t = el.textContent.trim();
-      if (t) resultLines.push(t);
-    });
-    return resultLines.filter(Boolean).join("\n\n");
+    return resultLines.filter(Boolean).slice(0, 8).join("\n\n");
   } catch { return ""; }
-}
-
-/** Reads page metadata — problem title and difficulty. */
-function readPageMeta() {
-  const titleEl =
-    document.querySelector('[data-e2e-locator="question-title"]') ||
-    document.querySelector('[data-cy="question-title"]') ||
-    document.querySelector("h1");
-  const diffEl =
-    document.querySelector('[data-e2e-locator="question-difficulty"]') ||
-    document.querySelector("div[diff]");
-  return {
-    title: titleEl?.textContent?.trim() || "",
-    difficulty: diffEl?.textContent?.trim() || "",
-  };
 }
 
 const PANEL_STYLE = `
@@ -277,7 +249,7 @@ export function createFloatingAI(slug = "", opts = {}) {
     overflow: "hidden",
     lineHeight: "1.4",
     maxHeight: "120px",
-    overflowY: "auto",
+    overflowY: "hidden",
     fontFamily: "inherit",
     transition: "border-color 0.15s",
   });
@@ -343,9 +315,9 @@ export function createFloatingAI(slug = "", opts = {}) {
       item.addEventListener("mouseleave", () => { item.style.background = ""; });
       item.addEventListener("mousedown", e => {
         e.preventDefault();
-        const val       = input.value;
+        const val = input.value;
         const lastSlash = val.lastIndexOf("/");
-        input.value     = val.slice(0, lastSlash) + "/" + cmd.id + " ";
+        input.value = val.slice(0, lastSlash) + "/" + cmd.id + " ";
         hideAutocomplete();
         autoGrow();
         input.focus();
@@ -505,7 +477,7 @@ export function createFloatingAI(slug = "", opts = {}) {
   }
 
   function buildSaveRecord() {
-    const pageMeta = typeof platform.readPageMeta === "function" ? platform.readPageMeta({ slug, window, document }) : readPageMeta();
+    const pageMeta = typeof platform.readPageMeta === "function" ? platform.readPageMeta({ slug, window, document }) : readGenericPageMeta();
     const code = (typeof platform.readEditorCode === "function" ? platform.readEditorCode({ slug, window, document }) : readEditorCode()) || "";
     const latestUserMessage = [...messages].reverse().find((msg) => msg?.role === "user")?.content || "";
     const context = buildAIChatContext({
@@ -708,8 +680,8 @@ export function createFloatingAI(slug = "", opts = {}) {
     if (!text || pending) return;
 
     const code = (typeof platform.readEditorCode === "function" ? platform.readEditorCode({ slug, window, document }) : readEditorCode()) || "";
-    const pageMeta = typeof platform.readPageMeta === "function" ? platform.readPageMeta({ slug, window, document }) : readPageMeta();
-    const rawErrors = (typeof platform.readTestFailures === "function" ? platform.readTestFailures({ slug, window, document }) : readTestFailures()) || "";
+    const pageMeta = typeof platform.readPageMeta === "function" ? platform.readPageMeta({ slug, window, document }) : readGenericPageMeta();
+    const rawErrors = (typeof platform.readTestFailures === "function" ? platform.readTestFailures({ slug, window, document }) : readGenericTestFailures()) || "";
     const baseContext = buildAIChatContext({
       surface: "floating-panel",
       text,
@@ -860,7 +832,7 @@ export function createFloatingAI(slug = "", opts = {}) {
 
   input.addEventListener("input", () => {
     autoGrow();
-    const val   = input.value;
+    const val = input.value;
     const match = val.match(/\/(\w*)$/);
     if (match) {
       showAutocomplete(match[1]);

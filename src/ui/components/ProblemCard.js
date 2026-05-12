@@ -41,7 +41,7 @@ const DIFF_STYLE = {
  * @param {function} [onSelect] - if provided, clicking the card body opens the modal;
  *                                 the "↗" link still navigates directly to the platform.
  */
-export function ProblemCard({ problem, onSelect, onRefresh }) {
+export function ProblemCard({ problem, onSelect, onRefresh, selectionMode = false, selected = false, onToggleSelect }) {
   const diffStyle = DIFF_STYLE[problem.difficulty] || "bg-slate-500/10 text-slate-400 border border-slate-500/30";
   const meta = PLATFORM_META[problem.platform] || { label: problem.platform, color: "#64748b", url: () => "#", favicon: null };
   const problemUrl = meta.url(problem.titleSlug || problem.id || "");
@@ -58,11 +58,23 @@ export function ProblemCard({ problem, onSelect, onRefresh }) {
     <div
       class="cl-problem-card p-5 bg-[#0a0a0f] rounded-2xl border border-white/5 relative overflow-hidden group
              hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(6,182,212,0.1)] transition-all flex flex-col gap-3
-             ${onSelect ? "cursor-pointer" : ""}"
+             ${onSelect ? "cursor-pointer" : ""} ${selectionMode && selected ? "border-cyan-500/50" : ""}"
       onClick=${handleClick}
     >
       <!-- Background glow on hover -->
       <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(6,182,212,0.05),transparent)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+
+      ${selectionMode ? html`
+        <label class="absolute top-3 right-3 z-20 flex items-center gap-1 text-[10px] text-slate-300 bg-black/60 border border-white/10 rounded px-1.5 py-1" onClick=${(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked=${selected}
+            onChange=${() => onToggleSelect?.(problem)}
+            class="accent-cyan-500"
+          />
+          Select
+        </label>
+      ` : ""}
 
       <!-- Header: title + platform badge -->
       <div class="flex items-start justify-between gap-2 z-10">

@@ -12,8 +12,8 @@ import { Storage } from "../../core/storage.js";
 const html = htm.bind(h);
 
 const PROVIDERS = [
-  { id: "github",    label: "GitHub" },
-  { id: "gitlab",    label: "GitLab" },
+  { id: "github", label: "GitHub" },
+  { id: "gitlab", label: "GitLab" },
   { id: "bitbucket", label: "Bitbucket" },
 ];
 
@@ -21,13 +21,13 @@ const EMPTY_MIRROR = { provider: "github", repo: "", owner: "" };
 
 export function MirrorsPanel() {
   const [mirrors, setMirrors] = useState([]);
-  const [draft,   setDraft]   = useState({ ...EMPTY_MIRROR });
-  const [status,  setStatus]  = useState("");
+  const [draft, setDraft] = useState({ ...EMPTY_MIRROR });
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
     Storage.getSettings()
       .then((s) => setMirrors(Array.isArray(s?.git_mirrors) ? s.git_mirrors : []))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const save = async (next) => {
@@ -58,14 +58,15 @@ export function MirrorsPanel() {
         <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Mirror Repositories</h3>
         <p class="text-[11px] text-slate-500">
           After each commit to the primary repository, the same files are pushed to every mirror.
+          If the active primary target fails, mirrors are attempted in the order shown below and the first healthy target becomes active.
           Mirrors require the provider's token to be configured in its settings section.
         </p>
       </div>
 
       <!-- Existing mirrors -->
       ${mirrors.length === 0
-        ? html`<p class="text-[11px] text-slate-600">No mirrors configured.</p>`
-        : html`
+      ? html`<p class="text-[11px] text-slate-600">No mirrors configured.</p>`
+      : html`
           <div class="flex flex-col gap-2">
             ${mirrors.map((m, i) => html`
               <div key=${i} class="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10">

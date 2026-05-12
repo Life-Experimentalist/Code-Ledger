@@ -27,6 +27,8 @@ import {
 } from "../../core/ai-prompts.js";
 import { DifficultyMapPanel } from "./DifficultyMapPanel.js";
 import { MirrorsPanel } from "./MirrorsPanel.js";
+import { ConflictResolutionModal } from "../../library/components/ConflictResolutionModal.js";
+import { FEATURE_STATUS, FEATURE_STATUS_META } from "../../core/constants.js";
 const html = htm.bind(h);
 
 // ── Backup / Restore helpers (rendered at bottom of git tab) ──────────────────
@@ -363,6 +365,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [repoSyncStatus, setRepoSyncStatus] = useState({});
   // Commit-mode dialog: null = hidden, { provider, count } = shown
   const [syncConfirm, setSyncConfirm] = useState(null);
+  const [syncConflictData, setSyncConflictData] = useState(null);
   // Problems for maintenance panel
   const [problems, setProblems] = useState([]);
   const initializedFromQueryRef = useRef(false);
@@ -737,32 +740,64 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     }
   }, []);
 
+  const getSyncPreview = useCallback(async () => {
+    if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+      throw new Error("Sync preview is only available inside the extension.");
+    }
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: "SYNC_PREVIEW" }, (resp) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else if (resp?.ok) resolve(resp);
+        else reject(new Error(resp?.error || "Sync preview failed"));
+      });
+    });
+  }, []);
+
+  const applySyncImport = useCallback(async (resolvedProblems) => {
+    if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+      throw new Error("Sync import is only available inside the extension.");
+    }
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: "SYNC_APPLY_IMPORT", problems: resolvedProblems || [] }, (resp) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else if (resp?.ok) resolve(resp);
+        else reject(new Error(resp?.error || "Sync apply failed"));
+      });
+    });
+  }, []);
+
   const handleResyncAll = useCallback(async (provider) => {
     if (typeof chrome === "undefined" || !chrome.runtime?.id) return;
-    // Count unsynced problems first; ask mode if more than one
     try {
-      const countRes = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: "RESYNC_COUNT" }, (resp) => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else if (resp?.ok) resolve(resp);
-          else reject(new Error(resp?.error || "Count failed"));
+      const preview = await getSyncPreview();
+
+      if ((preview.conflicts || []).length > 0) {
+        setSyncConflictData({
+          provider,
+          conflicts: preview.conflicts || [],
+          remoteOnly: preview.remoteOnly || [],
+          mode: "bulk",
         });
-      });
-      if (countRes.count === 0) {
+        return;
+      }
+
+      const count = Number(preview.remoteOnly?.length || 0);
+      if (count === 0) {
         setRepoSyncStatus((s) => ({ ...s, [provider]: "Already in sync — no missing problems found." }));
         return;
       }
-      if (countRes.count > 1) {
-        setSyncConfirm({ provider, count: countRes.count });
+
+      if (count > 1) {
+        setSyncConfirm({ provider, count });
         return;
       }
-      // Single problem — just commit directly (bulk and individual are identical for 1 problem)
+
       await doResyncAll(provider, "bulk");
     } catch (_) {
-      // If count fails, fall back to direct sync
+      // If preview fails, fall back to direct sync
       await doResyncAll(provider, "bulk");
     }
-  }, [doResyncAll]);
+  }, [doResyncAll, getSyncPreview]);
 
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
@@ -1021,6 +1056,9 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
         : !!values[enabledField]
       : true;
 
+    const status = section.status || (section.underConstruction ? FEATURE_STATUS.UNDER_CONSTRUCTION : "");
+    const statusMeta = FEATURE_STATUS_META[status];
+
     return html`
       <div
         id=${`settings-section-${section.id}`}
@@ -1033,7 +1071,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
           >
             ${section.icon ? html`<span>${section.icon}</span>` : ""}
             ${section.title || section.label}
-            ${section.underConstruction ? html`<span class="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded">Under Construction</span>` : ""}
+            ${statusMeta ? html`<span class=${`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest border rounded ${statusMeta.className}`}>${statusMeta.label}</span>` : ""}
           </h3>
           ${isGitProvider
         ? html`
@@ -1234,6 +1272,9 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               >
               <span class="text-[10px] text-slate-500 leading-tight"
                 >Fallback provider to be used if the primary fails.</span
+              >
+              <span class="text-[10px] text-cyan-500/80 leading-tight"
+                >You can choose the same provider as primary when the fallback model is different.</span
               >
             </div>
             <div class="w-1/3 flex flex-col items-end gap-2">
@@ -1646,6 +1687,31 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
             <button onClick=${() => setSyncConfirm(null)} class="text-[11px] text-slate-600 hover:text-slate-400 self-end">Cancel</button>
           </div>
         </div>
+      ` : ""}
+
+      ${syncConflictData ? html`
+        <${ConflictResolutionModal}
+          conflicts=${syncConflictData.conflicts}
+          remoteOnly=${syncConflictData.remoteOnly}
+          providerName=${syncConflictData.provider || "GitHub"}
+          onCancel=${() => setSyncConflictData(null)}
+          onResolve=${async (resolvedProblems) => {
+        const provider = syncConflictData.provider;
+        const mode = syncConflictData.mode || "bulk";
+        setSyncConflictData(null);
+        try {
+          await applySyncImport(resolvedProblems || []);
+          const count = (resolvedProblems || []).length;
+          if (count > 1) {
+            setSyncConfirm({ provider, count });
+            return;
+          }
+          await doResyncAll(provider, mode);
+        } catch (e) {
+          setRepoSyncStatus((s) => ({ ...s, [provider]: `Sync failed: ${e.message}` }));
+        }
+      }}
+        />
       ` : ""}
     </div>
   `;

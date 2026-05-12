@@ -7,7 +7,7 @@ import { h } from '../../vendor/preact-bundle.js';
 import { htm } from '../../vendor/preact-bundle.js';
 const html = htm.bind(h);
 
-export function AIReviewPanel({ review, onGenerate, loading }) {
+export function AIReviewPanel({ review, onGenerate, loading, error }) {
   if (loading) {
     return html`
       <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-cyan-500/20 animate-pulse flex flex-col gap-4">
@@ -29,6 +29,7 @@ export function AIReviewPanel({ review, onGenerate, loading }) {
       <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center gap-4">
         <p class="text-sm text-slate-400">Get an instant AI review on time/space complexity and optimization.</p>
         <button onClick=${onGenerate} class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest text-cyan-400 transition-colors">Start Review</button>
+        ${error ? html`<p class="text-xs text-rose-400">${error}</p>` : ""}
       </div>
     `;
   }
@@ -42,6 +43,10 @@ export function AIReviewPanel({ review, onGenerate, loading }) {
       <div class="prose prose-invert prose-sm prose-cyan max-w-none text-slate-300">
         ${review}
       </div>
+      <div class="flex justify-end">
+        <button onClick=${onGenerate} class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest text-cyan-400 transition-colors">Regenerate Review</button>
+      </div>
+      ${error ? html`<p class="text-xs text-rose-400">${error}</p>` : ""}
     </div>
   `;
 }
