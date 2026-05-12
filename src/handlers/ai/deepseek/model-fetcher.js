@@ -4,6 +4,8 @@
  */
 
 import { CONSTANTS } from '../../../core/constants.js';
+import { createDebugger } from '../../../lib/debug.js';
+const dbg = createDebugger('DeepSeekModelFetcher');
 
 /**
  * Fetches available models from DeepSeek API.
@@ -31,7 +33,7 @@ export async function fetchAvailableModels(apiKey) {
       name: model.id // DeepSeek uses the id as the display name typically
     }));
   } catch (error) {
-    console.error('DeepSeek model fetch failed', error);
+    dbg.error('DeepSeek model fetch failed', error);
     // Fallback to defaults
     return [
       { id: CONSTANTS.AI_PROVIDERS.deepseek.defaultModel, name: 'DeepSeek Coder V2' }

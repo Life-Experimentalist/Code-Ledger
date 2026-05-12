@@ -7,7 +7,19 @@
  * Returns a self-contained HTML stats page for GitHub Pages.
  * The page fetches ./index.json at runtime and renders a full dashboard.
  */
-export function getPagesHtml() {
+export function getPagesHtml(opts = {}) {
+  const theme = opts.theme || {};
+  const settings = opts.settings || {};
+  const commitSummary = opts.commitSummary || null;
+  const reportImages = Array.isArray(opts.reportImages) ? opts.reportImages : [];
+  const commitList = Array.isArray(opts.commitList) ? opts.commitList : [];
+  // Default raw image URLs (can be overridden via settings passed to generator)
+  const ASSETS = {
+    iconDark: (settings?.assets && settings.assets.iconDark) || 'https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-dark-bg.png',
+    iconTransparent: (settings?.assets && settings.assets.iconTransparent) || 'https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-transparent.png',
+    logo: (settings?.assets && settings.assets.logo) || 'https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/logo.png',
+    social: (settings?.assets && settings.assets.social) || 'https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/social%20preview.png',
+  };
   // NOTE: No backtick template literals inside the returned string — this entire
   // string is itself a template literal, so nested backticks would terminate it.
   return `<!DOCTYPE html>
@@ -19,6 +31,7 @@ export function getPagesHtml() {
   <meta name="description" content="DSA problem solutions tracked by CodeLedger — GitHub-backed, AI-reviewed, owned by you." />
   <meta property="og:title" content="CodeLedger — DSA Stats" />
   <meta property="og:description" content="DSA solutions committed automatically to GitHub." />
+  <meta property="og:image" content="${ASSETS.social}" />
   <meta property="og:type" content="website" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
@@ -26,17 +39,26 @@ export function getPagesHtml() {
       --bg: #050508; --surface: #0a0a0f; --border: rgba(255,255,255,.05);
       --cyan: #06b6d4; --text: #e2e8f0; --muted: #64748b;
       --easy: #34d399; --med: #fbbf24; --hard: #f87171;
+      --hdr-bg: rgba(5,5,8,.9);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc; --surface: #ffffff; --border: rgba(15,23,42,.08);
+      --cyan: #0891b2; --text: #0f172a; --muted: #64748b;
+      --easy: #16a34a; --med: #d97706; --hard: #dc2626;
+      --hdr-bg: rgba(248,250,252,.92);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; line-height: 1.5; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; line-height: 1.5; transition: background .2s, color .2s; }
     a { color: var(--cyan); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    .theme-toggle { background: none; border: 1px solid var(--border); border-radius: 9999px; padding: .25rem .65rem; cursor: pointer; font-size: .7rem; color: var(--muted); transition: all .2s; }
+    .theme-toggle:hover { color: var(--cyan); border-color: rgba(6,182,212,.35); }
 
     /* Layout */
     .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem 4rem; }
     header {
       border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem;
-      position: sticky; top: 0; background: rgba(5,5,8,.9); backdrop-filter: blur(12px); z-index: 10;
+      position: sticky; top: 0; background: var(--hdr-bg); backdrop-filter: blur(12px); z-index: 10;
     }
     .hdr { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
     .logo { display: flex; align-items: center; gap: .625rem; }
@@ -136,10 +158,14 @@ export function getPagesHtml() {
   <header>
     <div class="hdr">
       <div class="logo">
-        <div class="logo-dot"></div>
+        <img src="${ASSETS.iconTransparent}" alt="logo" style="width:28px;height:28px;border-radius:6px;margin-right:.5rem;object-fit:contain" />
         <div class="logo-text">Code<b>Ledger</b></div>
       </div>
-      <a id="repo-link" class="repo-pill" href="#" target="_blank" rel="noreferrer">—</a>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        ${commitSummary && settings.pages_show_verification ? `<div class="repo-pill" style="margin-right:.5rem">Verified: ${commitSummary.verified} / ${commitSummary.total}</div>` : ''}
+        <a id="repo-link" class="repo-pill" href="#" target="_blank" rel="noreferrer">—</a>
+        <button class="theme-toggle" id="theme-btn" title="Toggle light/dark mode" aria-label="Toggle theme">☀</button>
+      </div>
     </div>
   </header>
 
@@ -205,6 +231,18 @@ export function getPagesHtml() {
       </div>
     </div>
 
+    <!-- Commit verification placeholder (rendered client-side) -->
+    <div class="g2">
+      <div class="card">
+        <div class="card-label">Commit Verification</div>
+        <div id="commit-panel" style="font-size:.9rem;color:var(--muted);margin-bottom:.6rem">${commitSummary ? `Verified ${commitSummary.verified} of ${commitSummary.total} recent commits` : 'Commit verification not enabled'}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Report Images</div>
+        <div id="report-images" style="display:flex;gap:.5rem;flex-wrap:wrap">${reportImages.length ? reportImages.map(p => `<a href="/${p}" target="_blank"><img src="/${p}" style="width:120px;height:auto;border-radius:8px;border:1px solid rgba(255,255,255,.04)"></a>`).join('') : '<div style="color:var(--muted)">No report images found</div>'}</div>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:1rem">
       <div class="card-label">All Problems</div>
       <div class="search-row">
@@ -234,6 +272,18 @@ export function getPagesHtml() {
 
     <div class="footer" id="ft">Tracked by <a href="https://codeledger.vkrishna04.me" target="_blank" rel="noreferrer">CodeLedger</a></div>
   </div>
+
+  <!-- Floating image/report panel -->
+  ${reportImages.length ? `
+  <div id="float-panel" style="position:fixed;right:1rem;bottom:1rem;width:320px;max-width:40%;z-index:60">
+    <div class="card" style="padding: .5rem;">
+      <div class="card-label">Report Images</div>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        ${reportImages.map(img => `<a href="/${img}" target="_blank" style="display:block"><img src="/${img}" alt="report image" style="width:100%;height:auto;border-radius:8px;border:1px solid rgba(255,255,255,.04)"></a>`).join('')}
+      </div>
+    </div>
+  </div>
+  ` : ''}
 
   <script>
     var PALETTE = ['#06b6d4','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#f97316','#a855f7'];
@@ -387,8 +437,7 @@ export function getPagesHtml() {
       var slug = problem.titleSlug || problem.id || '';
       var langName = (problem.lang && (problem.lang.verbose || problem.lang.name)) || 'Solution';
       var ext = (problem.lang && problem.lang.ext) || 'txt';
-      var topic = (problem.tags && problem.tags[0]) || problem.topic || 'Uncategorized';
-      var path = 'topics/' + topic + '/' + slug + '/' + langName.replace(/\s+/g, '_') + '.' + ext;
+      var path = 'problems/' + slug + '/' + langName.replace(/\s+/g, '_') + '.' + ext;
       return ALL_REPO_URL + '/blob/main/' + path;
     }
 
@@ -565,6 +614,46 @@ export function getPagesHtml() {
 
     main();
   </script>
+  <script>
+    // Inject server-provided commit list for client-side rendering
+    window.SERVER_COMMIT_LIST = ${JSON.stringify(commitList || []).replace(/</g, '\\u003c')};
+    (function renderServerCommits() {
+      try {
+        var list = window.SERVER_COMMIT_LIST || [];
+        if (!list.length) return;
+        var panel = document.getElementById('commit-panel');
+        if (!panel) return;
+        var html = '';
+        for (var i = 0; i < list.length; i++) {
+          var c = list[i];
+          var color = c.verified ? '#10b981' : '#ef4444';
+          var msg = c.message || (c.sha ? c.sha.substring(0,7) : 'commit');
+          html += '<div style="display:flex;align-items:center;gap:.6rem;padding:.25rem 0;border-bottom:1px solid rgba(255,255,255,.02)">'
+               + '<div style="width:10px;height:10px;border-radius:50%;background:' + color + '"></div>'
+               + '<a href="' + (c.url || '#') + '" target="_blank" rel="noreferrer" style="color:var(--text);text-decoration:none">' + (msg) + '</a>'
+               + '<span style="color:var(--muted);font-size:.75rem;margin-left:auto">' + (c.author || '') + '</span>'
+               + '</div>';
+        }
+        panel.innerHTML = html;
+      } catch (e) { console.warn('renderServerCommits failed', e); }
+    })();
+  </script>
+  <script>
+    (function() {
+      var STORAGE_KEY = 'cl-pages-theme';
+      var root = document.documentElement;
+      var btn = document.getElementById('theme-btn');
+      function applyTheme(t) {
+        if (t === 'light') { root.setAttribute('data-theme', 'light'); if (btn) btn.textContent = '🌙'; }
+        else { root.removeAttribute('data-theme'); if (btn) btn.textContent = '☀'; }
+        try { localStorage.setItem(STORAGE_KEY, t); } catch(_) {}
+      }
+      try { applyTheme(localStorage.getItem(STORAGE_KEY) || 'dark'); } catch(_) { applyTheme('dark'); }
+      if (btn) btn.addEventListener('click', function() {
+        applyTheme(root.hasAttribute('data-theme') ? 'dark' : 'light');
+      });
+    })();
+  </script>
 </body>
 </html>`;
 }
@@ -596,6 +685,8 @@ export function getActionsWorkflow() {
     "        with:",
     "          script: |",
     "            const fs = require('fs');",
+    "            const startMarker = '<!-- CODELEDGER_AUTO_GENERATED_START -->';",
+    "            const endMarker = '<!-- CODELEDGER_AUTO_GENERATED_END -->';",
     "            const data = JSON.parse(fs.readFileSync('index.json', 'utf8'));",
     "            const stats = data.stats || {};",
     "            const problems = data.problems || [];",
@@ -612,7 +703,8 @@ export function getActionsWorkflow() {
     "                const lang = (p.lang && (p.lang.name || p.lang)) || '?';",
     "                return '| ' + [p.title || p.titleSlug, p.difficulty || '?', lang, date].join(' | ') + ' |';",
     "              });",
-    "            const readme = [",
+    "            const generatedBlock = [",
+    "              startMarker,",
     "              '# DSA Solutions',",
     "              '',",
     "              '> Managed by [CodeLedger](https://github.com/Life-Experimentalist/CodeLedger). Last updated: ' + updated,",
@@ -628,8 +720,22 @@ export function getActionsWorkflow() {
     "              '| Problem | Difficulty | Language | Date |',",
     "              '|---------|-----------|----------|------|',",
     "              ...(recentRows.length ? recentRows : ['| - | - | - | - |']),",
+    "              '',",
+    "              endMarker,",
     "            ].join('\\n');",
-    "            fs.writeFileSync('README.md', readme);",
+    "            const readmePath = 'README.md';",
+    "            if (fs.existsSync(readmePath)) {",
+    "              const existing = fs.readFileSync(readmePath, 'utf8');",
+    "              if (existing.includes(startMarker) && existing.includes(endMarker)) {",
+    "                const pattern = new RegExp(startMarker + '[\\\\s\\\\S]*?' + endMarker);",
+    "                const next = existing.replace(pattern, generatedBlock);",
+    "                fs.writeFileSync(readmePath, next);",
+    "              } else {",
+    "                console.log('README.md is manually maintained. Skipping auto-update.');",
+    "              }",
+    "            } else {",
+    "              fs.writeFileSync(readmePath, generatedBlock);",
+    "            }",
     "            console.log('README updated with ' + problems.length + ' problems.');",
     "",
     "      - name: Commit README",
@@ -647,33 +753,116 @@ export function getActionsWorkflow() {
  * Returns a root README.md for the user's CodeLedger repo.
  * pagesUrl is the GitHub Pages URL (or custom domain if configured).
  */
-export function getRepoReadme(owner, repo, pagesUrl) {
-  const url = pagesUrl || `https://${owner}.github.io/${repo}/`;
-  return `# CodeLedger — DSA Solutions
+export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMeta) {
+  const url = pagesUrl || "https://" + owner + ".github.io/" + repo + "/";
+  const stats = indexMeta?.stats || null;
+  const summary = indexMeta?.summary || null;
+  const updatedAt = indexMeta?.updatedAt ? new Date(indexMeta.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+  const recentProblems = (indexMeta?.problems || [])
+    .filter(p => p.timestamp)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .slice(0, 10);
 
-> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — your DSA journey, committed.
+  const lines = [
+    '<!-- CODELEDGER_AUTO_GENERATED_START -->',
+    '',
+    '# ' + owner + '\'s DSA Solutions',
+    '',
+    '> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — your DSA journey, committed to Git.',
+    '',
+    '**Live Dashboard:** [' + url + '](' + url + ')',
+    updatedAt ? ('**Last updated:** ' + updatedAt) : '',
+    '',
+    '---',
+    '',
+  ];
 
-**📊 Live Stats:** [${url}](${url})
+  // Stats table
+  if (stats) {
+    lines.push('## Stats', '');
+    lines.push('| Total | Easy | Medium | Hard |');
+    lines.push('|:-----:|:----:|:------:|:----:|');
+    lines.push('| **' + (stats.total || 0) + '** | ' + (stats.easy || 0) + ' | ' + (stats.medium || 0) + ' | ' + (stats.hard || 0) + ' |');
+    lines.push('');
 
----
+    // Platform breakdown
+    if (stats.byPlatform && Object.keys(stats.byPlatform).length) {
+      const platRows = Object.entries(stats.byPlatform).sort((a, b) => b[1] - a[1]);
+      lines.push('**By Platform:** ' + platRows.map(([p, n]) => p + ' (' + n + ')').join(' · '));
+      lines.push('');
+    }
 
-## Structure
+    // Language breakdown
+    if (stats.byLang && Object.keys(stats.byLang).length) {
+      const langRows = Object.entries(stats.byLang).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      lines.push('**Top Languages:** ' + langRows.map(([l, n]) => l + ' (' + n + ')').join(' · '));
+      lines.push('');
+    }
 
-\`\`\`
-problems/
-  {problem-slug}/
-    {problem-slug}.py      ← solution (one file per language)
-    {problem-slug}.js
-    README.md              ← problem statement + your stats
-    hints.md               ← hints (if enabled)
-\`\`\`
+    // Topic breakdown
+    if (stats.byTopic && Object.keys(stats.byTopic).length) {
+      const topicRows = Object.entries(stats.byTopic).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      lines.push('**Top Topics:** ' + topicRows.map(([t, n]) => t + ' (' + n + ')').join(' · '));
+      lines.push('');
+    }
 
-## Stats
+    lines.push('---', '');
+  }
 
-See [the live dashboard](${url}) for difficulty breakdown, solve heatmap, and recent solutions.
+  // AI narrative summary
+  if (summary) {
+    lines.push('## Progress Summary', '');
+    lines.push('> ' + summary.replace(/\n/g, '\n> '));
+    lines.push('');
+    lines.push('*Generated by AI based on solve history.*', '');
+    lines.push('---', '');
+  }
 
----
+  // Recent solves
+  if (recentProblems.length) {
+    lines.push('## Recent Solves', '');
+    lines.push('| Problem | Difficulty | Language | Platform | Date |');
+    lines.push('|---------|-----------|----------|----------|------|');
+    recentProblems.forEach(p => {
+      const ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
+      const date = new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const lang = (p.lang && (p.lang.name || p.lang)) || '?';
+      const title = p.title || p.titleSlug || '?';
+      const diff = p.difficulty || '?';
+      const plat = p.platform || '?';
+      lines.push('| ' + [title, diff, lang, plat, date].join(' | ') + ' |');
+    });
+    lines.push('');
+    lines.push('---', '');
+  }
 
-*Managed by [CodeLedger](https://codeledger.vkrishna04.me) — never manually edited.*
-`;
+  lines.push(
+    '## Repository Structure',
+    '',
+    '```',
+    'problems/',
+    '  {problem-slug}/',
+    '    {lang}.{ext}      ← solution file',
+    '    README.md         ← problem statement + your stats',
+    'index.json            ← machine-readable index (all problems + stats)',
+    'chats/                ← saved AI conversations',
+    '.codeledger/          ← extension config & knowledge bank',
+    '```',
+    '',
+    '---',
+    '',
+    '## About',
+    '',
+    'This repository is managed by [CodeLedger](https://codeledger.vkrishna04.me), a browser extension that automatically commits your DSA solutions to GitHub with AI-powered code reviews.',
+    '',
+    '- Solutions committed automatically on acceptance',
+    '- AI code reviews generated per solution',
+    '- Live stats dashboard at ' + url,
+    '- Fully owned by you — no lock-in, plain files',
+    '',
+    '<!-- CODELEDGER_AUTO_GENERATED_END -->',
+    '',
+  );
+
+  return lines.filter(l => l !== null && l !== undefined).join('\n');
 }

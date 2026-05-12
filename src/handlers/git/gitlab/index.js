@@ -9,6 +9,8 @@ import { BaseGitHandler } from '../../_base/BaseGitHandler.js';
 import { Storage } from '../../../core/storage.js';
 import { CONSTANTS } from '../../../core/constants.js';
 
+export const GITLAB_FEATURE_STATUS = CONSTANTS.FEATURE_STATUS.UNDER_CONSTRUCTION;
+
 export class GitLabHandler extends BaseGitHandler {
   constructor() {
     super('gitlab', 'GitLab');
@@ -19,31 +21,9 @@ export class GitLabHandler extends BaseGitHandler {
       id: this.id,
       title: 'GitLab Integration',
       order: 2,
-      description: 'Mirror solutions to a GitLab repository.',
-      fields: [
-        {
-          key: 'gitlab_token',
-          label: 'GitLab Personal Access Token',
-          type: 'password',
-          default: '',
-          description: 'Create a token at GitLab → User Settings → Access Tokens with api scope.',
-        },
-        {
-          key: 'gitlab_repo',
-          label: 'Repository (namespace/project)',
-          type: 'text',
-          default: '',
-          description: 'e.g. username/CodeLedger-Sync or group/subgroup/project',
-        },
-        {
-          key: 'gitlab_endpoint',
-          label: 'GitLab endpoint (self-hosted)',
-          type: 'text',
-          default: 'https://gitlab.com',
-          description: 'Leave as https://gitlab.com unless using a self-hosted instance.',
-          advanced: true,
-        },
-      ],
+      status: GITLAB_FEATURE_STATUS,
+      description: 'GitLab support is under construction and is not currently editable.',
+      fields: [],
     };
   }
 
@@ -56,7 +36,7 @@ export class GitLabHandler extends BaseGitHandler {
   async apiFetch(path, token, options = {}) {
     const settings = await Storage.getSettings();
     const base = (settings['gitlab_endpoint'] || 'https://gitlab.com').replace(/\/$/, '');
-    const url  = path.startsWith('http') ? path : `${base}/api/v4${path}`;
+    const url = path.startsWith('http') ? path : `${base}/api/v4${path}`;
     const method = (options.method || 'GET').toUpperCase();
     const headers = {
       'PRIVATE-TOKEN': token,
@@ -68,7 +48,7 @@ export class GitLabHandler extends BaseGitHandler {
     const res = await fetch(url, { ...options, method, headers });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      const err  = new Error(`GitLab API Error: ${body.message || res.statusText}`);
+      const err = new Error(`GitLab API Error: ${body.message || res.statusText}`);
       err.status = res.status;
       throw err;
     }
@@ -89,8 +69,8 @@ export class GitLabHandler extends BaseGitHandler {
     if (!token) throw new Error('Not authenticated with GitLab');
 
     const settings = await Storage.getSettings();
-    const project  = encodeURIComponent(repoName || settings['gitlab_repo'] || '');
-    if (!project)   throw new Error('No GitLab repository configured (settings.gitlab_repo)');
+    const project = encodeURIComponent(repoName || settings['gitlab_repo'] || '');
+    if (!project) throw new Error('No GitLab repository configured (settings.gitlab_repo)');
 
     const branch = CONSTANTS.REPO_BRANCH || 'main';
 
@@ -158,7 +138,7 @@ export class GitLabHandler extends BaseGitHandler {
     };
 
     if (opts.date) {
-      payload.author_date    = new Date(opts.date).toISOString();
+      payload.author_date = new Date(opts.date).toISOString();
       payload.committer_date = payload.author_date;
     }
 

@@ -5,6 +5,9 @@
 // @ts-nocheck
 
 import { registry } from "../core/handler-registry.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("HandlersInit");
 
 // Platforms
 import { LeetCodeHandler } from "./platforms/leetcode/index.js";
@@ -25,6 +28,7 @@ import { OllamaHandler } from "./ai/ollama/index.js";
 import { OpenRouterHandler } from "./ai/openrouter/index.js";
 
 export function initializeHandlers() {
+  dbg.log(`initializeHandlers(): starting handler registration...`);
   const platforms = [
     new LeetCodeHandler(),
     new GeeksForGeeksHandler(),
@@ -34,6 +38,7 @@ export function initializeHandlers() {
     registry.registerPlatform(h.id, h);
     if (typeof h.getSettingsSchema === "function")
       registry.registerSettings(h.id, h.getSettingsSchema());
+    dbg.log(`initializeHandlers(): ✓ platform ${h.id} registered`);
   });
 
   const gits = [
@@ -45,6 +50,7 @@ export function initializeHandlers() {
     registry.registerGitProvider(h.id, h);
     if (typeof h.getSettingsSchema === "function")
       registry.registerSettings(h.id, h.getSettingsSchema());
+    dbg.log(`initializeHandlers(): ✓ git provider ${h.id} registered`);
   });
 
   const ais = [
@@ -59,5 +65,8 @@ export function initializeHandlers() {
     registry.registerAIProvider(h.id, h);
     if (typeof h.getSettingsSchema === "function")
       registry.registerSettings(h.id, h.getSettingsSchema());
+    dbg.log(`initializeHandlers(): ✓ AI provider ${h.id} registered`);
   });
+
+  dbg.log(`initializeHandlers(): ✓ complete — ${platforms.length} platform(s), ${gits.length} git provider(s), ${ais.length} AI provider(s) registered`);
 }

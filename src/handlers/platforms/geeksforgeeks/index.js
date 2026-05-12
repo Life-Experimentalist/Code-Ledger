@@ -325,17 +325,18 @@ Be concise. Max 200 words.`;
   /* ── File set builder ────────────────────────────────────────────── */
   _buildFileSet(meta, code, lang, settings, slug, canonical = null) {
     const langObj = { verbose: lang.name.replace(/[^a-zA-Z0-9]/g, "_"), name: lang.name, ext: lang.ext };
+    const problemId = CONSTANTS.makeProblemId("geeksforgeeks", slug);
     const files = [];
 
     files.push({
-      path: solutionPath(slug, "geeksforgeeks", langObj, canonical, settings),
+      path: solutionPath(problemId, "geeksforgeeks", langObj, canonical, settings),
       content: code,
     });
 
     if (settings.gfg_readme !== false) {
       const readmeContent = this._buildReadme(meta, lang, slug);
       files.push({
-        path: readmePath(slug, canonical, settings),
+        path: readmePath(problemId, canonical, settings),
         content: readmeContent,
       });
     }

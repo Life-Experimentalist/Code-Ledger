@@ -53,12 +53,38 @@ import { solutionPath, readmePath, hintsPath } from "../../../core/path-builder.
 import { querySubmissionResult, isAcceptedVisibleExtended } from "./enhanced-selectors.js";
 function resolveLang(rawLang) {
   if (!rawLang) return { verbose: "Unknown", slug: "txt", ext: "txt" };
+  // Handle string form first
   if (typeof rawLang === "string") {
-    const slug = rawLang.toLowerCase().replace(/\s+/g, "");
+    const raw = rawLang.trim();
+    const low = raw.toLowerCase();
+    // Special-case: Pandas (often shown as a Python sub-language on LeetCode)
+    if (low.includes("pandas")) {
+      return { verbose: "Pandas", slug: "pandas", ext: langExt("python") };
+    }
+    // Python variants: prefer explicit Python3 when present
+    if (/python\s*3|python3/.test(low)) {
+      return { verbose: "Python3", slug: "python3", ext: langExt("python3") };
+    }
+    if (low.includes("python")) {
+      return { verbose: "Python", slug: "python", ext: langExt("python") };
+    }
+    const slug = low.replace(/\s+/g, "");
     return { verbose: LANG_VERBOSE[slug] || rawLang, slug, ext: langExt(slug) };
   }
+
   // Object form: { name, verboseName, langSlug }
-  const slug = (rawLang.name || rawLang.langSlug || "txt").toLowerCase().replace(/\s+/g, "");
+  const rawName = (rawLang.name || rawLang.langSlug || "txt").toString();
+  const lowName = rawName.toLowerCase();
+  if (lowName.includes("pandas")) {
+    return { verbose: "Pandas", slug: "pandas", ext: langExt("python") };
+  }
+  if (/python\s*3|python3/.test(lowName)) {
+    return { verbose: rawLang.verboseName || "Python3", slug: "python3", ext: langExt("python3") };
+  }
+  if (lowName.includes("python")) {
+    return { verbose: rawLang.verboseName || "Python", slug: "python", ext: langExt("python") };
+  }
+  const slug = lowName.replace(/\s+/g, "");
   const verbose = rawLang.verboseName || LANG_VERBOSE[slug] || rawLang.name || slug;
   return { verbose, slug, ext: langExt(slug) };
 }
@@ -285,7 +311,17 @@ Be concise. Max 200 words.`;
       if (this._aiPanel && this._aiPanelSlug === slug) return;
       this._stopAIPanel();
       this._aiPanelSlug = slug;
-      this._aiPanel = createFloatingAI(slug, { position: { bottom: "110px", right: "20px" } });
+      this._aiPanel = createFloatingAI(slug, {
+        position: { bottom: "110px", right: "20px" },
+        platform: {
+          id: "leetcode",
+          label: "LeetCode AI Assistant",
+          chatPlatform: "leetcode",
+          readPageMeta: () => this._readFloatingAIPageMeta(),
+          readEditorCode: () => this._readFloatingAIEditorCode(),
+          readTestFailures: () => this._readFloatingAITestFailures(),
+        },
+      });
     }).catch(() => { });
   }
 
@@ -539,7 +575,8 @@ Be concise. Max 200 words.`;
       if (anchor) {
         const username = null; // no per-user check needed on /progress
         const container = document.createElement("div");
-        container.style.cssText = "margin:12px 0;display:flex;flex-direction:column;gap:6px;";
+        // Place inline with the progress header and align right for a cleaner look
+        container.style.cssText = "margin:12px 0;display:flex;align-items:center;justify-content:flex-end;gap:10px;width:100%;";
 
         const btn = this._createImportBtn(username);
         const prog = document.createElement("div");
@@ -562,10 +599,10 @@ Be concise. Max 200 words.`;
         "position:fixed;bottom:80px;right:20px;z-index:9999;" +
         "display:flex;flex-direction:column;gap:6px;align-items:flex-end;";
       const btn = this._createImportBtn(null);
-      btn.style.boxShadow = "0 4px 24px rgba(6,182,212,0.25)";
+      btn.style.boxShadow = "0 4px 24px rgba(6,182,212,0.12)";
       const prog = document.createElement("div");
       prog.id = "cl-import-progress";
-      prog.style.cssText = "font-size:11px;color:#94a3b8;background:#0a0a0f;border:1px solid #1e293b;padding:4px 8px;border-radius:6px;max-width:240px;text-align:right;display:none;";
+      prog.style.cssText = "font-size:12px;color:#94a3b8;display:none;max-width:320px;text-align:right;";
       floater.appendChild(prog);
       floater.appendChild(btn);
       document.body.appendChild(floater);
@@ -784,15 +821,11 @@ Be concise. Max 200 words.`;
         return;
       }
 
-      // ── Phase 3: Dedup — keep newest accepted per (titleSlug, lang) ──
-      const dedupMap = new Map();
-      for (const s of allSubs) {
-        const key = `${s.titleSlug}::${s.lang}`;
-        const cur = dedupMap.get(key);
-        if (!cur || s.timestamp > cur.timestamp) dedupMap.set(key, s);
-      }
-      const picks = Array.from(dedupMap.values());
-      show(`Found ${picks.length} unique accepted submissions.`);
+      // ── Phase 3: Keep all accepted submissions (one entry per submission).
+      // We'll import all submissions so multi-language and multiple accepted submissions
+      // per problem are preserved. Later a dedup pass (AI) will mark duplicates for review/merge.
+      const picks = allSubs.slice();
+      show(`Found ${picks.length} accepted submissions (preserving all languages).`);
 
       // ── Phase 4: Fetch metadata (difficulty + tags + description) via QUESTION query ──
       // The REST API gives difficulty but NOT topic tags or descriptions.
@@ -854,62 +887,63 @@ Be concise. Max 200 words.`;
 
       const settings = await Storage.getSettings();
       const bulkProblems = picks.map((sub) => {
-        const lang    = resolveLang(sub.lang || sub.langName);
-        const tags    = tagsMap[sub.titleSlug] || [];
-        const topic   = resolvePrimaryTopic(tags);
-        const title   = titleMap[sub.titleSlug] || sub.title || sub.titleSlug;
+        const lang = resolveLang(sub.lang || sub.langName);
+        const tags = tagsMap[sub.titleSlug] || [];
+        const topic = resolvePrimaryTopic(tags);
+        const title = titleMap[sub.titleSlug] || sub.title || sub.titleSlug;
         const difficulty = diffMap[sub.titleSlug] || "Unknown";
-        const canonical  = null; // bulk import has no canonical mapping
+        const canonical = null; // bulk import has no canonical mapping
 
         const files = [];
         if (sub.code) {
           files.push({
-            path:    solutionPath(sub.titleSlug, "leetcode", lang, canonical, settings),
+            path: solutionPath(sub.titleSlug, "leetcode", lang, canonical, settings),
             content: sub.code,
           });
         }
 
         const readmeContent = (descMap[sub.titleSlug] || sub.code)
           ? this._buildBulkReadme(sub, {
-              title,
-              difficulty,
-              tags,
-              acRate:   acRateMap[sub.titleSlug] ?? null,
-              similar:  similarMap[sub.titleSlug] || [],
-              descHtml: descMap[sub.titleSlug] || null,
-            })
+            title,
+            difficulty,
+            tags,
+            acRate: acRateMap[sub.titleSlug] ?? null,
+            similar: similarMap[sub.titleSlug] || [],
+            descHtml: descMap[sub.titleSlug] || null,
+          })
           : null;
 
         if (readmeContent) {
           files.push({
-            path:    readmePath(sub.titleSlug, canonical, settings),
+            path: readmePath(sub.titleSlug, canonical, settings),
             content: readmeContent,
           });
         }
 
         return {
-          id:             CONSTANTS.makeProblemId("leetcode", sub.titleSlug),
-          submissionId:   sub.id || null,
-          platform:       "leetcode",
+          // Use submission-scoped ID to preserve multiple accepted submissions per problem.
+          id: CONSTANTS.makeProblemId("leetcode", `${sub.titleSlug}::${sub.id || Date.now()}`),
+          submissionId: sub.id || null,
+          platform: "leetcode",
           title,
-          titleSlug:      sub.titleSlug,
+          titleSlug: sub.titleSlug,
           difficulty,
-          lang:           { name: lang.verbose, ext: lang.ext, slug: lang.slug },
+          lang: { name: lang.verbose, ext: lang.ext, slug: lang.slug },
           tags,
           topic,
-          code:           sub.code || "",
-          readmeContent:  readmeContent || null,
+          code: sub.code || "",
+          readmeContent: readmeContent || null,
           files,
-          timestamp:      sub.timestamp,
-          runtime:        sub.runtime || null,
-          memory:         sub.memory  || null,
-          runtimePct:     sub.runtimePct  || null,
-          memoryPct:      sub.memoryPct   || null,
+          timestamp: sub.timestamp,
+          runtime: sub.runtime || null,
+          memory: sub.memory || null,
+          runtimePct: sub.runtimePct || null,
+          memoryPct: sub.memoryPct || null,
           problemStatement: descMap[sub.titleSlug] || null,
-          hints:          hintsMap[sub.titleSlug] || null,
-          acRate:         acRateMap[sub.titleSlug] ?? null,
-          similar:        similarMap[sub.titleSlug] || null,
-          hasSimilar:     (similarMap[sub.titleSlug]?.length > 0) || null,
+          hints: hintsMap[sub.titleSlug] || null,
+          acRate: acRateMap[sub.titleSlug] ?? null,
+          similar: similarMap[sub.titleSlug] || null,
+          hasSimilar: (similarMap[sub.titleSlug]?.length > 0) || null,
         };
       });
 
@@ -961,6 +995,20 @@ Be concise. Max 200 words.`;
           }
         });
         btn.parentElement?.appendChild(commitBtn);
+
+        // After import completes, ask background for a sync preview to detect any remote conflicts.
+        try {
+          runtime.sendMessage({ type: "SYNC_PREVIEW" }, (res) => {
+            if (!res) return;
+            const pending = res.pendingConflicts || res.pendingConflicts === 0 ? res.pendingConflicts : (res.conflicts || []).length;
+            if (pending > 0) {
+              show(`Sync paused — ${pending} conflict${pending !== 1 ? "s" : ""} need review. Opening Settings…`);
+              try { tabs.create({ url: runtime.getURL("library/library.html?tab=settings&settingsTab=git") }); } catch (_) { }
+            } else if (res.pendingRemoteOnly) {
+              show(`Imported ${imported} solves. ${res.pendingRemoteOnly} remote-only items detected.`);
+            }
+          });
+        } catch (e) { dbg.warn("SYNC_PREVIEW call failed", e); }
       }
     } catch (e) {
       dbg.error("Profile import failed", e);
@@ -1070,16 +1118,67 @@ Be concise. Max 200 words.`;
     }
   }
 
+  _readFloatingAIPageMeta() {
+    const titleEl =
+      document.querySelector('[data-e2e-locator="question-title"]') ||
+      document.querySelector('[data-cy="question-title"]') ||
+      document.querySelector("h1");
+    const diffEl =
+      document.querySelector('[data-e2e-locator="question-difficulty"]') ||
+      document.querySelector("div[diff]");
+    return {
+      title: titleEl?.textContent?.trim() || "",
+      difficulty: diffEl?.textContent?.trim() || "",
+    };
+  }
+
+  _readFloatingAIEditorCode() {
+    const monacoCode = this._getCodeFromMonaco();
+    if (monacoCode) return monacoCode;
+    try {
+      const lines = document.querySelectorAll(".monaco-editor .view-lines .view-line");
+      if (lines.length > 0) return Array.from(lines).map((l) => l.textContent).join("\n");
+    } catch (_) { }
+    return "";
+  }
+
+  _readFloatingAITestFailures() {
+    try {
+      const resultLines = [];
+      const errorBanner = document.querySelector('[data-e2e-locator="console-result"]');
+      if (errorBanner) resultLines.push((errorBanner.textContent || "").trim());
+      document.querySelectorAll(".testcase-result-block, [data-e2e-locator='submission-result']").forEach((el) => {
+        const text = (el.textContent || "").trim();
+        if (text) resultLines.push(text);
+      });
+      document.querySelectorAll(".result-panel pre, .console-output pre").forEach((el) => {
+        const text = (el.textContent || "").trim();
+        if (text) resultLines.push(text);
+      });
+      return resultLines.filter(Boolean).join("\n\n");
+    } catch (_) {
+      return "";
+    }
+  }
+
   /* ── Automatic submission detection ──────────────────────────────── */
   async _checkSubmission() {
     if (this._processingLock) return;
 
     const page = detectPage(window.location.pathname);
-    if (page.type !== PAGE_TYPES.PROBLEM && page.type !== PAGE_TYPES.SUBMISSION) return;
+    dbg.log("[_checkSubmission] pageType=" + page.type + ", slug=" + page.slug);
+    if (page.type !== PAGE_TYPES.PROBLEM && page.type !== PAGE_TYPES.SUBMISSION) {
+      dbg.log("[_checkSubmission] Not a problem/submission page, returning");
+      return;
+    }
 
     // For submission detail pages we can always fetch — no banner check needed.
     if (page.type === PAGE_TYPES.PROBLEM) {
-      if (!this._isAcceptedVisible()) return;
+      const visible = this._isAcceptedVisible();
+      dbg.log("[_checkSubmission] Problem page, accepted visible=" + visible);
+      if (!visible) return;
+    } else {
+      dbg.log("[_checkSubmission] Submission detail page, will fetch");
     }
 
     await this._processSubmission(page, false);
@@ -1152,6 +1251,7 @@ Be concise. Max 200 words.`;
         // Dedup: skip if we already committed this submission this browser session
         const dedupKey = `cl_committed_${slug}`;
         const lastId = sessionStorage.getItem(dedupKey);
+        dbg.log("[_processSubmission] dedupKey=" + dedupKey + ", lastId=" + lastId + ", currentId=" + latest.id + ", isManual=" + isManual);
         if (!isManual && lastId === String(latest.id)) {
           dbg.log("Skipping already-committed submission", slug, latest.id);
           return;
@@ -1172,7 +1272,11 @@ Be concise. Max 200 words.`;
 
       // Module-level dedup (same JS runtime, catches fast double-fires)
       const detectionId = `${slug}:${submission.timestamp || submission.id || Date.now()}`;
-      if (!isManual && detectionId === this.lastDetectedId) return;
+      dbg.log("[_processSubmission] detectionId=" + detectionId + ", lastDetectedId=" + this.lastDetectedId);
+      if (!isManual && detectionId === this.lastDetectedId) {
+        dbg.log("Module-level dedup triggered, skipping");
+        return;
+      }
       this.lastDetectedId = detectionId;
 
       // Fetch rich metadata
@@ -1194,6 +1298,23 @@ Be concise. Max 200 words.`;
       const tsMs = submission.timestamp
         ? Number(submission.timestamp) * 1000
         : Date.now();
+
+      // Detect whether this submission's code differs from what's already saved.
+      // If so, set a flag so the background can trigger an AI review when appropriate.
+      try {
+        const existingProblem = await Storage.getProblem(CONSTANTS.makeProblemId("leetcode", slug)).catch(() => null);
+        if (existingProblem) {
+          const existingCode = String(existingProblem.code || "").trim();
+          const newCode = String(submission.code || "").trim();
+          if (existingCode !== newCode) {
+            submission._codeChanged = true;
+            submission._requestAIReview = true;
+          }
+        } else {
+          // No existing problem — request review for new imports when enabled
+          submission._requestAIReview = true;
+        }
+      } catch (e) { dbg.error("Code-diff detection failed", e); }
 
       eventBus.emit("problem:solved", {
         platform: "leetcode",
@@ -1223,6 +1344,10 @@ Be concise. Max 200 words.`;
         elapsedSeconds,
         hasSimilar: meta?.hasSimilar ?? null, // explicit "no similar" field: true|false|null
         submissionsUrl: `https://leetcode.com/problems/${slug}/submissions/`, // direct link to submissions page
+        notes: "", // user-editable notes about this solution
+        methodTitle: "", // algorithm name: "Greedy", "DP", "Two-Pointer", etc.
+        isDuplicate: false, // will be set by AI duplicate detection
+        duplicateOf: null, // references original problem ID if this is a duplicate solution
       });
 
       dbg.log("Solve emitted", { slug, canonical: canonical?.canonicalId });
@@ -1235,25 +1360,26 @@ Be concise. Max 200 words.`;
 
   /* ── File set builder ────────────────────────────────────────────── */
   _buildFileSet(submission, meta, settings, slug, elapsedSeconds = null) {
-    const lang      = resolveLang(submission.lang);
+    const lang = resolveLang(submission.lang);
     const canonical = this._canonical || null;
-    const title     = meta?.title || slug;
+    const title = meta?.title || slug;
+    const problemId = CONSTANTS.makeProblemId("leetcode", slug);
 
     const files = [];
 
     // 1. Solution file
     files.push({
-      path: solutionPath(slug, "leetcode", lang, canonical, settings),
+      path: solutionPath(problemId, "leetcode", lang, canonical, settings),
       content: submission.code || "// (no code retrieved)",
     });
 
     // 2. README (problem description + stats)
     if (settings.leetcode_readme !== false && meta?.content) {
-      const stats   = this._formatStats(submission, meta, elapsedSeconds);
+      const stats = this._formatStats(submission, meta, elapsedSeconds);
       const similar = this._formatSimilar(meta, settings);
 
       files.push({
-        path: readmePath(slug, canonical, settings),
+        path: readmePath(problemId, canonical, settings),
         content: [
           `# ${meta.questionFrontendId ? `[${meta.questionFrontendId}] ` : ""}${title}`,
           "",
@@ -1279,7 +1405,7 @@ Be concise. Max 200 words.`;
     // 3. Hints (separate file if enabled)
     if (settings.leetcode_sync_hints && meta?.hints?.length) {
       files.push({
-        path: hintsPath(slug, canonical, settings),
+        path: hintsPath(problemId, canonical, settings),
         content: [
           `# Hints — ${title}`,
           "",
@@ -1322,9 +1448,9 @@ Be concise. Max 200 words.`;
 
   /** Build a README.md string for a bulk-imported problem. */
   _buildBulkReadme(sub, { title, difficulty, tags, acRate, similar, descHtml }) {
-    const tagStr  = tags.length ? tags.map(t => `\`${t}\``).join(", ") : "—";
+    const tagStr = tags.length ? tags.map(t => `\`${t}\``).join(", ") : "—";
     const simList = (similar || []).filter(q => !q.isPaidOnly).slice(0, 5);
-    const parts   = [
+    const parts = [
       `# ${title}`,
       "",
       `**Difficulty:** ${difficulty || "?"}  |  **Acceptance:** ${acRate != null ? acRate.toFixed(1) + "%" : "?"}`,
@@ -1348,7 +1474,7 @@ Be concise. Max 200 words.`;
     if (sub.runtime || sub.memory) {
       const perf = [];
       if (sub.runtime) perf.push(`Runtime: ${sub.runtime}`);
-      if (sub.memory)  perf.push(`Memory: ${sub.memory}`);
+      if (sub.memory) perf.push(`Memory: ${sub.memory}`);
       parts.push("## My Submission", "", ...perf.map(p => `- ${p}`), "");
     }
     if (simList.length) {
