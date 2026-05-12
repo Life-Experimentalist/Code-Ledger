@@ -36,13 +36,21 @@ class HandlerRegistry {
   }
 
   getPlatform(id) {
-    return this.platforms.get(id);
+    const handler = this.platforms.get(id);
+    dbg.log(`getPlatform(${id}): ${handler ? '✓ found' : 'NOT found'}`);
+    return handler;
   }
+
   getGitProvider(id) {
-    return this.gitProviders.get(id);
+    const handler = this.gitProviders.get(id);
+    dbg.log(`getGitProvider(${id}): ${handler ? '✓ found' : 'NOT found'}`);
+    return handler;
   }
+
   getAIProvider(id) {
-    return this.aiProviders.get(id);
+    const handler = this.aiProviders.get(id);
+    dbg.log(`getAIProvider(${id}): ${handler ? '✓ found' : 'NOT found'}`);
+    return handler;
   }
 
   getAllSettingsSchemas() {
@@ -112,7 +120,7 @@ class HandlerRegistry {
           label: "Secondary AI Provider",
           type: "select",
           default: "",
-          description: "Fallback provider to be used if the primary fails.",
+          description: "Fallback provider to be used if the primary fails. Same provider is allowed when the fallback model differs.",
           options: Object.keys(CONSTANTS.AI_PROVIDERS).map((id) => ({
             value: id,
             label: CONSTANTS.AI_PROVIDERS[id].name,

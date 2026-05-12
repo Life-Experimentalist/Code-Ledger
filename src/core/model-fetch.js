@@ -4,6 +4,9 @@
  */
 import { Storage } from "./storage.js";
 import { CONSTANTS } from "./constants.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("ModelFetch");
 
 async function getFirstKeyForProvider(providerId) {
   const aiKeys = await Storage.getAIKeys();
@@ -16,6 +19,7 @@ export async function fetchModelsForProvider(
   endpointOverride,
   options = {},
 ) {
+  dbg.log(`fetchModelsForProvider(): ${providerId}`);
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return [];
   const models = [];
@@ -48,7 +52,7 @@ export async function fetchModelsForProvider(
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
           ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       // Use header `x-goog-api-key` for Google Gemini model listing when possible.
@@ -74,7 +78,7 @@ export async function fetchModelsForProvider(
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
           ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       const res = await fetch(ep, {
@@ -97,7 +101,7 @@ export async function fetchModelsForProvider(
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
           ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       try {
@@ -122,7 +126,7 @@ export async function fetchModelsForProvider(
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
           ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/tags`;
       try {
@@ -151,7 +155,7 @@ export async function fetchModelsForProvider(
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
           ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       try {
@@ -179,7 +183,7 @@ export async function fetchModelsForProvider(
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
           ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       try {
@@ -207,6 +211,7 @@ export async function fetchModelsForProvider(
 }
 
 export async function fetchAIModels() {
+  dbg.log(`fetchAIModels(): fetching from ${Object.keys(CONSTANTS.AI_PROVIDERS).length} providers`);
   const out = [];
   for (const pid of Object.keys(CONSTANTS.AI_PROVIDERS)) {
     try {
@@ -216,6 +221,7 @@ export async function fetchAIModels() {
       // ignore per provider
     }
   }
+  dbg.log(`fetchAIModels(): ✓ loaded ${out.length} total models`);
   return out;
 }
 
@@ -237,9 +243,8 @@ export async function testAIKey(providerId, key, endpointOverride = "") {
       }
       return me.replace(/\/$/, "");
     }
-    return `${baseOverride || (provider.endpoint || "").replace(/\/$/, "")}/${
-      providerId === "ollama" ? "tags" : "models"
-    }`;
+    return `${baseOverride || (provider.endpoint || "").replace(/\/$/, "")}/${providerId === "ollama" ? "tags" : "models"
+      }`;
   };
   const me = provider.modelsEndpoint;
 
@@ -334,7 +339,7 @@ export async function testProviderEndpoint(providerId, endpointOverride) {
       ? baseOverride + me.substring(provider.endpoint.length)
       : me.replace(/\/$/, "")
     : (baseOverride || (provider.endpoint || "").replace(/\/$/, "")) +
-      (providerId === "ollama" ? "/tags" : "/models");
+    (providerId === "ollama" ? "/tags" : "/models");
 
   try {
     const res = await fetch(ep);

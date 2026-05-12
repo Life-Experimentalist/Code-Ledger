@@ -43,11 +43,13 @@ class CanonicalMapper {
   }
 
   async loadMap() {
+    dbg.log(`loadMap(): fetching canonical map`);
     const cached = await storage.local.get([CONSTANTS.SK.CANONICAL_MAP_CACHE, CONSTANTS.SK.CANONICAL_MAP_ETAG]);
     const etag = cached[CONSTANTS.SK.CANONICAL_MAP_ETAG];
     const data = cached[CONSTANTS.SK.CANONICAL_MAP_CACHE];
 
     if (data && (Date.now() - this.lastFetch < CONSTANTS.CANONICAL_CACHE_TTL_MS)) {
+      dbg.log(`loadMap(): ✓ using cached data (${this.map.size} entries)`);
       this.populate(data);
       return;
     }
@@ -78,6 +80,7 @@ class CanonicalMapper {
           [CONSTANTS.SK.CANONICAL_MAP_CACHE]: json,
           [CONSTANTS.SK.CANONICAL_MAP_ETAG]: newEtag
         });
+        dbg.log(`loadMap(): ✓ loaded remote map (entries: ${normalizeCanonicalEntries(json).length})`);
         this.populate(json);
         this.lastFetch = Date.now();
       }
@@ -89,12 +92,15 @@ class CanonicalMapper {
 
   populate(json) {
     this.map.clear();
+    let aliasCount = 0;
     for (const entry of normalizeCanonicalEntries(json)) {
       this.map.set(entry.canonicalId, entry);
       for (const alias of normalizeAliases(entry)) {
         this.map.set(`${alias.platform}:${alias.slug}`, entry);
+        aliasCount++;
       }
     }
+    dbg.log(`populate(): ✓ loaded ${this.map.size} entries (${aliasCount} aliases)`);
   }
 
   /**

@@ -15,8 +15,8 @@ export const LAYOUT_VERSION = 2;
 
 /** Base directory for a problem. Directory name is always id (or canonicalId if set). */
 export function problemBase(id, canonical, settings = {}) {
-  const root = (settings?.problems_dir || "problems").replace(/\/+$/, "");
-  const dir  = canonical?.canonicalId || id;
+  const root = CONSTANTS.PROBLEMS_DIR_DEFAULT.replace(/\/+$/, "");
+  const dir = canonical?.canonicalId || id;
   return `${root}/${dir}`;
 }
 
@@ -29,14 +29,17 @@ export function problemBase(id, canonical, settings = {}) {
  * The file is ALWAYS named after the problem slug, not the language verbose name.
  * Multiple languages for the same problem produce sibling files: two-sum.py, two-sum.js.
  */
-export function solutionPath(id, platform, lang, canonical, settings = {}) {
+export function solutionPath(id, platform, lang, canonical, settings = {}, methodTitle = "") {
   const base = problemBase(id, canonical, settings);
   const slug = canonical?.canonicalId || id;
-  const ext  = lang.ext || "txt";
+  const ext = lang.ext || "txt";
+  const sanitized = String(methodTitle || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const method = sanitized ? "-" + sanitized : "";
+  const fileName = `${slug}${method}.${ext}`;
   if (canonical?.canonicalId) {
-    return `${base}/${platform}/${slug}.${ext}`;
+    return `${base}/${platform}/${fileName}`;
   }
-  return `${base}/${slug}.${ext}`;
+  return `${base}/${fileName}`;
 }
 
 /** README is always at the problem base, never inside a platform subdir. */
@@ -53,21 +56,58 @@ export function hintsPath(id, canonical, settings = {}) {
  * Build the complete file list for a solved problem from its stored record.
  * Used by service-worker for resync/pending commits.
  *
+ * Includes: code, README, hints, and a metadata JSON file with AI review, tags, difficulty, etc.
+ *
  * @param {object} problem  — stored problem record
  * @param {object} settings — user settings
  * @returns {Array<{path: string, content: string}>}
  */
 export function buildProblemFiles(problem, settings = {}) {
+  if (Array.isArray(problem?.files) && problem.files.length > 0) {
+    // Use pre-built files array, but also add metadata if available
+    const files = problem.files
+      .filter((f) => f && typeof f.path === "string" && typeof f.content === "string")
+      .map((f) => ({ path: f.path, content: f.content }));
+
+    // Add metadata file
+    if (problem.aiReview || problem.tags || problem.difficulty || Array.isArray(problem.methods)) {
+      const meta = {
+        id: problem.id || problem.titleSlug,
+        title: problem.title,
+        platform: problem.platform,
+        difficulty: problem.difficulty,
+        tags: problem.tags || [],
+        aiReview: problem.aiReview || null,
+        timestamp: problem.timestamp,
+        elapsedSeconds: problem.elapsedSeconds || 0,
+        isDuplicate: problem.isDuplicate || false,
+        duplicateOf: problem.duplicateOf || null,
+        methods: Array.isArray(problem.methods) ? problem.methods.map(m => ({
+          title: m.title,
+          language: m.language,
+          description: m.description || "",
+          timestamp: m.timestamp,
+        })) : [],
+      };
+      const base = problemBase(problem.id || problem.titleSlug, problem.canonical, settings);
+      files.push({
+        path: `${base}/.meta.json`,
+        content: JSON.stringify(meta, null, 2),
+      });
+    }
+    return files;
+  }
+
   const canonical = problem.canonical || null;
-  const lang      = problem.lang || { verbose: "Solution", name: "solution", ext: "txt" };
-  const ext       = lang.ext || "txt";
+  const lang = problem.lang || { verbose: "Solution", name: "solution", ext: "txt" };
+  const ext = lang.ext || "txt";
   const normalLang = { verbose: lang.verbose || lang.name || "Solution", name: lang.name || "solution", ext };
-  const id        = problem.id || problem.titleSlug || "unknown";   // platform-scoped
+  const id = problem.id || problem.titleSlug || "unknown";   // platform-scoped
   const files = [];
 
   if (problem.code) {
     files.push({
-      path: solutionPath(id, problem.platform || "unknown", normalLang, canonical, settings),
+      path: solutionPath(id, problem.platform || "unknown", normalLang, canonical, settings, problem.methodTitle),
       content: problem.code,
     });
   }
@@ -83,6 +123,34 @@ export function buildProblemFiles(problem, settings = {}) {
       content: problem.hintsContent,
     });
   }
+
+  // Add metadata file with AI review and other metadata
+  if (problem.aiReview || problem.tags || problem.difficulty || Array.isArray(problem.methods)) {
+    const meta = {
+      id: problem.id || problem.titleSlug,
+      title: problem.title,
+      platform: problem.platform,
+      difficulty: problem.difficulty,
+      tags: problem.tags || [],
+      aiReview: problem.aiReview || null,
+      timestamp: problem.timestamp,
+      elapsedSeconds: problem.elapsedSeconds || 0,
+      isDuplicate: problem.isDuplicate || false,
+      duplicateOf: problem.duplicateOf || null,
+      methods: Array.isArray(problem.methods) ? problem.methods.map(m => ({
+        title: m.title,
+        language: m.language,
+        description: m.description || "",
+        timestamp: m.timestamp,
+      })) : [],
+    };
+    const base = problemBase(id, canonical, settings);
+    files.push({
+      path: `${base}/.meta.json`,
+      content: JSON.stringify(meta, null, 2),
+    });
+  }
+
   return files;
 }
 

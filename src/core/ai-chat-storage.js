@@ -4,6 +4,9 @@
  */
 
 import { Storage } from "./storage.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("AIChatStorage");
 
 /**
  * AI Chat storage — IndexedDB abstraction for storing conversations.
@@ -16,6 +19,7 @@ let db = null;
 
 /** Initialize IndexedDB with proper schema */
 async function initDB() {
+    dbg.log(`initDB(): initializing AI chat database`);
     return new Promise((resolve, reject) => {
         if (db) {
             resolve(db);
@@ -65,6 +69,7 @@ function normalizeChatRecord(record = {}) {
  * floating panel, and library view without duplicating storage logic.
  */
 export async function saveAIChat(problemSlug, problemURL, messages, platform = "leetcode", meta = {}) {
+    dbg.log(`saveAIChat(): ${platform} problem ${problemSlug} (${(messages || []).length} messages)`);
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], "readwrite");
@@ -76,9 +81,13 @@ export async function saveAIChat(problemSlug, problemURL, messages, platform = "
             messages: messages || [],
             ...meta,
         });
+        chat._pendingSync = true;
         const request = store.add(chat);
         request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => {
+            dbg.log(`saveAIChat(): ✓ saved chat ${request.result}`);
+            resolve(request.result);
+        };
     });
 }
 
@@ -88,6 +97,7 @@ export async function saveAIChat(problemSlug, problemURL, messages, platform = "
  * @param {Array} messages - New messages array
  */
 export async function updateAIChat(chatId, messages, meta = {}) {
+    dbg.log(`updateAIChat(): ${chatId} (${(messages || []).length} messages)`);
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], "readwrite");
@@ -102,6 +112,7 @@ export async function updateAIChat(chatId, messages, meta = {}) {
             }
             chat.messages = messages;
             chat.updatedAt = Date.now();
+            chat._pendingSync = true;
             Object.assign(chat, meta);
             const updateRequest = store.put(chat);
             updateRequest.onerror = () => reject(updateRequest.error);
@@ -116,6 +127,7 @@ export async function updateAIChat(chatId, messages, meta = {}) {
  * @returns {Promise<Array>}
  */
 export async function getChatsByProblem(problemSlug) {
+    dbg.log(`getChatsByProblem(): ${problemSlug}`);
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], "readonly");
@@ -171,6 +183,7 @@ export async function getChatsByDateRange(startTime, endTime) {
  * @returns {Promise<Array>}
  */
 export async function getAllChats() {
+    dbg.log(`getAllChats(): retrieving all chats`);
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], "readonly");
@@ -227,7 +240,13 @@ export async function getChat(chatId) {
  * @param {number} chatId
  */
 export async function deleteChat(chatId) {
+    dbg.log(`deleteChat(): ${chatId}`);
     const db = await initDB();
+    // Capture the github path before deleting so the sync can remove it from the repo
+    const existing = await getChat(chatId).catch(() => null);
+    if (existing?._githubPath) {
+        await _addDeletedChatPath(existing._githubPath);
+    }
     return new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], "readwrite");
         const store = tx.objectStore(STORE_NAME);
@@ -250,6 +269,68 @@ export async function addMessageToChat(chatId, message) {
         timestamp: message.timestamp || Date.now(),
     });
     return updateAIChat(chatId, chat.messages);
+}
+
+// ── Sync support ──────────────────────────────────────────────────────────────
+
+const DELETED_PATHS_KEY = "_deletedChatPaths";
+
+async function _addDeletedChatPath(path) {
+    const settings = await Storage.getSettings();
+    const existing = Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
+    if (!existing.includes(path)) {
+        await Storage.setSettings({ ...settings, [DELETED_PATHS_KEY]: [...existing, path] });
+    }
+}
+
+export async function getDeletedChatPaths() {
+    const settings = await Storage.getSettings();
+    return Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
+}
+
+export async function clearDeletedChatPaths() {
+    const settings = await Storage.getSettings();
+    await Storage.setSettings({ ...settings, [DELETED_PATHS_KEY]: [] });
+}
+
+export async function getPendingSyncChats() {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const tx = db.transaction([STORE_NAME], "readonly");
+        const req = tx.objectStore(STORE_NAME).getAll();
+        req.onsuccess = () => resolve((req.result || []).filter(c => c._pendingSync === true));
+        req.onerror = () => resolve([]);
+    });
+}
+
+export async function markChatSynced(chatId, githubPath) {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const tx = db.transaction([STORE_NAME], "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(chatId);
+        req.onsuccess = () => {
+            const chat = req.result;
+            if (!chat) { resolve(); return; }
+            chat._pendingSync = false;
+            chat._githubPath = githubPath;
+            store.put(chat);
+            tx.oncomplete = () => resolve();
+        };
+        req.onerror = () => resolve();
+    });
+}
+
+export async function importChatsLocal(items) {
+    if (!Array.isArray(items) || !items.length) return;
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        items.forEach(item => store.add({ ...normalizeChatRecord(item), _githubPath: item._githubPath, _pendingSync: false }));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
 }
 
 /** Export schema for reference */

@@ -24,6 +24,32 @@
  * - `AI_FALLBACK_CHAIN`: ordered provider ids to try when the primary is unavailable.
  */
 
+export const FEATURE_STATUS = Object.freeze({
+  STABLE: "stable",
+  ALPHA: "alpha",
+  BETA: "beta",
+  UNDER_CONSTRUCTION: "underConstruction",
+});
+
+export const FEATURE_STATUS_META = Object.freeze({
+  [FEATURE_STATUS.STABLE]: {
+    label: "Stable",
+    className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+  },
+  [FEATURE_STATUS.ALPHA]: {
+    label: "Alpha",
+    className: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/25",
+  },
+  [FEATURE_STATUS.BETA]: {
+    label: "Beta",
+    className: "bg-sky-500/15 text-sky-300 border-sky-500/25",
+  },
+  [FEATURE_STATUS.UNDER_CONSTRUCTION]: {
+    label: "Under Construction",
+    className: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  },
+});
+
 export const CONSTANTS = Object.freeze({
   VERSION: "1.0.0",
   EXTENSION_NAME: "CodeLedger",
@@ -121,11 +147,15 @@ export const CONSTANTS = Object.freeze({
   AI_DEFAULT_PRIMARY: "gemini",
   AI_FALLBACK_CHAIN: ["openai", "ollama", "claude", "deepseek"],
 
+  FEATURE_STATUS,
+  FEATURE_STATUS_META,
+
   // ── Git Providers ──
   GIT_PROVIDERS: {
     github: {
       id: "github",
       name: "GitHub",
+      status: FEATURE_STATUS.STABLE,
       apiBase: "https://api.github.com",
       oauthBase: "https://github.com/login/oauth",
       clientId: "",
@@ -133,6 +163,7 @@ export const CONSTANTS = Object.freeze({
     gitlab: {
       id: "gitlab",
       name: "GitLab",
+      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
       apiBase: "https://gitlab.com/api/v4",
       oauthBase: "https://gitlab.com/oauth",
       clientId: "",
@@ -140,6 +171,7 @@ export const CONSTANTS = Object.freeze({
     bitbucket: {
       id: "bitbucket",
       name: "Bitbucket",
+      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
       apiBase: "https://api.bitbucket.org/2.0",
       oauthBase: "https://bitbucket.org/site/oauth2",
       clientId: "",
@@ -189,9 +221,9 @@ export const CONSTANTS = Object.freeze({
   INDEX_JSON_PATH: "index.json",
   PROBLEMS_DIR_DEFAULT: "problems",
   COMMIT_TYPE: {
-    SOLVE:       "solve",
+    SOLVE: "solve",
     MAINTENANCE: "maintenance",
-    IMPORT:      "import",
+    IMPORT: "import",
   },
 
   HEARTBEAT_PORT_NAME: "heartbeat",

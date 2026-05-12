@@ -21,9 +21,11 @@ export class APIKeyPool {
     const { [CONSTANTS.SK.AI_KEYS]: allKeys = {} } = await storage.local.get(
       CONSTANTS.SK.AI_KEYS,
     );
-    return (allKeys[this.providerId] || [])
+    const keys = (allKeys[this.providerId] || [])
       .map((k) => String(k || "").trim())
       .filter(Boolean);
+    dbg.log(`APIKeyPool(${this.providerId}) keys loaded: ${keys.length}`);
+    return keys;
   }
 
   async getStrategy() {
@@ -35,6 +37,7 @@ export class APIKeyPool {
 
   async getKeyCount() {
     const keys = await this.getAllKeys();
+    dbg.log(`APIKeyPool(${this.providerId}) key count: ${keys.length}`);
     return keys.length;
   }
 
@@ -55,10 +58,12 @@ export class APIKeyPool {
 
     if (strategy === "random") {
       const idx = Math.floor(Math.random() * available.length);
+      dbg.log(`APIKeyPool(${this.providerId}) selecting random key idx=${idx}`);
       return available[idx];
     }
 
     if (strategy === "sticky-first") {
+      dbg.log(`APIKeyPool(${this.providerId}) selecting sticky-first key`);
       return available[0];
     }
 
@@ -80,6 +85,7 @@ export class APIKeyPool {
             [this.providerId]: (index + 1) % keys.length,
           },
         });
+        dbg.log(`APIKeyPool(${this.providerId}) selected key index=${index}`);
         return key;
       }
     }

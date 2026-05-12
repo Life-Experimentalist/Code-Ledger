@@ -5,6 +5,9 @@
 
 import { registry } from "./handler-registry.js";
 import { Storage } from "./storage.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("GitProviderSelector");
 
 /**
  * Fallback priority for git providers
@@ -19,6 +22,7 @@ const GIT_PROVIDER_PRIORITY = ["github", "gitlab", "bitbucket"];
  * @returns {string} The ID of the selected git provider
  */
 export function getActiveGitProvider(settings = {}) {
+  let selected = null;
   for (const providerId of GIT_PROVIDER_PRIORITY) {
     const provider = registry.getGitProvider(providerId);
     if (!provider) continue;
@@ -28,12 +32,14 @@ export function getActiveGitProvider(settings = {}) {
     const isEnabled = settings[enabledKey] !== false;
 
     if (isEnabled) {
-      return providerId;
+      selected = providerId;
+      break;
     }
   }
 
-  // Fallback to first available
-  return GIT_PROVIDER_PRIORITY[0];
+  const result = selected || GIT_PROVIDER_PRIORITY[0];
+  dbg.log(`getActiveGitProvider(): selected ${result}`);
+  return result;
 }
 
 /**
@@ -41,6 +47,7 @@ export function getActiveGitProvider(settings = {}) {
  * @returns {Array<{id: string, name: string, enabled: boolean}>}
  */
 export async function getAvailableGitProviders() {
+  dbg.log(`getAvailableGitProviders(): fetching available providers`);
   const settings = await Storage.getSettings();
   return GIT_PROVIDER_PRIORITY.map((id) => ({
     id,
@@ -59,6 +66,7 @@ export async function getAvailableGitProviders() {
  * @returns {Promise<any>} The git provider handler
  */
 export async function getActiveGitProviderInstance() {
+  dbg.log(`getActiveGitProviderInstance(): getting provider instance`);
   const settings = await Storage.getSettings();
   const providerId = getActiveGitProvider(settings);
   return registry.getGitProvider(providerId);
@@ -70,6 +78,7 @@ export async function getActiveGitProviderInstance() {
  * @returns {Promise<{valid: boolean, error?: string}>}
  */
 export async function validateGitProvider(providerId) {
+  dbg.log(`validateGitProvider(): ${providerId}`);
   const provider = registry.getGitProvider(providerId);
   if (!provider) {
     return { valid: false, error: `Provider ${providerId} not found` };

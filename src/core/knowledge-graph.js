@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createDebugger } from '../lib/debug.js';
+
+const dbg = createDebugger('KnowledgeGraph');
+
 /**
  * Builds a topic-centric knowledge graph from solved problems.
  *
@@ -17,16 +21,16 @@
  */
 
 const DIFFICULTY_COLOR = {
-  Easy:    "#22c55e",
-  Medium:  "#f59e0b",
-  Hard:    "#ef4444",
+  Easy: "#22c55e",
+  Medium: "#f59e0b",
+  Hard: "#ef4444",
   Unknown: "#64748b",
 };
 
 const PLATFORM_COLOR = {
-  leetcode:      "#FFA116",
+  leetcode: "#FFA116",
   geeksforgeeks: "#2F8D46",
-  codeforces:    "#1F8ACB",
+  codeforces: "#1F8ACB",
 };
 
 const TOPIC_COLORS = [
@@ -51,6 +55,7 @@ function blendColors(colorsArr) {
 }
 
 export function buildKnowledgeGraph(problems) {
+  dbg.log(`buildKnowledgeGraph(): building from ${(problems || []).length} problems`);
   const nodes = new Map(); // id → node
   const edges = [];        // { source, target, type }
   const topicColorMap = new Map();
@@ -211,10 +216,12 @@ export function buildKnowledgeGraph(problems) {
     }
   }
 
-  return {
+  const result = {
     nodes: [...nodes.values()],
     edges,
   };
+  dbg.log(`buildKnowledgeGraph(): ✓ complete - ${result.nodes.length} nodes, ${result.edges.length} edges`);
+  return result;
 }
 
 export { DIFFICULTY_COLOR, TOPIC_COLORS, PLATFORM_COLOR };

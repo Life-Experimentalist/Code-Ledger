@@ -20,6 +20,7 @@ export const Storage = {
     const { [CONSTANTS.SK.SETTINGS]: settings } =
       await browserStorage.local.get(CONSTANTS.SK.SETTINGS);
     const s = settings || {};
+    dbg.log(`getSettings(): loaded settings with ${Object.keys(s).length} keys`);
     // Migration: if legacy primaryModel/secondaryModel were used to store provider ids,
     // copy them to new keys `aiProvider` / `aiSecondary` when appropriate.
     try {
@@ -46,6 +47,7 @@ export const Storage = {
   },
 
   async setSettings(settings) {
+    dbg.log(`setSettings(): saving ${Object.keys(settings || {}).length} settings keys`);
     await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: settings });
   },
 
@@ -53,12 +55,15 @@ export const Storage = {
   async getAIKeys() {
     const res = await browserStorage.local.get(CONSTANTS.SK.AI_KEYS);
     const all = res[CONSTANTS.SK.AI_KEYS] || {};
+    dbg.log(`getAIKeys(): found keys for ${Object.keys(all).length} provider(s)`);
     return all;
   },
 
   async setAIKeys(map) {
     // map: { providerId: [key1,key2] }
     const payload = { [CONSTANTS.SK.AI_KEYS]: map };
+    const totalKeys = Object.values(map || {}).reduce((sum, keys) => sum + (Array.isArray(keys) ? keys.length : 0), 0);
+    dbg.log(`setAIKeys(): saving ${totalKeys} key(s) across ${Object.keys(map || {}).length} provider(s)`);
     await browserStorage.local.set(payload);
   },
 
@@ -160,6 +165,8 @@ export const Storage = {
   async getAuthToken(provider) {
     const keys = await browserStorage.local.get(CONSTANTS.SK.AUTH_TOKENS);
     const tokens = keys[CONSTANTS.SK.AUTH_TOKENS] || {};
+    const exists = !!tokens[provider];
+    dbg.log(`getAuthToken(${provider}): token ${exists ? 'found' : 'NOT found'}`);
     return tokens[provider];
   },
 
@@ -167,6 +174,7 @@ export const Storage = {
     const keys = await browserStorage.local.get(CONSTANTS.SK.AUTH_TOKENS);
     const tokens = keys[CONSTANTS.SK.AUTH_TOKENS] || {};
     tokens[provider] = token;
+    dbg.log(`setAuthToken(${provider}): token set (${String(token || '').substring(0, 20)}...)`);
     await browserStorage.local.set({ [CONSTANTS.SK.AUTH_TOKENS]: tokens });
   },
 
@@ -209,14 +217,22 @@ export const Storage = {
   },
 
   async saveProblem(problem) {
+    const problemId = problem?.id || problem?.titleSlug || 'unknown';
+    dbg.log(`saveProblem(): saving problem ${problemId} (${problem?.platform || 'unknown'})`);
     const store = await this.queryDB(
       CONSTANTS.IDB_STORES.PROBLEMS,
       "readwrite",
     );
     return new Promise((resolve, reject) => {
       const request = store.put(problem);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        dbg.log(`saveProblem(): ✓ saved ${problemId}`);
+        resolve();
+      };
+      request.onerror = () => {
+        dbg.error(`saveProblem(): ✗ failed for ${problemId}`, request.error);
+        reject(request.error);
+      };
     });
   },
 
@@ -224,8 +240,15 @@ export const Storage = {
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS);
     return new Promise((resolve, reject) => {
       const request = store.get(id);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const found = !!request.result;
+        dbg.log(`getProblem(${id}): ${found ? '✓ found' : 'NOT found'}`);
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        dbg.error(`getProblem(${id}): ✗ error`, request.error);
+        reject(request.error);
+      };
     });
   },
 
@@ -233,17 +256,56 @@ export const Storage = {
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS);
     return new Promise((resolve, reject) => {
       const request = store.getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const count = (request.result || []).length;
+        dbg.log(`getAllProblems(): retrieved ${count} problem(s)`);
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        dbg.error(`getAllProblems(): ✗ error`, request.error);
+        reject(request.error);
+      };
     });
   },
 
+  // Solutions helpers: problems can store multiple solutions under `solutions`.
+  async getSolutionsForProblem(problemId) {
+    const p = await this.getProblem(problemId);
+    return p?.solutions || [];
+  },
+
+  async addSolutionToProblem(problemId, solution) {
+    // solution: { id?, code, lang, timestamp?, meta? }
+    const p = await this.getProblem(problemId);
+    if (!p) throw new Error("Problem not found");
+    const sols = Array.isArray(p.solutions) ? p.solutions.slice() : [];
+    const entry = { id: solution.id || `s-${Date.now()}`, ts: Date.now(), ...solution };
+    sols.push(entry);
+    p.solutions = sols;
+    await this.saveProblem(p);
+    return entry;
+  },
+
+  async replaceSolutionsForProblem(problemId, solutions = []) {
+    const p = await this.getProblem(problemId);
+    if (!p) throw new Error("Problem not found");
+    p.solutions = solutions;
+    await this.saveProblem(p);
+  },
+
   async deleteProblem(id) {
+    dbg.log(`deleteProblem(): deleting ${id}`);
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS, "readwrite");
     return new Promise((resolve, reject) => {
       const request = store.delete(id);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        dbg.log(`deleteProblem(): ✓ deleted ${id}`);
+        resolve();
+      };
+      request.onerror = () => {
+        dbg.error(`deleteProblem(): ✗ failed for ${id}`, request.error);
+        reject(request.error);
+      };
     });
   },
 
@@ -304,8 +366,12 @@ export const Storage = {
     const key = "cl.pending.problemkeys";
     const map = await this.getPendingProblemKeys();
     const commitKey = String(problemCommitKey || "").trim();
-    if (!commitKey) return;
+    if (!commitKey) {
+      dbg.warn(`markPendingProblemKey(): empty commitKey, skipped`);
+      return;
+    }
     map[commitKey] = Date.now();
+    dbg.log(`markPendingProblemKey(): marked ${commitKey} (now ${Object.keys(map).length} pending)`);
     await browserStorage.local.set({ [key]: map });
   },
 
@@ -323,11 +389,14 @@ export const Storage = {
   async clearPendingProblemKeys(problemCommitKeys = []) {
     const key = "cl.pending.problemkeys";
     const map = await this.getPendingProblemKeys();
+    const before = Object.keys(map).length;
     for (const raw of problemCommitKeys || []) {
       const commitKey = String(raw || "").trim();
       if (!commitKey) continue;
       delete map[commitKey];
     }
+    const after = Object.keys(map).length;
+    dbg.log(`clearPendingProblemKeys(): removed ${problemCommitKeys.length} key(s) (${before} → ${after} pending)`);
     await browserStorage.local.set({ [key]: map });
   },
 

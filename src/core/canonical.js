@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createDebugger } from "../lib/debug.js";
+const dbg = createDebugger("CanonicalMap");
+
 export class CanonicalMap {
   static _map = null;
 
@@ -49,7 +52,7 @@ export class CanonicalMap {
         this._map = this._normalizeEntries(await res.json());
       } else {
         this._map = [];
-        console.warn('Failed to load canonical map', err);
+        dbg.warn('Failed to load canonical map', err);
       }
     }
     return this._map;

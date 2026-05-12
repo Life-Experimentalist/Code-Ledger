@@ -7,7 +7,9 @@
  * This keeps the core agnostic and lets new platforms be added as plugins.
  */
 
-/** Fallback template used when no platform-specific template is registered. */
+import { createDebugger } from '../lib/debug.js';
+
+const dbg = createDebugger('AIPrompts');
 export const DEFAULT_PROMPT_TEMPLATE = `Review this {difficulty} {language} solution for '{title}'.
 
 Provide:
@@ -41,6 +43,7 @@ const _platformPrompts = {
  */
 export function registerPlatformPrompt(platformId, template) {
   if (platformId && typeof template === "string" && template.trim()) {
+    dbg.log(`registerPlatformPrompt(${platformId}): registered`);
     _platformPrompts[platformId] = template;
   }
 }
@@ -71,13 +74,17 @@ export function getRegisteredPlatforms() {
  */
 export function normalizeAIPrompts(raw) {
   const defaults = getDefaultAIPrompts();
-  if (!raw || typeof raw !== "object") return defaults;
+  if (!raw || typeof raw !== "object") {
+    dbg.log(`normalizeAIPrompts(): no raw prompts, using defaults (${Object.keys(defaults).length} keys)`);
+    return defaults;
+  }
   const out = { ...defaults };
   for (const key of Object.keys(defaults)) {
     if (raw[key] && typeof raw[key] === "string" && raw[key].trim()) {
       out[key] = raw[key];
     }
   }
+  dbg.log(`normalizeAIPrompts(): merged raw + defaults (${Object.keys(out).length} keys)`);
   return out;
 }
 
@@ -92,6 +99,7 @@ export function fillPromptTemplate(template, ctx = {}) {
     .replace(/\{title\}/g, ctx.title || "Unknown Problem")
     .replace(/\{difficulty\}/g, ctx.difficulty || "Unknown")
     .replace(/\{language\}/g, ctx.language || ctx.lang?.name || "Unknown")
+    .replace(/\{methodTitle\}/g, ctx.methodTitle || ctx.method || "")
     .replace(/\{platform\}/g, ctx.platform || "Unknown");
 }
 
@@ -99,14 +107,17 @@ export function fillPromptTemplate(template, ctx = {}) {
  * Builds a complete review prompt by selecting the right template for the
  * problem's platform, filling in context, and appending the code block.
  *
- * @param {{ title?: string, difficulty?: string, language?: string, platform?: string, lang?: {name?: string}, problemUrl?: string }} problemContext
+ * @param {{ title?: string, difficulty?: string, language?: string, platform?: string, methodTitle?: string, lang?: {name?: string}, problemUrl?: string }} problemContext
  * @param {string} code            The solution code to review
  * @param {Record<string, string>} [prompts]  Optional overrides (from user storage); falls back to registered defaults
  * @returns {string}               Complete prompt ready to send to an AI provider
  */
 export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) {
   // Raw mode: the caller has already built the full prompt — return it as-is.
-  if (problemContext._rawPrompt) return code;
+  if (problemContext._rawPrompt) {
+    dbg.log(`buildReviewPrompt(): raw mode (pre-built prompt)`);
+    return code;
+  }
 
   const platform = (problemContext.platform || "").toLowerCase() || "default";
 
@@ -120,6 +131,7 @@ export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) 
 
   const filledTemplate = fillPromptTemplate(template, problemContext);
   const lang = problemContext.language || problemContext.lang?.name || "";
+  dbg.log(`buildReviewPrompt(): ${platform} (${lang})`);
   return `${filledTemplate}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
 }
 
@@ -130,6 +142,7 @@ export function buildConversationSystemPrompt(context = {}) {
 
   if (context.title) hints.push(`Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`);
   if (context.platform) hints.push(`Platform: ${context.platform}`);
+  if (context.methodTitle) hints.push(`Method: ${context.methodTitle}`);
   if (Array.isArray(context.attachedProblemSlugs) && context.attachedProblemSlugs.length) {
     hints.push(`Related problems: ${context.attachedProblemSlugs.join(", ")}`);
   }
@@ -145,6 +158,9 @@ export function buildConversationSystemPrompt(context = {}) {
     };
     if (requestMap[type]) hints.push(requestMap[type]);
   }
+
+  dbg.log(`buildConversationSystemPrompt(): surface=${surface} (${hints.length} hints)`);
+  return base;
 
   return hints.length ? `${base}\n\nContext:\n${hints.join("\n")}` : base;
 }

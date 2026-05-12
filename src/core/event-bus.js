@@ -25,33 +25,35 @@ class EventBus {
 
   /**
    * Subscribe to an event.
-   * @param {string} event 
-   * @param {Function} callback 
+   * @param {string} event
+   * @param {Function} callback
    */
   on(event, callback) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event).add(callback);
+    dbg.log(`on(${event}): listener registered (total: ${this.listeners.get(event).size})`);
     return () => this.off(event, callback);
   }
 
   /**
    * Unsubscribe from an event.
-   * @param {string} event 
-   * @param {Function} callback 
+   * @param {string} event
+   * @param {Function} callback
    */
   off(event, callback) {
     const set = this.listeners.get(event);
     if (set) {
       set.delete(callback);
+      dbg.log(`off(${event}): listener unregistered (remaining: ${set.size})`);
     }
   }
 
   /**
    * Emit an event.
-   * @param {string} event 
-   * @param {any} data 
+   * @param {string} event
+   * @param {any} data
    * @param {boolean} broadcast Whether to broadcast to other extension contexts
    */
   emit(event, data, broadcast = true) {
