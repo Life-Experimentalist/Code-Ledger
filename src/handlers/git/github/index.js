@@ -7,25 +7,18 @@
 import { BaseGitHandler } from "../../_base/BaseGitHandler.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
-import { getPagesHtml, getActionsWorkflow, getRepoReadme } from "./pages-template.js";
+import * as api from "./api-client.js";
+import { buildInfraFiles, resolveRepoTopics } from "./infra-builder.js";
+import { buildTreeItems, buildCommitPayload } from "./commit-builder.js";
+import { createDebugger } from "../../../lib/debug.js";
+
+const dbg = createDebugger("GitHubHandler");
 
 export class GitHubHandler extends BaseGitHandler {
   constructor() {
     super("github", "GitHub");
+    this.dbg = dbg;
   }
-
-  static DEFAULT_REPO_TOPICS = [
-    "codeledger",
-    "dsa",
-    "leetcode",
-    "algorithms",
-    "dynamic-programming",
-    "graphs",
-    "trees",
-    "arrays",
-    "hashing",
-    "greedy",
-  ];
 
   getSettingsSchema() {
     return {
@@ -40,24 +33,21 @@ export class GitHubHandler extends BaseGitHandler {
           type: "oauth",
           provider: "github",
           default: "",
-          description:
-            'Authenticate with GitHub to sync code. Requires "repo" scope.',
+          description: 'Authenticate with GitHub to sync code. Requires "repo" scope.',
         },
         {
           key: "github_repo",
           label: "Repository Name",
           type: "text",
           default: "CodeLedger-Sync",
-          description:
-            "The exact name of the repository (e.g. CodeLedger-Sync).",
+          description: "The exact name of the repository (e.g. CodeLedger-Sync).",
         },
         {
           key: "github_owner",
           label: "Organization / Owner (optional)",
           type: "text",
           default: "",
-          description:
-            "Leave blank to use your personal account. Set to an org login to commit to an org repo.",
+          description: "Leave blank to use your personal account. Set to an org login to commit to an org repo.",
           advanced: true,
         },
         {
@@ -65,175 +55,167 @@ export class GitHubHandler extends BaseGitHandler {
           label: "Enable GitHub Pages",
           type: "toggle",
           default: true,
-          description:
-            "Serve a public stats page at {owner}.github.io/{repo}/ — enabled automatically when creating a new repo.",
+          description: "Serve a public stats page at {owner}.github.io/{repo}/ — enabled automatically when creating a new repo.",
           advanced: true,
         },
         {
-          key: "problems_dir",
-          label: "Problems root directory",
-          type: "text",
-          default: "problems",
-          description: "Root folder inside your repo where solutions are stored. Default: problems",
+          key: "pages_show_verification",
+          label: "Show commit verification in report",
+          type: "toggle",
+          default: false,
+          description: "If enabled, the generated Pages report will include a verification summary of recent commits (verified vs total).",
           advanced: true,
-          placeholder: "problems",
+        },
+        {
+          key: "github_repo_topics_extra",
+          label: "Extra repository tags",
+          type: "text",
+          default: "",
+          description: "Optional comma-separated tags to add to GitHub repo topics.",
+          advanced: true,
+          placeholder: "arrays, dynamic-programming, competitive-programming",
+        },
+        {
+          key: "github_coauthor_enabled",
+          label: "Include optional co-author trailer",
+          type: "toggle",
+          default: true,
+          description: "Append a Co-authored-by trailer to commits (you can opt out anytime).",
+          advanced: true,
+        },
+        {
+          key: "github_coauthor_trailer",
+          label: "Co-author trailer",
+          type: "text",
+          default: "Co-authored-by: VKrishna04 <75069043+VKrishna04@users.noreply.github.com>",
+          description: "Full trailer line to append to commit messages. Example: Co-authored-by: Name <email>",
+          advanced: true,
+          placeholder: "Co-authored-by: VKrishna04 <75069043+VKrishna04@users.noreply.github.com>",
         },
       ],
     };
   }
 
-  /**
-   * Performs an atomic commit using the GitHub Trees API.
-   * @param {Array<{path: string, content: string}>} files
-   * @param {string} message
-   * @param {string} [repoName]
-   * @param {{ date?: string|number|Date }} [opts]  Optional commit options.
-   *   date — ISO string or timestamp for a backdated commit (uses author/committer date).
-   */
+  _withOptionalCoAuthor(message, settings = {}) {
+    if (settings.github_coauthor_enabled === false) return message;
+    const trailer = String(settings.github_coauthor_trailer || "").trim();
+    if (!/^Co-authored-by:\s+.+\s+<.+>$/.test(trailer)) return message;
+    if (message.includes(trailer)) return message;
+    return `${message}\n\n${trailer}`;
+  }
+
   async commit(files, message, repoName, opts = {}) {
     const token = await this.getToken();
     if (!token) throw new Error("Not authenticated with GitHub");
 
-    // 1. Resolve owner, repo and branch
+    dbg.log(`commit(): starting commit to ${repoName} with ${files?.length || 0} files`);
     const settings = await Storage.getSettings();
-    const userRes = await this.apiFetch("/user", token);
-    const owner = opts.ownerOverride?.trim() || settings["github_owner"]?.trim() || userRes.login;
-    const name = (
-      repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME
-    ).replace(/\s+/g, "-");
+    const userRes = await api.getCurrentUser(token);
+    const owner =
+      opts.ownerOverride?.trim() ||
+      settings["github_owner"]?.trim() ||
+      userRes.login;
+    const name = (repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME).replace(/\s+/g, "-");
     const branch = CONSTANTS.REPO_BRANCH || "main";
+    dbg.log(`commit(): owner=${owner}, repo=${name}, branch=${branch}`);
 
-    // 2. Ensure repository exists and get the latest commit SHA.
+    // Ensure repo exists
     let latestCommitSha;
     let isNewRepo = false;
+
     try {
-      const refRes = await this.apiFetch(
-        `/repos/${owner}/${name}/git/ref/heads/${branch}`,
-        token,
-      );
+      dbg.log(`commit(): fetching ref ${branch}...`);
+      const refRes = await api.getRepoRef(owner, name, branch, token);
       latestCommitSha = refRes.object.sha;
+      dbg.log(`commit(): ✓ ref found, latest SHA=${latestCommitSha.substring(0, 7)}`);
     } catch (err) {
       if (err.status === 404) {
-        this.dbg.log("Repo/branch not found. Creating repository…");
-        try {
-          await this.apiFetch("/user/repos", token, {
-            method: "POST",
-            body: JSON.stringify({
-              name,
-              description:
-                "Collection of solved DSA problems managed by CodeLedger",
-              private: false,
-              auto_init: true,
-              has_wiki: false,
-              has_projects: false,
-              has_discussions: false,
-              allow_merge_commit: false,
-              allow_rebase_merge: true,
-              allow_squash_merge: true,
-              delete_branch_on_merge: true,
-            }),
-          });
-          isNewRepo = true;
-          // Give GitHub time to initialize the default branch
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-          await this._configureRepoPresentation(owner, name, token);
-          const refRes = await this.apiFetch(
-            `/repos/${owner}/${name}/git/ref/heads/${branch}`,
-            token,
-          );
-          latestCommitSha = refRes.object.sha;
+        dbg.log(`commit(): repo not found, creating new repo...`);
+        await api.createRepository(name, token);
+        isNewRepo = true;
+        dbg.log(`commit(): ✓ repo created, waiting 3s for initialization...`);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await this._configureRepo(owner, name, token, settings);
 
-        } catch (createErr) {
-          throw new Error(`Failed to create repository: ${createErr.message}`);
-        }
+        const refRes = await api.getRepoRef(owner, name, branch, token);
+        latestCommitSha = refRes.object.sha;
+        dbg.log(`commit(): ✓ initial ref acquired, SHA=${latestCommitSha.substring(0, 7)}`);
       } else {
+        dbg.error(`commit(): ✗ ref fetch failed:`, err.message);
         throw err;
       }
     }
 
-    // 3. Get commit object to retrieve the base tree SHA
-    const commitObj = await this.apiFetch(
-      `/repos/${owner}/${name}/git/commits/${latestCommitSha}`,
-      token,
-    );
+    // Get base tree
+    dbg.log(`commit(): fetching commit object...`);
+    const commitObj = await api.getCommit(owner, name, latestCommitSha, token);
     const baseTreeSha = commitObj?.tree?.sha || null;
+    dbg.log(`commit(): ✓ base tree SHA=${(baseTreeSha || '').substring(0, 7)}`);
 
-    // 4. Build tree items — include solution files
-    const treeItems = files.map((f) => ({
-      path: f.path,
-      mode: "100644",
-      type: "blob",
-      content: f.content,
-    }));
+    // Build tree items
+    const treeItems = buildTreeItems(files, opts.deletes);
+    dbg.log(`commit(): prepared ${treeItems.length} tree items (${files.length} adds, ${opts.deletes?.length || 0} deletes)`);
 
-    // Add deletions: sha: null removes the file from the tree atomically
-    if (Array.isArray(opts.deletes)) {
-      for (const delPath of opts.deletes) {
-        treeItems.push({ path: delPath, mode: "100644", type: "blob", sha: null });
-      }
-    }
-
-    // Always recover missing infrastructure files so accidental deletions are self-healing.
-    // Skip the check on mirror commits (opts.isMirror) to avoid redundant API calls.
+    // Add infrastructure files
     if (!opts.isMirror) {
-      const infraFiles = await this._buildInfraFiles(owner, name, branch, token, settings);
+      const infraFiles = await buildInfraFiles(
+        owner,
+        name,
+        branch,
+        token,
+        settings,
+        isNewRepo,
+      );
+      dbg.log(`commit(): adding ${infraFiles.length} infra file(s)`);
       treeItems.push(...infraFiles);
     }
 
-    // 5. Create tree
-    const treeRes = await this.apiFetch(
-      `/repos/${owner}/${name}/git/trees`,
+    // Create tree
+    dbg.log(`commit(): creating tree with ${treeItems.length} items...`);
+    const treeRes = await api.createTree(
+      owner,
+      name,
+      treeItems,
+      baseTreeSha,
       token,
-      {
-        method: "POST",
-        body: JSON.stringify({ base_tree: baseTreeSha, tree: treeItems }),
-      },
+    );
+    dbg.log(`commit(): ✓ tree created, SHA=${treeRes.sha.substring(0, 7)}`);
+
+    // Create commit
+    if (opts.date) dbg.log(`commit(): backdating commit to ${new Date(opts.date).toISOString()}`);
+    const commitPayload = buildCommitPayload(
+      this._withOptionalCoAuthor(message, settings),
+      treeRes.sha,
+      latestCommitSha,
+      opts,
+      userRes,
     );
 
-    // 6. Create commit — optionally backdated via opts.date
-    const commitPayload = {
-      message,
-      tree: treeRes.sha,
-      parents: [latestCommitSha],
-    };
-
-    if (opts.date) {
-      const iso = new Date(opts.date).toISOString();
-      const authorName = userRes.name || userRes.login;
-      const authorEmail =
-        userRes.email ||
-        `${userRes.login}@users.noreply.github.com`;
-      commitPayload.author = { name: authorName, email: authorEmail, date: iso };
-      commitPayload.committer = { ...commitPayload.author };
-    }
-
-    const commitRes = await this.apiFetch(
-      `/repos/${owner}/${name}/git/commits`,
+    dbg.log(`commit(): creating commit object...`);
+    const commitRes = await api.createCommit(
+      owner,
+      name,
+      commitPayload,
       token,
-      { method: "POST", body: JSON.stringify(commitPayload) },
     );
+    dbg.log(`commit(): ✓ commit created, SHA=${commitRes.sha.substring(0, 7)}`);
 
-    // 7. Update branch ref
-    await this.apiFetch(
-      `/repos/${owner}/${name}/git/refs/heads/${branch}`,
-      token,
-      { method: "PATCH", body: JSON.stringify({ sha: commitRes.sha }) },
-    );
+    // Update ref
+    dbg.log(`commit(): updating ref ${branch}...`);
+    await api.updateRef(owner, name, branch, commitRes.sha, token);
+    dbg.log(`commit(): ✓ ref updated`);
 
     if (isNewRepo && settings["github_pages"] !== false) {
-      this._enablePages(owner, name, branch, token).catch((e) =>
-        this.dbg.warn("GitHub Pages enable failed (non-fatal):", e.message),
-      );
+      dbg.log(`commit(): enabling GitHub Pages...`);
+      api
+        .enablePages(owner, name, branch, token)
+        .then(() => dbg.log(`commit(): ✓ GitHub Pages enabled`))
+        .catch((e) => dbg.warn(`commit(): Pages enable failed (non-fatal):`, e.message));
     }
 
-    this.dbg.log("Atomic commit successful");
+    dbg.log(`commit(): ✅ commit successful to ${owner}/${name} on ${branch}`);
   }
 
-  /**
-   * Commits multiple historical solves with individual backdated timestamps.
-   * Each problem gets its own commit ordered by solve date.
-   * @param {Array<{files: Array, message: string, date: string|number, repoName?: string}>} commits
-   */
   async commitHistorical(commits) {
     if (!commits || !commits.length) return;
     const sorted = [...commits].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -244,93 +226,44 @@ export class GitHubHandler extends BaseGitHandler {
     }
   }
 
-  /**
-   * Returns tree items for infra files that should always be present and up-to-date.
-   * Uses always-write semantics: GitHub Trees API deduplicates identical blobs by SHA,
-   * so including unchanged content never creates a spurious diff.
-   */
-  async _buildInfraFiles(owner, name, branch, token, settings) {
-    const items = [];
+  async ensureRepoTopics(repoName) {
+    const token = await this.getToken();
+    if (!token) return;
+    const settings = await Storage.getSettings();
+    const userRes = await api.getCurrentUser(token);
+    const owner = settings["github_owner"]?.trim() || userRes.login;
+    const name = (
+      repoName ||
+      settings["github_repo"] ||
+      settings["gitRepo"] ||
+      CONSTANTS.DEFAULT_REPO_NAME
+    ).replace(/\s+/g, "-");
 
-    // index.html — GitHub Pages dashboard (always regenerate so template stays current)
-    if (settings?.github_pages !== false) {
-      items.push({ path: "index.html", mode: "100644", type: "blob", content: getPagesHtml() });
-    }
-
-    // .github/workflows/update-stats.yml
-    items.push({ path: ".github/workflows/update-stats.yml", mode: "100644", type: "blob", content: getActionsWorkflow() });
-
-    // Root README.md
-    const pagesUrl = settings?.github_pages_url || `https://${owner}.github.io/${name}/`;
-    items.push({ path: "README.md", mode: "100644", type: "blob", content: getRepoReadme(owner, name, pagesUrl) });
-
-    return items;
+    await api.setRepositoryTopics(
+      owner,
+      name,
+      resolveRepoTopics(settings),
+      token,
+    );
   }
 
-  /** Enables GitHub Pages on the given repo (serves from branch root). */
-  async _enablePages(owner, name, branch, token) {
-    await this.apiFetch(`/repos/${owner}/${name}/pages`, token, {
-      method: "POST",
-      body: JSON.stringify({ source: { branch, path: "/" } }),
-    });
-    this.dbg.log("GitHub Pages enabled:", `https://${owner}.github.io/${name}/`);
-  }
+  async _configureRepo(owner, name, token, settings) {
+    await api.updateRepository(owner, name, {
+      has_wiki: false,
+      has_projects: false,
+      has_discussions: false,
+      allow_merge_commit: false,
+      allow_rebase_merge: true,
+      allow_squash_merge: true,
+      delete_branch_on_merge: true,
+    }, token);
 
-  async _configureRepoPresentation(owner, name, token) {
-    await this.apiFetch(`/repos/${owner}/${name}`, token, {
-      method: "PATCH",
-      body: JSON.stringify({
-        has_wiki: false,
-        has_projects: false,
-        has_discussions: false,
-        allow_merge_commit: false,
-        allow_rebase_merge: true,
-        allow_squash_merge: true,
-        delete_branch_on_merge: true,
-      }),
-    });
-
-    await this.apiFetch(`/repos/${owner}/${name}/topics`, token, {
-      method: "PUT",
-      headers: {
-        Accept: "application/vnd.github.mercy-preview+json",
-      },
-      body: JSON.stringify({ names: GitHubHandler.DEFAULT_REPO_TOPICS }),
-    });
-  }
-
-  async apiFetch(url, token, options = {}) {
-    const fullUrl = url.startsWith("http")
-      ? url
-      : `${CONSTANTS.GIT_PROVIDERS.github.apiBase}${url}`;
-    const method = (options.method || "GET").toUpperCase();
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github.v3+json",
-      ...(options.headers || {}),
-    };
-
-    if (["POST", "PATCH", "PUT"].includes(method) && !headers["Content-Type"]) {
-      headers["Content-Type"] = "application/json";
-    }
-
-    const res = await fetch(fullUrl, { ...options, method, headers });
-
-    if (!res.ok) {
-      const errRes = await res.json().catch(() => ({}));
-      const err = new Error(
-        `GitHub API Error: ${errRes.message || res.statusText}`,
-      );
-      err.status = res.status;
-      throw err;
-    }
-
-    const txt = await res.text();
-    try {
-      return txt ? JSON.parse(txt) : {};
-    } catch (e) {
-      return txt;
-    }
+    await api.setRepositoryTopics(
+      owner,
+      name,
+      resolveRepoTopics(settings),
+      token,
+    );
   }
 
   async getToken() {
