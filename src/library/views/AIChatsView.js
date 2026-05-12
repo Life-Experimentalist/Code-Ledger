@@ -11,6 +11,7 @@ import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
 import { AIPromptModeSelector, PROMPT_MODE_PREFIXES } from "../../ui/components/AIPromptModeSelector.js";
+import { MCPToolsSidebar } from "../../ui/components/MCPToolsSidebar.js";
 import { CHAT_COMMANDS, AI_MENTION_OPTIONS, expandChatVariables } from "../../lib/chat-variables.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { getAllChats, searchChats, deleteChat, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
@@ -62,6 +63,17 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
   const [promptMode, setPromptMode] = useState("tutor");
   const [prefillHandled, setPrefillHandled] = useState(false);
   const [prefillChatSlug, setPrefillChatSlug] = useState("");
+  const [showMCPTools, setShowMCPTools] = useState(false);
+  const [mcpToolResult, setMCPToolResult] = useState(null);
+
+  const handleMCPToolResult = (result) => {
+    setMCPToolResult(result);
+    if (result?.result?.ok) {
+      // Optionally prepend tool result to current reply
+      const toolInfo = `\n\n[Tool: ${result.toolId}]\n`;
+      // Could auto-attach result if useful, for now just store it
+    }
+  };
 
   const problemIndex = useMemo(() => {
     const map = new Map();
@@ -534,7 +546,7 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
             ${!chats.length ? html`<div class="p-4 text-sm text-slate-500 text-center">No conversations yet</div>` : ""}
           </div>
 
-          <div class="flex-1 bg-slate-900/50 rounded-2xl border border-slate-700 p-4 overflow-y-auto min-h-0">
+          <div class="flex-1 bg-slate-900/50 rounded-2xl border border-slate-700 p-4 overflow-y-auto min-h-0 flex flex-col">
             ${selectedChat ? html`
               <div class="flex flex-col gap-4 h-full">
                 <div class="flex items-start justify-between border-b border-slate-700 pb-3 gap-3">
@@ -546,6 +558,16 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
                      ${selectedChat.aiProvider ? html`<div class="text-xs text-cyan-400 mt-1">🤖 ${selectedChat.aiModel || selectedChat.aiProvider}${selectedChat.aiProvider ? ` (${selectedChat.aiProvider})` : ""}</div>` : ""}
                   </div>
                   <div class="flex items-center gap-2">
+                    <button
+                      onClick=${() => setShowMCPTools(!showMCPTools)}
+                      title="MCP Tools"
+                      class="p-2 rounded hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1" /><circle cx="19" cy="5" r="1" /><circle cx="5" cy="19" r="1" />
+                        <path d="M12 13v8M12 3v6M19 6v6M5 20v-6" />
+                      </svg>
+                    </button>
                     <button onClick=${() => startNewChat(selectedChat.attachedProblems?.[0] || (selectedChat.problemSlug ? problemIndex.get(selectedChat.problemSlug) : null))} class="px-2 py-1 rounded border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-500/10">Continue</button>
                     <button onClick=${() => handleDeleteChat(selectedChat.id)} class="text-slate-500 hover:text-red-400 text-sm px-2 py-1">🗑️</button>
                   </div>
@@ -599,6 +621,14 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
               </div>
             ` : html`<div class="flex items-center justify-center h-full text-slate-500">Select a conversation to view</div>`}
           </div>
+
+          ${showMCPTools && html`
+            <div class="w-96 bg-slate-900/50 rounded-2xl border border-slate-700 overflow-hidden flex flex-col">
+              <${MCPToolsSidebar}
+                onToolResult=${handleMCPToolResult}
+              />
+            </div>
+          `}
         </div>
       </div>
     `;

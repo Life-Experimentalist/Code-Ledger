@@ -33,7 +33,7 @@ export function PanelAI({ settings, onSettingsChange }) {
   const [endpointDraft, setEndpointDraft] = useState({});
 
   useEffect(() => {
-    Storage.getAIKeys().then((all) => setSavedKeys(all || {})).catch(() => {});
+    Storage.getAIKeys().then((all) => setSavedKeys(all || {})).catch(() => { });
     // Populate endpoint drafts from settings
     const drafts = {};
     PROVIDERS.forEach((p) => {
@@ -164,10 +164,11 @@ export function PanelAI({ settings, onSettingsChange }) {
             class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-cyan-500/40"
           >
             <option value="">None</option>
-            ${PROVIDERS.filter((p) => p.id !== primaryProvider).map((p) => html`
+            ${PROVIDERS.map((p) => html`
               <option key=${p.id} value=${p.id}>${p.name}</option>
             `)}
           </select>
+          <p class="text-[11px] text-cyan-400/80">You can reuse the same provider as primary if the fallback model is different.</p>
           ${fallbackProvider && html`
             <${ModelSelector}
               providerId=${fallbackProvider}
@@ -184,14 +185,14 @@ export function PanelAI({ settings, onSettingsChange }) {
       <div class="space-y-3">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Provider Configuration</h3>
         ${PROVIDERS.map((p) => {
-          const enabled = isProviderEnabled(p.id);
-          const keys = Array.isArray(savedKeys[p.id]) ? savedKeys[p.id] : [];
-          const res = testResult[p.id] || "";
-          const isOk = res.startsWith("✓") || res.startsWith("Saved") || res.startsWith("Endpoint") || res.startsWith("Reset");
-          const customEndpoint = endpointDraft[p.id] ?? (settings?.[`${p.id}_endpoint`] || "");
-          const defaultEp = CONSTANTS.AI_PROVIDERS[p.id]?.endpoint || "";
+    const enabled = isProviderEnabled(p.id);
+    const keys = Array.isArray(savedKeys[p.id]) ? savedKeys[p.id] : [];
+    const res = testResult[p.id] || "";
+    const isOk = res.startsWith("✓") || res.startsWith("Saved") || res.startsWith("Endpoint") || res.startsWith("Reset");
+    const customEndpoint = endpointDraft[p.id] ?? (settings?.[`${p.id}_endpoint`] || "");
+    const defaultEp = CONSTANTS.AI_PROVIDERS[p.id]?.endpoint || "";
 
-          return html`
+    return html`
             <div key=${p.id} class="p-4 rounded-xl border ${enabled ? "border-white/10" : "border-white/5"} bg-white/2 space-y-3 transition-all">
               <!-- Header: name + enable toggle -->
               <div class="flex items-center gap-3">
@@ -289,7 +290,7 @@ export function PanelAI({ settings, onSettingsChange }) {
               `}
             </div>
           `;
-        })}
+  })}
       </div>
     </div>
   `;

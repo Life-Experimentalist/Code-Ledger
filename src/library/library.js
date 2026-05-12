@@ -3,17 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { h, render } from "../vendor/preact-bundle.js";
-import { useState, useEffect, useMemo, useCallback } from "../vendor/preact-bundle.js";
-import { htm } from "../vendor/preact-bundle.js";
+import { h, render } from "/vendor/preact-bundle.js";
+import { useState, useEffect, useMemo, useCallback } from "/vendor/preact-bundle.js";
+import { htm } from "/vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { Storage } from "../core/storage.js";
-import { CONSTANTS } from "../core/constants.js";
-import { initDebug, setDebug } from "../lib/debug.js";
-import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
-import { getQueryParam, updateQueryParams } from "../core/url-state.js";
-import { initializeHandlers } from "../handlers/init.js";
+import { Storage } from "/core/storage.js";
+import { CONSTANTS } from "/core/constants.js";
+import { initDebug, setDebug, createDebugger } from "/lib/debug.js";
+const dbg = createDebugger("LibraryApp");
+import { applyThemeFromStorage, setupThemeListener } from "/core/theme-engine.js";
+import { getQueryParam, updateQueryParams } from "/core/url-state.js";
+import { initializeHandlers } from "/handlers/init.js";
 import { ProblemsView } from "./views/ProblemsView.js";
 import { AnalyticsView } from "./views/AnalyticsView.js";
 import { GraphView } from "./views/GraphView.js";
@@ -21,15 +22,16 @@ import { SettingsView } from "./views/SettingsView.js";
 import { SettingsPageView } from "./views/SettingsPageView.js";
 import { CanonicalView } from "./views/CanonicalView.js";
 import { AIChatsView } from "./views/AIChatsView.js";
+import { BehaviourBankView } from "./views/BehaviourBankView.js";
 import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
 import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js";
 import { DuplicateDetectionModal, findDuplicates } from "./components/DuplicateDetectionModal.js";
 
 initializeHandlers();
-initDebug().catch(() => {});
+initDebug().catch(() => { });
 
 // Apply saved theme before first render so there's no flash of default styles
-applyThemeFromStorage().catch(() => {});
+applyThemeFromStorage().catch(() => { });
 setupThemeListener();
 
 function LibraryApp() {
@@ -41,11 +43,14 @@ function LibraryApp() {
   const [canonicalLookup, setCanonicalLookup] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [gitUser, setGitUser] = useState(null);
+  const [gitAvatar, setGitAvatar] = useState(null);
   const [showGitHubOnboarding, setShowGitHubOnboarding] = useState(false);
   const [onboardingData, setOnboardingData] = useState({ username: "", token: "" });
   const [graphFocusProblem, setGraphFocusProblem] = useState(null);
   const [duplicateGroups, setDuplicateGroups] = useState([]);
   const [currentDuplicateGroup, setCurrentDuplicateGroup] = useState(null);
+  const [setupIncomplete, setSetupIncomplete] = useState(null);
+  const [setupDismissed, setSetupDismissed] = useState(false);
 
   // Reload problems from IndexedDB (used after import or external change)
   const reloadProblems = useCallback(() => {
@@ -115,6 +120,9 @@ function LibraryApp() {
         if (!mounted) return;
         setProblems(p || []);
         setSettings(s || {});
+        // Hydrate display state from saved settings (avatar + username)
+        if (s?.github_avatar) setGitAvatar(s.github_avatar);
+        if (s?.github_username) setGitUser(s.github_username);
 
         // Check for duplicate problems
         const dups = findDuplicates(p || []);
@@ -128,6 +136,8 @@ function LibraryApp() {
         // Priority 2: Manual PAT from settings (legacy support)
         Storage.getAuthToken("github").then((oauthToken) => {
           const token = oauthToken || s?.github_token;
+          const hasRepo = !!(s?.github_repo || s?.gitRepo);
+          if (mounted) setSetupIncomplete(!token || !hasRepo);
           if (!token || !mounted) return;
           // Hydrate settings display with the OAuth token so SettingsSchema shows "Connected"
           // (OAuth tokens are never persisted to settings storage — they live in auth.tokens)
@@ -154,6 +164,7 @@ function LibraryApp() {
       "analytics",
       "graph",
       "ai-chats",
+      "behaviour-bank",
       "canonical",
       "settings",
       "search",
@@ -187,7 +198,7 @@ function LibraryApp() {
       }
 
       if (!data.token) {
-        console.error("[CodeLedger] OAuth error:", data.error);
+        dbg.error("OAuth error:", data.error);
         return;
       }
 
@@ -206,6 +217,40 @@ function LibraryApp() {
         const currentSettings = await Storage.getSettings();
         const hasRepo = !!(currentSettings?.github_repo || currentSettings?.gitRepo);
 
+        // Save username and avatar to settings for sync operations and UI
+        const updatedSettings = { ...currentSettings, github_username: user.login };
+        if (!currentSettings?.github_owner) {
+          updatedSettings.github_owner = user.login;
+        }
+        if (user.avatar_url) {
+          try {
+            // Try to fetch avatar and convert to data URL to avoid cross-origin/broken-img issues
+            const avatarRes = await fetch(user.avatar_url, { headers: { Authorization: `Bearer ${data.token}` }, cache: "no-store" });
+            if (avatarRes.ok) {
+              const blob = await avatarRes.blob();
+              const reader = new FileReader();
+              const dataUrl = await new Promise((res) => {
+                reader.onloadend = () => res(reader.result);
+                reader.readAsDataURL(blob);
+              });
+              updatedSettings.github_avatar = dataUrl;
+              setGitAvatar(dataUrl);
+            } else {
+              updatedSettings.github_avatar = user.avatar_url;
+              setGitAvatar(user.avatar_url);
+            }
+          } catch (e) {
+            // fallback to raw URL
+            updatedSettings.github_avatar = user.avatar_url;
+            setGitAvatar(user.avatar_url);
+          }
+        }
+        await Storage.setSettings(updatedSettings);
+
+        // Enable debug logging to assist with troubleshooting after OAuth
+        await Storage.setDebugEnabled(true).catch(() => { });
+        setDebug(true);
+
         // Show onboarding if no repo is configured
         if (!hasRepo) {
           setOnboardingData({ username: user.login, token: data.token });
@@ -214,9 +259,10 @@ function LibraryApp() {
 
         // Update user display
         setGitUser(user.login);
-        setSettings({ ...currentSettings });
+        setGitAvatar(user.avatar_url || null);
+        setSettings(updatedSettings);
       } catch (e) {
-        console.error("[CodeLedger] OAuth handler error:", e);
+        dbg.error("OAuth handler error:", e);
       }
     };
 
@@ -273,6 +319,7 @@ function LibraryApp() {
     { id: "analytics", label: "Analytics", icon: "📈" },
     { id: "graph", label: "Graph", icon: "🔗" },
     { id: "ai-chats", label: "AI Chats", icon: "🤖" },
+    { id: "behaviour-bank", label: "Behaviour Bank", icon: "🧠" },
     { id: "canonical", label: "Canonical", icon: "🔀" },
     { id: "settings", label: "Settings", icon: "⚙️" },
   ];
@@ -331,6 +378,8 @@ function LibraryApp() {
       return html`<${GraphView} problems=${enrichedProblems} focusProblem=${graphFocusProblem} onFocusProblemHandled=${() => setGraphFocusProblem(null)} onProblemDelete=${handleProblemDelete} onProblemUpdate=${handleProblemUpdate} onNavigate=${setActiveTab} />`;
     if (activeTab === "ai-chats")
       return html`<${AIChatsView} copyableEnabled=${settings?.aiCopyable === true} problems=${enrichedProblems} settings=${settings} />`;
+    if (activeTab === "behaviour-bank")
+      return html`<${BehaviourBankView} />`;
     if (activeTab === "canonical")
       return html`<${CanonicalView} problems=${enrichedProblems} />`;
     if (activeTab === "settings")
@@ -414,7 +463,7 @@ function LibraryApp() {
             ${gitUser
       ? html`
                   <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                    ${gitAvatar ? html`<img src=${gitAvatar} alt="avatar" class="w-6 h-6 rounded-full" />` : html`<div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>`}
                     <span class="text-xs font-mono text-emerald-500/80">${gitUser}</span>
                     ${(settings.github_repo || settings.gitRepo)
           ? (() => {
@@ -478,6 +527,24 @@ function LibraryApp() {
             </nav>
           </div>
 
+          ${setupIncomplete && !setupDismissed && !sidebarCollapsed ? html`
+            <a
+              href=${typeof chrome !== "undefined" && chrome.runtime?.id ? chrome.runtime.getURL("welcome/welcome.html") : "#"}
+              target="_blank"
+              class="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 hover:bg-amber-500/15 transition-colors"
+            >
+              <span>⚠</span>
+              <span>Complete setup</span>
+            </a>
+          ` : setupIncomplete && !setupDismissed && sidebarCollapsed ? html`
+            <a
+              href=${typeof chrome !== "undefined" && chrome.runtime?.id ? chrome.runtime.getURL("welcome/welcome.html") : "#"}
+              target="_blank"
+              title="Setup incomplete — click to complete"
+              class="flex items-center justify-center w-10 h-10 mx-auto mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/15 transition-colors"
+            >⚠</a>
+          ` : ""}
+
           <div class="mt-auto">
             <div
               class="p-3 rounded-xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5"
@@ -517,6 +584,26 @@ function LibraryApp() {
         </aside>
 
         <div class="flex-1 bg-[#050508] p-6 overflow-y-auto">
+          ${setupIncomplete && !setupDismissed ? html`
+            <div class="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-amber-400 shrink-0">⚠</span>
+                <p class="text-xs text-amber-300">Setup incomplete — connect GitHub and link a repo to start auto-committing solutions.</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <a
+                  href=${typeof chrome !== "undefined" && chrome.runtime?.id ? chrome.runtime.getURL("welcome/welcome.html") : "#"}
+                  target="_blank"
+                  class="text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                >Complete setup →</a>
+                <button
+                  onClick=${() => setSetupDismissed(true)}
+                  class="text-slate-500 hover:text-slate-300 text-lg leading-none transition-colors"
+                  title="Dismiss"
+                >×</button>
+              </div>
+            </div>
+          ` : ""}
           ${(() => {
       const mode = settings.incognitoMode;
       const expiry = settings.incognitoExpiry ?? 0;

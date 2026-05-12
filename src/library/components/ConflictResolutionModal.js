@@ -35,7 +35,7 @@ export function ConflictResolutionModal({ conflicts, remoteOnly = [], onResolve,
     onResolve([...resolved, ...remoteOnly]);
   }
 
-  const DIFF_FIELDS = ["title", "difficulty", "code", "aiReview", "tags", "lang"];
+  const DIFF_FIELDS = ["title", "difficulty", "code", "aiReview", "tags", "lang", "notes", "methodTitle", "isDuplicate", "duplicateOf"];
 
   function diffSummary(local, remote) {
     return DIFF_FIELDS.filter(k => {
@@ -65,9 +65,9 @@ export function ConflictResolutionModal({ conflicts, remoteOnly = [], onResolve,
 
         <div class="overflow-y-auto flex-1 px-4 py-3 flex flex-col gap-3">
           ${conflicts.map((c, i) => {
-            const diffs = diffSummary(c.local, c.remote);
-            const choice = choices[i];
-            return html`
+    const diffs = diffSummary(c.local, c.remote);
+    const choice = choices[i];
+    return html`
               <div key=${c.local.id || i} class="border border-white/10 rounded-xl overflow-hidden">
                 <div class="px-4 py-2.5 bg-white/[0.02] flex items-center justify-between">
                   <span class="text-sm font-medium text-slate-200">${c.local.title || c.local.id}</span>
@@ -75,9 +75,9 @@ export function ConflictResolutionModal({ conflicts, remoteOnly = [], onResolve,
                 </div>
                 <div class="grid grid-cols-2 divide-x divide-white/5">
                   ${["local", "remote"].map(side => {
-                    const p = c[side];
-                    const active = choice === side;
-                    return html`
+      const p = c[side];
+      const active = choice === side;
+      return html`
                       <button
                         onClick=${() => choose(i, side)}
                         class="text-left px-4 py-3 transition-colors ${active ? "bg-cyan-500/10 border-l-2 border-cyan-500" : "hover:bg-white/[0.03]"}"
@@ -93,11 +93,11 @@ export function ConflictResolutionModal({ conflicts, remoteOnly = [], onResolve,
                         </div>
                       </button>
                     `;
-                  })}
+    })}
                 </div>
               </div>
             `;
-          })}
+  })}
         </div>
 
         <div class="px-6 py-4 border-t border-white/5 flex items-center justify-between shrink-0">

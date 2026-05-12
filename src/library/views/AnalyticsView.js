@@ -79,9 +79,9 @@ const BLIND75 = [
 ];
 
 const PLATFORM_META = {
-  leetcode:      { name: "LeetCode",     color: "#FFA116", bg: "rgba(255,161,22,0.10)" },
+  leetcode: { name: "LeetCode", color: "#FFA116", bg: "rgba(255,161,22,0.10)" },
   geeksforgeeks: { name: "GeeksForGeeks", color: "#2F8D46", bg: "rgba(47,141,70,0.10)" },
-  codeforces:    { name: "Codeforces",   color: "#1F8ACB", bg: "rgba(31,138,203,0.10)" },
+  codeforces: { name: "Codeforces", color: "#1F8ACB", bg: "rgba(31,138,203,0.10)" },
 };
 
 // Normalize lang display names so "python3" / "Python3" / "Python 3" all map to "Python3"
@@ -119,7 +119,7 @@ export function AnalyticsView({ problems, onNavigate }) {
     let m = true;
     loadUserDifficultyMap()
       .then((map) => { if (m) setUserMap(map || {}); })
-      .catch(() => {});
+      .catch(() => { });
     return () => (m = false);
   }, []);
 
@@ -136,6 +136,9 @@ export function AnalyticsView({ problems, onNavigate }) {
       thisWeek: 0,
       thisMonth: 0,
       avgSolveSeconds: 0,
+      multiLangProblems: {}, // Map of problem ID → { langs: Set, count: N }
+      uniqueProblems: 0,     // Count of unique problems solved
+      multiLangCount: 0,     // Count of problems solved in 2+ languages
     };
 
     // Pre-build last 12 weeks slots
@@ -367,8 +370,8 @@ export function AnalyticsView({ problems, onNavigate }) {
 
   const diffColor = (d) =>
     d === "Hard" ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-    : d === "Medium" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      : d === "Medium" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
   return html`
     <div class="flex flex-col gap-6 w-full pb-10">
@@ -377,19 +380,19 @@ export function AnalyticsView({ problems, onNavigate }) {
       <!-- Quick stats row -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         ${[
-          { label: "Total Solved", value: stats.total, sub: `${stats.easy}E · ${stats.medium}M · ${stats.hard}H`, color: "#06b6d4" },
-          { label: "Current Streak", value: `${stats.currentStreak}d`, sub: `Best: ${stats.longestStreak} days`, color: "#10b981" },
-          { label: "This Week", value: stats.thisWeek, sub: `${stats.thisMonth} this month`, color: "#f59e0b" },
-          stats.avgSolveSeconds > 0
-            ? (() => {
-                const h = Math.floor(stats.avgSolveSeconds / 3600);
-                const m = Math.floor((stats.avgSolveSeconds % 3600) / 60);
-                const s2 = stats.avgSolveSeconds % 60;
-                const val = h > 0 ? `${h}h${m}m` : m > 0 ? `${m}m${s2}s` : `${s2}s`;
-                return { label: "Avg Solve Time", value: val, sub: "avg across timed problems", color: "#ec4899" };
-              })()
-            : { label: "Languages", value: Object.keys(stats.langs).length, sub: Object.entries(stats.langs).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([l])=>l).join(", ") || "—", color: "#8b5cf6" },
-        ].map(card => html`
+      { label: "Total Solved", value: stats.total, sub: `${stats.easy}E · ${stats.medium}M · ${stats.hard}H`, color: "#06b6d4" },
+      { label: "Current Streak", value: `${stats.currentStreak}d`, sub: `Best: ${stats.longestStreak} days`, color: "#10b981" },
+      { label: "This Week", value: stats.thisWeek, sub: `${stats.thisMonth} this month`, color: "#f59e0b" },
+      stats.avgSolveSeconds > 0
+        ? (() => {
+          const h = Math.floor(stats.avgSolveSeconds / 3600);
+          const m = Math.floor((stats.avgSolveSeconds % 3600) / 60);
+          const s2 = stats.avgSolveSeconds % 60;
+          const val = h > 0 ? `${h}h${m}m` : m > 0 ? `${m}m${s2}s` : `${s2}s`;
+          return { label: "Avg Solve Time", value: val, sub: "avg across timed problems", color: "#ec4899" };
+        })()
+        : { label: "Languages", value: Object.keys(stats.langs).length, sub: Object.entries(stats.langs).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([l]) => l).join(", ") || "—", color: "#8b5cf6" },
+    ].map(card => html`
           <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-1 relative overflow-hidden">
             <div class="absolute inset-0 opacity-5" style=${{ background: `radial-gradient(circle at 0% 0%, ${card.color}, transparent 60%)` }}></div>
             <span class="text-[10px] uppercase tracking-widest text-slate-500">${card.label}</span>
@@ -402,10 +405,10 @@ export function AnalyticsView({ problems, onNavigate }) {
       <!-- Platform breakdown -->
       ${Object.keys(stats.platforms).length > 0 ? html`
         <div class="grid gap-4" style=${{ gridTemplateColumns: `repeat(${Math.min(3, Object.keys(stats.platforms).length)}, 1fr)` }}>
-          ${Object.entries(stats.platforms).sort((a,b)=>b[1].total-a[1].total).map(([pid, counts]) => {
-            const meta = PLATFORM_META[pid] || { name: pid, color: "#94a3b8", bg: "rgba(148,163,184,0.10)" };
-            const pct = (n) => counts.total ? Math.round((n / counts.total) * 100) : 0;
-            return html`
+          ${Object.entries(stats.platforms).sort((a, b) => b[1].total - a[1].total).map(([pid, counts]) => {
+      const meta = PLATFORM_META[pid] || { name: pid, color: "#94a3b8", bg: "rgba(148,163,184,0.10)" };
+      const pct = (n) => counts.total ? Math.round((n / counts.total) * 100) : 0;
+      return html`
               <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 cursor-pointer hover:border-white/15 transition-colors" onClick=${() => handlePlatformClick(meta.name)}>
                 <div class="flex items-center justify-between">
                   <span class="text-sm font-semibold" style=${{ color: meta.color }}>${meta.name}</span>
@@ -423,7 +426,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                 </div>
               </div>
             `;
-          })}
+    })}
         </div>
       ` : ""}
 
@@ -442,13 +445,13 @@ export function AnalyticsView({ problems, onNavigate }) {
               data=${chartData.difficultyDonut}
               onElementClick=${handleDifficultyClick}
               options=${{
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: "72%",
-                plugins: {
-                  legend: { position: "bottom", labels: { color: "#94a3b8", padding: 12, usePointStyle: true, boxWidth: 6, font: { size: 10 } } },
-                },
-              }}
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "72%",
+      plugins: {
+        legend: { position: "bottom", labels: { color: "#94a3b8", padding: 12, usePointStyle: true, boxWidth: 6, font: { size: 10 } } },
+      },
+    }}
             />
             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style="padding-bottom:36px">
               <span class="text-2xl font-bold text-white">${stats.total}</span>
@@ -467,17 +470,17 @@ export function AnalyticsView({ problems, onNavigate }) {
               type="radar"
               data=${chartData.topicRadar}
               options=${{
-                scales: {
-                  r: {
-                    grid: { color: "rgba(255,255,255,0.1)" },
-                    angleLines: { color: "rgba(255,255,255,0.05)" },
-                    pointLabels: { color: "#94a3b8", font: { size: 10 } },
-                    ticks: { display: false },
-                    suggestedMin: 0, suggestedMax: 100,
-                  },
-                },
-                plugins: { legend: { display: false } },
-              }}
+      scales: {
+        r: {
+          grid: { color: "rgba(255,255,255,0.1)" },
+          angleLines: { color: "rgba(255,255,255,0.05)" },
+          pointLabels: { color: "#94a3b8", font: { size: 10 } },
+          ticks: { display: false },
+          suggestedMin: 0, suggestedMax: 100,
+        },
+      },
+      plugins: { legend: { display: false } },
+    }}
             />
           </div>
         </div>
@@ -489,9 +492,9 @@ export function AnalyticsView({ problems, onNavigate }) {
               type="line"
               data=${chartData.velocityLine}
               options=${{
-                scales: { y: { beginAtZero: true, grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#64748b" } }, x: { grid: { display: false }, ticks: { color: "#64748b" } } },
-                plugins: { legend: { display: false } },
-              }}
+      scales: { y: { beginAtZero: true, grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#64748b" } }, x: { grid: { display: false }, ticks: { color: "#64748b" } } },
+      plugins: { legend: { display: false } },
+    }}
             />
           </div>
         </div>
@@ -504,10 +507,10 @@ export function AnalyticsView({ problems, onNavigate }) {
               data=${chartData.langPie}
               onElementClick=${handleLangClick}
               options=${{
-                plugins: {
-                  legend: { position: "bottom", labels: { color: "#94a3b8", usePointStyle: true, boxWidth: 8, font: { size: 10 } } },
-                },
-              }}
+      plugins: {
+        legend: { position: "bottom", labels: { color: "#94a3b8", usePointStyle: true, boxWidth: 8, font: { size: 10 } } },
+      },
+    }}
             />
           </div>
         </div>
@@ -519,8 +522,8 @@ export function AnalyticsView({ problems, onNavigate }) {
           <h3 class="text-sm font-bold text-white tracking-wide">Topic Breakdown</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             ${topTopics.map(([topic, counts]) => {
-              const barPct = Math.round((counts.total / maxTopicCount) * 100);
-              return html`
+      const barPct = Math.round((counts.total / maxTopicCount) * 100);
+      return html`
                 <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-xl hover:border-cyan-900/50 transition-colors cursor-pointer group" onClick=${() => handleTopicClick(topic)}>
                   <div class="flex justify-between items-center mb-2">
                     <span class="font-medium text-sm text-slate-300 group-hover:text-cyan-400 transition-colors truncate pr-2">${topic}</span>
@@ -538,7 +541,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                   </div>
                 </div>
               `;
-            })}
+    })}
           </div>
         </div>
 
@@ -548,8 +551,8 @@ export function AnalyticsView({ problems, onNavigate }) {
           <div class="p-5 bg-gradient-to-b from-[#101018] to-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 h-full">
             <p class="text-[11px] text-slate-400 mb-1">Unsolved from the Blind 75 list, tailored to your gaps:</p>
             ${unsolvedNext.length === 0
-              ? html`<p class="text-xs text-emerald-400 py-4 text-center">You've completed the Blind 75!</p>`
-              : unsolvedNext.map(rec => html`
+      ? html`<p class="text-xs text-emerald-400 py-4 text-center">You've completed the Blind 75!</p>`
+      : unsolvedNext.map(rec => html`
                 <a
                   href=${"https://leetcode.com/problems/" + rec.slug + "/"}
                   target="_blank"
@@ -563,7 +566,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                   <span class="text-xs px-2 py-0.5 rounded-full border ${diffColor(rec.diff)} shrink-0 ml-2">${rec.diff}</span>
                 </a>
               `)
-            }
+    }
             <a
               href="https://neetcode.io/practice?tab=neetcode75"
               target="_blank"
@@ -587,12 +590,12 @@ export function AnalyticsView({ problems, onNavigate }) {
                   <button
                     class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20 transition-colors"
                     onClick=${() => {
-                      const first = drilldown.problems[0];
-                      setModalProblem(first);
-                      setModalProblemList(drilldown.problems);
-                      setDrilldown(null);
-                      updateQueryParams({ section: null, sectionFilter: null, problem: first?.id || first?.titleSlug });
-                    }}
+          const first = drilldown.problems[0];
+          setModalProblem(first);
+          setModalProblemList(drilldown.problems);
+          setDrilldown(null);
+          updateQueryParams({ section: null, sectionFilter: null, problem: first?.id || first?.titleSlug });
+        }}
                   >Browse ←→</button>
                 ` : ""}
                 <button onClick=${() => { setDrilldown(null); updateQueryParams({ section: null, sectionFilter: null }); }} class="text-slate-500 hover:text-white text-xl leading-none px-1">✕</button>
@@ -600,18 +603,18 @@ export function AnalyticsView({ problems, onNavigate }) {
             </div>
             <div class="overflow-y-auto flex-1 px-3 py-3 flex flex-col gap-1.5">
               ${drilldown.problems.length === 0
-                ? html`<p class="text-slate-500 text-sm text-center py-8">No problems found.</p>`
-                : drilldown.problems.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).map((p) => {
-                    const diffCls = p.difficulty === "Easy" ? "text-emerald-400" : p.difficulty === "Medium" ? "text-amber-400" : p.difficulty === "Hard" ? "text-rose-400" : "text-slate-500";
-                    return html`
+        ? html`<p class="text-slate-500 text-sm text-center py-8">No problems found.</p>`
+        : drilldown.problems.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).map((p) => {
+          const diffCls = p.difficulty === "Easy" ? "text-emerald-400" : p.difficulty === "Medium" ? "text-amber-400" : p.difficulty === "Hard" ? "text-rose-400" : "text-slate-500";
+          return html`
                       <button
                         class="w-full text-left px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.07] hover:border-cyan-500/20 transition-colors"
                         onClick=${() => {
-                          setModalProblem(p);
-                          setModalProblemList(drilldown.problems);
-                          setDrilldown(null);
-                          updateQueryParams({ section: null, sectionFilter: null, problem: p.id || p.titleSlug });
-                        }}
+              setModalProblem(p);
+              setModalProblemList(drilldown.problems);
+              setDrilldown(null);
+              updateQueryParams({ section: null, sectionFilter: null, problem: p.id || p.titleSlug });
+            }}
                       >
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-sm text-slate-200 leading-snug truncate">${p.title || p.titleSlug}</span>
@@ -623,8 +626,8 @@ export function AnalyticsView({ problems, onNavigate }) {
                         </div>
                       </button>
                     `;
-                  })
-              }
+        })
+      }
             </div>
           </div>
         </div>

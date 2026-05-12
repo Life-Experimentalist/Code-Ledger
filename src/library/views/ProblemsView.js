@@ -11,6 +11,7 @@ const html = htm.bind(h);
 import { ProblemCard } from "../../ui/components/ProblemCard.js";
 import { ProblemModal } from "../components/ProblemModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
+import { Storage } from "../../core/storage.js";
 
 const PLATFORMS = [
   {
@@ -51,8 +52,8 @@ const SORT_OPTIONS = [
   { value: "oldest", label: "Oldest First" },
   { value: "diff-asc", label: "Easy → Hard" },
   { value: "diff-desc", label: "Hard → Easy" },
-  { value: "title", label: "Title A–Z" },
-  { value: "platform", label: "Platform A–Z" },
+  { value: "title", label: "Title A-Z" },
+  { value: "platform", label: "Platform A-Z" },
   { value: "tags", label: "Most Tags" },
 ];
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
@@ -66,6 +67,48 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
   const [query, setQuery] = useState(searchQuery || getQueryParam("q", ""));
   const [sortBy, setSortBy] = useState(getQueryParam("sort", "newest"));
   const [selectedProblem, setSelectedProblem] = useState(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkTagInput, setBulkTagInput] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [queueStats, setQueueStats] = useState(null);
+  const [reviewQueueBusy, setReviewQueueBusy] = useState(false);
+  const [reviewQueueMsg, setReviewQueueMsg] = useState("");
+
+  const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+
+  const fetchQueueStats = () => {
+    if (!isExtension) return;
+    chrome.runtime.sendMessage({ type: "GET_QUEUE_STATS" }, (resp) => {
+      if (chrome.runtime.lastError || !resp?.ok) return;
+      setQueueStats(resp);
+    });
+  };
+
+  useEffect(() => {
+    fetchQueueStats();
+    const id = setInterval(fetchQueueStats, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleQueueAllReviews = async () => {
+    if (!isExtension || reviewQueueBusy) return;
+    setReviewQueueBusy(true);
+    setReviewQueueMsg("");
+    chrome.runtime.sendMessage({ type: "QUEUE_ALL_AI_REVIEWS" }, (resp) => {
+      setReviewQueueBusy(false);
+      if (chrome.runtime.lastError || !resp?.ok) {
+        setReviewQueueMsg("Failed to queue reviews.");
+      } else {
+        setReviewQueueMsg(`Queued ${resp.queued} problem(s) for AI review.`);
+        fetchQueueStats();
+      }
+      setTimeout(() => setReviewQueueMsg(""), 5000);
+    });
+  };
+
+  const getProblemKey = (p) => String(p?.id || p?.titleSlug || "");
 
   const handleProblemUpdate = (updated) => {
     setSelectedProblem(updated);
@@ -99,12 +142,22 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
   useEffect(() => { setQuery(searchQuery || ""); }, [searchQuery]);
 
   useEffect(() => {
+    if (!selectedIds.size) return;
+    const existing = new Set((problems || []).map((p) => getProblemKey(p)).filter(Boolean));
+    setSelectedIds((prev) => {
+      const next = new Set();
+      prev.forEach((id) => { if (existing.has(id)) next.add(id); });
+      return next;
+    });
+  }, [problems]);
+
+  useEffect(() => {
     updateQueryParams({
       difficulty: filterDifficulty !== "All" ? filterDifficulty : null,
-      platform:   filterPlatform   !== "All" ? filterPlatform   : null,
-      language:   filterLanguage   !== "All" ? filterLanguage   : null,
-      tag:        filterTag        !== "All" ? filterTag        : null,
-      sort:       sortBy           !== "newest" ? sortBy        : null,
+      platform: filterPlatform !== "All" ? filterPlatform : null,
+      language: filterLanguage !== "All" ? filterLanguage : null,
+      tag: filterTag !== "All" ? filterTag : null,
+      sort: sortBy !== "newest" ? sortBy : null,
     });
   }, [filterDifficulty, filterPlatform, filterLanguage, filterTag, sortBy]);
 
@@ -229,9 +282,130 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
     });
   };
 
+  const toggleSelect = (problem) => {
+    const key = getProblemKey(problem);
+    if (!key) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setBulkStatus("");
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedIds(new Set(filtered.map((p) => getProblemKey(p)).filter(Boolean)));
+  };
+
+  const selectedProblems = (problems || []).filter((p) => selectedIds.has(getProblemKey(p)));
+
+  const bulkDeleteSelected = async () => {
+    if (!selectedProblems.length || bulkBusy) return;
+    if (!window.confirm(`Delete ${selectedProblems.length} selected problem(s)? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    setBulkStatus("");
+    try {
+      for (const p of selectedProblems) {
+        if (!p?.id) continue;
+        await Storage.deleteProblem(p.id);
+        onProblemDelete?.(p.id);
+      }
+      clearSelection();
+      setBulkStatus(`Deleted ${selectedProblems.length} problem(s).`);
+    } catch (e) {
+      setBulkStatus(`Bulk delete failed: ${e.message || e}`);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkRetagSelected = async () => {
+    if (!selectedProblems.length || bulkBusy) return;
+    const newTags = bulkTagInput.split(",").map((t) => t.trim()).filter(Boolean);
+    if (!newTags.length) {
+      setBulkStatus("Enter at least one tag before applying.");
+      return;
+    }
+    setBulkBusy(true);
+    setBulkStatus("");
+    try {
+      for (const p of selectedProblems) {
+        const updated = {
+          ...p,
+          tags: newTags,
+          topic: newTags[0] || p.topic || "Untagged",
+          manuallyEdited: true,
+        };
+        await Storage.saveProblem(updated);
+        const slug = String(updated.titleSlug || updated.id || "").trim();
+        const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
+        const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
+        const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+        if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => { });
+        onProblemUpdate?.(updated);
+      }
+      setBulkStatus(`Updated tags for ${selectedProblems.length} problem(s).`);
+    } catch (e) {
+      setBulkStatus(`Bulk tag update failed: ${e.message || e}`);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkExportSelected = () => {
+    if (!selectedProblems.length) return;
+    try {
+      const payload = JSON.stringify(selectedProblems, null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `codeledger-selected-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setBulkStatus(`Exported ${selectedProblems.length} problem(s).`);
+    } catch (e) {
+      setBulkStatus(`Bulk export failed: ${e.message || e}`);
+    }
+  };
+
   return html`
     <div class="flex flex-col gap-6 w-full">
 
+      <!-- AI Review queue status banner -->
+      ${isExtension && (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg) ? html`
+        <div class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs">
+          <div class="flex items-center gap-2 text-violet-300">
+            ${(queueStats?.pending > 0 || queueStats?.processing > 0) ? html`
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span>
+              <span>AI reviews: ${queueStats?.processing || 0} processing · ${queueStats?.pending || 0} pending · ${queueStats?.failed || 0} failed</span>
+            ` : ""}
+            ${reviewQueueMsg ? html`<span class="text-emerald-400">${reviewQueueMsg}</span>` : ""}
+          </div>
+          <button
+            onClick=${handleQueueAllReviews}
+            disabled=${reviewQueueBusy}
+            class="px-2.5 py-1 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40"
+          >${reviewQueueBusy ? "Queuing…" : "Re-queue all"}</button>
+        </div>
+      ` : isExtension ? html`
+        <div class="flex items-center justify-between gap-3 px-4 py-2 rounded-xl bg-white/3 border border-white/5 text-xs">
+          <span class="text-slate-500">
+            ${(problems || []).filter(p => !p.aiReview).length} problems missing AI review
+          </span>
+          <button
+            onClick=${handleQueueAllReviews}
+            disabled=${reviewQueueBusy}
+            class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors disabled:opacity-40 text-[11px]"
+          >${reviewQueueBusy ? "Queuing…" : "Generate all AI reviews"}</button>
+        </div>
+      ` : ""}
 
       <!-- Platform hub -->
       <div class="grid grid-cols-3 gap-4">
@@ -345,19 +519,55 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
             <button onClick=${() => setQuery("")} class="text-slate-500 hover:text-slate-300 text-xs px-2">✕</button>
           ` : ""}
         </div>
-        <div class="flex items-center gap-2 justify-end">
+        <div class="flex items-center gap-2 justify-end flex-wrap">
           <button
             onClick=${refreshMissingFiltered}
+            disabled=${!filtered.some((p) => !p.problemStatement)}
             class="text-[11px] px-2.5 py-1 rounded border border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
           >Refresh missing overviews</button>
+          <button
+            onClick=${() => {
+      const next = !selectionMode;
+      setSelectionMode(next);
+      if (!next) clearSelection();
+    }}
+            class=${`text-[11px] px-2.5 py-1 rounded border transition-colors ${selectionMode
+      ? "border-cyan-500/50 text-cyan-300 bg-cyan-500/10"
+      : "border-white/15 text-slate-300 hover:bg-white/10"}`}
+          >${selectionMode ? "Exit Select Mode" : "Select Mode"}</button>
         </div>
       </div>
+
+      ${selectionMode ? html`
+        <div class="flex flex-col gap-2 bg-[#0a0a0f] p-3 rounded-xl border border-cyan-500/20">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="text-xs text-cyan-300">${selectedIds.size} selected</span>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onClick=${selectAllFiltered} class="text-[11px] px-2.5 py-1 rounded border border-white/15 text-slate-300 hover:bg-white/10">Select all filtered</button>
+              <button onClick=${clearSelection} class="text-[11px] px-2.5 py-1 rounded border border-white/15 text-slate-300 hover:bg-white/10">Clear</button>
+              <button onClick=${bulkExportSelected} disabled=${!selectedIds.size || bulkBusy} class="text-[11px] px-2.5 py-1 rounded border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40">Export JSON</button>
+              <button onClick=${bulkDeleteSelected} disabled=${!selectedIds.size || bulkBusy} class="text-[11px] px-2.5 py-1 rounded border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 disabled:opacity-40">Delete selected</button>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <input
+              value=${bulkTagInput}
+              onInput=${(e) => setBulkTagInput(e.target.value)}
+              placeholder="Bulk tags (comma-separated)"
+              class="px-3 py-1.5 bg-black border border-white/10 rounded text-xs text-white min-w-[260px]"
+            />
+            <button onClick=${bulkRetagSelected} disabled=${!selectedIds.size || bulkBusy} class="text-[11px] px-2.5 py-1 rounded border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-40">Apply tags</button>
+            ${bulkStatus ? html`<span class="text-[11px] text-slate-400">${bulkStatus}</span>` : ""}
+          </div>
+        </div>
+      ` : ""}
 
       <!-- Results count -->
       <div class="flex items-center justify-between -mt-2">
         <p class="text-[10px] text-slate-600 uppercase tracking-wider">
           ${filtered.length} solution${filtered.length !== 1 ? "s" : ""}
           ${filterDifficulty !== "All" || filterPlatform !== "All" || filterLanguage !== "All" || filterTag !== "All" || filterOverview !== "All" || query ? " (filtered)" : ""}
+          ${selectionMode ? ` · ${selectedIds.size} selected` : ""}
         </p>
         ${(filterDifficulty !== "All" || filterPlatform !== "All" || filterLanguage !== "All" || filterTag !== "All" || filterOverview !== "All" || query) ? html`
           <button
@@ -373,8 +583,11 @@ export function ProblemsView({ problems, searchQuery, onProblemUpdate, onProblem
           <${ProblemCard}
             key=${p.id || p.titleSlug}
             problem=${p}
-            onSelect=${handleSelectProblem}
+            onSelect=${selectionMode ? (() => toggleSelect(p)) : handleSelectProblem}
             onRefresh=${refreshProblemData}
+            selectionMode=${selectionMode}
+            selected=${selectedIds.has(getProblemKey(p))}
+            onToggleSelect=${() => toggleSelect(p)}
           />
         `)}
         ${filtered.length === 0 ? html`

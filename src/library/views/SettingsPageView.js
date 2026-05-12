@@ -14,31 +14,34 @@ import { PanelGit } from "../settings-panels/PanelGit.js";
 import { PanelPlatforms } from "../settings-panels/PanelPlatforms.js";
 import { PanelBackups } from "../settings-panels/PanelBackups.js";
 import { PanelAdvanced } from "../settings-panels/PanelAdvanced.js";
+import { PanelMCP } from "../settings-panels/PanelMCP.js";
 
 const NAV_ITEMS = [
-  { id: "general",   emoji: "🎨", label: "General"   },
-  { id: "ai",        emoji: "🤖", label: "AI"         },
-  { id: "git",       emoji: "🔗", label: "Git"        },
-  { id: "platforms", emoji: "🌐", label: "Platforms"  },
-  { id: "backups",   emoji: "💾", label: "Backups"    },
-  { id: "advanced",  emoji: "⚙️", label: "Advanced"   },
+  { id: "general", emoji: "🎨", label: "General" },
+  { id: "ai", emoji: "🤖", label: "AI" },
+  { id: "git", emoji: "🔗", label: "Git" },
+  { id: "platforms", emoji: "🌐", label: "Platforms" },
+  { id: "backups", emoji: "💾", label: "Backups" },
+  { id: "mcp", emoji: "🔧", label: "MCP Tools" },
+  { id: "advanced", emoji: "⚙️", label: "Advanced" },
 ];
 
 export function SettingsPageView({ settings, onSettingsChange, onSetupRepo }) {
-  const VALID_PANELS = new Set(["general", "ai", "git", "platforms", "backups", "advanced"]);
+  const VALID_PANELS = new Set(["general", "ai", "git", "platforms", "backups", "mcp", "advanced"]);
   const initPanel = getQueryParam("settingsTab", "general");
   const [activePanel, setActivePanel] = useState(VALID_PANELS.has(initPanel) ? initPanel : "general");
 
   function renderPanel() {
     const props = { settings, onSettingsChange, onSetupRepo };
     switch (activePanel) {
-      case "general":   return html`<${PanelGeneral}   ...${props} />`;
-      case "ai":        return html`<${PanelAI}        ...${props} />`;
-      case "git":       return html`<${PanelGit}       ...${props} />`;
-      case "platforms": return html`<${PanelPlatforms} ...${props} />`;
-      case "backups":   return html`<${PanelBackups}   ...${props} />`;
-      case "advanced":  return html`<${PanelAdvanced}  ...${props} />`;
-      default:          return null;
+      case "general": return html`<${PanelGeneral}        ...${props} />`;
+      case "ai": return html`<${PanelAI}             ...${props} />`;
+      case "git": return html`<${PanelGit}            ...${props} />`;
+      case "platforms": return html`<${PanelPlatforms}      ...${props} />`;
+      case "backups": return html`<${PanelBackups}        ...${props} />`;
+      case "mcp": return html`<${PanelMCP}            />`;
+      case "advanced": return html`<${PanelAdvanced}       ...${props} />`;
+      default: return null;
     }
   }
 
@@ -52,8 +55,8 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo }) {
             onClick=${() => { setActivePanel(id); updateQueryParams({ settingsTab: id }); }}
             class="flex items-center gap-1.5 px-3 py-2.5 rounded-t-lg text-sm font-medium whitespace-nowrap transition-colors border-b-2
               ${activePanel === id
-                ? "border-cyan-500 text-cyan-200 bg-cyan-500/5"
-                : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5"}"
+      ? "border-cyan-500 text-cyan-200 bg-cyan-500/5"
+      : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5"}"
           >
             <span class="text-sm leading-none">${emoji}</span>
             <span>${label}</span>

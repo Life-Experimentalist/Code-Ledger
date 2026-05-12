@@ -347,12 +347,155 @@ function RollingBackup() {
   `;
 }
 
+// ── Sub-panel: GitHub rolling backups ─────────────────────────────────────
+
+function GitHubBackups({ settings, onSettingsChange }) {
+  const [backups, setBackups] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const isExtension = typeof chrome !== "undefined" && !!chrome?.runtime?.id;
+
+  const flash = (text, isErr = false) => { setMsg({ text, isErr }); setTimeout(() => setMsg(""), 4000); };
+
+  const sw = (type, extra = {}) => new Promise((res, rej) =>
+    chrome.runtime.sendMessage({ type, ...extra }, r => r?.ok ? res(r) : rej(new Error(r?.error || type + " failed")))
+  );
+
+  const loadBackups = async () => {
+    if (!isExtension) return;
+    setBusy(true);
+    try {
+      const r = await sw("LIST_GITHUB_BACKUPS");
+      setBackups(r.backups || []);
+    } catch (e) { flash(e.message, true); }
+    finally { setBusy(false); }
+  };
+
+  useEffect(() => { if (isExtension) loadBackups(); }, []);
+
+  const commitNow = async () => {
+    setBusy(true);
+    try {
+      await sw("COMMIT_GITHUB_BACKUP_NOW");
+      flash("Backup committed to GitHub.");
+      await loadBackups();
+    } catch (e) { flash(e.message, true); }
+    finally { setBusy(false); }
+  };
+
+  const restore = async (b) => {
+    if (!confirm(`Restore backup "${b.name}" from GitHub?\n\nThis merges problems — existing problems are not deleted.`)) return;
+    setBusy(true);
+    try {
+      const r = await sw("RESTORE_GITHUB_BACKUP", { filePath: b.path });
+      flash(`Restored ${r.count} problems from ${b.name}`);
+    } catch (e) { flash(e.message, true); }
+    finally { setBusy(false); }
+  };
+
+  const GITHUB_SETTINGS = [
+    { key: "githubRollingBackups", label: "Enable GitHub rolling backups", desc: "Commits a full snapshot to your repo every N problem solves." },
+  ];
+
+  return html`
+    <div class="space-y-4">
+      <p class="text-[11px] text-slate-500">
+        Commits full snapshots as <code class="text-cyan-400">backups/YYYY-MM-DD-HH-mm-ss.json</code> in your GitHub repo.
+        Keeps only the N most recent — older ones are pruned automatically.
+      </p>
+
+      <!-- Toggle -->
+      ${GITHUB_SETTINGS.map(({ key, label, desc }) => {
+        const on = settings?.[key] !== false;
+        return html`
+          <label key=${key} class="flex items-start gap-3 cursor-pointer">
+            <div class="relative mt-0.5 shrink-0">
+              <input type="checkbox" checked=${on} onChange=${() => onSettingsChange?.(key, !on)} class="sr-only" />
+              <div class="w-8 h-4 rounded-full transition-colors ${on ? "bg-cyan-600" : "bg-white/10"}"></div>
+              <div class="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${on ? "translate-x-4" : ""}"></div>
+            </div>
+            <div>
+              <p class="text-xs text-slate-200">${label}</p>
+              <p class="text-[11px] text-slate-500 mt-0.5">${desc}</p>
+            </div>
+          </label>
+        `;
+      })}
+
+      <!-- Interval + keep -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[11px] text-slate-400 block mb-1">Every N commits</label>
+          <input
+            type="number" min="1" max="100"
+            value=${settings?.githubBackupInterval || "10"}
+            onInput=${e => onSettingsChange?.("githubBackupInterval", e.target.value)}
+            class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-400 block mb-1">Keep last N backups</label>
+          <input
+            type="number" min="1" max="50"
+            value=${settings?.githubBackupKeep || "10"}
+            onInput=${e => onSettingsChange?.("githubBackupKeep", e.target.value)}
+            class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+      </div>
+
+      <!-- Actions -->
+      ${isExtension && html`
+        <div class="flex items-center gap-2">
+          <button
+            onClick=${commitNow}
+            disabled=${busy}
+            class="px-4 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+          >${busy ? "Working…" : "Backup now"}</button>
+          <button
+            onClick=${loadBackups}
+            disabled=${busy}
+            class="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+          >Refresh list</button>
+        </div>
+      `}
+
+      ${msg && html`<p class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}">${msg.text}</p>`}
+
+      <!-- Backup list -->
+      ${backups.length > 0 && html`
+        <div class="divide-y divide-white/5 rounded-xl border border-white/8 overflow-hidden">
+          ${backups.map(b => html`
+            <div key=${b.path} class="flex items-center gap-3 px-3 py-2.5 bg-white/[0.02] hover:bg-white/[0.04]">
+              <div class="flex-1 min-w-0">
+                <p class="text-xs text-slate-300 truncate">${b.name}</p>
+                <p class="text-[11px] text-slate-500">${Math.round((b.size || 0) / 1024)} KB</p>
+              </div>
+              <button
+                onClick=${() => restore(b)}
+                disabled=${busy}
+                title="Restore"
+                class="px-2 py-1 text-[10px] text-slate-400 hover:text-emerald-300 bg-white/5 rounded transition-colors"
+              >↩ Restore</button>
+            </div>
+          `)}
+        </div>
+      `}
+
+      ${!isExtension && html`
+        <p class="text-xs text-slate-500 italic">GitHub backups are only available in the extension context.</p>
+      `}
+    </div>
+  `;
+}
+
 // ── Main panel ─────────────────────────────────────────────────────────────
 
 const BACKUP_TABS = [
   { id: "manual",    label: "Manual",    emoji: "📁" },
   { id: "scheduled", label: "Scheduled", emoji: "🔁" },
   { id: "rolling",   label: "Rolling",   emoji: "⚡" },
+  { id: "github",    label: "GitHub",    emoji: "☁️" },
 ];
 
 export function PanelBackups({ settings, onSettingsChange }) {
@@ -383,6 +526,7 @@ export function PanelBackups({ settings, onSettingsChange }) {
       ${activeTab === "manual"    && html`<${ManualBackups} settings=${settings} />`}
       ${activeTab === "scheduled" && html`<${ScheduledBackups} settings=${settings} onSettingsChange=${onSettingsChange} />`}
       ${activeTab === "rolling"   && html`<${RollingBackup} />`}
+      ${activeTab === "github"    && html`<${GitHubBackups} settings=${settings} onSettingsChange=${onSettingsChange} />`}
     </div>
   `;
 }

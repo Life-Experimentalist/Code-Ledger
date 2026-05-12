@@ -16,20 +16,22 @@ import { ConflictResolutionModal } from "../components/ConflictResolutionModal.j
 const DEFAULT_COMMIT_TPL = CONSTANTS.COMMIT_MESSAGE_TEMPLATE;
 const DEFAULT_REPO = CONSTANTS.DEFAULT_REPO_NAME;
 const GIT_PROVIDERS = Object.values(CONSTANTS.GIT_PROVIDERS || {});
+const STATUS_META = CONSTANTS.FEATURE_STATUS_META;
 
 export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
   const [oauthToken, setOauthToken] = useState("");
   const [msg, setMsg] = useState({ text: "", ok: true });
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncCount, setSyncCount] = useState(null);
-  const [importData,    setImportData]    = useState(null);
-  const [importing,     setImporting]     = useState(false);
-  const [importMsg,     setImportMsg]     = useState("");
+  const [syncNeedsPush, setSyncNeedsPush] = useState(false);
+  const [importData, setImportData] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => {
-    Storage.getAuthToken("github").then((t) => setOauthToken(t || "")).catch(() => {});
+    Storage.getAuthToken("github").then((t) => setOauthToken(t || "")).catch(() => { });
     loadSyncCount();
-  // Re-read auth token whenever parent settings update (catches post-OAuth refresh)
+    // Re-read auth token whenever parent settings update (catches post-OAuth refresh)
   }, [settings]);
 
   const loadSyncCount = () => {
@@ -46,11 +48,12 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
   };
 
   const githubUser = settings?.github_username || settings?.gitUser || "";
-  const repoName   = settings?.github_repo || settings?.gitRepo || "";
-  const repoOwner  = settings?.github_owner || githubUser || "";
-  const commitTpl  = settings?.commitMessageTemplate || DEFAULT_COMMIT_TPL;
+  const repoName = settings?.github_repo || settings?.gitRepo || "";
+  const repoOwner = settings?.github_owner || githubUser || "";
+  const commitTpl = settings?.commitMessageTemplate || DEFAULT_COMMIT_TPL;
   const gitEnabled = settings?.gitEnabled !== false;
   const gitProvider = settings?.gitProvider || "github";
+  const activeProvider = CONSTANTS.GIT_PROVIDERS?.[gitProvider] || null;
 
   const handleConnect = () => {
     const authUrl = `${CONSTANTS.URLS.AUTH_WORKER}/auth/github`;
@@ -74,9 +77,35 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
   };
 
   const handleSync = async (mode = "bulk") => {
+    if (activeProvider?.status && activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE) {
+      return flash(`${STATUS_META[activeProvider.status]?.label || "This provider"} is under construction.`, false);
+    }
     if (!gitEnabled) return flash("Git commits are disabled — enable them first.", false);
     setSyncBusy(true);
     try {
+      const git = registry.getGitProvider(settings.gitProvider || "github");
+      if (!git) throw new Error("Git provider not available. Try reloading.");
+      const token = await git.getToken();
+      if (!token) throw new Error("GitHub authentication is missing.");
+      let owner = settings.github_owner || settings.github_username || "";
+      if (!owner) {
+        const userRes = await git.apiFetch("/user", token);
+        owner = userRes.login;
+      }
+      const repo = settings.github_repo || settings.gitRepo || "";
+      const { remoteOnly, conflicts } = await importFromRepo(owner, repo, token);
+
+      if (conflicts.length > 0) {
+        setSyncNeedsPush(true);
+        setImportData({ remoteOnly, conflicts });
+        flash(`Sync paused — ${conflicts.length} conflict${conflicts.length !== 1 ? "s" : ""} need review.`, false);
+        return;
+      }
+
+      if (remoteOnly.length > 0) {
+        await applyImport(remoteOnly);
+      }
+
       await new Promise((resolve, reject) => {
         if (typeof chrome === "undefined" || !chrome.runtime?.id) {
           reject(new Error("Extension not available"));
@@ -88,8 +117,9 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
           else reject(new Error(resp?.error || "Sync failed"));
         });
       });
-      flash("Sync complete — index.json updated on GitHub");
-      setSyncCount(0);
+      flash("Sync complete — local library and repository are aligned.");
+      // Reload the actual sync count from service worker (don't assume 0)
+      loadSyncCount();
     } catch (e) {
       flash("Sync failed: " + e.message, false);
     } finally {
@@ -98,14 +128,23 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
   };
 
   const handleImport = async () => {
+    if (activeProvider?.status && activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE) {
+      setImportMsg(`${STATUS_META[activeProvider.status]?.label || "This provider"} is under construction.`);
+      return;
+    }
     setImporting(true);
     setImportMsg("");
+    setSyncNeedsPush(false);
     try {
-      const git   = registry.getGitProvider(settings.gitProvider || "github");
+      const git = registry.getGitProvider(settings.gitProvider || "github");
       if (!git) { setImportMsg("Git provider not available. Try reloading."); setImporting(false); return; }
       const token = await git.getToken();
-      const owner = settings.github_owner || settings.github_username || "";
-      const repo  = settings.github_repo  || settings.gitRepo         || "";
+      let owner = settings.github_owner || settings.github_username || "";
+      if (!owner) {
+        const userRes = await git.apiFetch("/user", token);
+        owner = userRes.login;
+      }
+      const repo = settings.github_repo || settings.gitRepo || "";
       const { remoteOnly, conflicts } = await importFromRepo(owner, repo, token);
 
       if (conflicts.length > 0) {
@@ -115,6 +154,17 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
         setImportMsg(`Imported ${remoteOnly.length} new problem${remoteOnly.length !== 1 ? "s" : ""}`);
         const s = await Storage.getSettings();
         await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+
+        // After import, request sync preview to detect any newly-detected remote problems
+        try {
+          chrome.runtime.sendMessage({ type: "SYNC_PREVIEW" }, (res) => {
+            if (!res || chrome.runtime.lastError) return;
+            const pending = res.pendingConflicts || res.pendingConflicts === 0 ? res.pendingConflicts : (res.conflicts || []).length;
+            if (pending > 0) {
+              setImportMsg(`Imported ${remoteOnly.length} problem${remoteOnly.length !== 1 ? "s" : ""}. ${pending} conflict${pending !== 1 ? "s" : ""} detected.`);
+            }
+          });
+        } catch (e) { /* SYNC_PREVIEW is optional */ }
       }
     } catch (e) {
       setImportMsg(`Import failed: ${e.message}`);
@@ -156,18 +206,33 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
       <!-- Git provider -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Git Provider</h3>
-        <p class="text-[11px] text-slate-500">Only GitHub is supported with full OAuth. GitLab and Bitbucket require a Personal Access Token in the repository field.</p>
+        <p class="text-[11px] text-slate-500">Only GitHub is fully supported right now. GitLab and Bitbucket are marked under construction and stay disabled until they are ready.</p>
         <div class="flex gap-2">
-          ${GIT_PROVIDERS.length ? GIT_PROVIDERS.map((gp) => html`
+          ${GIT_PROVIDERS.length ? GIT_PROVIDERS.map((gp) => {
+    const status = gp.status || CONSTANTS.FEATURE_STATUS.STABLE;
+    const statusMeta = STATUS_META[status] || STATUS_META[CONSTANTS.FEATURE_STATUS.STABLE];
+    const disabled = status !== CONSTANTS.FEATURE_STATUS.STABLE;
+    return html`
             <button
               key=${gp.id}
-              onClick=${() => onSettingsChange("gitProvider", gp.id)}
-              class="flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors
+              onClick=${() => {
+        if (disabled) return;
+        onSettingsChange("gitProvider", gp.id);
+      }}
+              disabled=${disabled}
+              title=${disabled ? statusMeta.label : gp.name}
+              class="flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors disabled:opacity-60
                 ${gitProvider === gp.id
-                  ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-200"
-                  : "bg-white/3 border-white/8 text-slate-400 hover:text-slate-300 hover:bg-white/5"}"
-            >${gp.name}</button>
-          `) : html`<span class="text-xs text-slate-500">GitHub</span>`}
+        ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-200"
+        : "bg-white/3 border-white/8 text-slate-400 hover:text-slate-300 hover:bg-white/5"}"
+            >
+              <span class="inline-flex items-center gap-2">
+                <span>${gp.name}</span>
+                ${disabled ? html`<span class=${`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest border rounded ${statusMeta.className}`}>${statusMeta.label}</span>` : ""}
+              </span>
+            </button>
+          `;
+  }) : html`<span class="text-xs text-slate-500">GitHub</span>`}
         </div>
       </div>
 
@@ -175,11 +240,15 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">GitHub Account</h3>
         ${oauthToken
-          ? html`
+      ? html`
             <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-300 text-sm font-bold shrink-0">
+              ${settings?.github_avatar
+          ? html`<img src=${settings.github_avatar} alt=${githubUser} class="w-8 h-8 rounded-full object-cover shrink-0" />`
+          : html`<div class="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-300 text-sm font-bold shrink-0">
                 ${(githubUser || "?")[0].toUpperCase()}
-              </div>
+              </div>`
+        }
+
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-slate-200">${githubUser || "Connected"}</p>
                 <p class="text-[11px] text-slate-500">OAuth connected</p>
@@ -190,14 +259,14 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
               >Unlink</button>
             </div>
           `
-          : html`
+      : html`
             <p class="text-sm text-slate-400">No GitHub account connected.</p>
             <button
               onClick=${handleConnect}
               class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-sm rounded-lg transition-colors"
             >Connect GitHub →</button>
           `
-        }
+    }
       </div>
 
       <!-- Repository -->
@@ -254,7 +323,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
         <div class="flex gap-2">
           <button
             onClick=${() => handleSync("bulk")}
-            disabled=${syncBusy || !gitEnabled}
+            disabled=${syncBusy || !gitEnabled || activeProvider?.status !== CONSTANTS.FEATURE_STATUS.STABLE}
             class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
           >${syncBusy ? "Syncing…" : "Sync to GitHub"}</button>
           <button
@@ -263,25 +332,12 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
             title="Check pending count"
           >↺</button>
         </div>
+        ${activeProvider?.status && activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE ? html`
+          <p class="text-[11px] text-amber-400">${STATUS_META[activeProvider.status]?.label || "This provider"} is not ready yet.</p>
+        ` : ""}
         ${msg.text && html`
           <p class="text-xs ${msg.ok ? "text-emerald-400" : "text-rose-400"}">${msg.text}</p>
         `}
-      </div>
-
-      <!-- Problems directory -->
-      <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
-        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Repository Layout</h3>
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Problems directory</label>
-          <input
-            type="text"
-            value=${settings?.problems_dir || "problems"}
-            placeholder="problems"
-            onInput=${(e) => onSettingsChange("problems_dir", e.target.value || "problems")}
-            class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-300 font-mono placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
-          />
-          <p class="text-[10px] text-slate-600 mt-1">Folder inside the repo where solutions are stored (default: <code>problems</code>)</p>
-        </div>
       </div>
 
       <!-- Commit message template -->
@@ -332,13 +388,27 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo }) {
           remoteOnly=${importData.remoteOnly}
           providerName="GitHub"
           onResolve=${async (resolved) => {
-            await applyImport(resolved);
-            setImportData(null);
-            setImportMsg(`Imported ${resolved.length} problem${resolved.length !== 1 ? "s" : ""}`);
-            const s = await Storage.getSettings();
-            await Storage.setSettings({ ...s, _pendingConflicts: 0 });
-          }}
-          onCancel=${() => setImportData(null)}
+        await applyImport(resolved);
+        setImportData(null);
+        setImportMsg(`Imported ${resolved.length} problem${resolved.length !== 1 ? "s" : ""}`);
+        const s = await Storage.getSettings();
+        await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+        if (syncNeedsPush) {
+          setSyncNeedsPush(false);
+          await new Promise((resolve, reject) => {
+            if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+              reject(new Error("Extension not available"));
+              return;
+            }
+            chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode: "bulk" }, (resp) => {
+              if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+              else if (resp?.ok) resolve(resp);
+              else reject(new Error(resp?.error || "Sync failed"));
+            });
+          }).catch((e) => setImportMsg(`Resolved conflicts, but repo push failed: ${e.message}`));
+        }
+      }}
+          onCancel=${() => { setImportData(null); setSyncNeedsPush(false); }}
         />
       ` : ""}
     </div>

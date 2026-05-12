@@ -8,9 +8,12 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
+import { createDebugger } from "../../lib/debug.js";
+const dbg = createDebugger("ProblemModal");
 import { cleanCode } from "../../lib/syntax-highlight.js";
 import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
+import { AIReviewPanel } from "../../ui/components/AIReviewPanel.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
@@ -105,11 +108,70 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   const [chatError, setChatError] = useState("");
   const [chatId, setChatId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [settings, setSettings] = useState({});
+  const [notes, setNotes] = useState(problem?.notes || "");
+
+  // Save notes when they change
+  const handleNotesChange = async (newNotes) => {
+    setNotes(newNotes);
+    try {
+      const updated = { ...problem, notes: newNotes };
+      await Storage.saveProblem(updated);
+      onUpdate?.(updated);
+    } catch (_) { }
+  };
+  const [methods, setMethods] = useState(problem?.methods || []);
+  const [selectedMethodIdx, setSelectedMethodIdx] = useState(0);
+  const [showAddMethod, setShowAddMethod] = useState(false);
+  const [newMethodTitle, setNewMethodTitle] = useState("");
+  const [newMethodDesc, setNewMethodDesc] = useState("");
+
+  const handleAddMethod = async () => {
+    if (!newMethodTitle.trim()) return;
+    const langName = problem.lang?.name || "solution";
+    const newMethod = {
+      title: newMethodTitle,
+      language: langName,
+      description: newMethodDesc,
+      code: "",
+      timestamp: Date.now(),
+    };
+    const updatedMethods = [...methods, newMethod];
+    setMethods(updatedMethods);
+    setShowAddMethod(false);
+    setNewMethodTitle("");
+    setNewMethodDesc("");
+    try {
+      const updated = { ...problem, methods: updatedMethods };
+      await Storage.saveProblem(updated);
+      onUpdate?.(updated);
+    } catch (_) { }
+  };
+
+  const handleDeleteMethod = async (idx) => {
+    const updatedMethods = methods.filter((_, i) => i !== idx);
+    setMethods(updatedMethods);
+    setSelectedMethodIdx(Math.min(selectedMethodIdx, updatedMethods.length - 1));
+    try {
+      const updated = { ...problem, methods: updatedMethods };
+      await Storage.saveProblem(updated);
+      onUpdate?.(updated);
+    } catch (_) { }
+  };
 
   useEffect(() => {
     Storage.getSettings().then(setSettings).catch(() => { });
   }, []);
+
+  // Update notes when problem changes
+  useEffect(() => {
+    setNotes(problem?.notes || "");
+    setMethods(problem?.methods || []);
+    setSelectedMethodIdx(0);
+    setShowAddMethod(false);
+  }, [problem?.id]);
 
   // Reset tab and load chat history when problem changes
   useEffect(() => {
@@ -166,8 +228,16 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   };
   const problemUrl = meta.url(problem.titleSlug || problem.id || "");
 
+  // Sort tags by importance: first by tag type (algorithms before data structures, etc),
+  // then alphabetically within each type. Priority: algorithms, data-structures, concepts, misc
+  const _tagPriority = { "algorithms": 0, "sorting": 1, "searching": 1, "dynamic-programming": 2, "greedy": 2, "backtracking": 2, "graph": 3, "tree": 3, "linked-list": 4, "array": 4, "hash-table": 4, "string": 5, "math": 6, "bit-manipulation": 7 };
   const topics = (Array.isArray(problem.tags) && problem.tags.length > 0
-    ? problem.tags
+    ? problem.tags.sort((a, b) => {
+      const aPri = _tagPriority[String(a).toLowerCase()] ?? 999;
+      const bPri = _tagPriority[String(b).toLowerCase()] ?? 999;
+      if (aPri !== bPri) return aPri - bPri;
+      return String(a).localeCompare(String(b));
+    })
     : problem.topic ? [problem.topic] : []
   ).filter(t => t && t !== "Untagged");
   const diffClass = DIFF_CLASS[problem.difficulty] || "bg-white/5 text-slate-400 border-white/10";
@@ -309,6 +379,54 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
     }
   };
 
+  const handleGenerateAIReview = async () => {
+    if (reviewBusy || !problem?.code) return;
+    if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+      setReviewError("Extension not available.");
+      return;
+    }
+    setReviewBusy(true);
+    setReviewError("");
+    try {
+      dbg.log(`Requesting AI review for problem ${problem.id || problem.titleSlug}`);
+      const TIMEOUT_MS = 45000;
+      const result = await new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          dbg.warn("AI review request timed out for UI request");
+          reject(new Error("AI review timed out"));
+        }, TIMEOUT_MS);
+
+        chrome.runtime.sendMessage({ type: "REGENERATE_AI_REVIEW", problem }, (resp) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (chrome.runtime.lastError) {
+            dbg.warn("REGENERATE_AI_REVIEW message error:", chrome.runtime.lastError.message);
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (resp?.ok) {
+            dbg.log(`AI review response received for ${problem.id || problem.titleSlug}`);
+            resolve(resp);
+          } else {
+            dbg.warn("REGENERATE_AI_REVIEW failed:", resp?.error);
+            reject(new Error(resp?.error || "AI review failed"));
+          }
+        });
+      });
+
+      if (result?.problem) {
+        onUpdate?.(result.problem);
+      }
+      setActiveTab("review");
+    } catch (e) {
+      setReviewError(e.message || String(e));
+    } finally {
+      setReviewBusy(false);
+    }
+  };
+
   const openAIChatsView = () => {
     const chatSlug = String(problem?.titleSlug || problem?.id || "").trim();
     const chatPrompt = chatInput.trim();
@@ -331,10 +449,16 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
   };
 
   const registryTabs = modalTabRegistry.getTabs(problem.platform || "leetcode", problem);
-  const tabs = registryTabs.map(tab => ({
+  const baseTabs = registryTabs.map(tab => ({
     id: tab.id,
     label: typeof tab.label === "function" ? tab.label(problem) : tab.label,
   }));
+  // Add Notes tab
+  const tabs = [
+    ...baseTabs,
+    ...(methods.length > 0 ? [{ id: "methods", label: `🔄 Methods (${methods.length})` }] : []),
+    { id: "notes", label: "📝 Notes" },
+  ];
 
   return html`
     <div
@@ -496,7 +620,85 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
 
         <!-- ── Tab content ── -->
         <div class="flex-1 overflow-y-auto p-5 min-h-0">
-          ${(() => {
+          ${activeTab === "notes" ? html`
+              <div class="flex flex-col gap-4 h-full">
+                ${methods.map((method, idx) => html`
+                  <div class="p-3 rounded-lg border ${selectedMethodIdx === idx ? "border-cyan-500/50 bg-cyan-500/10" : "border-white/10 bg-white/5"} transition-colors cursor-pointer">
+                    <button
+                      onClick=${() => setSelectedMethodIdx(idx)}
+                      class="w-full text-left"
+                    >
+                      <div class="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 class="font-semibold text-sm text-white">${method.title}</h4>
+                          <span class="text-[10px] font-mono text-cyan-400">${method.language}</span>
+                        </div>
+                        <button
+                          onClick=${(e) => { e.stopPropagation(); handleDeleteMethod(idx); }}
+                          class="text-xs px-2 py-1 rounded bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors"
+                        >Delete</button>
+                      </div>
+                      ${method.description ? html`<p class="text-[10px] text-slate-400 mb-2">${method.description}</p>` : ""}
+                      <span class="text-[9px] text-slate-600">${method.timestamp ? new Date(method.timestamp).toLocaleDateString() : "No date"}</span>
+                    </button>
+                  </div>
+                `)}
+                <button
+                  onClick=${() => setShowAddMethod(true)}
+                  class="mt-2 px-3 py-2 rounded-lg text-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors"
+                >+ Add Method</button>
+                ${showAddMethod ? html`
+                  <div class="border border-white/10 rounded-lg p-3 bg-white/5">
+                    <label class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-1">
+                      Method Title
+                    </label>
+                    <input
+                      type="text"
+                      value=${newMethodTitle}
+                      onInput=${(e) => setNewMethodTitle(e.target.value)}
+                      placeholder="e.g., Recursive Approach"
+                      class="w-full p-2 rounded text-sm bg-white/5 border border-white/10 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 mb-3"
+                    />
+                    <label class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-1">
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      value=${newMethodDesc}
+                      onInput=${(e) => setNewMethodDesc(e.target.value)}
+                      placeholder="Brief description of this approach..."
+                      class="w-full h-16 p-2 rounded text-sm bg-white/5 border border-white/10 text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:border-cyan-500/50 mb-3"
+                    />
+                    <div class="flex gap-2">
+                      <button
+                        onClick=${handleAddMethod}
+                        class="flex-1 px-3 py-2 rounded text-xs font-semibold bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/40 transition-colors"
+                      >Create Method</button>
+                      <button
+                        onClick=${() => { setShowAddMethod(false); setNewMethodTitle(""); setNewMethodDesc(""); }}
+                        class="px-3 py-2 rounded text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                      >Cancel</button>
+                    </div>
+                  </div>
+                ` : ""}
+              </div>
+            ` : activeTab === "notes" ? html`
+            <div class="flex flex-col gap-3 h-full">
+              <div>
+                <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold block mb-2">
+                  Problem Notes
+                </label>
+                <textarea
+                  value=${notes}
+                  onInput=${(e) => handleNotesChange(e.target.value)}
+                  placeholder="Add notes, observations, or follow-up items..."
+                  class="w-full h-64 p-3 rounded-lg bg-white/5 border border-white/10 text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 font-mono"
+                />
+              </div>
+              <div class="text-[10px] text-slate-600">
+                Notes are saved automatically to your problem record.
+              </div>
+            </div>
+          ` : (() => {
       const renderer = modalTabRegistry.getRenderer(problem.platform || "leetcode", activeTab);
       if (!renderer) return html`<p class="text-slate-500 text-sm">No content.</p>`;
       const onClearChat = async () => {
@@ -518,6 +720,7 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
         langName, copied, copyCode,
         chatMessages, chatInput, setChatInput, sendChat, chatPending, chatError,
         AIMarkdownRenderer, MultiLineAIChatInput, ModelStatusBar, openAIChatsView, onClearChat, chatId,
+        AIReviewPanel, onGenerateAIReview: handleGenerateAIReview, reviewBusy, reviewError,
         settings,
       };
       return renderer(problem, ctx);
@@ -546,14 +749,16 @@ export function ProblemModal({ problem, onClose, onUpdate, onDelete, problemList
 // ── EditTab sub-component — manages its own edit/delete state ───────────────
 
 function EditTab({ problem, onUpdate, onDelete, onClose }) {
+  const initialTags = (() => {
+    const fromProblem = Array.isArray(problem.tags) ? problem.tags : [];
+    const fallbackTopic = problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
+    return [...new Set([...fromProblem, ...fallbackTopic].map((t) => String(t || "").trim()).filter(Boolean))];
+  })();
+
   const [title, setTitle] = useState(problem.title || "");
   const [difficulty, setDifficulty] = useState(problem.difficulty || "Unknown");
-  const [tags, setTags] = useState(() => {
-    const t = Array.isArray(problem.tags) && problem.tags.length > 0
-      ? problem.tags.join(", ")
-      : problem.topic && problem.topic !== "Untagged" ? problem.topic : "";
-    return t;
-  });
+  const [tagList, setTagList] = useState(initialTags);
+  const [tagDraft, setTagDraft] = useState("");
   const [notes, setNotes] = useState(problem.notes || "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -561,10 +766,52 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  useEffect(() => {
+    const nextTags = (() => {
+      const fromProblem = Array.isArray(problem.tags) ? problem.tags : [];
+      const fallbackTopic = problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
+      return [...new Set([...fromProblem, ...fallbackTopic].map((t) => String(t || "").trim()).filter(Boolean))];
+    })();
+    setTitle(problem.title || "");
+    setDifficulty(problem.difficulty || "Unknown");
+    setTagList(nextTags);
+    setTagDraft("");
+    setNotes(problem.notes || "");
+    setError("");
+    setSaved(false);
+    setConfirmDelete(false);
+    setDeleting(false);
+  }, [problem?.id, problem?.titleSlug]);
+
+  const addTagsFromDraft = () => {
+    const incoming = tagDraft
+      .split(",")
+      .map((t) => String(t || "").trim())
+      .filter(Boolean);
+    if (!incoming.length) return;
+    setTagList((prev) => {
+      const seen = new Set(prev.map((t) => t.toLowerCase()));
+      const merged = [...prev];
+      incoming.forEach((tag) => {
+        const key = tag.toLowerCase();
+        if (!seen.has(key)) {
+          merged.push(tag);
+          seen.add(key);
+        }
+      });
+      return merged;
+    });
+    setTagDraft("");
+  };
+
+  const removeTag = (tagToRemove) => {
+    setTagList((prev) => prev.filter((tag) => tag !== tagToRemove));
+  };
+
   const save = async () => {
     setSaving(true); setError("");
     try {
-      const newTags = tags.split(",").map(t => t.trim()).filter(Boolean);
+      const newTags = [...new Set(tagList.map((t) => String(t || "").trim()).filter(Boolean))];
       const updated = {
         ...problem,
         title: title.trim() || problem.title,
@@ -615,10 +862,38 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] uppercase tracking-wider text-slate-500">Tags / Topics <span class="text-slate-600 normal-case">(comma-separated)</span></label>
-        <input type="text" value=${tags} onInput=${e => setTags(e.target.value)}
-          placeholder="Array, Dynamic Programming, Two Pointers…"
-          class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50" />
+        <label class="text-[11px] uppercase tracking-wider text-slate-500">Tag Editor</label>
+        <div class="flex flex-wrap gap-1.5 p-2 bg-black border border-white/10 rounded-lg min-h-[44px]">
+          ${tagList.length ? tagList.map((tag) => html`
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/10 border border-cyan-500/25 text-cyan-300">
+              ${tag}
+              <button
+                onClick=${() => removeTag(tag)}
+                class="text-cyan-200/80 hover:text-white leading-none"
+                title="Remove tag"
+              >✕</button>
+            </span>
+          `) : html`<span class="text-[11px] text-slate-600">No tags yet</span>`}
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            value=${tagDraft}
+            onInput=${(e) => setTagDraft(e.target.value)}
+            onKeyDown=${(e) => {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        addTagsFromDraft();
+      }
+    }}
+            placeholder="Add tags (comma-separated or Enter)"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 min-w-[250px]"
+          />
+          <button
+            onClick=${addTagsFromDraft}
+            class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors"
+          >Add</button>
+        </div>
         <p class="text-[10px] text-slate-600">First tag becomes the primary topic used in analytics and the graph.</p>
       </div>
 
