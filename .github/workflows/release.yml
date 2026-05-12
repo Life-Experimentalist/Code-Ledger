@@ -3,10 +3,10 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'   # triggers on v1.1.0, v2.0.0-rc.1, etc.
+      - "v*.*.*" # triggers on v1.1.0, v2.0.0-rc.1, etc.
 
 permissions:
-  contents: write   # needed to create GitHub Releases and upload assets
+  contents: write # needed to create GitHub Releases and upload assets
 
 jobs:
   build-and-release:
@@ -23,11 +23,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Sync regression checks
+        run: npm run test:sync-regression
 
       # ── Derive version from git tag ──────────────────────────────────────
       - name: Extract version
