@@ -4,6 +4,9 @@
  */
 
 import { getUsedCommands } from "./chat-variables.js";
+import { createDebugger } from "./debug.js";
+
+const dbg = createDebugger("AIChatContext");
 
 const REQUEST_COMMANDS = new Set([
     "explain",
@@ -39,6 +42,10 @@ function normalizeProblem(problem = {}) {
         code: problem.code || "",
         platform: problem.platform || "",
         difficulty: problem.difficulty || "",
+        methodTitle: problem.methodTitle || "",
+        notes: problem.notes || "",
+        isDuplicate: !!problem.isDuplicate,
+        duplicateOf: problem.duplicateOf || null,
         lang: normalizeLang(problem.lang),
     };
 }
@@ -61,6 +68,7 @@ export function buildAIChatContext({
     code = "",
     userCode = "",
     problemStatement = "",
+    methodTitle = "",
     aiReview = "",
     errors = [],
     submission = null,
@@ -81,12 +89,14 @@ export function buildAIChatContext({
     const resolvedConstraints = constraints || normalizedProblem.constraints || "";
     const resolvedStatement = problemStatement || normalizedProblem.statement || normalizedProblem.description || "";
     const resolvedLang = normalizeLang(lang || normalizedProblem.lang);
+    const resolvedMethodTitle = methodTitle || normalizedProblem.methodTitle || "";
 
     return {
         surface,
         title: title || normalizedProblem.title || "",
         difficulty: difficulty || normalizedProblem.difficulty || "",
         platform: platform || normalizedProblem.platform || "",
+        methodTitle: resolvedMethodTitle,
         lang: resolvedLang,
         code: resolvedCode,
         userCode: resolvedCode,
@@ -102,6 +112,7 @@ export function buildAIChatContext({
             code: resolvedCode,
             platform: platform || normalizedProblem.platform || "",
             difficulty: difficulty || normalizedProblem.difficulty || "",
+            methodTitle: resolvedMethodTitle,
             lang: resolvedLang,
         },
         errors: normalizeList(errors),
