@@ -45,6 +45,13 @@ function updateInstallUI(libraryUrl, version) {
   const badge = document.getElementById("ext-detected-badge");
   if (badge) badge.hidden = false;
 
+  // Update all library links to point to the extension library when known
+  if (libraryUrl) {
+    document.querySelectorAll("[data-cl-open]").forEach((el) => {
+      el.href = libraryUrl;
+    });
+  }
+
   // Hide "install" hints if present
   document.querySelectorAll("[data-cl-hide-when-installed]").forEach((el) => {
     el.style.display = "none";

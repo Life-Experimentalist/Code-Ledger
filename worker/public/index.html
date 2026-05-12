@@ -102,7 +102,7 @@
     <a href="#how-it-works"><span>How it works</span></a>
     <a href="#features"><span>Features</span></a>
     <a href="#faq"><span>FAQ</span></a>
-    <a href="/library">📚 <span>Library</span></a>
+    <a href="/library" id="nav-library-link" data-cl-open>📚 <span>Library</span></a>
     <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">⭐ <span>GitHub</span></a>
     <a href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md" target="_blank" rel="noopener" class="nav-cta">Contribute</a>
   </div>
@@ -114,7 +114,7 @@
     <div id="ext-detected-badge" hidden>Extension installed and ready</div>
   </div>
 
-  <div class="hero-badge">✦ Open source · Apache 2.0 · v1.1.0</div>
+  <div class="hero-badge">✦ Open source · Apache 2.0 · v1.2.0</div>
   <h1>Your DSA journey,<br/><span>committed.</span></h1>
   <p class="tagline">
     Every accepted LeetCode, GeeksForGeeks, and Codeforces solution is automatically pushed
@@ -124,7 +124,7 @@
 
   <div class="hero-actions">
     <a id="install-btn" class="btn btn-primary" href="#">⬇ Get Extension</a>
-    <a href="/library" class="btn btn-secondary" data-cl-show-when-installed style="display:none">📚 Open Library</a>
+    <a href="/library" id="hero-library-btn" class="btn btn-secondary" data-cl-open data-cl-show-when-installed style="display:none">📚 Open Library</a>
     <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener" class="btn btn-ghost">View Source</a>
   </div>
 
@@ -265,6 +265,57 @@
 
 <hr />
 
+<!-- ── What's new in v1.2 ─────────────────────────────────────────────── -->
+<section id="whats-new" style="background:linear-gradient(180deg,rgba(6,182,212,.04) 0%,transparent 100%)">
+  <p class="section-label">What's new · v1.2.0</p>
+  <h2 class="section-title">Smarter AI, rolling backups, and dedup</h2>
+  <p class="section-sub">Every feature is still local-first. No telemetry. No servers. Your code never leaves your browser.</p>
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🧠</div>
+      <h3>Behaviour Bank</h3>
+      <p>Capture your personal insights, define custom AI skills that trigger on difficulty or command, and set a learning roadmap. The AI assistant automatically uses these as context in every conversation.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔧</div>
+      <h3>MCP Tool-Calling</h3>
+      <p>The AI assistant can now call tools — save insights to your Knowledge Bank, recall past solutions, open problems, and set roadmap goals — all from the floating chat panel.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔁</div>
+      <h3>Cross-device sync</h3>
+      <p>Your problem library, AI chat history, and settings now sync across devices through your GitHub repo. Import once, solve anywhere — full bidirectional sync on every startup.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">☁️</div>
+      <h3>Rolling GitHub backups</h3>
+      <p>Automatically commit encrypted snapshots of your local data to a <code>backups/</code> folder in your repo. Keep the last N backups and restore from any point in time.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔍</div>
+      <h3>Duplicate detection</h3>
+      <p>AI-powered deduplication detects when you've solved the same problem twice (across platforms or under different names) and proposes merged, improved solutions for your review.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">💬</div>
+      <h3>Chat history sync</h3>
+      <p>Every AI chat is saved as a Markdown file in <code>chats/</code> in your GitHub repo — timestamped, searchable, and portable. View and continue any conversation from the Library.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🏥</div>
+      <h3>Repo diagnostics</h3>
+      <p>The welcome page doubles as a diagnostic tool. Scan for layout mismatches, missing infra files, and uncommitted problems — then repair everything with a single click.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🌙</div>
+      <h3>GitHub Pages dark/light theme</h3>
+      <p>Your auto-generated portfolio page now ships with a dark/light toggle, commit timeline, and per-platform stats — all rendered client-side from your <code>index.json</code>.</p>
+    </div>
+  </div>
+</section>
+
+<hr />
+
 <!-- ── FAQ ────────────────────────────────────────────────────────────── -->
 <section id="faq">
   <p class="section-label">FAQ</p>
@@ -301,6 +352,22 @@
     <details class="faq-item">
       <summary>What does the Library web app do?</summary>
       <p>The Library is the same UI as the extension sidebar, but accessible from any browser at <a href="/library">/library</a>. It reads your problems directly from your GitHub repo via the GitHub API — no database, no sync needed.</p>
+    </details>
+    <details class="faq-item">
+      <summary>What is the Behaviour Bank?</summary>
+      <p>The Behaviour Bank is a personal memory layer for the AI assistant. You can store insights ("I always struggle with graph traversal"), define skills that activate on specific commands or difficulty levels, and write a learning roadmap. The AI uses all of these automatically as context in every conversation.</p>
+    </details>
+    <details class="faq-item">
+      <summary>What are MCP tools?</summary>
+      <p>MCP (Model Control Protocol) tools let the AI assistant take actions beyond answering questions — it can save your insight to the Knowledge Bank, recall past solutions, open a specific problem, or update your roadmap, all within the chat panel. You can enable or disable individual tools in Settings → AI.</p>
+    </details>
+    <details class="faq-item">
+      <summary>How does cross-device sync work?</summary>
+      <p>CodeLedger syncs your problem library, AI chat history, and settings through your GitHub repo as structured files. On startup, new problems and chats from other devices are imported automatically. No third-party sync service — just your own repo.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I migrate my old problems to the new format?</summary>
+      <p>Yes. The Welcome page (accessible from the extension) has a built-in diagnostic and migration tool. It scans your repo for outdated layout versions and uncommitted problems, then lets you migrate everything with one click.</p>
     </details>
   </div>
 </section>
