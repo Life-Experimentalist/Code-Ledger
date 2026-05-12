@@ -186,7 +186,7 @@ Apache License
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2026 [VKrishna04](https://vkrishna04.me) and [Life Experimentalist](https://github.com/Life-Experimentalist/)
+   Copyright 2026+ [VKrishna04](https://vkrishna04.me) and [Life Experimentalist](https://github.com/Life-Experimentalist/) (CodeLedger uses dynamic year generation at runtime)
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

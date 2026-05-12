@@ -15,7 +15,7 @@ A **Manifest V3 browser extension** (Chrome + Firefox) that automatically commit
 
 ---
 
-## Commands
+## Quick Start
 
 ### Extension development
 ```bash
@@ -160,6 +160,31 @@ Extension listens for exactly `data.type === 'CODELEDGER_AUTH'`. Any mismatch si
 - AI API keys: `Storage.setAIKeys(map)` → stored at `ai.keys`
 - Manual PAT: `settings['github_token']`
 - `GitHubHandler.getToken()` checks OAuth path first, then settings PAT — order matters.
+- If a token is missing or invalid, **stop the flow and prompt the user to reauthenticate** instead of continuing with a partial login state.
+
+### GitHub API Error Handling
+
+When GitHub requests fail:
+
+1. **Check rate limiting first** — HTTP 403 with `x-ratelimit-remaining: 0` means wait until reset time
+2. **Check transient errors** — 5xx or 429 (too many requests) should retry once with exponential backoff
+3. **Check auth issues** — 401/403 (unauthorized) means token expired or is invalid; prompt for reauthentication
+4. **Check payload issues** — 422 (validation failed) or 400 (bad request) usually indicates malformed commit or tree payload
+5. **Fallback to mirror** — If primary target fails after retry, push to mirror repo (if configured) instead of blocking the user
+
+**Never silently drop errors.** Always log the full response status, message, and headers; this is critical for debugging cross-device sync issues.
+
+### Commit Failure Troubleshooting
+
+If commits fail, check in this order:
+
+1. **Owner/repo are set correctly** — `settings.github_owner` and `settings.github_repo` (or `gitRepo` legacy)
+2. **Token is valid** — `Storage.getAuthToken('github')` is non-empty; if empty, OAuth failed
+3. **GitHub response status** — Check response.status before parsing body; 404 usually means repo doesn't exist
+4. **Files array is valid** — Each file has `path` (string), `content` (string); if missing, commit prep was incomplete
+5. **Base branch exists** — For new repos, must have `auto_init: true` to generate initial commit SHA
+
+If all checks pass but commit still fails, the issue is likely in the Trees API call itself (check OPENAPI.yaml for the exact endpoint contract).
 
 ### OpenAPI spec maintenance
 **Source of truth:** `docs/OPENAPI.yaml`
@@ -180,16 +205,132 @@ Extension listens for exactly `data.type === 'CODELEDGER_AUTH'`. Any mismatch si
 
 ---
 
+## File Naming Conventions
+
+Consistent naming across the codebase reduces cognitive load and makes intent immediately clear. Follow these patterns strictly.
+
+### Handler Directories
+
+All handlers live in `src/handlers/` and follow a strict structure:
+
+- **Platform handlers**: `src/handlers/platforms/{name}/`
+  - `index.js` — the platform handler class extending `BasePlatformHandler`
+  - `dom-selectors.js` — DOM selectors, legacy selectors, and DOMAINS export (for manifest)
+  - `page-detector.js` — exports `detectPage()` and `isSolveCapablePage()`
+  - Optional: `enhanced-selectors.js` for version-specific overrides (e.g., LeetCode)
+  - Examples: `leetcode/`, `geeksforgeeks/`, `codeforces/`
+
+- **AI provider handlers**: `src/handlers/ai/{name}/`
+  - `index.js` — AI handler class extending `BaseAIHandler`
+  - `model-fetcher.js` — fetch live models or static list
+  - Examples: `gemini/`, `openai/`, `claude/`, `deepseek/`, `ollama/`, `openrouter/`
+
+- **Git repository handlers**: `src/handlers/git/{name}/`
+  - `index.js` — Git handler class extending `BaseGitHandler`
+  - Examples: `github/`, `gitlab/`, `bitbucket/`
+
+### UI Components & Views
+
+- **Reusable components**: `src/ui/components/{PascalCase}.js`
+  - One component per file; file name matches exported class/function name
+  - Examples: `SettingsSchema.js`, `GitHubOnboardingModal.js`, `DedupReviewQueue.js`, `AIReviewPanel.js`
+  - These are shared between extension sidebar and web app
+
+- **Library views**: `src/library/views/{PascalCase}View.js`
+  - Always end with `View` suffix to distinguish from generic components
+  - Examples: `ProblemsView.js`, `AnalyticsView.js`, `SettingsView.js`, `AIChatsView.js`, `GraphView.js`
+
+### Core Utilities & Modules
+
+- **Core modules**: `src/core/{hyphen-case}.js`
+  - Examples: `constants.js`, `storage.js`, `event-bus.js`, `ai-deduplication.js`, `canonical-mapper.js`, `ai-prompts.js`, `duplicate-detector.js`
+  - Each core module handles one responsibility
+
+- **Library utilities**: `src/lib/{hyphen-case}.js`
+  - Examples: `debug.js`, `browser-compat.js`
+
+### Naming Style Summary
+
+| Category            | Style             | Examples                                                   | Notes                               |
+| ------------------- | ----------------- | ---------------------------------------------------------- | ----------------------------------- |
+| Handler directories | kebab-case        | `leetcode`, `gemini`, `github`                             | All handlers indexed by name        |
+| Handler files       | `index.js`        | `index.js`                                                 | Standard entry point                |
+| Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `model-fetcher.js` | Clear purpose from name             |
+| Components          | PascalCase        | `SettingsSchema.js`, `ModelSelector.js`                    | React/Preact convention             |
+| Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                       | Distinguish from generic components |
+| Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                 | Lowercase for utility modules       |
+| Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.GITHUB_REPO`                                 | Via `CONSTANTS.SK.*` export only    |
+| CSS files           | kebab-case        | `floating-timer.css`                                       | Tailwind input files or compiled    |
+| Data files          | kebab-case        | `canonical-map.json`, `metadata.json`                      | In `src/data/`                      |
+
+### Storage Key Conventions
+
+**Never hardcode storage keys.** Always use `CONSTANTS.SK.*` from `src/core/constants.js`:
+
+```js
+// ✅ Correct
+const repo = settings[CONSTANTS.SK.GITHUB_REPO] || settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
+
+// ❌ Wrong
+const repo = settings['github_repo'];
+const repo = settings.github_repo;
+```
+
+**Canonical storage paths** (must never vary across modules):
+- OAuth tokens: `auth.tokens[provider]` via `Storage.setAuthToken(provider, token)` — NOT settings
+- Settings: `chrome.storage.local` via `Storage.setSettings(map)`
+- AI keys: `ai.keys[provider]` via `Storage.setAIKeys(map)` — NOT settings
+- Problems: IndexedDB via `Storage.setProblems(problems)`
+
+Before reading or writing a storage key, validate it exists in `CONSTANTS.SK`; if a key is unsupported or missing, fall back to the documented constant instead of throwing. This prevents silent data loss on schema changes.
+
+### Import Path Conventions
+
+- **From extension root**: Use relative paths with no `src/` prefix
+  ```js
+  import { createDebugger } from "../../lib/debug.js";
+  import { BasePlatformHandler } from "../_base/BasePlatformHandler.js";
+  ```
+
+- **In manifest.json paths**: Use paths relative to `src/`, without `src/` prefix
+  ```json
+  "background": { "service_worker": "background/service-worker.js" }
+  "content_scripts": [{ "js": ["content/handler-loader.js"] }]
+  ```
+
+- **In chrome.runtime.getURL()**: Same as manifest paths — no `src/` prefix
+  ```js
+  const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
+  ```
+
+### Version-Specific Selectors
+
+When DOM selectors change between platform versions (e.g., LeetCode refactors):
+
+- Base selectors live in `dom-selectors.js` (current version)
+- Legacy selectors in same file via `LEGACY_SELECTORS` export
+- Platform handler tries base selectors first, then legacy fallback
+- If multiple major versions need different selectors, create `enhanced-selectors.js` and conditionally load
+
+Example pattern in `dom-selectors.js`:
+```js
+export const SELECTORS = { /* current */ };
+export const LEGACY_SELECTORS = { /* old versions */ };
+export const DOMAINS = ["leetcode.com", "www.leetcode.com"];
+```
+
+---
+
 ## Settings Keys — Canonical Conventions
 
 These conventions apply across all files. Inconsistency here causes silent commit failures.
 
-| Key | Where stored | Canonical name | Notes |
-| --- | ------------ | -------------- | ----- |
-| GitHub repo name | `chrome.storage.local` (via `Storage.setSettings`) | `github_repo` | Do NOT use `gitRepo` (legacy camelCase) — always use `settings.github_repo \|\| settings.gitRepo` when reading for backwards compat |
-| GitHub repo owner | `chrome.storage.local` | `github_owner` | Falls back to `github_username` then `gitUser` from API |
-| GitHub PAT (manual) | `chrome.storage.local` | `github_token` | Only for legacy PAT — OAuth tokens go in `auth.tokens` |
-| OAuth token | `auth.tokens` (via `Storage.setAuthToken`) | accessed via `Storage.getAuthToken("github")` | Never save OAuth tokens to settings |
+| Key                 | Where stored                                       | Canonical name                                | Notes                                                                                                                               |
+| ------------------- | -------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub repo name    | `chrome.storage.local` (via `Storage.setSettings`) | `github_repo`                                 | Do NOT use `gitRepo` (legacy camelCase) — always use `settings.github_repo \|\| settings.gitRepo` when reading for backwards compat |
+| GitHub repo owner   | `chrome.storage.local`                             | `github_owner`                                | Falls back to `github_username` then `gitUser` from API                                                                             |
+| GitHub PAT (manual) | `chrome.storage.local`                             | `github_token`                                | Only for legacy PAT — OAuth tokens go in `auth.tokens`                                                                              |
+| OAuth token         | `auth.tokens` (via `Storage.setAuthToken`)         | accessed via `Storage.getAuthToken("github")` | Never save OAuth tokens to settings                                                                                                 |
 
 **When reading the repo name anywhere in the codebase, always use:**
 ```js

@@ -37,15 +37,6 @@
   },
   "private": true,
   "type": "module",
-  "prettier": {
-    "tabWidth": 4,
-    "useTabs": false,
-    "semi": true,
-    "singleQuote": false,
-    "trailingComma": "es5",
-    "bracketSpacing": true,
-    "endOfLine": "crlf"
-  },
   "scripts": {
     "dev": "node dev/run-dev.js",
     "start": "tsx server.ts",
@@ -59,7 +50,9 @@
     "package:chrome": "npm run build && node dev/package-chrome.js",
     "package:firefox": "npm run build && node dev/package-firefox.js",
     "publish": "npm run clean && npm run build && node dev/package.js",
+    "format": "npx prettier --write \"src/**/*.js\" \"worker/public/assets/**/*.js\"",
     "release": "node dev/release.js",
+    "test:sync-regression": "node dev/test-sync-regression.js",
     "lint": "tsc --noEmit",
     "validate:openapi": "node dev/validate-openapi.js",
     "deploy:worker": "cd worker && npx wrangler pages deploy public"
@@ -89,6 +82,7 @@
     "puppeteer": "^24.15.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "wrangler": "^4.85.0"
+    "wrangler": "^4.85.0",
+    "prettier": "^3.5.3"
   }
 }

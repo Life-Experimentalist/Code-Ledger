@@ -6,9 +6,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.2.0] — 2026-05-09
+## [1.2.0] — 2026-05-12
 
 ### Added
+- **AI Behaviour Bank** — personal memory layer for the AI assistant: Knowledge Bank (insights), user-defined Skills (trigger on command/difficulty/after-solve), and a learning Roadmap. All context is automatically injected into AI chat conversations. Accessible as a full Library tab.
+- **MCP Tool-calling** — AI assistant can now invoke tools mid-conversation: save/recall Knowledge Bank insights, open problems, set roadmap goals, list and delete chats. Tools are configurable per-provider in Settings → AI.
+- **Cross-device AI chat sync** — every AI conversation is committed as `chats/YYYY-MM-DD-HH-mm-ss-{id}.md` with YAML frontmatter. Bidirectional sync via GitHub on every startup; deleted chats are tombstoned and removed from remote.
+- **Rolling GitHub backups** — automatically snapshot local problems + settings to `backups/YYYY-MM-DD-HH-mm-ss.json` in the repo. Configurable interval (default every 20 commits) and retention count (default 10). Full restore from the Library Settings → Backups panel.
+- **Deduplication engine** — `duplicate-detector.js` finds same-slug same-language duplicates; `ai-deduplication.js` generates AI merge proposals stored on the problem. A dedicated `DedupReviewQueue` modal lets users approve/reject proposed merges.
+- **`MissingMetadataModal`** — review queue for problems missing tags or difficulty; supports individual refresh, per-problem ignore, and bulk ignore/unignore with persistent state.
+- **Setup completion notification** — Library sidebar and main content area show a dismissable amber banner if GitHub is not connected or no repo is linked, with a direct link to the Welcome page.
+- **Welcome page diagnostic tool** — second tab "Diagnostics & Migration" scans the repo for layout version mismatches, missing infra files, and uncommitted problems; offers one-click repair and bulk/individual migration commit.
+- **GitHub handler refactor** — `commit-builder.js` (tree items + commit payload), `api-client.js` (REST wrappers), and `infra-builder.js` (README/index.html generation) extracted from the monolithic `github/index.js`.
+- **Landing page v1.2** — dynamic "Open Library" links (extension URL when installed, web URL otherwise); "What's new in v1.2" features section; new FAQ entries for Behaviour Bank, MCP tools, sync, and migration.
+- **Prettier formatter** — `.prettierrc` config; `npm run format` script formats all `src/**/*.js` and `worker/public/assets/**/*.js` files.
 - **New repository path layout v2** — `problems/{slug}/{slug}.{ext}` (no platform subdir without canonical); `problems/{slug}/{platform}/{slug}.{ext}` when canonical is assigned. Solution files named after slug (`two-sum.py`) instead of verbose language name (`Python3.py`).
 - **Commit taxonomy** — structured commit messages: `[solved]`, `[update]`, `[comprehensive-update]`, `[maintenance]`, `[chore]`, `[init]` via `src/core/commit-messages.js`.
 - **Bulk progress-page import → GitHub** — imported problems now build proper v2 paths and READMEs; a "Commit N to GitHub" button appears after import that fires a `[comprehensive-update]` commit.
@@ -20,6 +31,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`index.json` layout stats** — now includes `layoutVersion`, `byPlatform`, and `byLang` breakdown fields.
 - **Root `README.md`** generated in user repos linking to their GitHub Pages stats dashboard (supports custom domains).
 - **Under Construction badge** in settings section renderer — sections with `underConstruction: true` show an amber badge and are visually marked.
+- **Missing Metadata review modal** — surfaces problems missing tags/difficulty and queues metadata refresh from the background.
+- **Dedup review queue** — same-language duplicate candidates now appear in a dedicated review modal with approve/reject actions.
+- **AI merge proposals** — same-language duplicates can generate an AI merge proposal that is stored on the problem and reviewed before applying.
+- **Mirror repository settings** — a dedicated settings panel manages additional git mirrors alongside the primary repository.
+- **Cross-device auto-sync** — periodic background sync is scheduled with `chrome.alarms` so remote changes are picked up automatically.
 - **LeetCode: non-accepted submissions could auto-sync** — submission detail pages now check `statusCode === 10` (Accepted) before auto-committing; WA / TLE / Runtime Error submissions are silently skipped. Manual "Sync to Ledger" still works on any submission.
 - **LeetCode: sync button appearance delay** — replaced the 1200 ms `setTimeout` retry with a `MutationObserver` that injects the button the instant the action button row enters the DOM; button now appears as soon as the page renders.
 - **LeetCode: Monaco code extraction** — added `_getCodeFromMonaco()` fallback (`window.monaco.editor.getModels()[0].getValue()`) for cases where GraphQL returns an empty code field.
@@ -33,11 +49,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Manual sync blocked by submission dedup** — `forceCommit: isManual` now bypasses the `alreadyCommitted` session-storage dedup check so the Sync button always commits.
 - **AI floating panel overlapping LeetCode's submit bar** — moved from `bottom: 70px` to `bottom: 110px`.
 - **Bulk-imported problems had no READMEs and used old hardcoded `topics/` paths** — now uses `solutionPath()` + `readmePath()` from path-builder and builds a full README per problem.
+- **GitHub avatar showed a placeholder instead of the real profile image** — avatar is now hydrated from saved settings on startup and stored as a data URL when OAuth can fetch it.
+- **Console logging was noisy when debug was disabled** — `console.log` / `console.error` are now gated behind the debug flag and re-enabled cleanly after OAuth.
+- **`index.json` could throw on malformed remote content** — remote sync now guards JSON parsing and falls back to an empty remote index.
+- **`providerId` could be undefined in the AI review loop** — the provider id is now scoped before use and falls back safely.
 
 ### Changed
 - **`Shift+Enter` inserts newline** in AI assistant input (previously single-line `<input>` — replaced with auto-growing `<textarea>`).
 - **Solution files named after problem slug** (`two-sum.py`) — `solutionPath()` no longer uses the verbose language name.
 - **`buildIndexJson`** includes layout version and per-platform / per-language stats.
+- **LeetCode import now preserves every accepted submission** — imports keep multiple languages and multiple accepted submissions instead of collapsing them too early.
+- **Atomic chore commits include notes and AI chats** — maintenance sync commits now bundle `notes.md` and `ai-chats/*.json` alongside problem files.
+- **AI review tags are ordered by importance** — tag presentation is now priority-based instead of alphabetical.
 
 ### Removed
 - Old `topics/{topic}/{slug}/` path pattern — migrated by `MIGRATE_REPO`.

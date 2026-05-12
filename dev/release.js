@@ -47,6 +47,16 @@ if (!changelog.includes(`## [${version}]`)) {
 }
 console.log(`   ✓ CHANGELOG.md has entry for [${version}]`);
 
+// 1.1 Regression safety checks
+console.log("\n→ Running regression checks...");
+try {
+  execSync("npm run test:sync-regression", { stdio: "inherit" });
+  console.log("   ✓ Sync regression checks passed");
+} catch (e) {
+  console.error("❌ Regression checks failed");
+  process.exit(1);
+}
+
 // 2. Check git status
 console.log("\n→ Checking git status...");
 try {

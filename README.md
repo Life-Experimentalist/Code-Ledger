@@ -30,15 +30,15 @@ You grind DSA problems across five different platforms. Your solutions disappear
 
 ## What you get
 
-| | |
-|---|---|
-| **⚡ Zero-click commits** | Every accepted submission is committed to your GitHub the instant it's accepted — code file + problem README in one atomic git commit. |
-| **🤖 Instant AI review** | Connect any API key and get time/space complexity analysis, hints, and optimization suggestions committed alongside your code. Supports Gemini, OpenAI, Claude, DeepSeek, Ollama, and OpenRouter. |
-| **📊 Dashboard** | A GitHub-style heatmap, topic radar, difficulty breakdown, and solve velocity chart — all built from your own data, no third-party accounts. |
-| **🕸️ Knowledge graph** | A force-directed graph of everything you've solved, linked by topic. See your strengths and gaps at a glance. |
-| **🌍 Multi-platform** | LeetCode, GeeksForGeeks, and Codeforces work out of the box. Bulk-import your entire LeetCode history in one click. |
-| **💬 AI chat panel** | A floating chat on every problem page. Ask about complexity, request hints, paste errors — all with your code pre-loaded via `/mycode`. |
-| **🔒 100% yours** | Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping. One repo, everything in it. |
+|                          |                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **⚡ Zero-click commits** | Every accepted submission is committed to your GitHub the instant it's accepted — code file + problem README in one atomic git commit.                                                            |
+| **🤖 Instant AI review**  | Connect any API key and get time/space complexity analysis, hints, and optimization suggestions committed alongside your code. Supports Gemini, OpenAI, Claude, DeepSeek, Ollama, and OpenRouter. |
+| **📊 Dashboard**          | A GitHub-style heatmap, topic radar, difficulty breakdown, and solve velocity chart — all built from your own data, no third-party accounts.                                                      |
+| **🕸️ Knowledge graph**    | A force-directed graph of everything you've solved, linked by topic. See your strengths and gaps at a glance.                                                                                     |
+| **🌍 Multi-platform**     | LeetCode, GeeksForGeeks, and Codeforces work out of the box. Bulk-import your entire LeetCode history in one click.                                                                               |
+| **💬 AI chat panel**      | A floating chat on every problem page. Ask about complexity, request hints, paste errors — all with your code pre-loaded via `/mycode`.                                                           |
+| **🔒 100% yours**         | Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping. One repo, everything in it.                                                                   |
 
 <br/>
 
@@ -61,25 +61,21 @@ Your GitHub contribution graph fills up. Your profile becomes a living portfolio
 
 ## Install
 
-### From Web Stores (Coming Soon)
-
-- **Chrome Web Store** — 📥 Coming soon v1.1.0
-- **Firefox Add-ons** — 🦊 Coming soon v1.1.0
-- **Microsoft Edge** — 🔮 Future release (v1.3.0+)
-
-### Or Load Unpacked Now (Development Mode)
-
 **Chrome / Edge / Brave**
 
 ```
 chrome://extensions  →  Developer mode ON  →  Load unpacked  →  select the src/ folder
 ```
 
+Or install directly from the **[Chrome Web Store →](https://chrome.google.com/webstore/detail/codeledger/)**
+
 **Firefox**
 
 ```
 about:debugging  →  Load Temporary Add-on  →  select src/manifest.json
 ```
+
+Or install from **[Firefox Add-ons →](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)**
 
 <br/>
 
@@ -96,14 +92,14 @@ about:debugging  →  Load Temporary Add-on  →  select src/manifest.json
 
 ## Supported AI providers
 
-| Provider | Notes |
-|----------|-------|
-| Google Gemini | Default — free tier available |
-| OpenAI (GPT-4o, o3-mini, …) | Bring your own key |
-| Anthropic Claude | Bring your own key |
-| DeepSeek | Bring your own key |
-| Ollama | Local models, no API key needed |
-| OpenRouter | Access 100+ models with one key |
+| Provider                    | Notes                           |
+| --------------------------- | ------------------------------- |
+| Google Gemini               | Default — free tier available   |
+| OpenAI (GPT-4o, o3-mini, …) | Bring your own key              |
+| Anthropic Claude            | Bring your own key              |
+| DeepSeek                    | Bring your own key              |
+| Ollama                      | Local models, no API key needed |
+| OpenRouter                  | Access 100+ models with one key |
 
 The extension tries providers in order and falls back automatically if one fails.
 
@@ -159,6 +155,18 @@ src/
 ```
 
 The extension has **no bundler, no transpiler** — pure ES6 modules, Preact + htm from a vendor shim, Tailwind pre-compiled. This keeps the footprint tiny and the CSP simple.
+
+<br/>
+
+## Documentation
+
+The canonical documentation index lives in [docs/README.md](docs/README.md).
+
+- Backlog: [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md)
+- Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+- Release guide: [docs/guides/RELEASE_GUIDE.md](docs/guides/RELEASE_GUIDE.md)
+- Release policy: [docs/RELEASE_VERSIONING.md](docs/RELEASE_VERSIONING.md)
+- OpenAPI contract: [docs/OPENAPI.yaml](docs/OPENAPI.yaml)
 
 <br/>
 

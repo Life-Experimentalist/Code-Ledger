@@ -71,7 +71,7 @@ Post-creation steps (high level):
 1. Download the App private key from the GitHub App settings. Store it as an encrypted secret in Cloudflare Worker (e.g. `GITHUB_APP_PRIVATE_KEY`).
 2. Save the webhook secret in `GITHUB_APP_WEBHOOK_SECRET` in the Worker environment.
 3. In the Worker code (`worker/src/index.js`) configure the App ID and endpoints via environment variables.
-4. Install the App on the `Life-Experimentalist/CodeLedger` repository (or choose the desired installation target).
+4. Install the App on the `Life-Experimentalist/Code-Ledger` repository (or choose the desired installation target).
 
 Cloudflare Worker environment variables (set these in the Cloudflare dashboard for your Worker):
 

@@ -46,6 +46,7 @@ npm run release -- --dry-run
 This validates everything without making any git changes. You'll see:
 - Version check (manifest ↔ package.json)
 - Changelog entry validation
+- Sync regression check
 - Working directory status
 - Build commands that will run
 - Git commands that will be executed
@@ -59,8 +60,8 @@ npm run release
 This does **everything automatically**:
 1. ✅ Validates versions match
 2. ✅ Checks CHANGELOG has entry
-3. ✅ Builds zips (Chrome, Firefox, source)
-4. ✅ Creates commit: `chore: release vX.Y.Z`
+3. ✅ Runs sync regression checks
+4. ✅ Builds zips (Chrome, Firefox, source)
 5. ✅ Creates tag: `vX.Y.Z`
 6. ✅ Pushes to GitHub (triggers GitHub Actions)
 
@@ -85,6 +86,7 @@ npm run release -- --dry-run       # Preview without git changes
 npm run publish                    # Just build zips (no git)
 npm run build:css                  # Compile Tailwind only
 npm run lint                       # Type-check before release
+npm run test:sync-regression       # Sync keying regression safety check
 ```
 
 ## Troubleshooting
