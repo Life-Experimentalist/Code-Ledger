@@ -41,7 +41,7 @@ import {
     migrateProblemIds,
 } from "./migration-manager.js";
 import { SyncEngine, importFromRepo, applyImport } from "./sync-engine.js";
-import { detectDuplicate } from "../core/duplicate-detector.js";
+import { detectDuplicate, normalizeCode } from "../core/duplicate-detector.js";
 import {
     autoSyncSettings,
     syncSettingsToGitHub,
@@ -1566,143 +1566,119 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
 }
 
 async function handleBulkImport(problems = []) {
-    if (!problems.length) return { saved: 0 };
+    if (!problems.length) return { saved: 0, autoMerged: 0, conflicts: 0, missingCode: 0, missingTags: 0, missingDifficulty: 0 };
+
     const pendingKeys = [];
-    for (const data of problems) {
-        const existing = await Storage.getProblem(data.id).catch(() => null);
-        if (existing?.manuallyEdited) continue;
-        await Storage.saveProblem(data).catch(() => {});
-        const key = getProblemCommitKey(data);
-        if (key) pendingKeys.push(key);
+    let autoMerged = 0;
+    let conflicts = 0;
+
+    // Group by titleSlug
+    const bySlug = {};
+    for (const p of problems) {
+        const slug = p.titleSlug || (p.id || "").split("::")[0];
+        (bySlug[slug] ??= []).push(p);
     }
+
+    for (const [, slugGroup] of Object.entries(bySlug)) {
+        // Sub-group by language slug
+        const byLang = {};
+        for (const p of slugGroup) {
+            const langSlug = (p.lang?.slug || p.lang?.name || "unknown").toLowerCase();
+            (byLang[langSlug] ??= []).push(p);
+        }
+
+        for (const langGroup of Object.values(byLang)) {
+            if (langGroup.length === 1) {
+                const existing = await Storage.getProblem(langGroup[0].id).catch(() => null);
+                if (existing?.manuallyEdited) continue;
+                await Storage.saveProblem(langGroup[0]).catch(() => {});
+                const key = getProblemCommitKey(langGroup[0]);
+                if (key) pendingKeys.push(key);
+                continue;
+            }
+
+            // Sort oldest first
+            langGroup.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            const primary = langGroup[0];
+            const rest = langGroup.slice(1);
+
+            const existingPrimary = await Storage.getProblem(primary.id).catch(() => null);
+            if (existingPrimary?.manuallyEdited) continue;
+
+            const primaryNorm = normalizeCode(primary.code);
+            const allSame = rest.every((r) => normalizeCode(r.code) === primaryNorm);
+
+            if (allSame) {
+                // Auto-merge: keep oldest, discard rest.
+                // Same code as already in repo — no GitHub commit needed.
+                await Storage.saveProblem(primary).catch(() => {});
+                autoMerged += rest.length;
+                dbg.log(`handleBulkImport(): auto-merged ${rest.length} duplicate(s) for ${primary.titleSlug} (no commit — same code)`);
+            } else {
+                // Conflict: save primary with conflict metadata
+                const candidates = rest.map((r) => ({
+                    id: r.id,
+                    code: r.code,
+                    lang: r.lang,
+                    runtime: r.runtime || null,
+                    memory: r.memory || null,
+                    runtimePct: r.runtimePct ?? null,
+                    memoryPct: r.memoryPct ?? null,
+                    timestamp: r.timestamp || 0,
+                    submissionId: r.submissionId || null,
+                }));
+                await Storage.saveProblem({
+                    ...primary,
+                    conflictPending: true,
+                    conflictCandidates: candidates,
+                }).catch(() => {});
+                const key = getProblemCommitKey(primary);
+                if (key) pendingKeys.push(key);
+                // Mark duplicates so library filters them out
+                for (const r of rest) {
+                    await Storage.saveProblem({ ...r, isDuplicate: true, duplicateOf: primary.id }).catch(() => {});
+                }
+                conflicts++;
+                dbg.log(`handleBulkImport(): conflict queued for ${primary.titleSlug} (${rest.length} candidate(s))`);
+            }
+        }
+    }
+
     if (pendingKeys.length) {
         await Storage.markPendingProblemKeys(pendingKeys).catch(() => {});
     }
-    // Post-import: perform same-language dedup detection and best-effort auto-mark duplicates.
-    try {
-        // Group imported problems by titleSlug + lang
-        const byKey = {};
-        for (const p of problems) {
-            const slug = p.titleSlug || (p.id || "").split("::")[0];
-            const lang =
-                (p.lang && (p.lang.name || p.lang.slug)) ||
-                p.langName ||
-                p.lang ||
-                "unknown";
-            const key = `${slug}::${String(lang).toLowerCase()}`;
-            if (!byKey[key]) byKey[key] = [];
-            byKey[key].push(p);
+
+    // Post-import validation
+    let missingCode = 0, missingTags = 0, missingDifficulty = 0;
+    const allSaved = await Storage.getAllProblems().catch(() => []);
+    const importedIds = new Set(problems.map((p) => p.id));
+    const imported = allSaved.filter((p) => importedIds.has(p.id));
+
+    for (const p of imported) {
+        if (!p.code && p.platform === "leetcode" && p.titleSlug) {
+            await enqueueReview(p.id, 999).catch(() => {});
+            missingCode++;
         }
-        for (const k of Object.keys(byKey)) {
-            const group = byKey[k];
-            if (group.length < 2) continue;
-            // Compare pairwise against the newest (by timestamp)
-            group.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            const primary = group[0];
-            for (let i = 1; i < group.length; i++) {
-                try {
-                    const res = await compareSolutions(
-                        (await Storage.getSettings()).aiProvider || "gemini",
-                        { code: primary.code, lang: primary.lang },
-                        { code: group[i].code, lang: group[i].lang }
-                    );
-                    if (res?.same) {
-                        // Mark older entry as duplicateOf primary
-                        const older = await Storage.getProblem(
-                            group[i].id
-                        ).catch(() => null);
-                        if (older) {
-                            older.isDuplicate = true;
-                            older.duplicateOf = primary.id;
-                            await Storage.saveProblem(older).catch(() => {});
-                            // Queue for review
-                            await Storage.markPendingProblemKey(
-                                `dedup:${older.id}`
-                            ).catch(() => {});
-                        }
-                    }
-                    // If AI thinks they're same, try to produce merged canonical solution
-                    if (res?.same) {
-                        try {
-                            const providerId =
-                                (await Storage.getSettings()).aiProvider ||
-                                "gemini";
-                            const merged = await mergeSolutions(
-                                providerId,
-                                [primary, group[i]],
-                                primary.lang?.name ||
-                                    primary.lang ||
-                                    (group[i].lang && group[i].lang.name) ||
-                                    null
-                            );
-                            if (merged) {
-                                // Store merge proposal on the primary problem for review.
-                                const primaryProblem = await Storage.getProblem(
-                                    primary.id
-                                ).catch(() => null);
-                                if (primaryProblem) {
-                                    primaryProblem.aiMergePending = true;
-                                    primaryProblem.aiMergeOriginalCode =
-                                        primaryProblem.code || "";
-                                    primaryProblem.aiMergeProposedCode = merged;
-                                    primaryProblem.aiMergeSources = [
-                                        primary.id,
-                                        group[i].id,
-                                    ].filter(Boolean);
-                                    primaryProblem.methods =
-                                        primaryProblem.methods || [];
-                                    primaryProblem.methods.push({
-                                        title: "AI-merge proposal",
-                                        language:
-                                            primary.lang?.name ||
-                                            primary.lang ||
-                                            "unknown",
-                                        timestamp: Date.now(),
-                                    });
-                                    await Storage.saveProblem(
-                                        primaryProblem
-                                    ).catch(() => {});
-                                    dbg.log(
-                                        `handleBulkImport(): dedup - proposed merged solution for ${primaryProblem.titleSlug || primaryProblem.id}`
-                                    );
-                                    // Mark the older entry as duplicate/removed
-                                    const older2 = await Storage.getProblem(
-                                        group[i].id
-                                    ).catch(() => null);
-                                    if (older2) {
-                                        older2.isDuplicate = true;
-                                        older2.duplicateOf = primary.id;
-                                        await Storage.saveProblem(older2).catch(
-                                            () => {}
-                                        );
-                                        await Storage.markPendingProblemKey(
-                                            `dedup:${older2.id}`
-                                        ).catch(() => {});
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            dbg.warn(
-                                `handleBulkImport(): AI auto-merge failed:`,
-                                e?.message || e
-                            );
-                        }
-                    }
-                } catch (e) {
-                    dbg.warn(
-                        `handleBulkImport(): bulk dedup compare failed:`,
-                        e?.message || e
-                    );
-                }
-            }
+        if (!p.tags?.length || !["Easy", "Medium", "Hard"].includes(p.difficulty)) {
+            await Storage.markForMetadataRefresh?.(p.id).catch(() => {});
+            if (!p.tags?.length) missingTags++;
+            if (!["Easy", "Medium", "Hard"].includes(p.difficulty)) missingDifficulty++;
         }
-    } catch (e) {
-        dbg.warn(
-            `handleBulkImport(): post-import dedup failed:`,
-            e?.message || e
-        );
     }
-    return { saved: pendingKeys.length };
+
+    // Broadcast import report to any open library tabs
+    const report = { saved: pendingKeys.length, autoMerged, conflicts, missingCode, missingTags, missingDifficulty };
+    dbg.log(`handleBulkImport(): complete — ${JSON.stringify(report)}`);
+    chrome.tabs.query({}, (allTabs) => {
+        for (const tab of allTabs || []) {
+            chrome.tabs.sendMessage(tab.id, {
+                type: "CODELEDGER_IMPORT_COMPLETE",
+                ...report,
+            }, () => { void chrome.runtime.lastError; }); // suppress "no receiver" errors
+        }
+    });
+
+    return report;
 }
 
 async function handleAIChat(messages, context = {}) {
