@@ -6,9 +6,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.2.0] — 2026-05-12
+## [1.2.0] — 2026-05-13
 
 ### Added
+- **AI Review Queue — Queue Missing button** — dedicated button that queues only problems with no AI review yet, separate from the full re-queue action.
+- **AI Review Queue — Requeue All button** — queues every problem for re-review (including those already reviewed); asks for confirmation before submitting.
+- **AI Review Queue — Cancel Queue button** — gracefully cancels all pending reviews: any review currently processing finishes naturally, then the rest are removed. Button appears only when there are pending or processing items.
+- **AI Review Queue — built-in dedup** — `enqueueReview()` now checks for an existing pending/processing entry before adding; duplicate submissions are silently skipped and reported as `skipped` in the response.
+- **GitHub Pages heatmap full width** — activity heatmap now fills the full card width. Cell size is computed from available width via a `--hm-cell` CSS variable set by a `resizeHeatmap()` function (minimum 8 px); re-runs on every window resize.
+- **User repo README — social banner, logo & badges** — generated `README.md` now opens with the CodeLedger social preview image, the extension logo, and four flat-square shields (total / easy / medium / hard counts) with difficulty colours, all using raw GitHub image links.
+- **Auto-save settings to repo** — every settings change in the Library UI now calls `markSettingsPendingCommit()` so the next problem commit automatically includes `.codeledger/config.json` with the updated portable settings. Manual "Force Commit Settings" and "Backup Config" buttons continue to work as before.
 - **AI Behaviour Bank** — personal memory layer for the AI assistant: Knowledge Bank (insights), user-defined Skills (trigger on command/difficulty/after-solve), and a learning Roadmap. All context is automatically injected into AI chat conversations. Accessible as a full Library tab.
 - **MCP Tool-calling** — AI assistant can now invoke tools mid-conversation: save/recall Knowledge Bank insights, open problems, set roadmap goals, list and delete chats. Tools are configurable per-provider in Settings → AI.
 - **Cross-device AI chat sync** — every AI conversation is committed as `chats/YYYY-MM-DD-HH-mm-ss-{id}.md` with YAML frontmatter. Bidirectional sync via GitHub on every startup; deleted chats are tombstoned and removed from remote.
@@ -45,6 +52,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Graph: zoom buttons** — `+` and `−` buttons in the toolbar for click-to-zoom (centered on canvas), grouped with the existing Fit view (▣) button.
 
 ### Fixed
+- **`import()` banned in MV3 service workers** — all dynamic `await import(...)` calls inside `service-worker.js` removed and replaced with top-level static imports. Affected modules: `ai-review-queue.js`, `ai-deduplication.js`, `backup-manager.js`, `migration-manager.js`, `api-client.js`, and `path-builder.js`. Fixes "Queue AI Reviews" and "Backup" features that were silently failing in production.
+- **AI Review Queue — IndexedDB version conflict** — `ai-review-queue.js` was opening a `"CodeLedger"` database at version 1 while the browser had an existing version 2, causing a hard error on every queue operation. Database renamed to `"codeledger-queue"` to open fresh at version 1.
+- **`git.apiFetch` not a function in PanelGit.js** — two call sites replaced with a direct call to `ghGetCurrentUser(token)` from the statically imported `api-client.js`. Fixed the manual import preview and individual-sync path when `github_owner` was unset.
+- **422 non-fast-forward on sequential commits** — `GitHubHandler.commit()` now retries up to 3 times (500 ms, then 1 000 ms back-off), fetching a fresh ref and rebuilding the tree on each retry.
+- **Stale `index.json` showing 0 problems after full sync** — a repair commit is now issued when the remote index contains an empty `problems: []` but local problems are already committed.
+- **Repo name forced to lowercase** — `GitHubOnboardingModal.js` `sanitize()` no longer calls `.toLowerCase()`; the allowed-character regex updated to `[^a-zA-Z0-9._-]` to match GitHub's actual rules.
 - **`/errors` command in AI assistant always showed "no errors"** — raw error string from `readTestFailures()` now passed directly to `expandChatVariables`, bypassing `normalizeList()` which was converting the string to `[]`.
 - **Manual sync blocked by submission dedup** — `forceCommit: isManual` now bypasses the `alreadyCommitted` session-storage dedup check so the Sync button always commits.
 - **AI floating panel overlapping LeetCode's submit bar** — moved from `bottom: 70px` to `bottom: 110px`.
@@ -55,6 +68,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`providerId` could be undefined in the AI review loop** — the provider id is now scoped before use and falls back safely.
 
 ### Changed
+- **AI Review Queue stats display** — replaced verbose paragraph list with a compact inline pill row that only shows non-zero counts; processing count highlighted in cyan.
+- **`handleQueueAllAIReviews` now accepts a `missingOnly` flag** — single function drives both "Queue Missing" and "Requeue All" to avoid duplicating logic.
 - **`Shift+Enter` inserts newline** in AI assistant input (previously single-line `<input>` — replaced with auto-growing `<textarea>`).
 - **Solution files named after problem slug** (`two-sum.py`) — `solutionPath()` no longer uses the verbose language name.
 - **`buildIndexJson`** includes layout version and per-platform / per-language stats.
@@ -126,6 +141,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 <!-- Add new releases above this line -->
-[Unreleased]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Life-Experimentalist/Code-Ledger/releases/tag/v1.0.0

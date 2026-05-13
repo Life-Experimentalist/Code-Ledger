@@ -120,6 +120,14 @@ export function updateRef(owner, repo, branch, sha, token) {
     });
 }
 
+/** POST /git/blobs — store a binary blob, returns { sha } */
+export function createBlob(owner, repo, base64Content, token) {
+    return apiFetch(`/repos/${owner}/${repo}/git/blobs`, token, {
+        method: "POST",
+        body: JSON.stringify({ content: base64Content, encoding: "base64" }),
+    });
+}
+
 // ── Repository management ─────────────────────────────────────────────────────
 
 /** POST /user/repos — create a new repository */

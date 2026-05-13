@@ -98,16 +98,16 @@ export function getPagesHtml(opts = {}) {
     @media (max-width: 660px) { .g2 { grid-template-columns: 1fr; } }
 
     /* Heatmap */
-    .hm-outer { margin-bottom: 1rem; }
+    .hm-outer { margin-bottom: 1rem; width: 100% }
     .hm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .hm-wrap { display: inline-flex; gap: 4px; align-items: flex-start; }
-    .hm-side { display: grid; grid-template-rows: repeat(7,11px); gap: 3px; font-size: .55rem; color: var(--muted); padding-right: 6px; padding-top: 20px; text-align: right; }
+    .hm-wrap { display: flex; gap: 4px; align-items: flex-start; }
+    .hm-side { display: grid; grid-template-rows: repeat(7,var(--hm-cell,11px)); gap: 3px; font-size: .55rem; color: var(--muted); padding-right: 6px; padding-top: 20px; text-align: right; }
     .hm-main { display: flex; flex-direction: column; gap: 4px; }
     .hm-months { display: flex; gap: 3px; font-size: .58rem; color: var(--muted); min-height: 18px; align-items: flex-end; }
-    .hm-months span { min-width: 14px; white-space: nowrap; }
+    .hm-months span { min-width: var(--hm-cell,11px); white-space: nowrap; }
     .hm-cols { display: flex; gap: 3px; }
     .hm-col { display: flex; flex-direction: column; gap: 3px; }
-    .hm-cell { width: 11px; height: 11px; border-radius: 2px; background: rgba(255,255,255,.04); flex-shrink: 0; }
+    .hm-cell { width: var(--hm-cell,11px); height: var(--hm-cell,11px); border-radius: 2px; background: rgba(255,255,255,.04); flex-shrink: 0; }
     .hm-cell.l1 { background: rgba(6,182,212,.18); }
     .hm-cell.l2 { background: rgba(6,182,212,.4); }
     .hm-cell.l3 { background: rgba(6,182,212,.65); }
@@ -546,6 +546,17 @@ export function getPagesHtml(opts = {}) {
 
         // Heatmap
         buildHeatmap(problems);
+        function resizeHeatmap() {
+          var outer = document.querySelector('.hm-outer');
+          var cols = document.querySelectorAll('.hm-col').length;
+          if (!outer || !cols) return;
+          var sideW = outer.querySelector('.hm-side') ? outer.querySelector('.hm-side').offsetWidth + 8 : 44;
+          var avail = outer.clientWidth - sideW - cols * 3;
+          var cell = Math.max(8, Math.floor(avail / cols));
+          document.documentElement.style.setProperty('--hm-cell', cell + 'px');
+        }
+        resizeHeatmap();
+        window.addEventListener('resize', resizeHeatmap);
 
         // Language donut
         var langMap = countBy(problems, function(p) {
@@ -790,15 +801,55 @@ export function getRepoReadme(
         .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
         .slice(0, 10);
 
+    const LOGO_URL =
+        "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/logo.png";
+    const ICON_URL =
+        "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-transparent.png";
+    const SOCIAL_URL =
+        "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/social%20preview.png";
+    const total = stats?.total || 0;
+    const easy = stats?.easy || 0;
+    const medium = stats?.medium || 0;
+    const hard = stats?.hard || 0;
+
     const lines = [
         "<!-- CODELEDGER_AUTO_GENERATED_START -->",
         "",
+        '<div align="center">',
+        "",
+        "[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")",
+        "",
+        '<img src="' + ICON_URL + '" alt="CodeLedger" width="72" height="72" />',
+        "",
         "# " + owner + "'s DSA Solutions",
         "",
-        "> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — your DSA journey, committed to Git.",
+        "[![Solutions](https://img.shields.io/badge/Solutions-" +
+            total +
+            "-06b6d4?style=flat-square&logo=github)](" +
+            url +
+            ")" +
+            "  [![Easy](https://img.shields.io/badge/Easy-" +
+            easy +
+            "-22c55e?style=flat-square)](" +
+            url +
+            ")" +
+            "  [![Medium](https://img.shields.io/badge/Medium-" +
+            medium +
+            "-f59e0b?style=flat-square)](" +
+            url +
+            ")" +
+            "  [![Hard](https://img.shields.io/badge/Hard-" +
+            hard +
+            "-ef4444?style=flat-square)](" +
+            url +
+            ")",
         "",
-        "**Live Dashboard:** [" + url + "](" + url + ")",
-        updatedAt ? "**Last updated:** " + updatedAt : "",
+        "> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — every problem solved, committed to Git.",
+        "",
+        "**[View Live Dashboard →](" + url + ")**",
+        updatedAt ? "*Last updated: " + updatedAt + "*" : "",
+        "",
+        "</div>",
         "",
         "---",
         "",
@@ -882,11 +933,15 @@ export function getRepoReadme(
                 day: "numeric",
             });
             const lang = (p.lang && (p.lang.name || p.lang)) || "?";
-            const title = p.title || p.titleSlug || "?";
+            const slug = p.titleSlug || "";
+            const titleText = p.title || slug || "?";
+            const titleCell = slug
+                ? "[" + titleText + "](https://leetcode.com/problems/" + slug + "/)"
+                : titleText;
             const diff = p.difficulty || "?";
             const plat = p.platform || "?";
             lines.push(
-                "| " + [title, diff, lang, plat, date].join(" | ") + " |"
+                "| " + [titleCell, diff, lang, plat, date].join(" | ") + " |"
             );
         });
         lines.push("");
@@ -898,24 +953,41 @@ export function getRepoReadme(
         "",
         "```",
         "problems/",
-        "  {problem-slug}/",
-        "    {lang}.{ext}      ← solution file",
-        "    README.md         ← problem statement + your stats",
-        "index.json            ← machine-readable index (all problems + stats)",
-        "chats/                ← saved AI conversations",
-        ".codeledger/          ← extension config & knowledge bank",
+        "  lc-{slug}/                  ← one directory per problem",
+        "    lc-{slug}.py              ← your solution (named after the slug)",
+        "    lc-{slug}.md              ← problem statement + runtime + memory + AI review",
+        "  lc-{slug}/",
+        "    leetcode/                 ← platform subdir (when canonical ID is assigned)",
+        "      lc-{slug}.py",
+        "index.json                    ← machine-readable index (all problems + stats)",
+        "index.html                    ← live GitHub Pages dashboard",
+        "chats/                        ← saved AI conversations (YYYY-MM-DD-*.md)",
+        ".codeledger/                  ← extension config & knowledge bank",
         "```",
         "",
         "---",
         "",
         "## About",
         "",
-        "This repository is managed by [CodeLedger](https://codeledger.vkrishna04.me), a browser extension that automatically commits your DSA solutions to GitHub with AI-powered code reviews.",
+        "This repository is managed by [CodeLedger](https://codeledger.vkrishna04.me), a browser extension that automatically commits every accepted DSA solution to GitHub with AI-powered code reviews.",
         "",
-        "- Solutions committed automatically on acceptance",
-        "- AI code reviews generated per solution",
-        "- Live stats dashboard at " + url,
-        "- Fully owned by you — no lock-in, plain files",
+        "- Solutions committed automatically the instant they are accepted",
+        "- AI code reviews (complexity analysis, hints, optimizations) committed alongside code",
+        "- Live stats dashboard: " + url,
+        "- Cross-device sync — your history is always up to date on any machine",
+        "- Fully owned by you — plain files, no lock-in, no third-party servers",
+        "",
+        "---",
+        "",
+        '<div align="center">',
+        "",
+        '<img src="' + LOGO_URL + '" width="32" alt="CodeLedger" />',
+        "",
+        "Built with [CodeLedger](https://codeledger.vkrishna04.me) · " +
+            "[⭐ Star the extension](https://github.com/Life-Experimentalist/Code-Ledger) · " +
+            "[Apache 2.0](https://github.com/Life-Experimentalist/Code-Ledger/blob/main/LICENSE.md)",
+        "",
+        "</div>",
         "",
         "<!-- CODELEDGER_AUTO_GENERATED_END -->",
         ""

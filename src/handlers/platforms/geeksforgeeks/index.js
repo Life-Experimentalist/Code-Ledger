@@ -416,7 +416,7 @@ Be concise. Max 200 words.`;
         if (settings.gfg_readme !== false) {
             const readmeContent = this._buildReadme(meta, lang, slug);
             files.push({
-                path: readmePath(problemId, canonical, settings),
+                path: readmePath(problemId, canonical, settings, "geeksforgeeks"),
                 content: readmeContent,
             });
         }

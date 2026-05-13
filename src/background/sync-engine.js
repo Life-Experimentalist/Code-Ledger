@@ -67,15 +67,10 @@ function _fieldsEqual(a, b) {
  */
 export async function importFromRepo(owner, repo, token) {
     dbg.log(`importFromRepo(): fetching index.json from ${owner}/${repo}...`);
-    const git = registry.getGitProvider("github");
-    if (!git) throw new Error("GitHub provider not registered");
 
     let res;
     try {
-        res = await git.apiFetch(
-            `/repos/${owner}/${repo}/contents/index.json`,
-            token
-        );
+        res = await getContents(owner, repo, "index.json", token);
     } catch (e) {
         dbg.warn(`importFromRepo(): API fetch failed:`, e?.message);
         res = null;
@@ -123,6 +118,14 @@ export async function importFromRepo(owner, repo, token) {
     }
     const rawRemote = Array.isArray(index.problems) ? index.problems : [];
     dbg.log(`importFromRepo(): parsed ${rawRemote.length} remote problem(s)`);
+    if (rawRemote.length > 0) {
+        const sample = rawRemote.slice(0, 5).map((p) => p.id || p.titleSlug || "?");
+        dbg.log(`importFromRepo(): index.json top-5 ids: [${sample.join(", ")}]`);
+    } else {
+        const keys = Object.keys(index).join(", ");
+        const snippet = raw.length > 300 ? raw.slice(0, 300) + "…" : raw;
+        dbg.warn(`importFromRepo(): index.json has 0 problems — top-level keys: [${keys}] — raw(truncated): ${snippet}`);
+    }
 
     // Ensure all remote problems have platform-scoped ids
     const remoteProblems = rawRemote.map((p) => {

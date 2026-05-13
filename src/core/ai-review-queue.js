@@ -55,7 +55,7 @@ export async function initializeReviewQueueStore() {
  */
 async function _openDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open("CodeLedger", 1);
+        const req = indexedDB.open("codeledger-queue", 1);
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
         req.onupgradeneeded = (evt) => {
@@ -80,6 +80,13 @@ async function _openDB() {
  * @returns {Promise<{id: string, status: string}>}
  */
 export async function enqueueReview(problemId, priority = 100) {
+    // Dedup: skip if already pending or processing for this problem
+    const existing = await getPendingReviewsForProblem(problemId);
+    if (existing.length > 0) {
+        dbg.log(`enqueueReview: ${problemId} already queued — skipping duplicate`);
+        return { id: existing[0].id, status: existing[0].status, skipped: true };
+    }
+
     const id = `review-${problemId}-${Date.now()}`;
     const item = {
         id,
@@ -106,6 +113,39 @@ export async function enqueueReview(problemId, priority = 100) {
     }
 
     return { id, status: item.status };
+}
+
+/**
+ * Cancel all pending (not yet processing) queue items.
+ * Items currently processing are left to finish naturally.
+ * @returns {Promise<number>} count of cancelled items
+ */
+export async function cancelPendingReviews() {
+    try {
+        const db = await _openDB();
+        const tx = db.transaction([QUEUE_STORE], "readwrite");
+        const store = tx.objectStore(QUEUE_STORE);
+        return new Promise((resolve) => {
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const items = req.result || [];
+                let cancelled = 0;
+                for (const item of items) {
+                    if (item.status === STATUS.PENDING) {
+                        store.delete(item.id);
+                        cancelled++;
+                    }
+                }
+                db.close();
+                dbg.log(`cancelPendingReviews: removed ${cancelled} pending item(s)`);
+                resolve(cancelled);
+            };
+            req.onerror = () => { db.close(); resolve(0); };
+        });
+    } catch (e) {
+        dbg.warn("cancelPendingReviews failed:", e?.message);
+        return 0;
+    }
 }
 
 /**

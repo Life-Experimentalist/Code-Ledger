@@ -596,9 +596,18 @@ function WelcomeApp() {
         return owner ? `https://github.com/${owner}/${repo}` : null;
     })();
 
+    const openSetupWizard = () => {
+        if (chrome?.runtime?.id)
+            chrome.tabs.create({
+                url:
+                    chrome.runtime.getURL("library/library.html") +
+                    "?tab=settings&settingsTab=git&openSetup=true",
+            });
+    };
+
     const stepAction = (stepId) => {
-        if (stepId === "github" || stepId === "repo")
-            return { label: "Set up →", onClick: openSettings };
+        if (stepId === "github") return { label: "Connect GitHub →", onClick: openSettings };
+        if (stepId === "repo") return { label: "Set up repository →", onClick: openSetupWizard };
         if (stepId === "solve")
             return {
                 label: "Start solving →",

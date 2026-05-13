@@ -21,9 +21,10 @@
 
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
+import { LAYOUT_VERSION } from "../../../core/path-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { getPagesHtml, getRepoReadme } from "./pages-template.js";
-import { getCommitHistory, getContents, listDirectory } from "./api-client.js";
+import { getCommitHistory, getContents, listDirectory, createBlob } from "./api-client.js";
 import { DEFAULT_THEME, getThemePalette } from "../../../core/theme-engine.js";
 
 const dbg = createDebugger("GitHubInfra");
@@ -41,7 +42,14 @@ const dbg = createDebugger("GitHubInfra");
  * @param {boolean} isNewRepo  True when the repo was just created
  * @returns {Promise<object[]>} Tree items (path / mode / type / content)
  */
-export async function buildInfraFiles(owner, repo, branch, token, settings, isNewRepo = false) {
+export async function buildInfraFiles(
+    owner,
+    repo,
+    branch,
+    token,
+    settings,
+    isNewRepo = false
+) {
     const items = [];
 
     // Dynamic files — always up to date
@@ -50,10 +58,12 @@ export async function buildInfraFiles(owner, repo, branch, token, settings, isNe
 
     // Bootstrap files — only on first commit so they never re-dirty the tree
     if (isNewRepo) {
-        items.push(..._buildBootstrapFiles(settings));
+        items.push(...(await _buildBootstrapFiles(owner, repo, token, settings)));
     }
 
-    dbg.log(`buildInfraFiles(): ${items.length} infra file(s) (isNewRepo=${isNewRepo})`);
+    dbg.log(
+        `buildInfraFiles(): ${items.length} infra file(s) (isNewRepo=${isNewRepo})`
+    );
     return items;
 }
 
@@ -62,32 +72,53 @@ export async function buildInfraFiles(owner, repo, branch, token, settings, isNe
 async function _buildDynamicFiles(owner, repo, token, settings) {
     const theme = await Storage.getTheme().catch(() => null);
     const pagesTheme = _buildPagesTheme(theme);
-    const indexMeta = await _readIndexMeta(owner, repo, token).catch(() => null);
+    const indexMeta = await _readIndexMeta(owner, repo, token).catch(
+        () => null
+    );
 
     const items = [];
 
     if (settings?.github_pages !== false) {
-        const pageHtml = await _buildPagesContent(owner, repo, token, pagesTheme, settings);
-        items.push({ path: "index.html", mode: "100644", type: "blob", content: pageHtml });
+        const pageHtml = await _buildPagesContent(
+            owner,
+            repo,
+            token,
+            pagesTheme,
+            settings
+        );
+        items.push({
+            path: "index.html",
+            mode: "100644",
+            type: "blob",
+            content: pageHtml,
+        });
     }
 
-    const pagesUrl = settings?.github_pages_url || `https://${owner}.github.io/${repo}/`;
+    const pagesUrl =
+        settings?.github_pages_url || `https://${owner}.github.io/${repo}/`;
     items.push({
         path: "README.md",
         mode: "100644",
         type: "blob",
-        content: getRepoReadme(owner, repo, pagesUrl, pagesTheme, settings, indexMeta),
+        content: getRepoReadme(
+            owner,
+            repo,
+            pagesUrl,
+            pagesTheme,
+            settings,
+            indexMeta
+        ),
     });
 
     return items;
 }
 
-// ── Bootstrap files (LICENSE / .gitignore / config) ───────────────────────────
+// ── Bootstrap files (LICENSE / .gitignore / config / images) ─────────────────
 
-function _buildBootstrapFiles(settings) {
+async function _buildBootstrapFiles(owner, repo, token, settings) {
     const year = new Date().getFullYear();
 
-    return [
+    const items = [
         {
             path: "LICENSE",
             mode: "100644",
@@ -128,7 +159,7 @@ build/
                 {
                     version: "1.0",
                     extension: "CodeLedger",
-                    layoutVersion: CONSTANTS.LAYOUT_VERSION || 2,
+                    layoutVersion: LAYOUT_VERSION,
                     description: "Managed by the CodeLedger browser extension",
                 },
                 null,
@@ -136,6 +167,35 @@ build/
             ),
         },
     ];
+
+    // Commit extension branding images as binary blobs
+    const imageAssets = [
+        "assets/images/logo.png",
+        "assets/images/icon-transparent.png",
+        "assets/images/icon-dark-bg.png",
+    ];
+    for (const assetPath of imageAssets) {
+        try {
+            const url = (typeof chrome !== "undefined" && chrome.runtime?.getURL)
+                ? chrome.runtime.getURL(assetPath)
+                : null;
+            if (!url) continue;
+            const res = await fetch(url);
+            if (!res.ok) continue;
+            const buf = await res.arrayBuffer();
+            let binary = "";
+            const bytes = new Uint8Array(buf);
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            const b64 = btoa(binary);
+            const blob = await createBlob(owner, repo, b64, token);
+            items.push({ path: assetPath, mode: "100644", type: "blob", sha: blob.sha });
+            dbg.log(`_buildBootstrapFiles(): added image ${assetPath}`);
+        } catch (e) {
+            dbg.warn(`_buildBootstrapFiles(): skipping image ${assetPath}:`, e?.message);
+        }
+    }
+
+    return items;
 }
 
 // ── GitHub Pages builder ──────────────────────────────────────────────────────
@@ -148,13 +208,22 @@ async function _buildPagesContent(owner, repo, token, pagesTheme, settings) {
     // Commit verification summary (opt-in)
     if (settings?.pages_show_verification) {
         try {
-            const commits = await getCommitHistory(owner, repo, { per_page: 20 }, token);
+            const commits = await getCommitHistory(
+                owner,
+                repo,
+                { per_page: 20 },
+                token
+            );
             const list = Array.isArray(commits) ? commits : [];
-            const verified = list.filter((c) => c?.commit?.verification?.verified).length;
+            const verified = list.filter(
+                (c) => c?.commit?.verification?.verified
+            ).length;
             commitSummary = { total: list.length, verified };
             commitList = list.slice(0, 20).map((c) => ({
                 sha: c.sha,
-                url: c.html_url || `https://github.com/${owner}/${repo}/commit/${c.sha}`,
+                url:
+                    c.html_url ||
+                    `https://github.com/${owner}/${repo}/commit/${c.sha}`,
                 message: c.commit?.message?.split("\n")[0] || "",
                 author: c.author?.login || c.commit?.author?.name || "",
                 verified: !!c.commit?.verification?.verified,
@@ -166,13 +235,28 @@ async function _buildPagesContent(owner, repo, token, pagesTheme, settings) {
 
     // Report images — listed from the directory, not from commit history
     try {
-        const entries = await listDirectory(owner, repo, "report-images", token);
+        const entries = await listDirectory(
+            owner,
+            repo,
+            "report-images",
+            token
+        );
         reportImages = entries
-            .filter((e) => e.type === "file" && /\.(png|jpe?g|svg|gif|webp)$/i.test(e.name))
+            .filter(
+                (e) =>
+                    e.type === "file" &&
+                    /\.(png|jpe?g|svg|gif|webp)$/i.test(e.name)
+            )
             .map((e) => e.path);
     } catch (_) {}
 
-    return getPagesHtml({ theme: pagesTheme, settings, commitSummary, reportImages, commitList });
+    return getPagesHtml({
+        theme: pagesTheme,
+        settings,
+        commitSummary,
+        reportImages,
+        commitList,
+    });
 }
 
 // ── Pages theme helper ────────────────────────────────────────────────────────
@@ -225,7 +309,7 @@ async function _readIndexMeta(owner, repo, token) {
 // ── Repository topics ─────────────────────────────────────────────────────────
 
 const DEFAULT_TOPICS = [
-    "codeledger",
+    "code-ledger",
     "dsa",
     "leetcode",
     "algorithms",
@@ -259,3 +343,4 @@ function _normalizeTopic(t) {
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "");
 }
+

@@ -533,11 +533,28 @@ export function ProblemModal({
                 `Requesting AI review for problem ${problem.id || problem.titleSlug}`
             );
             const TIMEOUT_MS = 90000;
+            // Keep the MV3 service worker alive for the duration of the request.
+            // An open runtime port prevents Chrome from terminating the SW mid-call.
+            let keepAlivePort = null;
+            let keepAliveTimer = null;
+            try {
+                keepAlivePort = chrome.runtime.connect({ name: "ai-review-keepalive" });
+                keepAliveTimer = setInterval(() => {
+                    try { keepAlivePort?.postMessage({ type: "ping" }); } catch (_) {}
+                }, 20000);
+            } catch (_) {}
+            const releaseKeepalive = () => {
+                clearInterval(keepAliveTimer);
+                try { keepAlivePort?.disconnect(); } catch (_) {}
+                keepAlivePort = null;
+            };
+
             const result = await new Promise((resolve, reject) => {
                 let settled = false;
                 const timer = setTimeout(() => {
                     if (settled) return;
                     settled = true;
+                    releaseKeepalive();
                     dbg.warn("AI review request timed out for UI request");
                     reject(new Error("AI review timed out"));
                 }, TIMEOUT_MS);
@@ -548,6 +565,7 @@ export function ProblemModal({
                         if (settled) return;
                         settled = true;
                         clearTimeout(timer);
+                        releaseKeepalive();
                         if (chrome.runtime.lastError) {
                             dbg.warn(
                                 "REGENERATE_AI_REVIEW message error:",

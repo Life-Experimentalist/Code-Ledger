@@ -15,12 +15,11 @@
  * @returns {object[]} tree items ready for POST /git/trees
  */
 export function buildTreeItems(files, deletes = []) {
-    const items = (files || []).map((f) => ({
-        path: f.path,
-        mode: "100644",
-        type: "blob",
-        content: f.content,
-    }));
+    const items = (files || []).map((f) => {
+        const item = { path: f.path, mode: "100644", type: "blob" };
+        if (f.sha) item.sha = f.sha; else item.content = f.content;
+        return item;
+    });
 
     for (const delPath of deletes || []) {
         items.push({ path: delPath, mode: "100644", type: "blob", sha: null });

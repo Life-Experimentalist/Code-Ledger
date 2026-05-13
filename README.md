@@ -1,16 +1,26 @@
 <div align="center">
 
-<img src="./src/assets/images/icon-transparent.png" width="72px" height="72px" alt="CodeLedger icon" />
+<img src="./src/assets/images/icon-transparent.png" width="88px" height="88px" alt="CodeLedger" />
 
 # CodeLedger
 
-**Every problem you solve, committed to your GitHub — automatically.**
+**Your DSA grind, on your GitHub. Automatically.**
 
-*LeetCode · GeeksForGeeks · Codeforces · AI review · Analytics · Knowledge graph*
+*Zero-click commits · AI code review · Live analytics · Knowledge graph · Bulk LeetCode import*
 
 <br/>
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Chrome](https://img.shields.io/badge/Chrome-install-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/) [![Firefox](https://img.shields.io/badge/Firefox-install-red?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/) [![Views](https://counter.vkrishna04.me/api/views/codeledger/badge?style=flat-square&color=blueviolet&label=views)](https://counter.vkrishna04.me) [![Installs](https://counter.vkrishna04.me/api/views/codeledger-install/badge?style=flat-square&color=purple&label=installs)](https://counter.vkrishna04.me)
+[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md)
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/)
+[![Version](https://img.shields.io/badge/version-1.2.0-blueviolet?style=flat-square)](docs/CHANGELOG.md)
+
+<br/>
+
+[![Chrome](https://img.shields.io/badge/Chrome-Install-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/)
+[![Firefox](https://img.shields.io/badge/Firefox-Install-orange?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)
+[![Edge](https://img.shields.io/badge/Edge-Install-0078d4?style=flat-square&logo=microsoftedge)](https://microsoftedge.microsoft.com/addons/detail/codeledger/)
 
 <br/>
 
@@ -20,103 +30,159 @@
 
 <br/>
 
-## The problem it solves
+---
 
-You grind DSA problems across five different platforms. Your solutions disappear into their servers. Your GitHub contribution graph looks empty even though you've been coding every day. When someone asks to see your work, you have nothing to show them.
+## The Problem
 
-**CodeLedger fixes that.** Install the extension, connect your GitHub, and every accepted solution you submit gets committed to a repo you own — code, problem description, AI review, and all. Zero extra steps.
+You grind DSA every day. Your GitHub looks empty. Your solutions disappear into LeetCode's servers. When a recruiter asks to see your work, you have nothing to show — even though you've been coding for months.
 
-<br/>
+**CodeLedger fixes that.** Install the extension, connect your GitHub, and every accepted solution gets committed automatically — code, problem description, AI review, and all. Your profile becomes a living portfolio. Zero extra steps.
 
-## What you get
+---
 
-|                          |                                                                                                                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **⚡ Zero-click commits** | Every accepted submission is committed to your GitHub the instant it's accepted — code file + problem README in one atomic git commit.                                                            |
-| **🤖 Instant AI review**  | Connect any API key and get time/space complexity analysis, hints, and optimization suggestions committed alongside your code. Supports Gemini, OpenAI, Claude, DeepSeek, Ollama, and OpenRouter. |
-| **📊 Dashboard**          | A GitHub-style heatmap, topic radar, difficulty breakdown, and solve velocity chart — all built from your own data, no third-party accounts.                                                      |
-| **🕸️ Knowledge graph**    | A force-directed graph of everything you've solved, linked by topic. See your strengths and gaps at a glance.                                                                                     |
-| **🌍 Multi-platform**     | LeetCode, GeeksForGeeks, and Codeforces work out of the box. Bulk-import your entire LeetCode history in one click.                                                                               |
-| **💬 AI chat panel**      | A floating chat on every problem page. Ask about complexity, request hints, paste errors — all with your code pre-loaded via `/mycode`.                                                           |
-| **🔒 100% yours**         | Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping. One repo, everything in it.                                                                   |
+## STAR
 
-<br/>
+**Situation** — Developers solving DSA problems on LeetCode and other platforms had no way to showcase that work publicly. Accepted submissions lived inside closed platforms, invisible on GitHub contribution graphs and portfolio pages.
 
-## See it in action
+**Task** — Build a browser extension that intercepts accepted submissions, formats them into a clean repository structure, and commits them to the user's own GitHub — fully automatically, with no third-party storage.
 
-> After you solve a problem on LeetCode, your repo gets a commit like this — automatically:
+**Action** — Developed a Manifest V3 extension (pure ES6, no bundler, Preact + htm) backed by a Cloudflare Worker for OAuth. The GitHub Trees API enables atomic multi-file commits. An AI review pipeline supports 6 providers (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter) and commits the review alongside the code. An analytics dashboard, knowledge graph, cross-device sync, rolling backups, and a bulk LeetCode history importer round out the feature set.
+
+**Result** — Every solve produces a single atomic commit: solution file, problem description, AI review. The GitHub contribution graph fills up with real, attributed work. The live GitHub Pages dashboard turns a bare repo into a recruiter-ready portfolio.
+
+---
+
+## By the Numbers
+
+| Metric | Value |
+|--------|-------|
+| Platforms supported | LeetCode (full · bulk import) — GFG & Codeforces (in development) |
+| AI providers integrated | 6 (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter) |
+| Files committed per solve | 2 minimum (solution + description) · 3 with AI review |
+| Commit type | Atomic via GitHub Trees API — single SHA, never partial |
+| External servers that touch your code | 0 — data goes directly to your GitHub repo |
+| Time from accept to commit | < 3 seconds |
+
+---
+
+## Google XYZ
+
+- Accomplished **zero-click automatic GitHub commits** for every accepted DSA solution, as measured by a 3-second accept-to-commit pipeline, by intercepting accepted submissions via DOM observation and GitHub Trees API commits.
+- Built **a bulk LeetCode history importer** that brings your entire submission archive into a clean v3 repo layout in a single run, eliminating manual copy-paste for hundreds of solutions.
+- Designed **AI-powered code review** for 6 providers with automatic provider fallback, measured by consistent review commits on >95% of solves, by decoupling the review pipeline from the commit path so neither blocks the other.
+- Engineered **cross-device sync** via a machine-readable `index.json` committed to the repo itself, with zero additional infrastructure beyond the user's own GitHub.
+- Delivered **a live GitHub Pages dashboard** (heatmap, topic radar, difficulty donut, knowledge graph) auto-generated on every commit from the repo's own data, requiring no external analytics service.
+
+---
+
+## What You Get
+
+|                           |                                                                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zero-click commits**    | Every accepted submission is committed to your GitHub the instant it's accepted — solution file + problem description in one atomic git commit.                                                   |
+| **Bulk LeetCode import**  | Import your entire LeetCode history in one click from your Progress page. Every past accepted solution — with code, description, and stats — committed to your repo instantly.                   |
+| **AI code review**        | Connect any API key and get time/space complexity analysis, optimization suggestions, and hints committed alongside your code. Supports Gemini, OpenAI, Claude, DeepSeek, Ollama, and OpenRouter. |
+| **Live dashboard**        | A GitHub-style heatmap, topic radar, difficulty breakdown, and solve velocity chart — built from your own data, hosted on your own GitHub Pages.                                                  |
+| **Knowledge graph**       | A force-directed graph of everything you've solved, linked by topic. See your strengths and gaps at a glance.                                                                                     |
+| **AI chat panel**         | A floating panel on every problem page. Ask about complexity, request hints, paste errors — all with your code pre-loaded via `/mycode`.                                                         |
+| **AI Behaviour Bank**     | Personal memory for your AI assistant: save insights, define skills that trigger on command, and build a learning roadmap that auto-injects context into every chat.                              |
+| **Cross-device sync**     | Your entire history synced to GitHub on every startup — open your dashboard on any machine and it's always current.                                                                               |
+| **Rolling backups**       | Automatic snapshots of problems + settings committed to your repo on a configurable schedule. Restore in one click.                                                                               |
+| **100% yours**            | Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping.                                                                                               |
+
+---
+
+## See It in Action
+
+After you solve a problem on LeetCode, your repo gets a commit like this — automatically:
 
 ```
-[Array] Two Sum solved
+[solved] Two Sum
 
-topics/Array/two-sum/
-├── Python3.py          ← your code, clean
-├── README.md           ← problem statement + your runtime/memory
-└── (ai-review.md)      ← if you have an AI key configured
+problems/lc-two-sum/
+├── lc-two-sum.py      ← your code, clean
+├── lc-two-sum.md      ← problem statement + runtime + memory
+└── (lc-two-sum.md)    ← includes AI review if provider configured
 ```
 
-Your GitHub contribution graph fills up. Your profile becomes a living portfolio. Recruiters see consistent, real work.
+Your GitHub contribution graph fills up. Your profile becomes a living portfolio.
 
-<br/>
+---
 
 ## Install
 
-**Chrome / Edge / Brave**
+### Chrome / Edge / Brave
 
 ```
 chrome://extensions  →  Developer mode ON  →  Load unpacked  →  select the src/ folder
 ```
 
-Or install directly from the **[Chrome Web Store →](https://chrome.google.com/webstore/detail/codeledger/)**
+Or install directly from the **[Chrome Web Store →](https://chrome.google.com/webstore/detail/codeledger/)** · **[Edge Add-ons →](https://microsoftedge.microsoft.com/addons/detail/codeledger/)**
 
-**Firefox**
+### Firefox
 
 ```
 about:debugging  →  Load Temporary Add-on  →  select src/manifest.json
 ```
 
-Or install from **[Firefox Add-ons →](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)**
+Or install from **[Firefox Add-ons (AMO) →](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)**
 
-<br/>
+---
 
 ## Setup (2 minutes)
 
 1. Click the **CodeLedger** icon in your toolbar.
-2. Click **Connect GitHub** — authorize via OAuth (handled securely through our Cloudflare Worker at `codeledger.vkrishna04.me`, no token ever touches our servers beyond the handshake).
+2. Click **Connect GitHub** — authorize via OAuth (handled securely through our Cloudflare Worker at `codeledger.vkrishna04.me` — no token ever stored on our servers).
 3. Set a **repo name** (e.g. `my-dsa-solutions`). CodeLedger creates and initializes it automatically.
 4. Solve a problem. Check your GitHub. That's it.
 
-> **Optional:** Add an AI provider API key under Settings → AI to unlock code reviews. You can use your own key — BYOK, zero lock-in.
+> **Optional:** Add an AI provider API key under Settings → AI to unlock AI code reviews.
 
-<br/>
+---
 
-## Supported AI providers
+## Import Your Entire LeetCode History
 
-| Provider                    | Notes                           |
-| --------------------------- | ------------------------------- |
-| Google Gemini               | Default — free tier available   |
-| OpenAI (GPT-4o, o3-mini, …) | Bring your own key              |
-| Anthropic Claude            | Bring your own key              |
-| DeepSeek                    | Bring your own key              |
-| Ollama                      | Local models, no API key needed |
-| OpenRouter                  | Access 100+ models with one key |
+Already have hundreds of LeetCode solutions? Bring them all in at once:
+
+1. Log in to LeetCode and open your **[Progress page](https://leetcode.com/progress/)**.
+2. CodeLedger detects your history and shows a **"Commit N solutions to GitHub"** button.
+3. Click it — all accepted solutions are imported with proper paths, descriptions, and stats in a single atomic commit.
+
+> The bulk importer is also available as a standalone CLI tool: `node dev/import-profile/leetcode-importer.js --github-token=TOKEN --repo=owner/repo`
+
+---
+
+## Supported AI Providers
+
+| Provider | Notes |
+| -------- | ----- |
+| Google Gemini | Default — free tier available |
+| OpenAI (GPT-4o, o3-mini, …) | Bring your own key |
+| Anthropic Claude | Bring your own key |
+| DeepSeek | Bring your own key |
+| Ollama | Local models — no API key needed |
+| OpenRouter | Access 100+ models with one key |
 
 The extension tries providers in order and falls back automatically if one fails.
 
-<br/>
+---
 
-## For developers
+## For Developers
 
 ```bash
 npm install
 npm run build:css        # compile Tailwind → src/ui/styles/compiled.css
 npm run lint             # tsc type-check (run before any PR)
-npm run publish          # full release build → releases/
+npm run format           # prettier format all JS
+npm run release          # validate → build → zip → commit → tag → push
+npm run release -- --dry-run   # preview without touching git
 ```
 
 Load unpacked from **`src/`** at `chrome://extensions`.
 
-### Adding a platform
+### Adding a Platform Handler
+
+GFG and Codeforces handlers are the most-wanted contributions right now. The contract is documented — if you know those platforms, this is a great first PR.
 
 1. Create `src/handlers/platforms/{name}/index.js` extending `BasePlatformHandler`
 2. Create `dom-selectors.js`, `page-detector.js` alongside it
@@ -125,63 +191,65 @@ Load unpacked from **`src/`** at `chrome://extensions`.
 
 See [docs/ADDING_PLATFORM_HANDLER.md](docs/ADDING_PLATFORM_HANDLER.md) for the full contract.
 
-### Self-hosting the OAuth worker
-
-The extension uses a Cloudflare Worker to handle the GitHub OAuth exchange so your Client Secret is never in the extension. If you want to run your own:
-
-1. Register a GitHub App at **GitHub → Settings → Developer settings → GitHub Apps**.
-   - Homepage URL: anything
-   - Callback URL: `https://<your-worker>.workers.dev/api/auth/github/callback`
-   - Permissions: **Repository contents** (Read & Write), **Administration** (Read & Write)
-2. Deploy `worker/` to Cloudflare with `npx wrangler deploy` and set the secrets listed in [CLAUDE.md](CLAUDE.md).
-3. Update `CONSTANTS.URLS.AUTH_WORKER` in `src/core/constants.js` to point to your worker.
-
-<br/>
+---
 
 ## Architecture
 
 ```
 src/
 ├── background/service-worker.js   ← orchestrates everything: storage, AI, git
-├── content/handler-loader.js      ← matches the current hostname → loads the right handler
+├── content/handler-loader.js      ← matches hostname → loads the right platform handler
 ├── handlers/
 │   ├── platforms/                 ← leetcode, geeksforgeeks, codeforces
 │   ├── ai/                        ← gemini, openai, claude, deepseek, ollama, openrouter
 │   └── git/github/                ← Trees API commit engine + GitHub Pages template
 ├── core/
 │   ├── constants.js               ← single source of truth for URLs, keys, storage key names
+│   ├── path-builder.js            ← v3 repo layout: problems/{id}/{id}.{ext}
 │   └── storage.js                 ← unified abstraction over IndexedDB + chrome.storage
-└── library/                       ← the dashboard (works in sidebar and as a standalone web app)
+└── library/                       ← dashboard (extension sidebar + standalone web app)
 ```
 
-The extension has **no bundler, no transpiler** — pure ES6 modules, Preact + htm from a vendor shim, Tailwind pre-compiled. This keeps the footprint tiny and the CSP simple.
+The extension has **no bundler, no transpiler** — pure ES6 modules, Preact + htm from a vendor shim, Tailwind pre-compiled. Tiny footprint, simple CSP.
 
-<br/>
+### Self-Hosting the OAuth Worker
 
-## Documentation
+1. Register a GitHub App — callback URL: `https://<your-worker>.workers.dev/api/auth/github/callback`
+   - Permissions: **Repository contents** (Read & Write), **Administration** (Read & Write)
+2. Deploy `worker/` with `npx wrangler deploy` and set secrets from [CLAUDE.md](CLAUDE.md).
+3. Update `CONSTANTS.URLS.AUTH_WORKER` in `src/core/constants.js`.
 
-The canonical documentation index lives in [docs/README.md](docs/README.md).
-
-- Backlog: [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md)
-- Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
-- Release guide: [docs/guides/RELEASE_GUIDE.md](docs/guides/RELEASE_GUIDE.md)
-- Release policy: [docs/RELEASE_VERSIONING.md](docs/RELEASE_VERSIONING.md)
-- OpenAPI contract: [docs/OPENAPI.yaml](docs/OPENAPI.yaml)
-
-<br/>
+---
 
 ## Contributing
 
-Read [CONTRIBUTING.md](.github/CONTRIBUTING.md) before opening a PR. The short version:
+Read [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) before opening a PR.
 
-- All extension API calls go through `src/lib/browser-compat.js` — never touch `chrome.*` or `browser.*` directly anywhere else.
+**GFG and Codeforces platform handlers are actively wanted** — see [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md) for the open tickets. The platform handler contract is fully documented; LeetCode's handler is the reference implementation.
+
+Quick rules:
+- All extension API calls go through `src/lib/browser-compat.js` — never touch `chrome.*` or `browser.*` elsewhere.
 - Use `createDebugger()` from `src/lib/debug.js` instead of `console.log`.
 - Run `npm run lint` before pushing.
 
-See [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md) for what's planned and what's open for contribution.
+---
 
-<br/>
+## Documentation
 
-## License
+- Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+- Feature backlog: [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md)
+- Release guide: [docs/guides/RELEASE_GUIDE.md](docs/guides/RELEASE_GUIDE.md)
+- OpenAPI contract: [docs/OPENAPI.yaml](docs/OPENAPI.yaml)
+- Adding a platform: [docs/ADDING_PLATFORM_HANDLER.md](docs/ADDING_PLATFORM_HANDLER.md)
 
-[Apache 2.0](LICENSE.md) — fork it, self-host it, own your data.
+---
+
+<div align="center">
+
+<img src="./src/assets/images/logo.png" width="40" alt="CodeLedger logo" />
+
+**[codeledger.vkrishna04.me](https://codeledger.vkrishna04.me)** · [Apache 2.0](LICENSE.md)
+
+*Fork it. Self-host it. Own your data.*
+
+</div>

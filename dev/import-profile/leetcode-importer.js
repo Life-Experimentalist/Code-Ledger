@@ -71,6 +71,8 @@ const LANG_EXT = {
   kotlin: "kt", scala: "scala", rust: "rs", php: "php",
   csharp: "cs", "c#": "cs", dart: "dart",
   mysql: "sql", postgresql: "sql", bash: "sh",
+  // LeetCode uses "pythondata" as the internal lang slug for Pandas submissions
+  pythondata: "py", pandas: "py",
 };
 
 function langExt(name = "") {
@@ -338,54 +340,72 @@ async function run() {
       const questionRes = await gql(page, QUESTION_QUERY, { titleSlug: p.titleSlug });
       const question    = questionRes?.data?.question;
 
-      const langVerbose = detail.lang?.verboseName || detail.lang?.name || p.lang || "Solution";
-      const ext         = langExt(detail.lang?.name || p.lang);
-      const topic       = question?.topicTags?.[0]?.name || "Uncategorized";
+      const langName    = detail.lang?.name || p.lang || "";
+      const ext         = langExt(langName);
       const title       = question?.title || p.titleSlug;
-      const base        = `topics/${topic}/${p.titleSlug}/`;
+      const pid         = `lc-${p.titleSlug}`;
+      const base        = `problems/${pid}/`;
 
       files.push({
-        path:    `${base}${langVerbose.replace(/\s+/g, "_")}.${ext}`,
+        path:    `${base}${pid}.${ext}`,
         content: detail.code,
       });
 
-      if (question?.content) {
-        const stats = [
-          detail.runtimeDisplay  ? `- Runtime: ${detail.runtimeDisplay}${detail.runtimePercentile ? ` (beats ${detail.runtimePercentile.toFixed(1)}%)` : ""}` : "",
-          detail.memoryDisplay   ? `- Memory: ${detail.memoryDisplay}${detail.memoryPercentile   ? ` (beats ${detail.memoryPercentile.toFixed(1)}%)`  : ""}` : "",
-        ].filter(Boolean).join("\n");
+      // Always write a description file (even without question metadata)
+      {
+        const tags    = (question?.topicTags || []).map((t) => t.name);
+        const rows    = [
+          `| Difficulty | ${question?.difficulty || "?"} |`,
+          `| Platform   | LeetCode |`,
+          `| Problem ID | \`${pid}\` |`,
+          tags.length ? `| Topics     | ${tags.join(", ")} |` : null,
+          `| Solved     | ${new Date(detail.timestamp * 1000).toISOString().slice(0, 10)} |`,
+          detail.runtimeDisplay
+            ? `| Runtime    | ${detail.runtimeDisplay}${detail.runtimePercentile ? ` (beats ${detail.runtimePercentile.toFixed(1)}%)` : ""} |`
+            : null,
+          detail.memoryDisplay
+            ? `| Memory     | ${detail.memoryDisplay}${detail.memoryPercentile ? ` (beats ${detail.memoryPercentile.toFixed(1)}%)` : ""} |`
+            : null,
+        ].filter(Boolean);
 
-        const similar = (question.similarQuestionList || [])
+        const stmtRaw = question?.content
+          ? question.content
+              .replace(/<br\s*\/?>/gi, "\n")
+              .replace(/<\/p>/gi, "\n\n")
+              .replace(/<p[^>]*>/gi, "")
+              .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**")
+              .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "`$1`")
+              .replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, "\n```\n$1\n```\n")
+              .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
+              .replace(/<[^>]+>/g, "")
+              .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+              .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+              .replace(/\n{3,}/g, "\n\n")
+              .trim()
+          : null;
+
+        const similar = (question?.similarQuestionList || [])
           .filter((q) => !q.isPaidOnly)
           .slice(0, 5)
           .map((q) => `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`)
           .join("\n");
 
         files.push({
-          path: `${base}README.md`,
+          path: `${base}${pid}.md`,
           content: [
-            `# ${question.questionFrontendId ? `[${question.questionFrontendId}] ` : ""}${title}`,
+            `# ${question?.questionFrontendId ? `[${question.questionFrontendId}] ` : ""}${title}`,
             "",
-            `**Difficulty:** ${question.difficulty || "?"}  |  **Acceptance:** ${question.acRate ? question.acRate.toFixed(1) + "%" : "?"}`,
+            "| Field | Value |",
+            "|-------|-------|",
+            ...rows,
             "",
-            `**Tags:** ${(question.topicTags || []).map((t) => `\`${t.name}\``).join(", ") || "—"}`,
-            "",
-            "## Problem",
-            "",
-            question.content
-              .replace(/<[^>]+>/g, "")
-              .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
-              .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
-              .replace(/\n{3,}/g, "\n\n")
-              .trim(),
-            "",
-            stats ? `## My Submission\n\n${stats}\n` : "",
+            stmtRaw ? `## Problem Statement\n\n${stmtRaw}\n` : "",
             similar ? `## Similar Problems\n\n${similar}\n` : "",
-          ].filter(Boolean).join("\n"),
+          ].filter((l) => l !== null && l !== undefined).join("\n"),
         });
       }
 
-      console.log(`done (${langVerbose})`);
+      console.log(`done (${langName})`);
     } catch (e) {
       console.log(`failed: ${e.message || e}`);
     }

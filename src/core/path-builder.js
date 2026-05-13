@@ -2,202 +2,233 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * Centralised problem-path computation — layout v2.
+ * path-builder.js — Layout v3 problem-path computation.
  *
- * No canonical:   problems/{slug}/{slug}.{ext}
- * With canonical: problems/{slug}/{platform}/{slug}.{ext}
- * README:         problems/{slug}/README.md   (always, no platform subdir)
- * Hints:          problems/{slug}/hints.md    (always, no platform subdir)
+ * With canonical:    problems/{canonicalId}/{platform}/{platformId}[-{method}].{ext}
+ *                    problems/{canonicalId}/{platform}/{platformId}.md
+ * Without canonical: problems/{platformId}/{platformId}[-{method}].{ext}
+ *                    problems/{platformId}/{platformId}.md
+ *
+ * platformId = {prefix}-{id}  e.g. lc-1, lc-two-sum, gfg-reverse-string
  */
+// @ts-nocheck
+
+import { CONSTANTS } from "./constants.js";
 
 /** Increment when the directory layout changes. Stored in index.json. */
-export const LAYOUT_VERSION = 2;
+export const LAYOUT_VERSION = 3;
 
-/** Base directory for a problem. Directory name is always id (or canonicalId if set). */
-export function problemBase(id, canonical, settings = {}) {
-    const root = CONSTANTS.PROBLEMS_DIR_DEFAULT.replace(/\/+$/, "");
-    const dir = canonical?.canonicalId || id;
-    return `${root}/${dir}`;
+/** Root directory for all problems in the user repo. Fixed — never changes. */
+export const PROBLEMS_ROOT = "problems";
+
+// ── Path helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Build the platform-prefixed problem ID string, e.g. "lc-1" or "gfg-two-sum".
+ * Idempotent: if id already starts with the prefix, returns it unchanged.
+ */
+export function platformId(platform, id) {
+    const prefix = CONSTANTS.PLATFORM_CODE[platform] || String(platform).slice(0, 3).toLowerCase();
+    const s = String(id);
+    if (s.startsWith(`${prefix}-`)) return s;
+    return `${prefix}-${s}`;
 }
 
 /**
- * Full path for the solution file.
+ * Top-level directory for a problem (shared across platforms for canonical).
  *
- * canonical present  → base/{platform}/{slug}.{ext}   (platform subdir for multi-platform problems)
- * canonical absent   → base/{slug}.{ext}              (no subdir — single platform only)
+ * With canonical:    problems/{canonicalId}
+ * Without canonical: problems/{platformId}   e.g. problems/lc-two-sum
  *
- * The file is ALWAYS named after the problem slug, not the language verbose name.
- * Multiple languages for the same problem produce sibling files: two-sum.py, two-sum.js.
+ * Used for shared files: notes.md, ai-chats/, etc.
+ *
+ * @param {string} id         Platform-scoped problem ID (e.g. "1", "two-sum")
+ * @param {object} [canonical] { canonicalId: string } if resolved
+ * @param {object} [_settings] Reserved
+ * @param {string} [platform]  Platform name — required when canonical is absent
  */
-export function solutionPath(
-    id,
-    platform,
-    lang,
-    canonical,
-    settings = {},
-    methodTitle = ""
-) {
-    const base = problemBase(id, canonical, settings);
-    const slug = canonical?.canonicalId || id;
-    const ext = lang.ext || "txt";
-    const sanitized = String(methodTitle || "")
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "");
-    const method = sanitized ? "-" + sanitized : "";
-    const fileName = `${slug}${method}.${ext}`;
+export function problemBase(id, canonical, _settings = {}, platform = "") {
+    if (canonical?.canonicalId) return `${PROBLEMS_ROOT}/${canonical.canonicalId}`;
+    const pid = platform ? platformId(platform, id) : id;
+    return `${PROBLEMS_ROOT}/${pid}`;
+}
+
+/**
+ * Directory where solution + description files live.
+ *
+ * With canonical:    problems/{canonicalId}/{platform}
+ * Without canonical: problems/{platformId}
+ */
+export function problemDir(id, platform, canonical) {
+    const platId = platformId(platform, id);
     if (canonical?.canonicalId) {
-        return `${base}/${platform}/${fileName}`;
+        return `${PROBLEMS_ROOT}/${canonical.canonicalId}/${platform}`;
     }
-    return `${base}/${fileName}`;
-}
-
-/** README is always at the problem base, never inside a platform subdir. */
-export function readmePath(id, canonical, settings = {}) {
-    return `${problemBase(id, canonical, settings)}/README.md`;
-}
-
-/** Hints file is always at the problem base, never inside a platform subdir. */
-export function hintsPath(id, canonical, settings = {}) {
-    return `${problemBase(id, canonical, settings)}/hints.md`;
+    return `${PROBLEMS_ROOT}/${platId}`;
 }
 
 /**
- * Build the complete file list for a solved problem from its stored record.
- * Used by service-worker for resync/pending commits.
+ * Full path for a solution file.
  *
- * Includes: code, README, hints, and a metadata JSON file with AI review, tags, difficulty, etc.
+ * Filename is always {platformId}[-{method}].{ext}
+ * e.g. problems/two-sum/leetcode/lc-two-sum.py
+ *      problems/lc-two-sum/lc-two-sum-greedy.py
  *
- * @param {object} problem  — stored problem record
- * @param {object} settings — user settings
- * @returns {Array<{path: string, content: string}>}
+ * @param {string} id           Platform-scoped problem ID (e.g. "1" or "two-sum")
+ * @param {string} platform     Platform name (e.g. "leetcode")
+ * @param {object} lang         { ext: string, name?: string }
+ * @param {object} [canonical]  { canonicalId: string } if resolved
+ * @param {object} [_settings]  Reserved for future use
+ * @param {string} [methodTitle] Optional approach title (e.g. "greedy")
  */
-export function buildProblemFiles(problem, settings = {}) {
-    if (Array.isArray(problem?.files) && problem.files.length > 0) {
-        // Use pre-built files array, but also add metadata if available
-        const files = problem.files
-            .filter(
-                (f) =>
-                    f &&
-                    typeof f.path === "string" &&
-                    typeof f.content === "string"
-            )
-            .map((f) => ({ path: f.path, content: f.content }));
+export function solutionPath(id, platform, lang, canonical, _settings = {}, methodTitle = "") {
+    const dir = problemDir(id, platform, canonical);
+    const pid = platformId(platform, id);
+    const ext = lang?.ext || "txt";
+    const method = _safeMethod(methodTitle);
+    return `${dir}/${pid}${method ? `-${method}` : ""}.${ext}`;
+}
 
-        // Add metadata file
-        if (
-            problem.aiReview ||
-            problem.tags ||
-            problem.difficulty ||
-            Array.isArray(problem.methods)
-        ) {
-            const meta = {
-                id: problem.id || problem.titleSlug,
-                title: problem.title,
-                platform: problem.platform,
-                difficulty: problem.difficulty,
-                tags: problem.tags || [],
-                aiReview: problem.aiReview || null,
-                timestamp: problem.timestamp,
-                elapsedSeconds: problem.elapsedSeconds || 0,
-                isDuplicate: problem.isDuplicate || false,
-                duplicateOf: problem.duplicateOf || null,
-                methods: Array.isArray(problem.methods)
-                    ? problem.methods.map((m) => ({
-                          title: m.title,
-                          language: m.language,
-                          description: m.description || "",
-                          timestamp: m.timestamp,
-                      }))
-                    : [],
-            };
-            const base = problemBase(
-                problem.id || problem.titleSlug,
-                problem.canonical,
-                settings
-            );
-            files.push({
-                path: `${base}/.meta.json`,
-                content: JSON.stringify(meta, null, 2),
-            });
-        }
-        return files;
+/**
+ * Path for the per-platform markdown file (description + AI review + solve info).
+ * Always {platformId}.md inside the platform directory.
+ */
+export function descriptionPath(id, platform, canonical) {
+    const dir = problemDir(id, platform, canonical);
+    const pid = platformId(platform, id);
+    return `${dir}/${pid}.md`;
+}
+
+/** Backwards-compat alias. New code should use descriptionPath(). */
+export function readmePath(id, canonical, _settings = {}, platform = "") {
+    const dir = problemBase(id, canonical, _settings, platform);
+    return `${dir}/README.md`;
+}
+
+/** Backwards-compat alias. New code should use descriptionPath(). */
+export function hintsPath(id, canonical, _settings = {}, platform = "") {
+    return readmePath(id, canonical, _settings, platform);
+}
+
+// ── Markdown builder ──────────────────────────────────────────────────────────
+
+/**
+ * Build rich markdown content for a problem.
+ * Covers: metadata table, problem statement, code approaches, AI review, notes.
+ */
+export function buildProblemMarkdown(problem) {
+    const platform = problem.platform || "unknown";
+    const id = problem.id || problem.titleSlug || "unknown";
+    const pid = platformId(platform, id);
+    const approaches = _collectApproaches(problem);
+
+    const lines = [];
+
+    lines.push(`# ${problem.title || pid}`);
+    lines.push("");
+
+    // Metadata table
+    const rows = [];
+    if (problem.difficulty) rows.push(`| Difficulty | ${problem.difficulty} |`);
+    if (platform !== "unknown") rows.push(`| Platform | ${_capitalise(platform)} |`);
+    rows.push(`| Problem ID | \`${pid}\` |`);
+    if (problem.tags?.length) rows.push(`| Topics | ${problem.tags.join(", ")} |`);
+    if (problem.timestamp) rows.push(`| Solved | ${new Date(problem.timestamp).toISOString().slice(0, 10)} |`);
+    if (problem.elapsedSeconds) rows.push(`| Solve Time | ${_formatTime(problem.elapsedSeconds)} |`);
+    if (problem.runtime) rows.push(`| Runtime | ${problem.runtime}${problem.runtimePct ? ` (beats ${problem.runtimePct}%)` : ""} |`);
+    if (problem.memory) rows.push(`| Memory | ${problem.memory}${problem.memoryPct ? ` (beats ${problem.memoryPct}%)` : ""} |`);
+
+    if (rows.length) {
+        lines.push("| Field | Value |");
+        lines.push("|-------|-------|");
+        lines.push(...rows);
+        lines.push("");
     }
 
+    // Problem statement
+    const stmt = problem.description || problem.problemStatement;
+    if (stmt) {
+        lines.push("## Problem Statement");
+        lines.push("");
+        lines.push(_htmlToMarkdown(stmt));
+        lines.push("");
+    }
+
+    // Code approaches
+    if (approaches.length > 0) {
+        lines.push("## Solutions");
+        lines.push("");
+        for (let i = 0; i < approaches.length; i++) {
+            const a = approaches[i];
+            const heading = a.title || (approaches.length > 1 ? `Approach ${i + 1}` : "");
+            if (heading) {
+                lines.push(`### ${heading}`);
+                lines.push("");
+            }
+            if (a.description) {
+                lines.push(a.description);
+                lines.push("");
+            }
+            if (a.code) {
+                lines.push("```" + (a.langName || ""));
+                lines.push(a.code);
+                lines.push("```");
+                lines.push("");
+            }
+        }
+    }
+
+    // AI review
+    if (problem.aiReview) {
+        lines.push("## AI Review");
+        lines.push("");
+        lines.push(problem.aiReview);
+        lines.push("");
+    }
+
+    // Notes
+    if (problem.notes) {
+        lines.push("## Notes");
+        lines.push("");
+        lines.push(problem.notes);
+        lines.push("");
+    }
+
+    return lines.join("\n");
+}
+
+// ── File builder ──────────────────────────────────────────────────────────────
+
+/**
+ * Build the complete file list for a solved problem.
+ * Always recomputes from stored fields — never uses a pre-built files array.
+ *
+ * @param {object} problem   Stored problem record
+ * @param {object} [_settings]  Reserved for future use
+ * @returns {Array<{path:string, content:string}>}
+ */
+export function buildProblemFiles(problem, _settings = {}) {
     const canonical = problem.canonical || null;
-    const lang = problem.lang || {
-        verbose: "Solution",
-        name: "solution",
-        ext: "txt",
-    };
-    const ext = lang.ext || "txt";
-    const normalLang = {
-        verbose: lang.verbose || lang.name || "Solution",
-        name: lang.name || "solution",
-        ext,
-    };
-    const id = problem.id || problem.titleSlug || "unknown"; // platform-scoped
+    const platform = problem.platform || "unknown";
+    const id = problem.id || problem.titleSlug || "unknown";
+    const approaches = _collectApproaches(problem);
+
     const files = [];
 
-    if (problem.code) {
+    for (const approach of approaches) {
+        if (!approach.code) continue;
+        const lang = _normLangObj(approach.lang || problem.lang);
         files.push({
-            path: solutionPath(
-                id,
-                problem.platform || "unknown",
-                normalLang,
-                canonical,
-                settings,
-                problem.methodTitle
-            ),
-            content: problem.code,
-        });
-    }
-    if (problem.readmeContent) {
-        files.push({
-            path: readmePath(id, canonical, settings),
-            content: problem.readmeContent,
-        });
-    }
-    if (problem.hintsContent) {
-        files.push({
-            path: hintsPath(id, canonical, settings),
-            content: problem.hintsContent,
+            path: solutionPath(id, platform, lang, canonical, {}, approach.title || ""),
+            content: approach.code,
         });
     }
 
-    // Add metadata file with AI review and other metadata
-    if (
-        problem.aiReview ||
-        problem.tags ||
-        problem.difficulty ||
-        Array.isArray(problem.methods)
-    ) {
-        const meta = {
-            id: problem.id || problem.titleSlug,
-            title: problem.title,
-            platform: problem.platform,
-            difficulty: problem.difficulty,
-            tags: problem.tags || [],
-            aiReview: problem.aiReview || null,
-            timestamp: problem.timestamp,
-            elapsedSeconds: problem.elapsedSeconds || 0,
-            isDuplicate: problem.isDuplicate || false,
-            duplicateOf: problem.duplicateOf || null,
-            methods: Array.isArray(problem.methods)
-                ? problem.methods.map((m) => ({
-                      title: m.title,
-                      language: m.language,
-                      description: m.description || "",
-                      timestamp: m.timestamp,
-                  }))
-                : [],
-        };
-        const base = problemBase(id, canonical, settings);
-        files.push({
-            path: `${base}/.meta.json`,
-            content: JSON.stringify(meta, null, 2),
-        });
-    }
+    // One markdown file per platform directory
+    files.push({
+        path: descriptionPath(id, platform, canonical),
+        content: buildProblemMarkdown(problem),
+    });
 
     return files;
 }
@@ -208,6 +239,81 @@ export function buildProblemFiles(problem, settings = {}) {
  */
 export function rebasePath(oldPath, oldBase, newBase) {
     if (!oldPath.startsWith(oldBase + "/")) return oldPath;
-    const rel = oldPath.slice(oldBase.length + 1);
-    return `${newBase}/${rel}`;
+    return `${newBase}/${oldPath.slice(oldBase.length + 1)}`;
+}
+
+// ── Private helpers ───────────────────────────────────────────────────────────
+
+function _collectApproaches(problem) {
+    if (Array.isArray(problem.methods) && problem.methods.length > 0) {
+        return problem.methods.map((m) => ({
+            title: m.title || "",
+            description: m.description || "",
+            code: m.code || "",
+            lang: m.lang || problem.lang,
+            langName: _normLangObj(m.lang || problem.lang).name,
+        }));
+    }
+    if (problem.code) {
+        return [{
+            title: problem.methodTitle || "",
+            description: "",
+            code: problem.code,
+            lang: problem.lang,
+            langName: _normLangObj(problem.lang).name,
+        }];
+    }
+    return [];
+}
+
+function _normLangObj(lang) {
+    if (!lang) return { ext: "txt", name: "text" };
+    if (typeof lang === "string") return { ext: lang, name: lang };
+    return { ext: lang.ext || "txt", name: lang.name || lang.verbose || lang.slug || "text" };
+}
+
+function _safeMethod(title) {
+    return String(title || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+
+function _capitalise(str) {
+    return String(str || "").charAt(0).toUpperCase() + String(str || "").slice(1);
+}
+
+function _formatTime(seconds) {
+    if (!seconds) return "0s";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function _htmlToMarkdown(html) {
+    if (!html) return "";
+    return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n\n")
+        .replace(/<p[^>]*>/gi, "")
+        .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**")
+        .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**")
+        .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "_$1_")
+        .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "_$1_")
+        .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "`$1`")
+        .replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, "\n```\n$1\n```\n")
+        .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
+        .replace(/<[uo]l[^>]*>|<\/[uo]l>/gi, "")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
 }

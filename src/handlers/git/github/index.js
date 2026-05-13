@@ -72,7 +72,7 @@ export class GitHubHandler extends BaseGitHandler {
                     type: "toggle",
                     default: true,
                     description:
-                        "Serve a public stats page at {owner}.github.io/{repo}/ — enabled automatically when creating a new repo.",
+                        "Serve a public stats page at {owner}.github.io/{repo}/ or at custom domain — enabled automatically when creating a new repo.",
                     advanced: true,
                 },
                 {
@@ -167,24 +167,32 @@ export class GitHubHandler extends BaseGitHandler {
         let latestSha;
         let isNewRepo = false;
 
-        try {
-            const ref = await api.getRepoRef(owner, name, BRANCH, token);
-            latestSha = ref.object.sha;
-            dbg.log(`commit(): branch HEAD = ${latestSha.slice(0, 7)}`);
-        } catch (err) {
-            if (err.status !== 404) throw err;
+        if (opts.knownParentSha) {
+            // Caller tracked the last commit SHA — skip the round-trip to GitHub.
+            // This prevents 422 "not a fast-forward" during sequential individual
+            // commits where GitHub's ref propagation hasn't caught up yet.
+            latestSha = opts.knownParentSha;
+            dbg.log(`commit(): using caller-provided parent ${latestSha.slice(0, 7)}`);
+        } else {
+            try {
+                const ref = await api.getRepoRef(owner, name, BRANCH, token);
+                latestSha = ref.object.sha;
+                dbg.log(`commit(): branch HEAD = ${latestSha.slice(0, 7)}`);
+            } catch (err) {
+                if (err.status !== 404) throw err;
 
-            dbg.log(`commit(): repo not found — creating ${owner}/${name}…`);
-            await api.createRepository(name, token);
-            isNewRepo = true;
+                dbg.log(`commit(): repo not found — creating ${owner}/${name}…`);
+                await api.createRepository(name, token);
+                isNewRepo = true;
 
-            // GitHub needs a moment after auto_init to create the initial commit
-            await _sleep(NEW_REPO_WAIT_MS);
-            await this._configureRepo(owner, name, token, settings);
+                // GitHub needs a moment after auto_init to create the initial commit
+                await _sleep(NEW_REPO_WAIT_MS);
+                await this._configureRepo(owner, name, token, settings);
 
-            const ref = await api.getRepoRef(owner, name, BRANCH, token);
-            latestSha = ref.object.sha;
-            dbg.log(`commit(): new repo HEAD = ${latestSha.slice(0, 7)}`);
+                const ref = await api.getRepoRef(owner, name, BRANCH, token);
+                latestSha = ref.object.sha;
+                dbg.log(`commit(): new repo HEAD = ${latestSha.slice(0, 7)}`);
+            }
         }
 
         // ── Build tree ────────────────────────────────────────────────────────
@@ -205,12 +213,36 @@ export class GitHubHandler extends BaseGitHandler {
         dbg.log(`commit(): tree ${treeRes.sha.slice(0, 7)}`);
 
         const commitMsg = this._withOptionalCoAuthor(message, settings);
-        const commitPayload = buildCommitPayload(commitMsg, treeRes.sha, latestSha, opts, userRes);
 
-        const commitRes = await api.createCommit(owner, name, commitPayload, token);
-        dbg.log(`commit(): commit ${commitRes.sha.slice(0, 7)}`);
+        // ── Push commit with up to 3 attempts on 422 non-fast-forward ─────────
+        // GitHub's distributed ref store can lag across edge nodes: the node that
+        // accepted updateRef(sha_N) may not be the one we hit for the next call,
+        // so it still sees the old HEAD and rejects a fast-forward.  Fetching a
+        // fresh ref and rebuilding the commit on each 422 lets the system catch up.
+        let parentSha = latestSha;
+        let currentTreeSha = treeRes.sha;
+        let commitRes;
 
-        await api.updateRef(owner, name, BRANCH, commitRes.sha, token);
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const payload = buildCommitPayload(commitMsg, currentTreeSha, parentSha, opts, userRes);
+            commitRes = await api.createCommit(owner, name, payload, token);
+            dbg.log(`commit(): commit ${commitRes.sha.slice(0, 7)} (attempt ${attempt + 1})`);
+
+            try {
+                await api.updateRef(owner, name, BRANCH, commitRes.sha, token);
+                break; // success
+            } catch (refErr) {
+                if (refErr.status !== 422 || attempt === 2) throw refErr;
+                dbg.warn(`commit(): 422 non-fast-forward (attempt ${attempt + 1}) — refreshing ref`);
+                await _sleep(500 * (attempt + 1)); // 500ms, then 1000ms
+                const freshRef = await api.getRepoRef(owner, name, BRANCH, token);
+                parentSha = freshRef.object.sha;
+                const freshCommit = await api.getCommit(owner, name, parentSha, token);
+                const retryTree = await api.createTree(owner, name, treeItems, freshCommit.tree.sha, token);
+                currentTreeSha = retryTree.sha;
+            }
+        }
+
         dbg.log(`commit(): ✅ ${owner}/${name} @ ${BRANCH}`);
 
         // Enable Pages on new repo — fire-and-forget
@@ -219,6 +251,8 @@ export class GitHubHandler extends BaseGitHandler {
                 .then(() => dbg.log(`commit(): GitHub Pages enabled`))
                 .catch((e) => dbg.warn(`commit(): Pages enable failed (non-fatal):`, e.message));
         }
+
+        return commitRes.sha;
     }
 
     // ── Historical commit helper ──────────────────────────────────────────────

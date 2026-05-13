@@ -817,7 +817,7 @@ export function PanelBackups({ settings, onSettingsChange }) {
     const [activeTab, setActiveTab] = useState("manual");
 
     return html`
-        <div class="space-y-5 max-w-xl">
+        <div class="space-y-5 w-full">
             <div>
                 <h2 class="text-base font-semibold text-white mb-1">Backups</h2>
                 <p class="text-xs text-slate-500 mb-1">

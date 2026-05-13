@@ -186,7 +186,7 @@ export function PanelBehaviorBank() {
     };
 
     return html`
-        <div class="flex flex-col gap-6 w-full max-w-4xl">
+        <div class="flex flex-col gap-6 w-full">
             <!-- Header -->
             <div class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl">
                 <h2 class="text-xl font-light text-white mb-1">

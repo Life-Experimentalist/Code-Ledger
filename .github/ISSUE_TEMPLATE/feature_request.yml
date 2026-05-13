@@ -1,0 +1,60 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+    - type: dropdown
+      id: area
+      attributes:
+          label: Feature area
+          options:
+              - Platform handler (LeetCode)
+              - Platform handler (GeeksForGeeks) — wanted
+              - Platform handler (Codeforces) — wanted
+              - AI review / chat
+              - Analytics / dashboard
+              - GitHub integration
+              - Import / export
+              - Settings / UI
+              - Other
+      validations:
+          required: true
+
+    - type: textarea
+      id: problem
+      attributes:
+          label: What problem does this solve?
+          description: Describe the pain point or gap this feature would address.
+          placeholder: "As a developer who... I find it frustrating that..."
+      validations:
+          required: true
+
+    - type: textarea
+      id: solution
+      attributes:
+          label: Proposed solution
+          description: How would you like it to work? Be as specific as you can.
+      validations:
+          required: true
+
+    - type: textarea
+      id: alternatives
+      attributes:
+          label: Alternatives considered
+          description: Any other approaches you thought of?
+
+    - type: textarea
+      id: acceptance
+      attributes:
+          label: Acceptance criteria
+          description: How would we know this is done?
+          placeholder: |
+              - [ ] ...
+              - [ ] ...
+
+    - type: checkboxes
+      id: contribution
+      attributes:
+          label: Would you like to implement this?
+          options:
+              - label: Yes, I'd like to open a PR for this

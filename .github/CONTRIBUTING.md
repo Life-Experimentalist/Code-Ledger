@@ -82,12 +82,16 @@ npx wrangler dev    # local dev — requires wrangler.toml with secrets (see doc
 
 ## Adding a platform handler
 
+**GeeksForGeeks and Codeforces handlers are the most-wanted contributions right now.** If you know either platform's DOM structure or submission flow, this is a well-scoped, high-impact first PR — the contract is fully documented and LeetCode's handler is the reference implementation.
+
 1. Create `src/handlers/platforms/{name}/index.js` extending `BasePlatformHandler`
 2. Create `dom-selectors.js` with versioned `SELECTORS`, `LEGACY_SELECTORS`, and `DOMAINS` export
 3. Create `page-detector.js` with `detectPage()` and `isSolveCapablePage()`
 4. Add hostname match in `src/content/handler-loader.js`
 5. Run `node dev/generate-manifest-domains.js` to update `manifest.json` `host_permissions`
 6. See `docs/ADDING_PLATFORM_HANDLER.md` for the full contract and checklist
+
+Open tickets for GFG and Codeforces are in `docs/FEATURE_REQUESTS.md` with acceptance criteria.
 
 ---
 

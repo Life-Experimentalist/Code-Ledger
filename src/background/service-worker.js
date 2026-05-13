@@ -53,6 +53,8 @@ import {
     markDone,
     markFailedWithRetry,
     getQueueStats,
+    enqueueReview,
+    cancelPendingReviews,
     RATE_LIMIT_DELAY_MS_EXPORT as REVIEW_RATE_LIMIT_MS,
 } from "../core/ai-review-queue.js";
 import {
@@ -67,10 +69,27 @@ import {
     getAutoToolIds,
 } from "../core/ai/skills-registry.js";
 import { buildKnowledgeContext } from "../core/memory/knowledge-bank.js";
-import { maybeCommitRollingBackup } from "../core/backup/backup-manager.js";
+import {
+    maybeCommitRollingBackup,
+    listBackups,
+    commitBackupToGitHub,
+    fetchBackupSnapshot,
+} from "../core/backup/backup-manager.js";
+import {
+    findDuplicatesForProblem,
+    compareSolutions,
+    mergeSolutions,
+} from "../core/ai-deduplication.js";
+import {
+    apiFetch as ghApiFetch,
+    getCurrentUser as ghGetCurrentUser,
+    getContents as ghGetContents,
+} from "../handlers/git/github/api-client.js";
 
 let _syncAlarmBound = false;
 let _reviewQueueAlarmBound = false;
+let _resyncInProgress = false;
+let _activeSyncPort = null;
 
 const dbg = createDebugger("ServiceWorker");
 
@@ -122,6 +141,8 @@ async function init() {
     chrome.tabs.onRemoved.addListener((tabId) => {
         completeRefreshMetadata(tabId);
     });
+
+    // (onConnect listener registered at top level — see below init())
 
     if (!_syncAlarmBound) {
         _syncAlarmBound = true;
@@ -529,13 +550,13 @@ async function _commitWithFailover(
         dbg.log(
             `_commitWithFailover(): no ordered targets; committing to configured provider ${settings.gitProvider || "github"} repo ${repoName || settings.github_repo || settings.gitRepo}`
         );
-        await git.commit(
+        const newSha = await git.commit(
             files,
             message,
             repoName || settings.github_repo || settings.gitRepo,
             commitOpts
         );
-        return { handler: git, target: null };
+        return { handler: git, target: null, newSha };
     }
 
     let lastErr = null;
@@ -546,7 +567,7 @@ async function _commitWithFailover(
         );
         if (!handler) continue;
         try {
-            await handler.commit(files, message, target.repo, {
+            const newSha = await handler.commit(files, message, target.repo, {
                 ...(commitOpts || {}),
                 ownerOverride: target.owner || undefined,
                 isMirror: false,
@@ -566,7 +587,7 @@ async function _commitWithFailover(
             dbg.log(
                 `_commitWithFailover(): ✓ succeeded to ${target.provider}/${target.owner || ""}/${target.repo}`
             );
-            return { handler, target };
+            return { handler, target, newSha };
         } catch (e) {
             lastErr = e;
             dbg.warn(
@@ -596,7 +617,7 @@ async function _resolveGitHubContext(settings = null) {
 
     let owner = (target.owner || "").trim();
     if (!owner) {
-        const userRes = await git.apiFetch("/user", token);
+        const userRes = await ghGetCurrentUser(token);
         owner = userRes.login;
     }
 
@@ -693,7 +714,8 @@ async function handleSolved(data) {
         const expectedBase = problemBase(
             data.id || data.titleSlug,
             { canonicalId: data.canonical.id },
-            settings
+            settings,
+            data.platform
         );
         if (data._storedBasePath !== expectedBase) {
             await Storage.markRenameNeeded(data.id, {
@@ -739,8 +761,6 @@ async function handleSolved(data) {
 
     // 3c. Auto-merge deduplication: check for same-language solutions and queue for review if similar
     try {
-        const { findDuplicatesForProblem } =
-            await import("../core/ai-deduplication.js");
         const existingProblem = await Storage.getProblem(data.id).catch(
             () => null
         );
@@ -833,7 +853,8 @@ async function handleSolved(data) {
                         const base = problemBase(
                             p.id || p.titleSlug,
                             p.canonical,
-                            settings
+                            settings,
+                            p.platform
                         );
                         const notesPath = `${base}/notes.md`;
                         if (!seenPaths.has(notesPath)) {
@@ -857,7 +878,8 @@ async function handleSolved(data) {
                         const base = problemBase(
                             p.id || p.titleSlug,
                             p.canonical,
-                            settings
+                            settings,
+                            p.platform
                         );
                         if (Array.isArray(chats) && chats.length) {
                             for (const chat of chats) {
@@ -992,6 +1014,7 @@ async function pushToMirrors(
     await Promise.allSettled(
         mirrors.map(async (mirror) => {
             if (!mirror?.repo) return;
+            if (mirror.enabled === false) return;
             const normalized = _normalizeGitTarget(mirror);
             if (
                 normalized &&
@@ -1007,7 +1030,6 @@ async function pushToMirrors(
                 await handler.commit(files, message, mirror.repo, {
                     ...commitOpts,
                     ownerOverride: mirror.owner || undefined,
-                    isMirror: true,
                 });
                 dbg.log(
                     `pushToMirrors(): ✓ mirror commit OK - ${mirror.provider}/${mirror.repo}`
@@ -1036,7 +1058,7 @@ async function performPendingRenames() {
     const token = await git.getToken().catch(() => null);
     if (!token) return;
 
-    const userRes = await git.apiFetch("/user", token).catch(() => null);
+    const userRes = await ghGetCurrentUser(token).catch(() => null);
     const owner = settings.github_owner?.trim() || userRes?.login;
     const repo = (settings.github_repo || settings.gitRepo || "").replace(
         /\s+/g,
@@ -1049,7 +1071,7 @@ async function performPendingRenames() {
 
     for (const r of renames) {
         try {
-            const tree = await git.apiFetch(
+            const tree = await ghApiFetch(
                 `/repos/${owner}/${repo}/git/trees/main?recursive=1`,
                 token
             );
@@ -1058,7 +1080,7 @@ async function performPendingRenames() {
             );
             for (const f of relevant) {
                 const newPath = f.path.replace(r.oldBase, r.newBase);
-                const blob = await git.apiFetch(
+                const blob = await ghApiFetch(
                     `/repos/${owner}/${repo}/git/blobs/${f.sha}`,
                     token
                 );
@@ -1096,6 +1118,29 @@ async function performPendingRenames() {
             e.message
         );
     }
+}
+
+/**
+ * Build index.json content from an explicit problem list.
+ * Used by the individual-commit loop so each checkpoint reflects only what
+ * has actually been committed, not the full local library.
+ */
+function _buildIndexJsonFromList(problems, settings) {
+    const stats = {
+        total: problems.length,
+        easy: problems.filter((p) => p.difficulty === "Easy").length,
+        medium: problems.filter((p) => p.difficulty === "Medium").length,
+        hard: problems.filter((p) => p.difficulty === "Hard").length,
+        byPlatform: problems.reduce((acc, p) => { const k = p.platform || "unknown"; acc[k] = (acc[k] || 0) + 1; return acc; }, {}),
+        byLang: problems.reduce((acc, p) => { const k = p.lang?.name || p.lang?.slug || "unknown"; acc[k] = (acc[k] || 0) + 1; return acc; }, {}),
+        byTopic: problems.reduce((acc, p) => { const k = (p.tags && p.tags[0]) || p.topic || "uncategorized"; acc[k] = (acc[k] || 0) + 1; return acc; }, {}),
+    };
+    const meta = {
+        summary: settings?._aiSummary || null,
+        summaryUpdatedAt: settings?._aiSummaryUpdatedAt || null,
+        commitsSinceLastSummary: settings?._commitsSinceLastSummary || 0,
+    };
+    return JSON.stringify({ updatedAt: new Date().toISOString(), layoutVersion: LAYOUT_VERSION, stats, meta, problems }, null, 2);
 }
 
 async function buildIndexJson() {
@@ -1201,13 +1246,10 @@ async function _maybeGenerateAISummary(settings) {
 /** Counts how many local problems are missing from the remote repo, without committing. */
 async function handleResyncCount() {
     dbg.log(`handleResyncCount(): starting count of missing problems...`);
-    const { git, token, owner, repoName } = await _resolveGitHubContext();
+    const { token, owner, repoName } = await _resolveGitHubContext();
     const remoteProblems = [];
     try {
-        const indexRes = await git.apiFetch(
-            "/repos/" + owner + "/" + repoName + "/contents/index.json",
-            token
-        );
+        const indexRes = await ghGetContents(owner, repoName, "index.json", token);
         const raw = atob((indexRes.content || "").replace(/\n/g, ""));
         const index = JSON.parse(raw);
         remoteProblems.push(...(index.problems || []));
@@ -1258,6 +1300,20 @@ async function handleResyncCount() {
  * mode="individual" — one commit per problem with correct backdated timestamps.
  */
 async function handleResyncAll(mode = "bulk", commitType = "chore") {
+    if (_resyncInProgress) {
+        dbg.warn("handleResyncAll(): already in progress — skipping duplicate call");
+        return { committed: 0, skipped: true };
+    }
+    _resyncInProgress = true;
+    try {
+        return await _handleResyncAllInner(mode, commitType);
+    } finally {
+        _resyncInProgress = false;
+        try { _activeSyncPort?.postMessage({ type: "sync-done" }); } catch (_) {}
+    }
+}
+
+async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     dbg.log(
         `handleResyncAll(): starting - mode=${mode}, commitType=${commitType}`
     );
@@ -1267,10 +1323,7 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
     // Fetch existing index.json to find already-committed slugs/langs
     const remoteByCommitKey = new Map();
     try {
-        const indexRes = await git.apiFetch(
-            "/repos/" + owner + "/" + repoName + "/contents/index.json",
-            token
-        );
+        const indexRes = await ghGetContents(owner, repoName, "index.json", token);
         const raw = atob((indexRes.content || "").replace(/\n/g, ""));
         const index = JSON.parse(raw);
         (index.problems || []).forEach((p) => {
@@ -1302,6 +1355,23 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
         `handleResyncAll(): found ${missing.length} missing/drifted problem(s)`
     );
     if (missing.length === 0) {
+        // Index may be stale even though no problems are missing (e.g. empty onboarding
+        // index.json while all problem files exist from a previous session).
+        if (remoteByCommitKey.size < allProblems.length) {
+            dbg.log(
+                `handleResyncAll(): nothing to commit but remote index is stale ` +
+                `(${remoteByCommitKey.size} vs ${allProblems.length} local) — repairing`
+            );
+            const repairContent = _buildIndexJsonFromList(allProblems, settings);
+            await _commitWithFailover(
+                [{ path: "index.json", content: repairContent }],
+                "chore: repair repository index [CodeLedger]",
+                repoName,
+                { skipInfra: false },
+                settings
+            );
+            return { committed: 1, repaired: true };
+        }
         dbg.log(`handleResyncAll(): nothing to sync, returning`);
         return { committed: 0 };
     }
@@ -1310,8 +1380,10 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
         dbg.log(
             `handleResyncAll(): creating ${missing.length} individual backdated commit(s)`
         );
-        // One backdated commit per problem, sorted chronologically
-        const historicalCommits = missing.map((p) => ({
+        // Sort FIRST so index.json always lands on the chronologically final commit,
+        // not on whatever happened to be last in the unsorted missing[] array.
+        const sorted = missing.map((p) => ({
+            problem: p,
             files: getProblemFiles(p, settings),
             message:
                 "[" +
@@ -1325,27 +1397,49 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
                   )
                 : new Date(),
             repoName,
-        }));
-        // Append index.json only to the last commit
-        if (historicalCommits.length > 0) {
-            historicalCommits[historicalCommits.length - 1].files.push({
-                path: "index.json",
-                content: await buildIndexJson(),
-            });
-        }
-        for (const entry of historicalCommits.sort(
-            (a, b) => new Date(a.date) - new Date(b.date)
-        )) {
+        })).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // Problems already confirmed in the remote index before this session
+        const alreadyRemote = Array.from(remoteByCommitKey.values());
+        // Accumulates as commits succeed — used for incremental index.json snapshots
+        const sessionCommitted = [];
+        // Thread the commit SHA between sequential commits so each one uses the
+        // SHA returned by the previous instead of re-fetching from GitHub.  This
+        // avoids 422 "not a fast-forward" caused by GitHub's ref propagation lag.
+        let knownParentSha = null;
+
+        for (let i = 0; i < sorted.length; i++) {
+            const entry = sorted[i];
+            const isLast = i === sorted.length - 1;
+            // Checkpoint: update index.json every 25 commits AND always on the last.
+            // Index reflects only problems actually committed so far, so if the loop
+            // is interrupted the next sync correctly skips what was already done.
+            const isCheckpoint = isLast || (i > 0 && i % 25 === 0);
+            if (isCheckpoint) {
+                const committedSoFar = [...alreadyRemote, ...sessionCommitted, entry.problem];
+                entry.files.push({
+                    path: "index.json",
+                    content: _buildIndexJsonFromList(committedSoFar, settings),
+                });
+            }
+            // Report progress so the UI can show "Committing N/M"
+            try { _activeSyncPort?.postMessage({ type: "sync-progress", current: i + 1, total: sorted.length }); } catch (_) {}
             dbg.log(
-                `handleResyncAll(): committing (backdated to ${entry.date.toISOString()})`
+                `handleResyncAll(): committing ${i + 1}/${sorted.length} (backdated to ${entry.date.toISOString()})`
             );
-            await _commitWithFailover(
+            const result = await _commitWithFailover(
                 entry.files,
                 entry.message,
                 entry.repoName,
-                { date: entry.date },
+                // Skip expensive infra rebuild (README + Pages HTML) on every commit
+                // except the last, which updates the repo to its final state.
+                // Pass the SHA returned by the previous commit to avoid a getRepoRef
+                // round-trip and sidestep GitHub's ref propagation delay.
+                { date: entry.date, skipInfra: !isLast, knownParentSha: knownParentSha || undefined },
                 settings
             );
+            knownParentSha = result?.newSha || null;
+            sessionCommitted.push(entry.problem);
         }
     } else {
         dbg.log(
@@ -1365,7 +1459,8 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
                     const base = problemBase(
                         problem.id || problem.titleSlug,
                         problem.canonical,
-                        settings
+                        settings,
+                        problem.platform
                     );
                     filesToCommit.push({
                         path: `${base}/notes.md`,
@@ -1380,7 +1475,8 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
                     const base = problemBase(
                         problem.id || problem.titleSlug,
                         problem.canonical,
-                        settings
+                        settings,
+                        problem.platform
                     );
                     for (const chat of chats || []) {
                         filesToCommit.push({
@@ -1464,8 +1560,6 @@ async function handleBulkImport(problems = []) {
     }
     // Post-import: perform same-language dedup detection and best-effort auto-mark duplicates.
     try {
-        const { compareSolutions, mergeSolutions } =
-            await import("../core/ai-deduplication.js");
         // Group imported problems by titleSlug + lang
         const byKey = {};
         for (const p of problems) {
@@ -1771,34 +1865,31 @@ async function handleRegenerateAIReview(problem = {}) {
 }
 
 /**
- * Queue AI reviews for all problems that don't have one.
- * @returns {Promise<{queued: number}>}
+ * Queue AI reviews for problems.
+ * @param {boolean} missingOnly  true = only problems without an existing review; false = all problems
+ * @returns {Promise<{queued: number, skipped: number}>}
  */
-async function handleQueueAllAIReviews() {
-    dbg.log(`handleQueueAllAIReviews(): starting...`);
-    const { enqueueReview } = await import("../core/ai-review-queue.js");
+async function handleQueueAllAIReviews(missingOnly = false) {
+    dbg.log(`handleQueueAllAIReviews(): starting (missingOnly=${missingOnly})...`);
     const allProblems = await Storage.getAllProblems();
-    dbg.log(
-        `handleQueueAllAIReviews(): checking ${allProblems.length} problem(s) for missing reviews`
-    );
-    const toQueue = allProblems
-        .filter((p) => !p.aiReview || p.aiReview.trim() === "")
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // newest first = highest priority
+    const candidates = missingOnly
+        ? allProblems.filter((p) => !p.aiReview || p.aiReview.trim() === "")
+        : allProblems;
+    // Newest first = highest priority (lowest priority number = processed first)
+    candidates.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    dbg.log(`handleQueueAllAIReviews(): ${candidates.length} candidate(s) from ${allProblems.length} total`);
 
     let queued = 0;
-    for (let i = 0; i < toQueue.length; i++) {
-        const problem = toQueue[i];
-        const problemId = problem.id || problem.titleSlug;
-        if (problemId) {
-            await enqueueReview(problemId, i); // i=0 for newest = lowest priority number = processed first
-            queued++;
-        }
+    let skipped = 0;
+    for (let i = 0; i < candidates.length; i++) {
+        const problemId = candidates[i].id || candidates[i].titleSlug;
+        if (!problemId) continue;
+        const result = await enqueueReview(problemId, i);
+        if (result.skipped) skipped++; else queued++;
     }
 
-    dbg.log(
-        `handleQueueAllAIReviews(): queued ${queued}/${toQueue.length} problem(s) for AI review`
-    );
-    return { queued };
+    dbg.log(`handleQueueAllAIReviews(): queued=${queued} skipped(dedup)=${skipped}`);
+    return { queued, skipped };
 }
 
 /**
@@ -1899,6 +1990,23 @@ chrome.runtime.onInstalled.addListener(() => {
 
 init();
 
+// Keepalive ports — MUST be registered at top level (not inside async init) so Chrome
+// picks them up on the first tick when the SW wakes.  An open port prevents the SW from
+// being terminated during long-running operations (AI review, bulk sync, backup).
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === "ai-review-keepalive") {
+        port.onMessage.addListener(() => {});
+    }
+    if (port.name === "sync-keepalive") {
+        _activeSyncPort = port;
+        port.onMessage.addListener(() => {});
+        port.onDisconnect.addListener(() => { _activeSyncPort = null; });
+    }
+    if (port.name === "backup-keepalive") {
+        port.onMessage.addListener(() => {});
+    }
+});
+
 // Keep the debug flag in sync with user preference changes without requiring SW restart
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && CONSTANTS.SK.DEBUG in changes) {
@@ -1919,16 +2027,37 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === "QUEUE_ALL_AI_REVIEWS") {
         (async () => {
             try {
-                const result = await handleQueueAllAIReviews();
-                dbg.log(
-                    `onMessage(QUEUE_ALL_AI_REVIEWS): result=${JSON.stringify(result)}`
-                );
+                const result = await handleQueueAllAIReviews(false);
+                dbg.log(`onMessage(QUEUE_ALL_AI_REVIEWS): result=${JSON.stringify(result)}`);
                 sendResponse({ ok: true, ...result });
             } catch (err) {
-                dbg.error(
-                    `onMessage(QUEUE_ALL_AI_REVIEWS): failed:`,
-                    err?.message || err
-                );
+                dbg.error(`onMessage(QUEUE_ALL_AI_REVIEWS): failed:`, err?.message || err);
+                sendResponse({ ok: false, error: err?.message || String(err) });
+            }
+        })();
+        return true;
+    }
+    if (msg.type === "QUEUE_MISSING_AI_REVIEWS") {
+        (async () => {
+            try {
+                const result = await handleQueueAllAIReviews(true);
+                dbg.log(`onMessage(QUEUE_MISSING_AI_REVIEWS): result=${JSON.stringify(result)}`);
+                sendResponse({ ok: true, ...result });
+            } catch (err) {
+                dbg.error(`onMessage(QUEUE_MISSING_AI_REVIEWS): failed:`, err?.message || err);
+                sendResponse({ ok: false, error: err?.message || String(err) });
+            }
+        })();
+        return true;
+    }
+    if (msg.type === "CANCEL_AI_REVIEW_QUEUE") {
+        (async () => {
+            try {
+                const cancelled = await cancelPendingReviews();
+                dbg.log(`onMessage(CANCEL_AI_REVIEW_QUEUE): cancelled=${cancelled}`);
+                sendResponse({ ok: true, cancelled });
+            } catch (err) {
+                dbg.error(`onMessage(CANCEL_AI_REVIEW_QUEUE): failed:`, err?.message || err);
                 sendResponse({ ok: false, error: err?.message || String(err) });
             }
         })();
@@ -2019,13 +2148,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                     sendResponse({ ok: false, error: "Repo not configured" });
                     return;
                 }
-
-                const { detectRepoLayoutVersion } =
-                    await import("./migration-manager.js");
-                const { getContents } =
-                    await import("../handlers/git/github/api-client.js");
-                const { LAYOUT_VERSION } =
-                    await import("../core/path-builder.js");
 
                 const checks = {
                     owner,
@@ -2131,8 +2253,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         dbg.log(`onMessage(REPO_REPAIR): action=${msg.action}`);
         (async () => {
             try {
-                const { migrateRepo, resetRepo, forceRebuildRepo } =
-                    await import("./migration-manager.js");
                 let result;
                 if (msg.action === "migrate-layout") {
                     result = await migrateRepo();
@@ -2210,6 +2330,49 @@ try {
                     sendResponse({ ok: false, error: e.message });
                 });
             return true; // async response
+        }
+
+        if (msg && msg.type === "BACKUP_TO_REPO") {
+            dbg.log("onMessage(BACKUP_TO_REPO): committing settings backup...");
+            (async () => {
+                try {
+                    const { settings, repoName } = await _resolveGitHubContext();
+                    const allProblems = await Storage.getAllProblems();
+                    const safeSettings = Object.fromEntries(
+                        Object.entries(settings).filter(([k]) =>
+                            !k.includes("token") && !k.includes("key") && !k.includes("secret") && k !== "github_token"
+                        )
+                    );
+                    const backup = {
+                        timestamp: new Date().toISOString(),
+                        settings: safeSettings,
+                        stats: {
+                            total: allProblems.length,
+                            easy: allProblems.filter((p) => p.difficulty === "Easy").length,
+                            medium: allProblems.filter((p) => p.difficulty === "Medium").length,
+                            hard: allProblems.filter((p) => p.difficulty === "Hard").length,
+                        },
+                    };
+                    const date = new Date().toISOString().slice(0, 10);
+                    const backupFiles = [{ path: `config/backup-${date}.json`, content: JSON.stringify(backup, null, 2) }];
+                    const commitMsg = `chore: backup config and settings ${date}`;
+                    // Primary + failover targets
+                    await _commitWithFailover(backupFiles, commitMsg, repoName, { date: new Date() }, settings);
+                    // Also push to all enabled mirrors
+                    const activeTarget = _normalizeGitTarget(
+                        (await Storage.getSettings().catch(() => settings)).git_active_primary || _getDefaultPrimaryTarget(settings)
+                    );
+                    await pushToMirrors(backupFiles, commitMsg, {}, settings, activeTarget ? _targetKey(activeTarget) : "").catch(
+                        (e) => dbg.warn("BACKUP_TO_REPO: mirror push failed:", e?.message)
+                    );
+                    dbg.log("onMessage(BACKUP_TO_REPO): ✓ backup committed");
+                    sendResponse({ ok: true });
+                } catch (e) {
+                    dbg.warn("onMessage(BACKUP_TO_REPO): failed:", e?.message);
+                    sendResponse({ ok: false, error: e.message });
+                }
+            })();
+            return true;
         }
 
         if (msg && msg.type === "SYNC_PREVIEW") {
@@ -2450,8 +2613,6 @@ try {
                         sendResponse({ ok: false, error: "Not configured" });
                         return;
                     }
-                    const { listBackups } =
-                        await import("../core/backup/backup-manager.js");
                     const backups = await listBackups(owner, repo, token);
                     sendResponse({ ok: true, backups });
                 } catch (e) {
@@ -2491,8 +2652,6 @@ try {
                         1,
                         parseInt(settings.githubBackupKeep || "10", 10)
                     );
-                    const { commitBackupToGitHub } =
-                        await import("../core/backup/backup-manager.js");
                     await commitBackupToGitHub(owner, repo, token, git, keep);
                     sendResponse({ ok: true });
                 } catch (e) {
@@ -2528,8 +2687,6 @@ try {
                         sendResponse({ ok: false, error: "Not configured" });
                         return;
                     }
-                    const { fetchBackupSnapshot } =
-                        await import("../core/backup/backup-manager.js");
                     const snapshot = await fetchBackupSnapshot(
                         owner,
                         repo,

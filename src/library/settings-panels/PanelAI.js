@@ -142,7 +142,7 @@ export function PanelAI({ settings, onSettingsChange }) {
     };
 
     return html`
-        <div class="space-y-6 max-w-xl">
+        <div class="space-y-6 w-full">
             <div>
                 <h2 class="text-base font-semibold text-white mb-1">
                     AI Providers

@@ -37,6 +37,7 @@ import {
     DuplicateDetectionModal,
     findDuplicates,
 } from "./components/DuplicateDetectionModal.js";
+import { markSettingsPendingCommit } from "/core/settings-auto-commit.js";
 
 initializeHandlers();
 initDebug().catch(() => {});
@@ -62,6 +63,7 @@ function LibraryApp() {
     });
     const [graphFocusProblem, setGraphFocusProblem] = useState(null);
     const [duplicateGroups, setDuplicateGroups] = useState([]);
+    const [pendingAutoSetup, setPendingAutoSetup] = useState(false);
     const [currentDuplicateGroup, setCurrentDuplicateGroup] = useState(null);
     const [setupIncomplete, setSetupIncomplete] = useState(null);
     const [setupDismissed, setSetupDismissed] = useState(false);
@@ -199,7 +201,16 @@ function LibraryApp() {
         if (allowed.has(tab))
             setActiveTab(tab === "archive" ? "solutions" : tab);
         if (q) setSearchQuery(q);
+        if (getQueryParam("openSetup") === "true") setPendingAutoSetup(true);
     }, []);
+
+    // Auto-open repo setup modal when navigated here with ?openSetup=true
+    useEffect(() => {
+        if (!loading && pendingAutoSetup) {
+            setPendingAutoSetup(false);
+            handleSetupRepo();
+        }
+    }, [loading, pendingAutoSetup]);
 
     useEffect(() => {
         updateQueryParams({
@@ -417,6 +428,7 @@ function LibraryApp() {
                     await Storage.setDebugEnabled(value);
                     setDebug(value); // update live state in this page without reload
                 }
+                markSettingsPendingCommit().catch(() => {});
             } catch (e) {
                 // noop
             }

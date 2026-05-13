@@ -200,13 +200,13 @@ export async function migrateRepo() {
         });
         if (p.readmeContent) {
             newFiles.push({
-                path: readmePath(p.id || p.titleSlug, canonical, settings),
+                path: readmePath(p.id || p.titleSlug, canonical, settings, p.platform),
                 content: p.readmeContent,
             });
         }
         if (p.hintsContent) {
             newFiles.push({
-                path: hintsPath(p.id || p.titleSlug, canonical, settings),
+                path: hintsPath(p.id || p.titleSlug, canonical, settings, p.platform),
                 content: p.hintsContent,
             });
         }
@@ -283,13 +283,13 @@ export async function resetRepo() {
         desiredFiles.set(solPath, p.code);
         if (p.readmeContent) {
             desiredFiles.set(
-                readmePath(p.id || p.titleSlug, canonical, settings),
+                readmePath(p.id || p.titleSlug, canonical, settings, p.platform),
                 p.readmeContent
             );
         }
         if (p.hintsContent) {
             desiredFiles.set(
-                hintsPath(p.id || p.titleSlug, canonical, settings),
+                hintsPath(p.id || p.titleSlug, canonical, settings, p.platform),
                 p.hintsContent
             );
         }

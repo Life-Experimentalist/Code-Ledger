@@ -1152,7 +1152,7 @@ Be concise. Max 200 words.`;
 
                 if (readmeContent) {
                     files.push({
-                        path: readmePath(sub.titleSlug, canonical, settings),
+                        path: readmePath(sub.titleSlug, canonical, settings, "leetcode"),
                         content: readmeContent,
                     });
                 }
@@ -1762,7 +1762,7 @@ Be concise. Max 200 words.`;
             const similar = this._formatSimilar(meta, settings);
 
             files.push({
-                path: readmePath(problemId, canonical, settings),
+                path: readmePath(problemId, canonical, settings, "leetcode"),
                 content: [
                     `# ${meta.questionFrontendId ? `[${meta.questionFrontendId}] ` : ""}${title}`,
                     "",
@@ -1793,7 +1793,7 @@ Be concise. Max 200 words.`;
         // 3. Hints (separate file if enabled)
         if (settings.leetcode_sync_hints && meta?.hints?.length) {
             files.push({
-                path: hintsPath(problemId, canonical, settings),
+                path: hintsPath(problemId, canonical, settings, "leetcode"),
                 content: [
                     `# Hints — ${title}`,
                     "",
