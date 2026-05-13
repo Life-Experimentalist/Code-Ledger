@@ -21,6 +21,7 @@ import {
     handleRefreshMetadata,
     completeRefreshMetadata,
 } from "./refresh-metadata-handler.js";
+import { triggerCodeRecovery } from "./code-recovery-handler.js";
 import {
     buildProblemFiles,
     problemBase,
@@ -55,6 +56,9 @@ import {
     getQueueStats,
     enqueueReview,
     cancelPendingReviews,
+    clearCompletedReviews,
+    removeQueueItem,
+    getAllQueueItems,
     RATE_LIMIT_DELAY_MS_EXPORT as REVIEW_RATE_LIMIT_MS,
 } from "../core/ai-review-queue.js";
 import {
@@ -370,7 +374,7 @@ async function generateAIReview(problem = {}, settings = null) {
             dbg.log(
                 `generateAIReview(): calling ${providerId} with ${TIMEOUT_MS}ms timeout`
             );
-            const review = await Promise.race([
+            let review = await Promise.race([
                 ai.review(problem.code, {
                     ...problem,
                     aiModelOverride: provider.model || "",
@@ -393,6 +397,24 @@ async function generateAIReview(problem = {}, settings = null) {
             dbg.log(
                 `generateAIReview(): ✓ success via ${providerId} (${String(review).length} chars)`
             );
+
+            // Parse AI-inferred tags if the problem had none
+            if (review && (!problem.tags || problem.tags.length === 0)) {
+                const tagsMatch = review.match(/^TAGS:\s*(.+)$/m);
+                if (tagsMatch) {
+                    const parsed = tagsMatch[1].split(",").map((t) => t.trim()).filter(Boolean);
+                    if (parsed.length) {
+                        const withTags = { ...problem, tags: parsed, topic: parsed[0] };
+                        await Storage.saveProblem(withTags).catch(() => {});
+                        const tagKey = getProblemCommitKey(withTags);
+                        if (tagKey) await Storage.markPendingProblemKeys([tagKey]).catch(() => {});
+                        dbg.log(`generateAIReview(): saved AI-inferred tags: ${parsed.join(", ")}`);
+                    }
+                    // Strip TAGS line from review so it doesn't appear in the UI
+                    review = review.replace(/^TAGS:\s*.+$/m, "").trim();
+                }
+            }
+
             return { review, providerId };
         } catch (err) {
             if (
@@ -1871,6 +1893,9 @@ async function handleRegenerateAIReview(problem = {}) {
  */
 async function handleQueueAllAIReviews(missingOnly = false) {
     dbg.log(`handleQueueAllAIReviews(): starting (missingOnly=${missingOnly})...`);
+    // Clear stale done/failed entries so they don't inflate queue counts and
+    // don't block re-queuing problems that already had entries.
+    await clearCompletedReviews().catch(() => {});
     const allProblems = await Storage.getAllProblems();
     const candidates = missingOnly
         ? allProblems.filter((p) => !p.aiReview || p.aiReview.trim() === "")
@@ -1923,13 +1948,32 @@ async function processAIReviewQueue() {
                 }
 
                 if (!problem.code) {
-                    await markDone(item.id);
-                    dbg.warn(
-                        `processAIReviewQueue(): problem ${item.problemId} has no code, skipping`
-                    );
-                    processed++;
-                    item = await getNextPendingReview();
-                    continue;
+                    if (problem.platform === "leetcode" && problem.titleSlug) {
+                        dbg.log(`processAIReviewQueue(): ${item.problemId} has no code — attempting recovery`);
+                        const recovery = await triggerCodeRecovery(problem);
+                        if (!recovery.ok) {
+                            await markFailedWithRetry(item.id, `Code recovery failed: ${recovery.error}`);
+                            dbg.warn(`processAIReviewQueue(): recovery failed for ${item.problemId}: ${recovery.error}`);
+                            processed++;
+                            item = await getNextPendingReview();
+                            continue;
+                        }
+                        // Reload problem — triggerCodeRecovery already saved the code
+                        problem = await Storage.getProblem(item.problemId);
+                        if (!problem?.code) {
+                            await markFailedWithRetry(item.id, "Code recovery succeeded but code still empty");
+                            processed++;
+                            item = await getNextPendingReview();
+                            continue;
+                        }
+                        dbg.log(`processAIReviewQueue(): ✓ recovery succeeded for ${item.problemId}`);
+                    } else {
+                        await markFailedWithRetry(item.id, "No code stored and automatic recovery not supported for this platform");
+                        dbg.warn(`processAIReviewQueue(): non-recoverable no-code for ${item.problemId}`);
+                        processed++;
+                        item = await getNextPendingReview();
+                        continue;
+                    }
                 }
 
                 const settings = await Storage.getSettings();
@@ -2076,6 +2120,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                     `onMessage(GET_QUEUE_STATS): failed:`,
                     err?.message || err
                 );
+                sendResponse({ ok: false, error: err?.message || String(err) });
+            }
+        })();
+        return true;
+    }
+    if (msg.type === "GET_QUEUE_ITEMS") {
+        (async () => {
+            try {
+                const items = await getAllQueueItems(msg.status || null);
+                // Enrich with problem titles
+                const problems = await Storage.getAllProblems();
+                const problemMap = {};
+                for (const p of problems) {
+                    if (p.id) problemMap[p.id] = p;
+                    if (p.titleSlug) problemMap[p.titleSlug] = p;
+                }
+                const enriched = items.map((item) => {
+                    const p = problemMap[item.problemId];
+                    return {
+                        ...item,
+                        problemTitle: p?.title || item.problemId,
+                        problemPlatform: p?.platform || null,
+                        problemDifficulty: p?.difficulty || null,
+                    };
+                });
+                sendResponse({ ok: true, items: enriched });
+            } catch (err) {
+                dbg.error(`onMessage(GET_QUEUE_ITEMS): failed:`, err?.message || err);
+                sendResponse({ ok: false, error: err?.message || String(err) });
+            }
+        })();
+        return true;
+    }
+    if (msg.type === "REMOVE_QUEUE_ITEM") {
+        (async () => {
+            try {
+                const removed = await removeQueueItem(msg.itemId);
+                sendResponse({ ok: true, removed });
+            } catch (err) {
+                dbg.error(`onMessage(REMOVE_QUEUE_ITEM): failed:`, err?.message || err);
                 sendResponse({ ok: false, error: err?.message || String(err) });
             }
         })();
