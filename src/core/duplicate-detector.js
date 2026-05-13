@@ -13,7 +13,7 @@ const dbg = createDebugger("DuplicateDetector");
  * @param {string} code
  * @returns {string}
  */
-function normalizeCode(code = "") {
+export function normalizeCode(code = "") {
     return code
         .split("\n")
         .map((line) => line.trim())
