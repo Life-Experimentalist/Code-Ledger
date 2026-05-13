@@ -94,7 +94,30 @@ async function loadHandler() {
     }
 }
 
-console.log(
-    `[CodeLedger:HandlerLoader] script loaded, calling loadHandler()...`
-);
-loadHandler();
+console.log(`[CodeLedger:HandlerLoader] script loaded`);
+
+// Code recovery mode: opened by code-recovery-handler.js with a flag in the URL
+const _urlParams = new URLSearchParams(window.location.search);
+if (_urlParams.get("codeledger_code_fetch") === "1" && window.location.hostname.includes("leetcode.com")) {
+    const _problemId = _urlParams.get("codeledger_problemid") || "";
+    console.log(`[CodeLedger:HandlerLoader] code-fetch mode detected, problemId=${_problemId}`);
+    (async () => {
+        try {
+            const { initDebug } = await import(chrome.runtime.getURL("lib/debug.js"));
+            await initDebug();
+        } catch (_) {}
+        const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
+        const { LeetCodeHandler } = await import(url);
+        await new LeetCodeHandler().handleCodeFetch(_problemId);
+    })().catch((e) => {
+        console.error("[CodeLedger:HandlerLoader] code-fetch failed:", e?.message);
+        chrome.runtime.sendMessage({
+            type: "CODELEDGER_CODE_FETCHED",
+            problemId: _problemId,
+            error: e?.message || "Unknown error in handler-loader code-fetch path",
+        });
+    });
+} else {
+    console.log(`[CodeLedger:HandlerLoader] calling loadHandler()...`);
+    loadHandler();
+}
