@@ -345,6 +345,7 @@ async function generateAIReview(problem = {}, settings = null) {
         `generateAIReview(): ${providers.length} provider(s) in fallback chain`
     );
 
+    let inferredTags = null;
     for (let idx = 0; idx < providers.length; idx++) {
         const provider = providers[idx];
         const providerId = provider.id;
@@ -404,18 +405,15 @@ async function generateAIReview(problem = {}, settings = null) {
                 if (tagsMatch) {
                     const parsed = tagsMatch[1].split(",").map((t) => t.trim()).filter(Boolean);
                     if (parsed.length) {
-                        const withTags = { ...problem, tags: parsed, topic: parsed[0] };
-                        await Storage.saveProblem(withTags).catch(() => {});
-                        const tagKey = getProblemCommitKey(withTags);
-                        if (tagKey) await Storage.markPendingProblemKeys([tagKey]).catch(() => {});
-                        dbg.log(`generateAIReview(): saved AI-inferred tags: ${parsed.join(", ")}`);
+                        inferredTags = parsed;
+                        dbg.log(`generateAIReview(): inferred tags: ${parsed.join(", ")}`);
                     }
                     // Strip TAGS line from review so it doesn't appear in the UI
                     review = review.replace(/^TAGS:\s*.+$/m, "").trim();
                 }
             }
 
-            return { review, providerId };
+            return { review, providerId, inferredTags };
         } catch (err) {
             if (
                 String(err?.message || "")
@@ -1980,11 +1978,12 @@ async function processAIReviewQueue() {
                 dbg.log(
                     `processAIReviewQueue(): generating review (${processed + 1}/${BATCH_SIZE})`
                 );
-                const { review, providerId } = await generateAIReview(
+                const { review, providerId, inferredTags } = await generateAIReview(
                     problem,
                     settings
                 );
-                const updated = { ...problem, aiReview: review };
+                const base = inferredTags ? { ...problem, tags: inferredTags, topic: inferredTags[0] } : problem;
+                const updated = { ...base, aiReview: review };
                 await Storage.saveProblem(updated);
 
                 // Mark as pending for next sync (reviews will be committed together, not as special commit)
