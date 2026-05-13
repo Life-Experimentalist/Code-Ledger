@@ -4,7 +4,7 @@
 
 **Goal:** Replace the existing AI-heavy dedup logic in `handleBulkImport()` with fast local deduplication (auto-merge exact matches, conflict UI for divergent code), add a post-import validation pass, and broadcast a summary report banner to open library tabs.
 
-**Architecture:** `handleBulkImport()` is rewritten to group by `titleSlug` then by `lang.slug`. Same-language same-normalized-code → auto-merge (keep oldest, discard rest). Same-language different-code → save primary with `conflictPending: true` + `conflictCandidates[]`. Different-language → save all, no conflict. `DedupReviewQueue.js` is fully redesigned: side-by-side diff, per-item 10–15s countdown timer, AI auto-resolve via existing `compareSolutions()`. After all saves, a `CODELEDGER_IMPORT_COMPLETE` message is broadcast to any open tabs. `library.js` listens and shows a dismissable banner.
+**Architecture:** `handleBulkImport()` is rewritten to group by `titleSlug` then by `lang.slug`. **Code is the primary decision-maker.** Same-language same-normalized-code → auto-merge silently (keep oldest, discard rest, **no GitHub commit** — already in repo). Same-language different-code → save primary with `conflictPending: true` + `conflictCandidates[]`. Different-language → save all, no conflict. `DedupReviewQueue.js` is fully redesigned: code blocks are the centerpiece of each conflict item. Each `ConflictItem` re-checks normalized equality at render time — if codes are the same, it shows a 3-second "Identical code — merging…" notice and auto-resolves without any user action or GitHub commit. If codes genuinely differ, it shows a per-item 12s countdown with AI auto-resolve. After all saves, a `CODELEDGER_IMPORT_COMPLETE` message is broadcast to any open tabs. `library.js` listens and shows a dismissable banner.
 
 **Tech Stack:** Manifest V3 Service Worker, IndexedDB (via `Storage`), Preact + htm (no JSX), `chrome.tabs.query` + `chrome.tabs.sendMessage` for broadcast, existing `compareSolutions()` from `ai-deduplication.js`
 
@@ -135,12 +135,12 @@ async function handleBulkImport(problems = []) {
             const allSame = rest.every((r) => normalizeCode(r.code) === primaryNorm);
 
             if (allSame) {
-                // Auto-merge: keep oldest, discard rest
+                // Auto-merge: keep oldest, discard rest.
+                // Code is identical to what's already in the repo — no GitHub commit needed.
                 await Storage.saveProblem(primary).catch(() => {});
-                const key = getProblemCommitKey(primary);
-                if (key) pendingKeys.push(key);
+                // Deliberately NOT adding to pendingKeys — no git commit for exact duplicates.
                 autoMerged += rest.length;
-                dbg.log(`handleBulkImport(): auto-merged ${rest.length} duplicate(s) for ${primary.titleSlug}`);
+                dbg.log(`handleBulkImport(): auto-merged ${rest.length} duplicate(s) for ${primary.titleSlug} (no commit — same code)`);
             } else {
                 // Conflict: save primary with conflict metadata
                 const candidates = rest.map((r) => ({
@@ -254,6 +254,7 @@ const html = htm.bind(h);
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
 import { runtime } from "../../lib/browser-compat.js";
+import { normalizeCode } from "../../core/duplicate-detector.js";
 
 const dbg = createDebugger("DedupReviewQueue");
 
@@ -284,6 +285,38 @@ function ConflictItem({ item, candidate, onResolved }) {
     const [resolving, setResolving] = useState(false);
     const timerRef = useRef(null);
     const cancelledRef = useRef(false);
+
+    // Check at mount whether codes are actually identical (normalized).
+    // If so, skip the conflict UI entirely: show a 3s notice then auto-merge.
+    const codesAreIdentical = normalizeCode(item.code) === normalizeCode(candidate.code);
+    const [identicalCountdown, setIdenticalCountdown] = useState(codesAreIdentical ? 3 : null);
+
+    useEffect(() => {
+        if (!codesAreIdentical) return;
+        const id = setInterval(() => {
+            setIdenticalCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(id);
+                    // Resolve silently — keep oldest, no commit needed
+                    resolveKeepPrimary();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(id);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // If codes are identical show a short notice and skip the rest of the UI
+    if (codesAreIdentical) {
+        return html`
+            <div class="p-4 bg-emerald-900/20 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                <span class="text-emerald-400 text-sm">✓ Identical code detected</span>
+                <span class="text-slate-400 text-xs">${item.title || item.titleSlug} · ${item.lang?.name}</span>
+                <span class="ml-auto text-xs text-slate-500">Auto-merging in ${identicalCountdown}s…</span>
+            </div>
+        `;
+    }
 
     const cancelTimer = useCallback(() => {
         cancelledRef.current = true;
@@ -736,8 +769,8 @@ git commit -m "feat: show import complete report banner in library, listen for C
 
 **Spec coverage:**
 - ✅ Task 1: `normalizeCode()` exported for import handler reuse
-- ✅ Task 2: `handleBulkImport()` groups by slug+lang, auto-merges same-code, flags conflicts with `conflictPending`/`conflictCandidates`, keeps different-lang entries (separate lang groups = separate saves), post-import validation queues missing code/tags, broadcasts `CODELEDGER_IMPORT_COMPLETE`
-- ✅ Task 3: `DedupReviewQueue` redesigned — `ConflictItem` with side-by-side code blocks, per-item 12s countdown, `resolveKeepPrimary`, `resolveKeepCandidate`, `resolveBothAsMethods`, AI auto-resolve via `AI_COMPARE_SOLUTIONS` message
+- ✅ Task 2: `handleBulkImport()` groups by slug+lang, auto-merges same-code (saves to IDB, **no pendingKeys entry = no GitHub commit**), flags conflicts with `conflictPending`/`conflictCandidates`, keeps different-lang entries, post-import validation queues missing code/tags, broadcasts `CODELEDGER_IMPORT_COMPLETE`
+- ✅ Task 3: `DedupReviewQueue` redesigned — `ConflictItem` re-checks `normalizeCode()` at render; if codes identical → 3s notice + auto-merge (no commit); if codes differ → side-by-side code blocks + 12s AI countdown. Imports `normalizeCode` from `duplicate-detector.js`.
 - ✅ Task 4: `AI_COMPARE_SOLUTIONS` SW handler wired up
 - ✅ Task 5: Library listens for `CODELEDGER_IMPORT_COMPLETE`, shows banner with counts and "View conflicts" button
 - ✅ Spec: backward compat — legacy `aiMergePending` items still rendered in queue
