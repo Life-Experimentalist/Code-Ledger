@@ -77,17 +77,19 @@ export async function triggerCodeRecovery(problem) {
                         }
                         return Storage.saveProblem(updated);
                     })
-                    .catch((e) => dbg.warn(`triggerCodeRecovery(): save failed:`, e?.message));
-                resolve({
-                    ok: true,
-                    code: msg.code,
-                    lang: msg.lang,
-                    tags: msg.tags || [],
-                    runtime: msg.runtime,
-                    memory: msg.memory,
-                    runtimePct: msg.runtimePct,
-                    memoryPct: msg.memoryPct,
-                });
+                    .catch((e) => dbg.warn(`triggerCodeRecovery(): save failed:`, e?.message))
+                    .finally(() => {
+                        resolve({
+                            ok: true,
+                            code: msg.code,
+                            lang: msg.lang,
+                            tags: msg.tags || [],
+                            runtime: msg.runtime,
+                            memory: msg.memory,
+                            runtimePct: msg.runtimePct,
+                            memoryPct: msg.memoryPct,
+                        });
+                    });
             }
         }
 
