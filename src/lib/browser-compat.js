@@ -5,6 +5,11 @@
 
 // This file is the ONLY place that touches chrome.* or browser.* directly.
 // Everything else in the codebase imports from this file.
+
+import { createDebugger } from "./debug.js";
+
+const dbg = createDebugger("BrowserCompat");
+
 // @ts-ignore
 export const ext =
     typeof browser !== "undefined" && browser.runtime
@@ -109,7 +114,7 @@ export const storage = {
 
 export const runtime = ext.runtime || {
     sendMessage: async () => {},
-    onMessage: { addListener: () => {} },
+    onMessage: { addListener: () => {}, removeListener: () => {} },
     getURL: (path) => `/${path}`, // Mock for dev
 };
 export const tabs = ext.tabs || {

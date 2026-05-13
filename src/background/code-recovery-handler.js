@@ -5,7 +5,7 @@
 
 import { createDebugger } from "../lib/debug.js";
 import { Storage } from "../core/storage.js";
-import { tabs } from "../lib/browser-compat.js";
+import { tabs, runtime } from "../lib/browser-compat.js";
 
 const dbg = createDebugger("CodeRecovery");
 
@@ -24,6 +24,9 @@ export async function triggerCodeRecovery(problem) {
     if (!titleSlug) {
         return { ok: false, error: "Problem has no titleSlug — cannot open recovery tab" };
     }
+    if (!problemId) {
+        return { ok: false, error: "Problem has no id — cannot match recovery response" };
+    }
 
     const url = `https://leetcode.com/problems/${encodeURIComponent(titleSlug)}/?codeledger_code_fetch=1&codeledger_problemid=${encodeURIComponent(problemId)}`;
     dbg.log(`triggerCodeRecovery(${titleSlug}): opening background tab`);
@@ -39,7 +42,7 @@ export async function triggerCodeRecovery(problem) {
             if (tabId != null) {
                 tabs.remove?.(tabId)?.catch?.(() => {});
             }
-            chrome.runtime.onMessage.removeListener(listener);
+            runtime.onMessage.removeListener?.(listener);
             resolve({ ok: false, error: `Recovery timed out after ${RECOVERY_TIMEOUT_MS / 1000}s` });
         }, RECOVERY_TIMEOUT_MS);
 
@@ -49,7 +52,7 @@ export async function triggerCodeRecovery(problem) {
             if (settled) return;
             settled = true;
             clearTimeout(timeoutHandle);
-            chrome.runtime.onMessage.removeListener(listener);
+            runtime.onMessage.removeListener?.(listener);
             if (tabId != null) {
                 tabs.remove?.(tabId)?.catch?.(() => {});
             }
@@ -93,7 +96,7 @@ export async function triggerCodeRecovery(problem) {
             }
         }
 
-        chrome.runtime.onMessage.addListener(listener);
+        runtime.onMessage.addListener(listener);
         tabs.create({ url, active: false })
             .then((tab) => {
                 if (settled) {
@@ -107,7 +110,7 @@ export async function triggerCodeRecovery(problem) {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timeoutHandle);
-                chrome.runtime.onMessage.removeListener(listener);
+                runtime.onMessage.removeListener?.(listener);
                 dbg.error(`triggerCodeRecovery(${titleSlug}): ✗ tab creation failed:`, e?.message);
                 resolve({ ok: false, error: `Tab creation failed: ${e?.message}` });
             });
