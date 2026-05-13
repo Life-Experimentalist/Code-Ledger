@@ -64,7 +64,7 @@ function ConflictItem({ item, candidate, onResolved }) {
         setResolving(true);
         try {
             const primary = await Storage.getProblem(item.id);
-            if (!primary) return;
+            if (!primary) { dbg.warn(`resolveKeepPrimary(): item ${item.id} not found`); setResolving(false); return; }
             const updated = { ...primary, conflictPending: false };
             delete updated.conflictCandidates;
             await Storage.saveProblem(updated);
@@ -88,7 +88,7 @@ function ConflictItem({ item, candidate, onResolved }) {
         setResolving(true);
         try {
             const primary = await Storage.getProblem(item.id);
-            if (!primary) return;
+            if (!primary) { dbg.warn(`resolveKeepCandidate(): item ${item.id} not found`); setResolving(false); return; }
             const updated = {
                 ...primary,
                 code: candidate.code,
@@ -121,7 +121,7 @@ function ConflictItem({ item, candidate, onResolved }) {
         setResolving(true);
         try {
             const primary = await Storage.getProblem(item.id);
-            if (!primary) return;
+            if (!primary) { dbg.warn(`resolveBothAsMethods(): item ${item.id} not found`); setResolving(false); return; }
             const newMethod = {
                 title: `Alt approach (${candidate.lang?.name || "unknown"}) — imported`,
                 language: candidate.lang?.name || "unknown",
@@ -155,13 +155,16 @@ function ConflictItem({ item, candidate, onResolved }) {
         cancelTimer();
         setResolving(true);
         try {
-            const result = await new Promise((resolve) => {
-                runtime.sendMessage({
-                    type: "AI_COMPARE_SOLUTIONS",
-                    primary: { code: item.code, lang: item.lang?.name },
-                    candidate: { code: candidate.code, lang: candidate.lang?.name },
-                }, (r) => resolve(r || {}));
-            });
+            const result = await Promise.race([
+                new Promise((resolve) => {
+                    runtime.sendMessage({
+                        type: "AI_COMPARE_SOLUTIONS",
+                        primary: { code: item.code, lang: item.lang?.name },
+                        candidate: { code: candidate.code, lang: candidate.lang?.name },
+                    }, (r) => resolve(r || {}));
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 10_000)),
+            ]);
             if (result?.same) {
                 await resolveKeepPrimary();
             } else {
