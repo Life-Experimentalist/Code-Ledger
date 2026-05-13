@@ -1588,8 +1588,12 @@ async function handleBulkImport(problems = []) {
                 const existing = await Storage.getProblem(langGroup[0].id).catch(() => null);
                 if (existing?.manuallyEdited) continue;
                 await Storage.saveProblem(langGroup[0]).catch(() => {});
-                const key = getProblemCommitKey(langGroup[0]);
-                if (key) pendingKeys.push(key);
+                // Only commit if code actually changed — avoid re-committing unchanged data on repeated imports
+                const isNew = !existing || normalizeCode(existing.code) !== normalizeCode(langGroup[0].code);
+                if (isNew) {
+                    const key = getProblemCommitKey(langGroup[0]);
+                    if (key) pendingKeys.push(key);
+                }
                 continue;
             }
 

@@ -80,8 +80,7 @@ export async function triggerCodeRecovery(problem) {
                         }
                         return Storage.saveProblem(updated);
                     })
-                    .catch((e) => dbg.warn(`triggerCodeRecovery(): save failed:`, e?.message))
-                    .finally(() => {
+                    .then(() => {
                         resolve({
                             ok: true,
                             code: msg.code,
@@ -92,6 +91,10 @@ export async function triggerCodeRecovery(problem) {
                             runtimePct: msg.runtimePct,
                             memoryPct: msg.memoryPct,
                         });
+                    })
+                    .catch((e) => {
+                        dbg.warn(`triggerCodeRecovery(): save failed:`, e?.message);
+                        resolve({ ok: false, error: `Save failed: ${e?.message}` });
                     });
             }
         }

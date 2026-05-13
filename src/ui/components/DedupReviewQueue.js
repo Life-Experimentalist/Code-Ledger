@@ -172,7 +172,12 @@ function ConflictItem({ item, candidate, onResolved }) {
             }
         } catch (e) {
             dbg.warn(`resolveWithAI(): AI compare failed, defaulting to keep oldest:`, e?.message);
-            await resolveKeepPrimary();
+            try {
+                await resolveKeepPrimary();
+            } catch (e2) {
+                dbg.error("resolveWithAI(): fallback also failed:", e2?.message);
+                setResolving(false);
+            }
         }
     }, [item, candidate, cancelTimer, resolveKeepPrimary, resolveBothAsMethods]);
 
