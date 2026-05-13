@@ -732,7 +732,7 @@ export function getActionsWorkflow() {
         "              startMarker,",
         "              '# DSA Solutions',",
         "              '',",
-        "              '> Managed by [CodeLedger](https://github.com/Life-Experimentalist/CodeLedger). Last updated: ' + updated,",
+        "              '> Managed by [CodeLedger](https://github.com/Life-Experimentalist/Code-Ledger). Last updated: ' + updated,",
         "              '',",
         "              '## Stats',",
         "              '',",
@@ -819,7 +819,9 @@ export function getRepoReadme(
         "",
         "[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")",
         "",
-        '<img src="' + ICON_URL + '" alt="CodeLedger" width="72" height="72" />',
+        '<img src="' +
+            ICON_URL +
+            '" alt="CodeLedger" width="72" height="72" />',
         "",
         "# " + owner + "'s DSA Solutions",
         "",
@@ -936,7 +938,11 @@ export function getRepoReadme(
             const slug = p.titleSlug || "";
             const titleText = p.title || slug || "?";
             const titleCell = slug
-                ? "[" + titleText + "](https://leetcode.com/problems/" + slug + "/)"
+                ? "[" +
+                  titleText +
+                  "](https://leetcode.com/problems/" +
+                  slug +
+                  "/)"
                 : titleText;
             const diff = p.difficulty || "?";
             const plat = p.platform || "?";

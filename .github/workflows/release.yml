@@ -71,7 +71,7 @@ jobs:
 
       # ── Locate built archives ────────────────────────────────────────────
       - name: List dist artifacts
-        run: ls -lh *.zip dist/*.zip 2>/dev/null || ls -lh
+        run: ls -lh releases/*.zip 2>/dev/null || ls -lh releases/
 
       # ── Generate release notes from CHANGELOG ────────────────────────────
       - name: Extract release notes
@@ -98,8 +98,8 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
           files: |
-            codeledger-chrome-v*.zip
-            codeledger-firefox-v*.zip
+            releases/codeledger-chromium-v*.zip
+            releases/codeledger-firefox-v*.zip
 
       # ── Summary ─────────────────────────────────────────────────────────
       - name: Print release URL

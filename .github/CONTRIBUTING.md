@@ -146,9 +146,9 @@ Only maintainers cut releases, but contributors should be aware of the process:
 # 3. Run the publish command:
 npm run publish
 # Produces in releases/:
-#   codeledger-chrome-vX.Y.Z.zip   ← load in Chrome/Edge/Brave
-#   codeledger-firefox-vX.Y.Z.zip  ← submit to AMO / side-load in Firefox
-#   codeledger-source-vX.Y.Z.zip   ← source tarball
+#   codeledger-chromium-vX.Y.Z.zip  ← load in Chrome/Edge/Brave
+#   codeledger-firefox-vX.Y.Z.zip   ← submit to AMO / side-load in Firefox
+#   codeledger-source-vX.Y.Z.zip    ← source tarball
 
 # 4. Commit and tag:
 git commit -m "chore: release vX.Y.Z"

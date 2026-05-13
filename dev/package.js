@@ -45,8 +45,8 @@ function run(cmd, label) {
 // 1. CSS build
 run("npm run build:css", "Compile Tailwind CSS");
 
-// 2. Chrome package
-run("node dev/package-chrome.js", `Package Chrome → releases/codeledger-chrome-v${version}.zip`);
+// 2. Chromium package
+run("node dev/package-chrome.js", `Package Chromium → releases/codeledger-chromium-v${version}.zip`);
 
 // 3. Firefox package
 run("node dev/package-firefox.js", `Package Firefox → releases/codeledger-firefox-v${version}.zip`);
@@ -69,7 +69,7 @@ sourceZip.writeZip(sourcePath);
 console.log(`→ Source tarball → releases/codeledger-source-v${version}.zip`);
 
 console.log(`\nDone. Three artifacts in releases/:`);
-console.log(`  codeledger-chrome-v${version}.zip`);
+console.log(`  codeledger-chromium-v${version}.zip`);
 console.log(`  codeledger-firefox-v${version}.zip`);
 console.log(`  codeledger-source-v${version}.zip`);
 console.log(`\nNext steps:`);

@@ -7,9 +7,9 @@ const version = pkg.version;
 
 mkdirSync("releases", { recursive: true });
 
-const outPath = resolve(`releases/codeledger-chrome-v${version}.zip`);
+const outPath = resolve(`releases/codeledger-chromium-v${version}.zip`);
 const zip = new AdmZip();
 zip.addLocalFolder("./src", "");
 zip.writeZip(outPath);
 
-console.log(`Chrome extension packaged: ${outPath}`);
+console.log(`Chromium extension packaged: ${outPath}`);
