@@ -79,7 +79,7 @@ import {
     commitBackupToGitHub,
     fetchBackupSnapshot,
 } from "../core/backup/backup-manager.js";
-import { findDuplicatesForProblem } from "../core/ai-deduplication.js";
+import { findDuplicatesForProblem, compareSolutions as compareSolutionsForDedup } from "../core/ai-deduplication.js";
 import {
     apiFetch as ghApiFetch,
     getCurrentUser as ghGetCurrentUser,
@@ -2646,6 +2646,25 @@ try {
                     sendResponse({ ok: false, error: e.message });
                 });
             return true;
+        }
+
+        if (msg && msg.type === "AI_COMPARE_SOLUTIONS") {
+            (async () => {
+                try {
+                    const settings = await Storage.getSettings();
+                    const providerId = settings.aiProvider || "gemini";
+                    const result = await compareSolutionsForDedup(
+                        providerId,
+                        { code: msg.primary?.code, lang: msg.primary?.lang },
+                        { code: msg.candidate?.code, lang: msg.candidate?.lang }
+                    );
+                    sendResponse({ same: !!result?.same });
+                } catch (e) {
+                    dbg.warn(`AI_COMPARE_SOLUTIONS: failed:`, e?.message);
+                    sendResponse({ same: false });
+                }
+            })();
+            return true; // async response
         }
 
         if (msg && msg.type === "LIST_GITHUB_BACKUPS") {
