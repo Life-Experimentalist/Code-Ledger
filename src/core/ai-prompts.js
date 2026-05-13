@@ -10,14 +10,22 @@
 import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("AIPrompts");
-export const DEFAULT_PROMPT_TEMPLATE = `Review this {difficulty} {language} solution for '{title}'.
+export const DEFAULT_PROMPT_TEMPLATE = `You are an expert competitive programming mentor. Review this {difficulty} {language} solution for '{title}'.
 
-Provide:
-1. Time complexity (Big-O) and space complexity
-2. Correctness — any edge cases that could fail?
-3. One concrete optimisation if applicable
+## Complexity
+- **Time:** O(?) — one-line justification
+- **Space:** O(?) — one-line justification
 
-Be concise. Max 200 words.`;
+## Correctness
+Identify up to 2 specific edge cases that could break this solution (e.g. empty input, integer overflow, duplicates, off-by-one). For each, state the input and expected vs actual behaviour.
+
+## Optimization
+If a meaningfully better approach exists (strictly better complexity, or code that is 30%+ simpler), describe it in 2–3 sentences and state the improved complexity. Otherwise write "Current approach is optimal."
+
+## Code Quality
+One sentence on the most impactful readability or style improvement, if any.
+
+Keep each section tight. Total response under 350 words. Use markdown.`;
 
 export const AI_CHAT_SURFACE_PROMPTS = {
     default: `You are CodeLedger's DSA tutor. Help the learner think clearly, keep answers concise, and prioritize correctness, edge cases, and complexity. When appropriate, use bullet points and small examples.`,
@@ -144,7 +152,11 @@ export function buildReviewPrompt(
     const filledTemplate = fillPromptTemplate(template, problemContext);
     const lang = problemContext.language || problemContext.lang?.name || "";
     dbg.log(`buildReviewPrompt(): ${platform} (${lang})`);
-    return `${filledTemplate}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
+    const needsTags = !problemContext.tags?.length;
+    const tagInstruction = needsTags
+        ? `\n\nThis problem has no topic tags. On the very last line of your response, output 2–4 relevant algorithm/data structure tags in exactly this format (no other text on that line):\nTAGS: Tag One, Tag Two`
+        : "";
+    return `${filledTemplate}${tagInstruction}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
 }
 
 export function buildConversationSystemPrompt(context = {}) {
