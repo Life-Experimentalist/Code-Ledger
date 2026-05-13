@@ -1949,4 +1949,56 @@ Be concise. Max 200 words.`;
             throw new Error(json.errors[0]?.message || "GraphQL error");
         return json;
     }
+
+    async handleCodeFetch(problemId) {
+        const slug = window.location.pathname.split("/problems/")[1]?.replace(/\//g, "");
+        dbg.log(`handleCodeFetch(${problemId}): slug=${slug}`);
+        try {
+            // 1. Latest accepted submission
+            const listRes = await this._gql(QUERIES.SUBMISSION_LIST, {
+                questionSlug: slug,
+                offset: 0,
+                limit: 10,
+                lastKey: null,
+            });
+            const submissions = listRes?.data?.questionSubmissionList?.submissions || [];
+            const accepted = submissions.find((s) => /accepted/i.test(s.statusDisplay));
+            if (!accepted) throw new Error("No accepted submissions found");
+
+            // 2. Submission details (code + runtime)
+            const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, {
+                submissionId: +accepted.id,
+            });
+            const detail = detailRes?.data?.submissionDetails;
+            if (!detail?.code) throw new Error("Submission details returned no code");
+
+            // 3. Topic tags — non-fatal
+            let tags = [];
+            try {
+                const metaRes = await this._gql(QUERIES.QUESTION, { titleSlug: slug });
+                tags = metaRes?.data?.question?.topicTags?.map((t) => t.name) || [];
+            } catch (_) {}
+
+            const lang = resolveLang(detail.lang);
+
+            runtime.sendMessage({
+                type: "CODELEDGER_CODE_FETCHED",
+                problemId,
+                code: detail.code,
+                lang: { name: lang.verbose, slug: lang.slug, ext: lang.ext },
+                runtime: detail.runtimeDisplay || null,
+                memory: detail.memoryDisplay || null,
+                runtimePct: Math.round(detail.runtimePercentile || 0),
+                memoryPct: Math.round(detail.memoryPercentile || 0),
+                tags,
+            });
+        } catch (e) {
+            dbg.error(`handleCodeFetch(${problemId}): ✗`, e?.message);
+            runtime.sendMessage({
+                type: "CODELEDGER_CODE_FETCHED",
+                problemId,
+                error: e.message,
+            });
+        }
+    }
 }
