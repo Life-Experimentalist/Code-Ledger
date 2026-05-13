@@ -156,7 +156,7 @@ export function buildReviewPrompt(
     const tagInstruction = needsTags
         ? `\n\nThis problem has no topic tags. On the very last line of your response, output 2–4 relevant algorithm/data structure tags in exactly this format (no other text on that line):\nTAGS: Tag One, Tag Two`
         : "";
-    return `${filledTemplate}${tagInstruction}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\``;
+    return `${filledTemplate}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\`${tagInstruction}`;
 }
 
 export function buildConversationSystemPrompt(context = {}) {
