@@ -79,11 +79,7 @@ import {
     commitBackupToGitHub,
     fetchBackupSnapshot,
 } from "../core/backup/backup-manager.js";
-import {
-    findDuplicatesForProblem,
-    compareSolutions,
-    mergeSolutions,
-} from "../core/ai-deduplication.js";
+import { findDuplicatesForProblem } from "../core/ai-deduplication.js";
 import {
     apiFetch as ghApiFetch,
     getCurrentUser as ghGetCurrentUser,
