@@ -1936,7 +1936,7 @@ async function processAIReviewQueue() {
             );
             await markProcessing(item.id);
             try {
-                const problem = await Storage.getProblem(item.problemId);
+                let problem = await Storage.getProblem(item.problemId);
                 if (!problem) {
                     await markDone(item.id);
                     dbg.warn(
