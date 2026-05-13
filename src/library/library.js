@@ -67,6 +67,7 @@ function LibraryApp() {
     const [currentDuplicateGroup, setCurrentDuplicateGroup] = useState(null);
     const [setupIncomplete, setSetupIncomplete] = useState(null);
     const [setupDismissed, setSetupDismissed] = useState(false);
+    const [importReport, setImportReport] = useState(null);
 
     // Reload problems from IndexedDB (used after import or external change)
     const reloadProblems = useCallback(() => {
@@ -327,6 +328,24 @@ function LibraryApp() {
         return () => window.removeEventListener("message", handleOAuthMessage);
     }, []);
 
+    // Listen for import complete broadcast from the service worker
+    useEffect(() => {
+        if (!window.chrome?.runtime?.onMessage) return;
+        const handleImportComplete = (msg) => {
+            if (msg?.type !== "CODELEDGER_IMPORT_COMPLETE") return;
+            setImportReport({
+                saved: msg.saved || 0,
+                autoMerged: msg.autoMerged || 0,
+                conflicts: msg.conflicts || 0,
+                missingCode: msg.missingCode || 0,
+                missingTags: msg.missingTags || 0,
+            });
+            reloadProblems();
+        };
+        chrome.runtime.onMessage.addListener(handleImportComplete);
+        return () => chrome.runtime.onMessage.removeListener(handleImportComplete);
+    }, [reloadProblems]);
+
     const handleOnboardingComplete = async () => {
         setShowGitHubOnboarding(false);
         // Refresh settings to reflect repo setup
@@ -499,6 +518,32 @@ function LibraryApp() {
 
     return html`
         <div class="flex flex-col h-full w-full bg-[#050508]">
+            ${importReport && html`
+                <div class="px-4 py-3 bg-emerald-900/30 border-b border-emerald-500/20 flex items-center gap-3 flex-wrap text-sm shrink-0">
+                    <span class="text-emerald-300 font-medium">Import complete:</span>
+                    <span class="text-slate-300">${importReport.saved} saved</span>
+                    ${importReport.autoMerged > 0 && html`<span class="text-slate-400">· ${importReport.autoMerged} auto-merged</span>`}
+                    ${importReport.conflicts > 0 && html`<span class="text-amber-300">· ${importReport.conflicts} conflict${importReport.conflicts === 1 ? "" : "s"} need review</span>`}
+                    ${importReport.missingCode > 0 && html`<span class="text-slate-400">· ${importReport.missingCode} queued for code recovery</span>`}
+                    ${importReport.missingTags > 0 && html`<span class="text-slate-400">· ${importReport.missingTags} queued for tag refresh</span>`}
+                    <div class="ml-auto flex gap-2">
+                        ${importReport.conflicts > 0 && html`
+                            <button
+                                onClick=${() => { setActiveTab("settings"); setImportReport(null); }}
+                                class="px-3 py-1 text-xs rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-200 hover:bg-amber-500/25 transition-colors"
+                            >
+                                View conflicts
+                            </button>
+                        `}
+                        <button
+                            onClick=${() => setImportReport(null)}
+                            class="px-3 py-1 text-xs rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-slate-200 transition-colors"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            `}
             <header
                 class="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[#0a0a0f] shrink-0"
             >
