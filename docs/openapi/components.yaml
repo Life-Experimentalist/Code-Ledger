@@ -1,0 +1,34 @@
+components:
+  securitySchemes:
+    app_jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    canonical_token:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Bearer token that must match `CANONICAL_UPLOAD_TOKEN` binding on the worker.
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        version:
+          type: string
+        ts:
+          type: number
+      required: [ok, version, ts]
+    OKResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required: [ok]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
