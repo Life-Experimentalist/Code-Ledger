@@ -3,7 +3,7 @@
 This document defines version semantics and release policy.
 
 For the procedural release steps, always use:
-- [guides/RELEASE_GUIDE.md](guides/RELEASE_GUIDE.md)
+- [guides/release/release-guide.md](guides/release/release-guide.md)
 
 ## Semantic Versioning
 
@@ -30,7 +30,7 @@ If they differ, release must fail.
 
 Release is blocked unless all checks pass:
 
-- CHANGELOG section exists for the target version in docs/CHANGELOG.md
+- CHANGELOG section exists for the target version in docs/archive/changelog.md
 - Type-check passes
 - Sync regression checks pass
 - Build and packaging steps succeed
@@ -55,5 +55,5 @@ CI will re-validate key guards, including sync regression checks.
 
 Release steps are intentionally centralized in one place:
 
-- Canonical procedure: guides/RELEASE_GUIDE.md
+- Canonical procedure: guides/release/release-guide.md
 - This file: policy only

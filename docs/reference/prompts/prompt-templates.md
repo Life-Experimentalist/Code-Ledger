@@ -371,14 +371,14 @@ codeledger/
 │       ├── leetcode-importer.js      # automated profile import for LeetCode
 │       └── gfg-importer.js          # automated profile import for GFG
 ├── docs/
-│   ├── ARCHITECTURE.md               # 7 Mermaid diagrams
-│   ├── ADDING_PLATFORM_HANDLER.md
+│   ├── architecture/README.md        # architecture index
+│   ├── guides/adding-platform-handler.md
 │   ├── ADDING_GIT_HANDLER.md
 │   ├── ADDING_AI_HANDLER.md
 │   ├── CANONICAL_MAP.md
 │   ├── SCRAPING_SYSTEM.md
 │   ├── DEBUG_SYSTEM.md
-│   ├── PORTFOLIO_INTEGRATION.md      # how to wire into VKrishna04.github.io
+│   ├── reference/strategy/portfolio-integration.md # how to wire into VKrishna04.github.io
 │   ├── SECURITY.md
 │   └── OPENAPI.yaml
 ├── .env.example
@@ -1065,7 +1065,7 @@ The manifest must include `browser_specific_settings.gecko` for Firefox and `sid
 
 ---
 
-## §PORTFOLIO INTEGRATION — `docs/PORTFOLIO_INTEGRATION.md` + `src/core/portfolio-bridge.js`
+## §PORTFOLIO INTEGRATION — `docs/reference/strategy/portfolio-integration.md` + `src/core/portfolio-bridge.js`
 
 CodeLedger exports a read-only data bridge for the portfolio.
 
@@ -1094,7 +1094,7 @@ export async function getDSAStatsForPortfolio(githubToken, repoOwner, repoName) 
 }
 ```
 
-### Portfolio `settings.json` integration snippet (document in `docs/PORTFOLIO_INTEGRATION.md`):
+### Portfolio `settings.json` integration snippet (document in `docs/reference/strategy/portfolio-integration.md`):
 
 ```json
 {
@@ -1113,7 +1113,7 @@ export async function getDSAStatsForPortfolio(githubToken, repoOwner, repoName) 
 
 The portfolio (React+Vite) reads this config and calls the GitHub API directly to fetch `index.json` from the DSA repo. The CodeLedger integration provides the exact schema of `index.json` so the portfolio knows what fields to expect.
 
-Generate `docs/PORTFOLIO_INTEGRATION.md` with:
+Generate `docs/reference/strategy/portfolio-integration.md` with:
 - Complete setup guide
 - Example `settings.json` snippet
 - The `index.json` schema reference
@@ -1170,7 +1170,7 @@ Generate with:
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![Firefox](https://img.shields.io/badge/Firefox-supported-red?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)
 [![Chrome](https://img.shields.io/badge/Chrome-supported-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/)
-[![Platforms](https://img.shields.io/badge/platforms-3%2B-teal?style=flat-square)](docs/ADDING_PLATFORM_HANDLER.md)
+[![Platforms](https://img.shields.io/badge/platforms-3%2B-teal?style=flat-square)](docs/guides/adding-platform-handler.md)
 [![Views](https://counter.vkrishna04.me/api/views/codeledger/badge?style=flat-square&color=blueviolet&label=views)](https://counter.vkrishna04.me)
 [![Installs](https://counter.vkrishna04.me/api/views/codeledger-install/badge?style=flat-square&color=purple&label=installs)](https://counter.vkrishna04.me)
 ```
@@ -1210,7 +1210,7 @@ profile. Owned entirely by you. Shareable on your portfolio. No servers.
 
 ---
 
-## §DOCUMENTATION — `docs/ARCHITECTURE.md`
+## §DOCUMENTATION — `docs/architecture/overview.md`
 
 Generate all 7 Mermaid diagrams completely. They must be syntactically valid Mermaid.
 

@@ -10,17 +10,11 @@
 
 <br/>
 
-[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md)
-[![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![Version](https://img.shields.io/badge/version-1.2.0-blueviolet?style=flat-square)](docs/CHANGELOG.md)
+[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members) [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Version](https://img.shields.io/badge/version-1.3.0-blueviolet?style=flat-square)](docs/archive/changelog.md)
 
 <br/>
 
-[![Chrome](https://img.shields.io/badge/Chrome-Install-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/)
-[![Firefox](https://img.shields.io/badge/Firefox-Install-orange?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)
-[![Edge](https://img.shields.io/badge/Edge-Install-0078d4?style=flat-square&logo=microsoftedge)](https://microsoftedge.microsoft.com/addons/detail/codeledger/)
+[![Chrome](https://img.shields.io/badge/Chrome-Install-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/) [![Firefox](https://img.shields.io/badge/Firefox-Install-orange?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/) [![Edge](https://img.shields.io/badge/Edge-Install-0078d4?style=flat-square&logo=microsoftedge)](https://microsoftedge.microsoft.com/addons/detail/codeledger/)
 
 <br/>
 
@@ -54,14 +48,14 @@ You grind DSA every day. Your GitHub looks empty. Your solutions disappear into 
 
 ## By the Numbers
 
-| Metric | Value |
-|--------|-------|
-| Platforms supported | LeetCode (full · bulk import) — GFG & Codeforces (in development) |
-| AI providers integrated | 6 (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter) |
-| Files committed per solve | 2 minimum (solution + description) · 3 with AI review |
-| Commit type | Atomic via GitHub Trees API — single SHA, never partial |
-| External servers that touch your code | 0 — data goes directly to your GitHub repo |
-| Time from accept to commit | < 3 seconds |
+| Metric                                | Value                                                             |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| Platforms supported                   | LeetCode (full · bulk import) — GFG & Codeforces (in development) |
+| AI providers integrated               | 6 (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter)          |
+| Files committed per solve             | 2 minimum (solution + description) · 3 with AI review             |
+| Commit type                           | Atomic via GitHub Trees API — single SHA, never partial           |
+| External servers that touch your code | 0 — data goes directly to your GitHub repo                        |
+| Time from accept to commit            | < 3 seconds                                                       |
 
 ---
 
@@ -77,18 +71,18 @@ You grind DSA every day. Your GitHub looks empty. Your solutions disappear into 
 
 ## What You Get
 
-|                           |                                                                                                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Zero-click commits**    | Every accepted submission is committed to your GitHub the instant it's accepted — solution file + problem description in one atomic git commit.                                                   |
-| **Bulk LeetCode import**  | Import your entire LeetCode history in one click from your Progress page. Every past accepted solution — with code, description, and stats — committed to your repo instantly.                   |
-| **AI code review**        | Connect any API key and get time/space complexity analysis, optimization suggestions, and hints committed alongside your code. Supports Gemini, OpenAI, Claude, DeepSeek, Ollama, and OpenRouter. |
-| **Live dashboard**        | A GitHub-style heatmap, topic radar, difficulty breakdown, and solve velocity chart — built from your own data, hosted on your own GitHub Pages.                                                  |
-| **Knowledge graph**       | A force-directed graph of everything you've solved, linked by topic. See your strengths and gaps at a glance.                                                                                     |
-| **AI chat panel**         | A floating panel on every problem page. Ask about complexity, request hints, paste errors — all with your code pre-loaded via `/mycode`.                                                         |
-| **AI Behaviour Bank**     | Personal memory for your AI assistant: save insights, define skills that trigger on command, and build a learning roadmap that auto-injects context into every chat.                              |
-| **Cross-device sync**     | Your entire history synced to GitHub on every startup — open your dashboard on any machine and it's always current.                                                                               |
-| **Rolling backups**       | Automatic snapshots of problems + settings committed to your repo on a configurable schedule. Restore in one click.                                                                               |
-| **100% yours**            | Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping.                                                                                               |
+|                          |                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zero-click commits**   | Every accepted submission is committed to your GitHub the instant it's accepted — solution file + problem description in one atomic git commit.                                                   |
+| **Bulk LeetCode import** | Import your entire LeetCode history in one click from your Progress page. Every past accepted solution — with code, description, and stats — committed to your repo instantly.                    |
+| **AI code review**       | Connect any API key and get time/space complexity analysis, optimization suggestions, and hints committed alongside your code. Supports Gemini, OpenAI, Claude, DeepSeek, Ollama, and OpenRouter. |
+| **Live dashboard**       | A GitHub-style heatmap, topic radar, difficulty breakdown, and solve velocity chart — built from your own data, hosted on your own GitHub Pages.                                                  |
+| **Knowledge graph**      | A force-directed graph of everything you've solved, linked by topic. See your strengths and gaps at a glance.                                                                                     |
+| **AI chat panel**        | A floating panel on every problem page. Ask about complexity, request hints, paste errors — all with your code pre-loaded via `/mycode`.                                                          |
+| **AI Behaviour Bank**    | Personal memory for your AI assistant: save insights, define skills that trigger on command, and build a learning roadmap that auto-injects context into every chat.                              |
+| **Cross-device sync**    | Your entire history synced to GitHub on every startup — open your dashboard on any machine and it's always current.                                                                               |
+| **Rolling backups**      | Automatic snapshots of problems + settings committed to your repo on a configurable schedule. Restore in one click.                                                                               |
+| **100% yours**           | Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping.                                                                                               |
 
 ---
 
@@ -154,14 +148,14 @@ Already have hundreds of LeetCode solutions? Bring them all in at once:
 
 ## Supported AI Providers
 
-| Provider | Notes |
-| -------- | ----- |
-| Google Gemini | Default — free tier available |
-| OpenAI (GPT-4o, o3-mini, …) | Bring your own key |
-| Anthropic Claude | Bring your own key |
-| DeepSeek | Bring your own key |
-| Ollama | Local models — no API key needed |
-| OpenRouter | Access 100+ models with one key |
+| Provider                    | Notes                            |
+| --------------------------- | -------------------------------- |
+| Google Gemini               | Default — free tier available    |
+| OpenAI (GPT-4o, o3-mini, …) | Bring your own key               |
+| Anthropic Claude            | Bring your own key               |
+| DeepSeek                    | Bring your own key               |
+| Ollama                      | Local models — no API key needed |
+| OpenRouter                  | Access 100+ models with one key  |
 
 The extension tries providers in order and falls back automatically if one fails.
 
@@ -189,7 +183,32 @@ GFG and Codeforces handlers are the most-wanted contributions right now. The con
 3. Add the hostname in `src/content/handler-loader.js`
 4. Run `node dev/generate-manifest-domains.js`
 
-See [docs/ADDING_PLATFORM_HANDLER.md](docs/ADDING_PLATFORM_HANDLER.md) for the full contract.
+See [docs/guides/development/adding-platform-handler.md](docs/guides/development/adding-platform-handler.md) for the full contract.
+
+### Graphify Knowledge Graph (Full Project)
+
+Upstream tool repository: https://github.com/safishamsi/graphify
+
+PowerShell:
+
+```powershell
+Set-Location "V:\Code\ProjectCode\CodeLedger"
+graphify --help
+graphify update "V:\Code\ProjectCode\CodeLedger"
+Invoke-Item ".\graphify-out\graph.html"
+```
+
+Generated outputs:
+
+- graphify-out/graph.html
+- graphify-out/graph.json
+- graphify-out/GRAPH_REPORT.md
+
+For full semantic extraction across docs and non-code files, run the assistant command:
+
+```text
+/graphify V:\Code\ProjectCode\CodeLedger
+```
 
 ---
 
@@ -225,7 +244,7 @@ The extension has **no bundler, no transpiler** — pure ES6 modules, Preact + h
 
 Read [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) before opening a PR.
 
-**GFG and Codeforces platform handlers are actively wanted** — see [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md) for the open tickets. The platform handler contract is fully documented; LeetCode's handler is the reference implementation.
+**GFG and Codeforces platform handlers are actively wanted** — see [docs/reference/backlog.md](docs/reference/backlog.md) for the open tickets. The platform handler contract is fully documented; LeetCode's handler is the reference implementation.
 
 Quick rules:
 - All extension API calls go through `src/lib/browser-compat.js` — never touch `chrome.*` or `browser.*` elsewhere.
@@ -236,11 +255,12 @@ Quick rules:
 
 ## Documentation
 
-- Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
-- Feature backlog: [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md)
-- Release guide: [docs/guides/RELEASE_GUIDE.md](docs/guides/RELEASE_GUIDE.md)
+- Changelog: [docs/archive/changelog.md](docs/archive/changelog.md)
+- Feature backlog: [docs/reference/backlog.md](docs/reference/backlog.md)
+- Release guide: [docs/guides/release/release-guide.md](docs/guides/release/release-guide.md)
 - OpenAPI contract: [docs/OPENAPI.yaml](docs/OPENAPI.yaml)
-- Adding a platform: [docs/ADDING_PLATFORM_HANDLER.md](docs/ADDING_PLATFORM_HANDLER.md)
+- Adding a platform: [docs/guides/development/adding-platform-handler.md](docs/guides/development/adding-platform-handler.md)
+- Graphify workflow: [docs/guides/development/graphify-workflow.md](docs/guides/development/graphify-workflow.md)
 
 ---
 

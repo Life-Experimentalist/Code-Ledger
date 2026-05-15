@@ -2,6 +2,12 @@
 
 CodeLedger is built using a modern, event-driven pattern designed for Manifest V3 (MV3). It avoids hardcoding platform logic directly into the core engine, utilizing a plugin architecture instead.
 
+## Entry Points
+
+- [Detailed Architecture](../architecture/README.md)
+- [Queues & Orchestration](../queues/README.md)
+- [Debugging & Logging](../debugging/README.md)
+
 ## 1. System Overview Flowchart
 
 At a high level, CodeLedger relies on Content Scripts injected into specific platforms to parse the DOM and detect successful code submissions.

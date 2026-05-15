@@ -53,7 +53,7 @@ pm run build
 ### Documentation
 
 - [ ] README.md is complete and user-friendly
-- [ ] CHANGELOG.md is up-to-date
+- [ ] archive/changelog.md is up-to-date
 - [ ] Icons are present (16, 32, 48, 128px)
 - [ ] No broken links in documentation
 
@@ -538,11 +538,11 @@ pm run build
 ### Documentation
 
 - [ ] README.md complete
-- [ ] CHANGELOG.md up-to-date
+- [ ] archive/changelog.md up-to-date
 - [ ] PRIVACY.md created and linked
 - [ ] CODE_OF_CONDUCT.md present
 - [ ] SECURITY.md present
-- [ ] ARCHITECTURE.md present
+- [ ] architecture/README.md present
 - [ ] All links tested (no 404s)
 
 ### Store-Specific
@@ -586,7 +586,7 @@ pm run build
 ### Ongoing
 
 - [ ] Update stores with new releases (same process)
-- [ ] Keep CHANGELOG.md current
+- [ ] Keep archive/changelog.md current
 - [ ] Respond to user issues
 - [ ] Monitor store ratings + comments
 - [ ] Security updates: prioritize and release ASAP

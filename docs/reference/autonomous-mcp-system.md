@@ -307,6 +307,6 @@ Manual testing checklist:
 
 ## See Also
 
-- [MCP_TOOLS.md](./MCP_TOOLS.md) — 7 available tools reference
+- [MCP Tools](mcp-tools.md) — 7 available tools reference
 - [CLAUDE.md](../CLAUDE.md) — Architecture overview
 - [CodeLedger extension docs](../README.md)

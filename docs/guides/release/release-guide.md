@@ -12,7 +12,7 @@ How to cut a new release of CodeLedger.
 
 ### 1. Update the changelog
 
-Add a new section at the top of `docs/CHANGELOG.md`:
+Add a new section at the top of `docs/archive/changelog.md`:
 
 ```markdown
 ## [X.Y.Z] — YYYY-MM-DD
@@ -29,6 +29,8 @@ Add a new section at the top of `docs/CHANGELOG.md`:
 ```
 
 Follow [Keep a Changelog](https://keepachangelog.com) format.
+
+See the section landing page at [Release Guides](./README.md).
 
 ### 2. Bump version
 

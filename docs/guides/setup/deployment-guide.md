@@ -36,9 +36,8 @@ Worker → redirects to GitHub's OAuth authorize endpoint
 User → approves scope (repo access)
     ↓
 GitHub → redirects back to /api/auth/github/callback?code=XXX
-    ↓
+ For details, see [GitHub App Setup](github-app-setup.md).
 Worker → exchanges code for access token (using OAuth client ID/secret)
-    ↓
 Worker → posts token back to opener window (via postMessage)
     ↓
 Extension → stores token in chrome.storage.local
@@ -53,7 +52,6 @@ All secrets are **already set** in your repository. Here's what they do:
 | Secret                             | Purpose                                               | Set? |
 | ---------------------------------- | ----------------------------------------------------- | ---- |
 | `CF_API_TOKEN`                     | Cloudflare API token for publishing Worker            | ✅    |
-| `CF_ACCOUNT_ID`                    | Your Cloudflare account ID (32-char string)           | ✅    |
 | `CF_ZONE_ID`                       | DNS zone ID for codeledger.vkrishna04.me              | ✅    |
 | `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | ✅    |
 | `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | ✅    |
@@ -91,7 +89,6 @@ The CI workflow automatically uploads these at deployment time. To verify they'r
 
 ```bash
 # List all secrets for the codeledger worker
-npx wrangler secret list --env production
 ```
 
 Expected secrets in Cloudflare:
@@ -121,7 +118,7 @@ Your GitHub App (`CodeLedger Dev`) should be configured with:
      - `Members` (read) — optional, for org-wide insights
 4. **Events:** `push`, `pull_request`, `issues`, `workflow_run`
 
-> For details, see [GITHUB_APP_SETUP.md](../GITHUB_APP_SETUP.md).
+> For details, see [GitHub App Setup](github-app-setup.md).
 
 ---
 
@@ -140,15 +137,11 @@ Expected output: all 11 secrets listed above should be present.
 Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → **codeledger.vkrishna04.me** → **Workers** → **Routes** and confirm:
 - Route `codeledger.vkrishna04.me/*` is bound to the `codeledger` Worker.
 
-### 3. Trigger Deployment
 
 **Option A: Using GitHub Actions UI (recommended)**
 
 1. Go to [Actions](https://github.com/Life-Experimentalist/Code-Ledger/actions)
 2. Select **Deploy Worker** workflow
-3. Click **"Run workflow"** button
-4. Select **Branch: main**
-5. Click **"Run workflow"**
 
 **Option B: Via CLI**
 
@@ -180,7 +173,6 @@ gh run view --repo Life-Experimentalist/Code-Ledger --log | Select-Object -Last 
 
 ## Testing Deployed Endpoints
 
-Once deployed, test these endpoints:
 
 ### 1. Landing Page
 
@@ -232,7 +224,6 @@ Expected: Returns list of GitHub App installations (200 OK) or 500 if secrets mi
 ### Prerequisites
 
 - Node.js 20+
-- `npm` (or `uv` if using Python)
 - Wrangler CLI: `npm install -g wrangler` (or `npx wrangler`)
 
 ### Setup
@@ -248,7 +239,6 @@ npm ci
 npm run dev
 # or
 npx wrangler dev --local
-```
 
 This starts a local Worker on `http://localhost:8787`.
 
@@ -272,12 +262,8 @@ curl http://localhost:8787/api/data/canonical-map.json
 ### Issue: Workflow fails with "Authentication error [code: 10000]"
 
 **Cause:** API token lacks permissions to update Worker routes.
-
 **Solution:**
 - Regenerate API token with these permissions:
-  - **Account:** Workers Scripts (Edit)
-  - **Zone:** Workers Routes (Edit), Workers KV (Edit)
-  - **User:** User Details (Read)
 - Update `CF_API_TOKEN` in GitHub repo secrets.
 - Re-run the workflow.
 
@@ -360,6 +346,6 @@ cd worker && npm ci && npm run dev
 ---
 
 For more details, see:
-- [GITHUB_APP_SETUP.md](../GITHUB_APP_SETUP.md)
+- [GitHub App Setup](github-app-setup.md)
 - [OPENAPI.yaml](../OPENAPI.yaml)
-- [ARCHITECTURE.md](../ARCHITECTURE.md)
+- [Architecture](../architecture/README.md)

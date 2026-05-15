@@ -10,7 +10,7 @@ This document provides recommended values and a manifest to create the GitHub Ap
 
 **Webhook URL**: https://codeledger.vkrishna04.me/api/webhook/github
 
-**Webhook secret**: generate a strong random secret and store it as an environment variable in your Cloudflare Worker (e.g. `GITHUB_APP_WEBHOOK_SECRET`).
+**Webhook secret**: generate a strong random secret and store it as an environment variable in your Cloudflare Worker (e.g. `CODELEDGER_GH_APP_WEBHOOK_SECRET`).
 
 Recommended choices in the App creation UI:
 
@@ -68,17 +68,17 @@ How it will be used by CodeLedger:
 
 Post-creation steps (high level):
 
-1. Download the App private key from the GitHub App settings. Store it as an encrypted secret in Cloudflare Worker (e.g. `GITHUB_APP_PRIVATE_KEY`).
-2. Save the webhook secret in `GITHUB_APP_WEBHOOK_SECRET` in the Worker environment.
+1. Download the App private key from the GitHub App settings. Store it as an encrypted secret in Cloudflare Worker (e.g. `CODELEDGER_GH_APP_PRIVATE_KEY`).
+2. Save the webhook secret in `CODELEDGER_GH_APP_WEBHOOK_SECRET` in the Worker environment.
 3. In the Worker code (`worker/src/index.js`) configure the App ID and endpoints via environment variables.
 4. Install the App on the `Life-Experimentalist/Code-Ledger` repository (or choose the desired installation target).
 
 Cloudflare Worker environment variables (set these in the Cloudflare dashboard for your Worker):
 
-- `GITHUB_APP_ID` — GitHub App numeric ID
-- `GITHUB_APP_PRIVATE_KEY` — the PEM private key (store as a secret; newline-escaped if pasting)
-- `GITHUB_APP_WEBHOOK_SECRET` — webhook secret used to validate incoming hooks
-- `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` — only needed if you use OAuth user flow instead of App-installation flow
+- `CODELEDGER_GH_APP_ID` — GitHub App numeric ID
+- `CODELEDGER_GH_APP_PRIVATE_KEY` — the PEM private key (store as a secret; newline-escaped if pasting)
+- `CODELEDGER_GH_APP_WEBHOOK_SECRET` — webhook secret used to validate incoming hooks
+- `CODELEDGER_GH_APP_CLIENT_ID` and `CODELEDGER_GH_APP_CLIENT_SECRET` — only needed if you use OAuth user flow instead of App-installation flow
 - `TELEMETRY_ENDPOINT` — e.g. `https://counter.vkrishna04.me`
 
 Manual Cloudflare Worker deployment (via Cloudflare dashboard):
@@ -150,6 +150,6 @@ If you want, I can:
 ---
 File references:
 
-- Worker auth entry: [worker/src/index.js](../worker/src/index.js)
-- Cloudflare config: [worker/wrangler.toml](../worker/wrangler.toml)
+- Worker auth entry: [worker/src/index.js](../../worker/src/index.js)
+- Cloudflare config: [worker/wrangler.toml](../../worker/wrangler.toml)
 
