@@ -1,0 +1,40 @@
+eventBus:
+  transport:
+    type: chrome.runtime messaging bridge
+    envelope:
+      type: EB_EMIT
+      shape:
+        type: string
+        event: string
+        data: any
+  events:
+    - name: problem:solved
+      producer:
+        - src/handlers/platforms/leetcode/index.js
+        - src/handlers/platforms/geeksforgeeks/index.js
+      consumer:
+        - src/background/service-worker.js (handleSolved)
+      description: Platform handlers emit solved-problem payloads; service-worker persists, reviews, and commits.
+      payloadRef: "#/components/schemas/ProblemPayload"
+
+oauthMessageContract:
+  messageType: CODELEDGER_AUTH
+  producer:
+    - worker/src/index.js (/api/auth/github/callback HTML postMessage)
+  consumers:
+    - src/library/library.js
+    - src/ui/components/SettingsSchema.js
+  shape:
+    type: object
+    required: [type, provider]
+    properties:
+      type:
+        type: string
+        const: CODELEDGER_AUTH
+      provider:
+        type: string
+        enum: [github]
+      token:
+        type: string
+      error:
+        type: string

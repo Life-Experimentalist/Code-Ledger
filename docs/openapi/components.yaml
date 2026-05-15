@@ -32,3 +32,101 @@ components:
         error:
           type: string
       required: [error]
+    RuntimeMessageEnvelope:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - QUEUE_ALL_AI_REVIEWS
+            - QUEUE_MISSING_AI_REVIEWS
+            - CANCEL_AI_REVIEW_QUEUE
+            - GET_QUEUE_STATS
+            - GET_QUEUE_ITEMS
+            - REMOVE_QUEUE_ITEM
+            - SYNC_SETTINGS_TO_GITHUB
+            - SYNC_SETTINGS_FROM_GITHUB
+            - REPO_DIAGNOSTICS
+            - REPO_REPAIR
+            - CODELEDGER_RUN_MIGRATIONS
+            - RESYNC_COUNT
+            - RESYNC_ALL
+            - BACKUP_TO_REPO
+            - SYNC_PREVIEW
+            - SYNC_APPLY_IMPORT
+            - MIGRATE_REPO
+            - RESET_REPO
+            - FORCE_REBUILD_REPO
+            - FORCE_COMMIT_SETTINGS
+            - DETECT_LAYOUT_VERSION
+            - BULK_IMPORT
+            - REFRESH_METADATA
+            - REFRESH_METADATA_DONE
+            - AI_CHAT
+            - REGENERATE_AI_REVIEW
+            - AI_COMPARE_SOLUTIONS
+            - LIST_GITHUB_BACKUPS
+            - COMMIT_GITHUB_BACKUP_NOW
+            - RESTORE_GITHUB_BACKUP
+            - TRIGGER_CODE_RECOVERY
+            - OPEN_WELCOME
+            - OPEN_LIBRARY
+            - OPEN_POPUP
+      required: [type]
+    ProblemPayload:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        titleSlug:
+          type: string
+        platform:
+          type: string
+          enum: [leetcode, geeksforgeeks, codeforces]
+        difficulty:
+          type: string
+          enum: [Easy, Medium, Hard]
+        lang:
+          type: object
+          properties:
+            name:
+              type: string
+            ext:
+              type: string
+            slug:
+              type: string
+        tags:
+          type: array
+          items:
+            type: string
+        topic:
+          type: string
+        timestamp:
+          type: number
+        code:
+          type: string
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              content:
+                type: string
+            required: [path, content]
+        aiReview:
+          type: string
+        runtime:
+          type: string
+        memory:
+          type: string
+        elapsedSeconds:
+          type: number
+      required:
+        - title
+        - titleSlug
+        - platform
+        - difficulty

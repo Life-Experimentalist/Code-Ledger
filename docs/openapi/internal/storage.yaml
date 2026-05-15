@@ -1,0 +1,31 @@
+abstraction:
+  file: src/core/storage.js
+  name: Storage
+
+keyPolicy:
+  sourceOfTruth: src/core/constants.js#CONSTANTS.SK
+  rule: Never use hardcoded storage key strings outside constants.
+
+canonicalPaths:
+  oauthTokens:
+    key: auth.tokens
+    methods:
+      - Storage.getAuthToken(provider)
+      - Storage.setAuthToken(provider, token)
+  aiKeys:
+    key: ai.keys
+    methods:
+      - Storage.getAIKeys()
+      - Storage.setAIKeys(map)
+  settings:
+    key: settings
+    methods:
+      - Storage.getSettings()
+      - Storage.setSettings(settings)
+  problems:
+    engine: IndexedDB
+    dbName: codeledger
+    store: problems
+    methods:
+      - Storage.saveProblem(problem)
+      - Storage.getAllProblems()

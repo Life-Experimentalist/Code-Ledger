@@ -1,0 +1,49 @@
+transport:
+  api: chrome.runtime.onMessage / sendMessage
+  backgroundListener:
+    - src/background/service-worker.js
+
+requestTypes:
+  - QUEUE_ALL_AI_REVIEWS
+  - QUEUE_MISSING_AI_REVIEWS
+  - CANCEL_AI_REVIEW_QUEUE
+  - GET_QUEUE_STATS
+  - GET_QUEUE_ITEMS
+  - REMOVE_QUEUE_ITEM
+  - SYNC_SETTINGS_TO_GITHUB
+  - SYNC_SETTINGS_FROM_GITHUB
+  - REPO_DIAGNOSTICS
+  - REPO_REPAIR
+  - CODELEDGER_RUN_MIGRATIONS
+  - RESYNC_COUNT
+  - RESYNC_ALL
+  - BACKUP_TO_REPO
+  - SYNC_PREVIEW
+  - SYNC_APPLY_IMPORT
+  - MIGRATE_REPO
+  - RESET_REPO
+  - FORCE_REBUILD_REPO
+  - FORCE_COMMIT_SETTINGS
+  - DETECT_LAYOUT_VERSION
+  - BULK_IMPORT
+  - REFRESH_METADATA
+  - REFRESH_METADATA_DONE
+  - AI_CHAT
+  - REGENERATE_AI_REVIEW
+  - AI_COMPARE_SOLUTIONS
+  - LIST_GITHUB_BACKUPS
+  - COMMIT_GITHUB_BACKUP_NOW
+  - RESTORE_GITHUB_BACKUP
+  - TRIGGER_CODE_RECOVERY
+  - OPEN_WELCOME
+  - OPEN_LIBRARY
+  - OPEN_POPUP
+
+commonResponseShape:
+  type: object
+  properties:
+    ok:
+      type: boolean
+    error:
+      type: string
+  description: "Most service-worker message handlers return { ok: boolean, ... }."

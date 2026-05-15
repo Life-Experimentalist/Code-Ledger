@@ -1,10 +1,17 @@
 openapi: 3.1.0
 info:
-  title: CodeLedger Auth & Utility Worker API
+  title: CodeLedger Contracts (Worker + Internal Extension + Handlers)
   description: |
-    Cloudflare Worker API used by CodeLedger for OAuth, GitHub App operations,
-    canonical map hosting, and webhooks. Keep this spec in sync with
-    `worker/src/index.js` (the worker is the source of truth for routes).
+    Contract hub for CodeLedger:
+    1) Worker HTTP API (Cloudflare/Hono routes)
+    2) Internal extension runtime messaging contracts
+    3) Event bus contracts and OAuth postMessage contract
+    4) Handler registration and base-class interfaces
+    5) Storage key/path conventions
+
+    Keep HTTP routes in sync with `worker/src/index.js` and internal contracts in sync
+    with `src/background/service-worker.js`, `src/core/event-bus.js`,
+    `src/handlers/_base/*`, and `src/handlers/init.js`.
   version: 1.0.1
 
 servers:
@@ -30,10 +37,10 @@ tags:
     description: Miscellaneous routes (favicon, static assets)
 
 paths:
-  $ref: './openapi/paths/worker.yaml'
+  $ref: "./openapi/paths/worker.yaml"
 
 components:
-  $ref: './openapi/components.yaml#/components'
+  $ref: "./openapi/components.yaml#/components"
 
 x-extension-urls:
   description: |
@@ -86,3 +93,13 @@ x-extension-urls:
       description: Analytics with Python drill-down panel open
     - url: "library.html?tab=graph&graphLayout=force&problem=lc-two-sum"
       description: Graph in force layout with Two Sum modal open
+
+x-codeledger-internal-contracts:
+  events:
+    $ref: "./openapi/internal/events.yaml"
+  runtimeMessages:
+    $ref: "./openapi/internal/runtime-messages.yaml"
+  handlers:
+    $ref: "./openapi/internal/handlers.yaml"
+  storage:
+    $ref: "./openapi/internal/storage.yaml"

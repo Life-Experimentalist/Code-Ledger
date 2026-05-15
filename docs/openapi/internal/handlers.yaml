@@ -1,0 +1,54 @@
+registry:
+  file: src/core/handler-registry.js
+  methods:
+    - registerPlatform(id, handler)
+    - registerGitProvider(id, handler)
+    - registerAIProvider(id, handler)
+    - registerSettings(id, schema)
+
+bootstrap:
+  file: src/handlers/init.js
+  function: initializeHandlers()
+  platforms:
+    - leetcode
+    - geeksforgeeks
+    - codeforces
+  gitProviders:
+    - github
+    - gitlab
+    - bitbucket
+  aiProviders:
+    - gemini
+    - openai
+    - claude
+    - deepseek
+    - ollama
+    - openrouter
+
+contracts:
+  platform:
+    baseClass: src/handlers/_base/BasePlatformHandler.js
+    requiredMethods:
+      - detectSubmission()
+      - getSolutionCode()
+    optionalMethods:
+      - getDefaultPrompt()
+    helperMethods:
+      - safeQuery(selectors, scope)
+      - extractText(selector, scope)
+  git:
+    baseClass: src/handlers/_base/BaseGitHandler.js
+    requiredMethods:
+      - authenticate()
+      - commit(files, message)
+      - getFile(path)
+  ai:
+    baseClass: src/handlers/_base/BaseAIHandler.js
+    requiredMethods:
+      - review(code, problemContext)
+    optionalMethods:
+      - chat(messages, context)
+      - getAvailableModels()
+      - getSupportedMCPTools()
+      - executeMCPTool(toolId, args)
+      - processMCPToolCalls(toolCalls)
