@@ -1,33 +1,65 @@
 openapi: 3.1.0
 info:
-  title: CodeLedger GitHub Authentication & Sync API
-  description: CodeLedger relies heavily on standard GraphQL/REST platform endpoints and GitHub's Git Data Tree API. Below is the simplified spec indicating how CodeLedger interacts with Cloudflare workers for OAuth.
-  version: 1.0.0
+  title: CodeLedger Auth & Utility Worker API
+  description: |
+    Cloudflare Worker API used by CodeLedger for OAuth, GitHub App operations,
+    canonical map hosting, and webhooks. Keep this spec in sync with
+    `worker/src/index.js` (the worker is the source of truth for routes).
+  version: 1.0.1
 
-# Servers: update these to match `CONSTANTS.URLS` in src/core/constants.js.
 servers:
-  - url: https://codeledger.vkrishna04.me/api
-    description: Production Cloudflare OAuth Bridge (AUTH_WORKER)
   - url: https://codeledger.vkrishna04.me
-    description: Project landing / public docs
+    description: Production (worker mounted at root; API paths start with `/api`)
+  - url: https://codeledger.vkrishna04.me/api
+    description: Production API base (convenience entry; same host)
   - url: http://localhost:8787
-    description: Local development worker (use when running the auth worker locally)
+    description: Local development worker (run with `wrangler dev`)
+
+tags:
+  - name: health
+    description: Health and monitoring endpoints
+  - name: auth
+    description: OAuth flows and callbacks
+  - name: app
+    description: GitHub App related endpoints (requires App JWT)
+  - name: webhook
+    description: Incoming webhook receivers
+  - name: data
+    description: Canonical map hosting and admin endpoints
+  - name: misc
+    description: Miscellaneous routes (favicon, static assets)
 
 paths:
-  /app/installations:
+  /api/health:
     get:
+      tags: [health]
+      summary: Health check
+      description: Returns a minimal JSON health payload for uptime monitoring.
+      responses:
+        "200":
+          description: Health payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/app/installations:
+    get:
+      tags: [app]
       summary: List GitHub App installations
-      description: Returns a list of installations for the GitHub App. Requires an App JWT (server-side authentication).
+      description: Returns a list of installations for the configured GitHub App. Requires App JWT.
       security:
         - app_jwt: []
       responses:
         "200":
-          description: A JSON array of installation objects.
+          description: Array of installation objects (proxied from GitHub)
+          content:
+            application/json: {}
 
-  /app/installations/{id}/access_tokens:
+  /api/app/installations/{id}/access_tokens:
     post:
+      tags: [app]
       summary: Create an installation access token
-      description: Creates an installation access token for a given installation id (App JWT required).
       parameters:
         - in: path
           name: id
@@ -38,62 +70,66 @@ paths:
         - app_jwt: []
       responses:
         "201":
-          description: Installation access token created (JSON)
+          description: Installation access token created (proxied from GitHub)
+          content:
+            application/json: {}
 
-  /auth/{provider}:
+  /api/auth/{provider}:
     get:
-      summary: Initiate OAuth Flow for provider
-      description: >
-        Redirects the user to the chosen provider's authorization screen.
-        Supported providers: github, gitlab, bitbucket.
+      tags: [auth]
+      summary: Initiate OAuth flow
       parameters:
         - in: path
           name: provider
           required: true
           schema:
             type: string
-            enum: [github, gitlab, bitbucket]
+            enum: [github]
       responses:
         "302":
-          description: Redirection to provider authorization URL
+          description: Redirect to provider authorization URL
 
-  /auth/{provider}/callback:
+  /api/auth/{provider}/callback:
     get:
-      summary: OAuth Callback Receiver for provider
-      description: >
-        Exchanges the temporary authorization code for an access token, then
-        communicates it back to the extension using window.postMessage on the
-        opened window.
+      tags: [auth]
+      summary: OAuth callback receiver
+      description: Returns an HTML page that posts a `CODELEDGER_AUTH` message to the opener window.
       parameters:
         - in: path
           name: provider
           required: true
           schema:
             type: string
-            enum: [github, gitlab, bitbucket]
+            enum: [github]
         - in: query
           name: code
-          required: true
+          schema:
+            type: string
+        - in: query
+          name: error
+          schema:
+            type: string
+        - in: query
+          name: error_description
           schema:
             type: string
       responses:
         "200":
-          description: HTML page which posts the token back to the opener window.
+          description: HTML page which posts the token back to the opener window
           content:
             text/html:
               schema:
                 type: string
 
-  /webhook/github:
+  /api/webhook/github:
     post:
-      summary: GitHub Webhook receiver
-      description: >
-        Verifies the x-hub-signature-256 HMAC signature of the request body
-        and then processes webhook events.
+      tags: [webhook]
+      summary: GitHub webhook receiver
+      description: Verifies `x-hub-signature-256` header when configured, then processes webhook payloads.
       parameters:
         - in: header
           name: x-hub-signature-256
-          required: true
+          required: false
           schema:
             type: string
       requestBody:
@@ -103,20 +139,115 @@ paths:
       responses:
         "200":
           description: Webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OKResponse'
+
+  /api/data/canonical-map.json:
+    get:
+      tags: [data]
+      summary: Canonical map (public)
+      description: Returns the canonical map JSON from KV when available, otherwise a raw GitHub fallback.
+      responses:
+        "200":
+          description: Canonical map JSON
+          content:
+            application/json: {}
+        "503":
+          description: Canonical map unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/canonical:
+    post:
+      tags: [data]
+      summary: Admin: replace canonical map
+      description: Requires a bearer token matching the `CANONICAL_UPLOAD_TOKEN` binding. Stores the posted body into KV at key `canonical-map`.
+      security:
+        - canonical_token: []
+      requestBody:
+        required: true
+        content:
+          text/plain: {}
+      responses:
+        "200":
+          description: Update accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OKResponse'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/post_install:
+    get:
+      tags: [misc]
+      summary: Post-install redirect (GitHub App marketplace)
+      parameters:
+        - in: query
+          name: installation_id
+          schema:
+            type: string
+        - in: query
+          name: setup_action
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to root with query parameters
+
+  /favicon.ico:
+    get:
+      tags: [misc]
+      summary: Favicon redirect
+      responses:
+        "301":
+          description: Redirect to extension icon URL
 
 components:
   securitySchemes:
-    githubToken:
-      type: http
-      scheme: bearer
-      bearerFormat: GitHub OAuth
     app_jwt:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    canonical_token:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Bearer token that must match `CANONICAL_UPLOAD_TOKEN` binding on the worker.
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        version:
+          type: string
+        ts:
+          type: number
+      required: [ok, version, ts]
+    OKResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required: [ok]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
 
 x-extension-urls:
-  description: >
+  description: |
     Browser extension internal URL params (library.html page, not HTTP endpoints).
     All params use window.history.replaceState — no page reload occurs on change.
   base: chrome-extension://{ext-id}/library/library.html
