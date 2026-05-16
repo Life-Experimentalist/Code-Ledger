@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("CanonicalView");
+
 /**
  * CanonicalView — cross-platform problem linking pipeline.
  *
@@ -19,7 +23,6 @@ import {
     useState,
     useEffect,
     useCallback,
-    useRef,
 } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
@@ -39,10 +42,9 @@ const PLATFORM_LABEL = {
     codeforces: "Codeforces",
 };
 const PLATFORM_FAVICON = {
-    leetcode:
-        "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
-    geeksforgeeks: "https://www.geeksforgeeks.org/favicon.ico",
-    codeforces: "https://codeforces.com/favicon.ico",
+    leetcode: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    geeksforgeeks: `${CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl}/favicon.ico`,
+    codeforces: `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/favicon.ico`,
 };
 
 const TOPICS = [
@@ -178,18 +180,89 @@ export function CanonicalView({ problems }) {
     const [issues, setIssues] = useState([]);
     const [issuesLoading, setIssuesLoading] = useState(true);
     const [issuesError, setIssuesError] = useState(null);
+
+    // ── Local canonical entries ─────────────────────────────────────────
+    const [localEntries, setLocalEntries] = useState([]);
+    const [localFormOpen, setLocalFormOpen] = useState(false);
+    const [editingEntry, setEditingEntry] = useState(null); // null = new, object = editing
+    const [localTitle, setLocalTitle] = useState("");
+    const [localTopic, setLocalTopic] = useState("arrays");
+    const [localAliases, setLocalAliases] = useState([
+        { platform: "leetcode", slug: "" },
+    ]);
+    const [localSaving, setLocalSaving] = useState(false);
     const [voting, setVoting] = useState({}); // issueNumber → bool
     const [votedSet, setVotedSet] = useState(new Set());
 
     // ── GitHub token ────────────────────────────────────────────────────
     const [githubToken, setGithubToken] = useState(null);
 
-    // ── Load token on mount ─────────────────────────────────────────────
+    // ── Load token + local entries on mount ─────────────────────────────
     useEffect(() => {
         Storage.getAuthToken("github")
             .then((t) => setGithubToken(t || null))
             .catch(() => {});
+        Storage.getLocalCanonicalEntries()
+            .then((e) => setLocalEntries(e))
+            .catch(() => {});
     }, []);
+
+    // ── Local entry handlers ─────────────────────────────────────────────
+    function openLocalForm(entry = null) {
+        if (entry) {
+            setEditingEntry(entry);
+            setLocalTitle(entry.canonicalTitle || "");
+            setLocalTopic(entry.topic || "arrays");
+            setLocalAliases(
+                entry.aliases?.length
+                    ? entry.aliases
+                    : [{ platform: "leetcode", slug: "" }]
+            );
+        } else {
+            setEditingEntry(null);
+            setLocalTitle("");
+            setLocalTopic("arrays");
+            setLocalAliases([{ platform: "leetcode", slug: "" }]);
+        }
+        setLocalFormOpen(true);
+    }
+
+    async function saveLocalEntry() {
+        const title = localTitle.trim();
+        if (!title) return;
+        const validAliases = localAliases.filter((a) => a.slug.trim());
+        if (validAliases.length === 0) return;
+
+        setLocalSaving(true);
+        try {
+            const entry = {
+                canonicalId: editingEntry?.canonicalId || slugifyCanonicalId(title),
+                canonicalTitle: title,
+                topic: localTopic,
+                aliases: validAliases.map((a) => ({
+                    platform: a.platform,
+                    slug: a.slug.trim(),
+                })),
+                addedAt: editingEntry?.addedAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                source: "local",
+            };
+            await Storage.addLocalCanonicalEntry(entry);
+            const updated = await Storage.getLocalCanonicalEntries();
+            setLocalEntries(updated);
+            setLocalFormOpen(false);
+            setEditingEntry(null);
+        } catch (e) {
+            dbg.warn("saveLocalEntry() failed:", e?.message);
+        } finally {
+            setLocalSaving(false);
+        }
+    }
+
+    async function deleteLocalEntry(canonicalId) {
+        await Storage.deleteLocalCanonicalEntry(canonicalId);
+        setLocalEntries((prev) => prev.filter((e) => e.canonicalId !== canonicalId));
+    }
 
     // ── Fetch canonical map ─────────────────────────────────────────────
     useEffect(() => {
@@ -910,6 +983,141 @@ ${aliasLines}
                     >
                     labelled <code class="text-[9px]">${ISSUE_LABEL}</code>
                 </p>
+            </div>
+
+            <!-- ── Local canonical entries ── -->
+            <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-widest">
+                            My Local Entries
+                        </h3>
+                        <p class="text-[11px] text-slate-500 mt-0.5">
+                            Personal canonical links stored locally — used immediately
+                            without waiting for CDN merges. Useful for new platforms.
+                        </p>
+                    </div>
+                    <button
+                        onClick=${() => openLocalForm(null)}
+                        class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25 transition-colors shrink-0"
+                    >
+                        + Add Entry
+                    </button>
+                </div>
+
+                ${localFormOpen
+                    ? html`
+                          <div class="border border-white/10 rounded-xl p-4 flex flex-col gap-3 bg-white/[0.02]">
+                              <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                                  ${editingEntry ? "Edit Entry" : "New Local Entry"}
+                              </h4>
+                              <div class="flex flex-col gap-1">
+                                  <label class="text-[10px] uppercase tracking-wider text-slate-500">Canonical Title</label>
+                                  <input
+                                      type="text"
+                                      value=${localTitle}
+                                      onInput=${(e) => setLocalTitle(e.target.value)}
+                                      placeholder="e.g., Two Sum"
+                                      class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+                                  />
+                              </div>
+                              <div class="flex flex-col gap-1">
+                                  <label class="text-[10px] uppercase tracking-wider text-slate-500">Topic</label>
+                                  <select
+                                      value=${localTopic}
+                                      onChange=${(e) => setLocalTopic(e.target.value)}
+                                      class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                                  >
+                                      ${TOPICS.map((t) => html`<option value=${t}>${t}</option>`)}
+                                  </select>
+                              </div>
+                              <div class="flex flex-col gap-2">
+                                  <label class="text-[10px] uppercase tracking-wider text-slate-500">Platform Aliases</label>
+                                  ${localAliases.map((alias, ai) => html`
+                                      <div class="flex gap-2 items-center">
+                                          <select
+                                              value=${alias.platform}
+                                              onChange=${(e) => {
+                                                  const next = [...localAliases];
+                                                  next[ai] = { ...next[ai], platform: e.target.value };
+                                                  setLocalAliases(next);
+                                              }}
+                                              class="w-36 px-2 py-1.5 bg-black border border-white/10 rounded text-sm text-white focus:outline-none"
+                                          >
+                                              ${PLATFORMS.map((p) => html`<option value=${p}>${PLATFORM_LABEL[p] || p}</option>`)}
+                                          </select>
+                                          <input
+                                              type="text"
+                                              value=${alias.slug}
+                                              onInput=${(e) => {
+                                                  const next = [...localAliases];
+                                                  next[ai] = { ...next[ai], slug: e.target.value };
+                                                  setLocalAliases(next);
+                                              }}
+                                              placeholder="problem-slug"
+                                              class="flex-1 px-2 py-1.5 bg-black border border-white/10 rounded text-sm text-white placeholder:text-slate-600 focus:outline-none"
+                                          />
+                                          ${localAliases.length > 1
+                                              ? html`<button
+                                                    onClick=${() => setLocalAliases(localAliases.filter((_, j) => j !== ai))}
+                                                    class="text-slate-600 hover:text-rose-400 text-xs px-1"
+                                                >✕</button>`
+                                              : ""}
+                                      </div>
+                                  `)}
+                                  ${localAliases.length < 4
+                                      ? html`<button
+                                            onClick=${() => setLocalAliases([...localAliases, { platform: "leetcode", slug: "" }])}
+                                            class="self-start text-[10px] text-slate-500 hover:text-slate-300 border border-white/10 rounded px-2 py-1 transition-colors"
+                                        >+ Add platform</button>`
+                                      : ""}
+                              </div>
+                              <div class="flex gap-2 pt-1">
+                                  <button
+                                      onClick=${saveLocalEntry}
+                                      disabled=${localSaving || !localTitle.trim()}
+                                      class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${localSaving || !localTitle.trim() ? "bg-white/5 text-slate-600 cursor-not-allowed" : "bg-cyan-500 text-black hover:bg-cyan-400"}"
+                                  >
+                                      ${localSaving ? "Saving…" : editingEntry ? "Update" : "Save Entry"}
+                                  </button>
+                                  <button
+                                      onClick=${() => { setLocalFormOpen(false); setEditingEntry(null); }}
+                                      class="px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                                  >Cancel</button>
+                              </div>
+                          </div>
+                      `
+                    : ""}
+
+                ${localEntries.length === 0 && !localFormOpen
+                    ? html`<p class="text-[11px] text-slate-600 italic">No local entries yet. Add one above.</p>`
+                    : ""}
+
+                ${localEntries.map((entry) => html`
+                    <div class="border border-white/5 rounded-xl p-3 flex items-start justify-between gap-3 bg-white/[0.01] hover:bg-white/[0.03] transition-colors">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm text-slate-200 font-medium">${entry.canonicalTitle}</p>
+                            <p class="text-[10px] text-slate-600 mt-0.5">${entry.canonicalId} · ${entry.topic}</p>
+                            <div class="flex flex-wrap gap-1 mt-1.5">
+                                ${(entry.aliases || []).map((a) => html`
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-slate-400">
+                                        ${PLATFORM_LABEL[a.platform] || a.platform}: ${a.slug}
+                                    </span>
+                                `)}
+                            </div>
+                        </div>
+                        <div class="flex gap-1 shrink-0">
+                            <button
+                                onClick=${() => openLocalForm(entry)}
+                                class="text-[10px] px-2 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
+                            >Edit</button>
+                            <button
+                                onClick=${() => deleteLocalEntry(entry.canonicalId)}
+                                class="text-[10px] px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-colors"
+                            >Delete</button>
+                        </div>
+                    </div>
+                `)}
             </div>
         </div>
     `;

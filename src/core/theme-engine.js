@@ -6,6 +6,9 @@
  */
 
 import { Storage } from "./storage.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("ThemeEngine");
 
 // ─────────────────────────────────────────────────────────────
 // Default theme settings
@@ -1716,11 +1719,17 @@ export function setThemeVariables(theme) {
 }
 
 export async function applyThemeFromStorage() {
+    dbg.log(`applyThemeFromStorage(): entering`);
     let theme = DEFAULT_THEME;
     try {
         const stored = await Storage.getTheme();
-        if (stored) theme = stored;
-    } catch (_) {}
+        if (stored) {
+            theme = stored;
+            dbg.log(`applyThemeFromStorage(): ✓ loaded theme=${theme.preset}`);
+        }
+    } catch (e) {
+        dbg.warn(`applyThemeFromStorage(): failed to load theme`, e?.message);
+    }
     setThemeVariables(theme);
     return theme;
 }

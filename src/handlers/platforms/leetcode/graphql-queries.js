@@ -50,47 +50,34 @@ export const QUERIES = {
         memoryPercentile
         code
         timestamp
-        statusCode
         notes
         lang {
           name
           verboseName
         }
-        question {
-          questionId
-          titleSlug
-          title
-          difficulty
+        topicTags {
+          name
+          slug
         }
       }
     }
   `,
 
     SUBMISSION_LIST: `
-    query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!, $status: Int) {
+    query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!) {
       questionSubmissionList(
         offset: $offset
         limit: $limit
         lastKey: $lastKey
         questionSlug: $questionSlug
-        status: $status
       ) {
         lastKey
         hasNext
         submissions {
           id
-          title
-          titleSlug
-          status
           statusDisplay
           lang
-          langName
-          runtime
           timestamp
-          url
-          isPending
-          memory
-          hasCompileError
         }
       }
     }

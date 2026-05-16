@@ -167,11 +167,14 @@ export function setRepositoryTopics(owner, repo, topics, token) {
     });
 }
 
-/** POST /repos/{owner}/{repo}/pages — enable GitHub Pages */
-export function enablePages(owner, repo, branch, token) {
+/** POST /repos/{owner}/{repo}/pages — enable GitHub Pages (workflow-based deploy) */
+export function enablePages(owner, repo, _branch, token) {
     return apiFetch(`/repos/${owner}/${repo}/pages`, token, {
         method: "POST",
-        body: JSON.stringify({ source: { branch, path: "/" } }),
+        // build_type:"workflow" pairs with the deploy-pages workflow committed to the repo,
+        // allowing concurrency control (cancel-in-progress) to avoid wasted builds on
+        // rapid consecutive commits from the extension or GitHub App.
+        body: JSON.stringify({ build_type: "workflow" }),
     });
 }
 

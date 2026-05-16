@@ -6,6 +6,7 @@
 import { createDebugger } from "../lib/debug.js";
 import { Storage } from "../core/storage.js";
 import { tabs, runtime } from "../lib/browser-compat.js";
+import { CONSTANTS } from "../core/constants.js";
 
 const dbg = createDebugger("CodeRecovery");
 
@@ -20,7 +21,7 @@ const RECOVERY_TIMEOUT_MS = 30000;
  * @returns {Promise<{ ok: boolean, code?: string, lang?: object, tags?: string[], error?: string }>}
  */
 export async function triggerCodeRecovery(problem) {
-    const { id: problemId, titleSlug } = problem;
+    const { id: problemId, titleSlug, submissionId } = problem;
     if (!titleSlug) {
         return { ok: false, error: "Problem has no titleSlug — cannot open recovery tab" };
     }
@@ -28,8 +29,17 @@ export async function triggerCodeRecovery(problem) {
         return { ok: false, error: "Problem has no id — cannot match recovery response" };
     }
 
-    const url = `https://leetcode.com/problems/${encodeURIComponent(titleSlug)}/?codeledger_code_fetch=1&codeledger_problemid=${encodeURIComponent(problemId)}`;
-    dbg.log(`triggerCodeRecovery(${titleSlug}): opening background tab`);
+    // Include problemId in both the query string AND the URL hash.
+    // When a specific submissionId is known (bulk-imported problems), go directly to the
+    // submissions page — this avoids reading from the editor cache (which for free LeetCode
+    // users only persists in the browser and is not server-side retrievable).
+    const encoded = encodeURIComponent(problemId);
+    const lcProblemsBase = CONSTANTS.PLATFORMS.leetcode.problemsBase;
+    const base = submissionId
+        ? `${lcProblemsBase}${encodeURIComponent(titleSlug)}/submissions/${submissionId}/`
+        : `${lcProblemsBase}${encodeURIComponent(titleSlug)}/`;
+    const url = `${base}?codeledger_code_fetch=1&codeledger_problemid=${encoded}#cl-pid=${encoded}`;
+    dbg.log(`triggerCodeRecovery(${titleSlug}): opening background tab (submissionId=${submissionId || "unknown"})`);
 
     return new Promise((resolve) => {
         let tabId = null;
@@ -47,6 +57,16 @@ export async function triggerCodeRecovery(problem) {
         }, RECOVERY_TIMEOUT_MS);
 
         function listener(msg) {
+            // Fast-fail when URL redirect stripped the problemId — the content script
+            // reports this separately so we don't silently wait the full 30 s timeout.
+            if (msg?.type === "CODELEDGER_CODE_FETCH_ID_MISSING" && !settled) {
+                settled = true;
+                clearTimeout(timeoutHandle);
+                runtime.onMessage.removeListener?.(listener);
+                if (tabId != null) tabs.remove?.(tabId)?.catch?.(() => {});
+                resolve({ ok: false, error: "Recovery URL lost problemId in redirect — retry may help" });
+                return;
+            }
             if (msg?.type !== "CODELEDGER_CODE_FETCHED") return;
             if (msg.problemId !== problemId) return;
             if (settled) return;
@@ -78,7 +98,20 @@ export async function triggerCodeRecovery(problem) {
                             updated.tags = msg.tags;
                             updated.topic = msg.tags[0];
                         }
-                        return Storage.saveProblem(updated);
+                        if (msg.notes && !stored.notes) {
+                            updated.notes = msg.notes;
+                        }
+                        if (msg.timestamp && !stored.timestamp) {
+                            updated.timestamp = msg.timestamp;
+                        }
+                        return Storage.saveProblem(updated).then(async () => {
+                            // Mark for GitHub commit — problem now has code it lacked before
+                            const slug = String(updated.titleSlug || updated.id || "").trim();
+                            const langRaw = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
+                            const normLang = String(langRaw).toLowerCase().replace(/\s+/g, "");
+                            const key = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+                            if (key) await Storage.markPendingProblemKey(key).catch(() => {});
+                        });
                     })
                     .then(() => {
                         resolve({
@@ -90,6 +123,8 @@ export async function triggerCodeRecovery(problem) {
                             memory: msg.memory,
                             runtimePct: msg.runtimePct,
                             memoryPct: msg.memoryPct,
+                            notes: msg.notes || null,
+                            timestamp: msg.timestamp || null,
                         });
                     })
                     .catch((e) => {

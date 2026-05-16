@@ -6,7 +6,40 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.2.0] ΓÇö 2026-05-13
+## [1.3.0] — 2026-05-17
+
+### Added
+- **Per-method AI review** — each code approach in a multi-method problem gets its own AI review. `MethodCard` renders per-method code + AI review inline in the Methods tab of ProblemModal. Clicking "Generate Review" triggers an immediate on-demand review for that method alone.
+- **Per-method AI review queue** — `handleQueueAllAIReviews` now enqueues `${problemId}::method::${index}` entries for methods without a review. `processAIReviewQueue` detects the `::method::` pattern and processes them separately from problem-level reviews.
+- **MAINTENANCE_COMMIT alarm** — every 10 minutes the service worker batches all pending AI reviews, metadata edits, and notes updates into a single atomic chore commit instead of one commit per edit.
+- **Bulk import resilience** — individual-mode sync (onboarding commit-per-problem) persists its state to `chrome.storage.local`. If the browser closes mid-import, a `BULK_IMPORT_RESUME` alarm fires 45 seconds after the next browser open to automatically resume.
+- **Onboarding progress bar** — the "done" step of GitHubOnboardingModal now shows a live progress bar (current/total) streamed from the SW via a `sync-keepalive` port. "Start Coding" is always enabled; the user can close the modal and sync continues in the background.
+- **Refresh README Stats button** — new button in Settings → Git that commits a fresh `index.json` and triggers a full infra rebuild (README + index.html) from current local data, without needing a new problem commit. Useful after repo recreation or when stats are stale.
+- **Settings + behaviour bank + roadmaps in infra commit** — every trailing infra commit (and Refresh README Stats) now bundles `.codeledger/sync.json` (portable settings), `.codeledger/behaviour-bank.json`, and `.codeledger/roadmaps.json` into the same atomic tree, keeping a full backup of user configuration in the repo without extra commits.
+- **Collapsible hints in problem README** — `buildProblemMarkdown()` now emits a `<details><summary>Hint N</summary>` block for each hint stored on the problem. Hints are collapsed by default and work in both GitHub's file view and raw markdown.
+- **Canonical path resolution at commit time** — `_handleResyncAllInner` pre-loads the canonical map and enriches each problem with its canonical ID before building file paths. Problems previously committed without canonical (e.g., via bulk importer) are now placed under `problems/{canonicalId}/{platform}/` on resync.
+- **Landing page library links** — `data-cl-open` added to the nav Library link and the CTA button; `landing.js` already rewrites these to the extension URL when the extension is detected.
+- **Landing page platform icons** — LeetCode, GeeksForGeeks, and Codeforces chips now use actual favicons instead of emoji.
+
+### Changed
+- **Problem description file renamed to README.md** — `descriptionPath()` now returns `{dir}/README.md` instead of `{dir}/{platformId}.md`. GitHub automatically renders this when browsing the problem directory.
+- **Infra commit separated from problem commits** — problem commits always use `skipInfra: true`. A single trailing infra commit at the end of every sync rebuilds `index.json`, `README.md`, and `index.html` from the complete local dataset, eliminating per-problem README updates and reducing noise in git history.
+- **GitHub Pages "src" link uses v3 path** — `repoFileUrl()` now reconstructs the correct v3 path (`problems/{canonicalId}/{platform}/README.md` or `problems/{platformId}/README.md`) instead of the old v1 slug-based format.
+- **Language label normalization on GitHub Pages** — `pythondata` → "Python (Pandas)", `mysql` → "MySQL", `postgresql` → "PostgreSQL", etc., for cleaner display in the Recent Solves table and badges.
+- **Recent Solves date includes year** — dates in a prior year now display as "Jan 5, 2024" instead of "Jan 5" to avoid ambiguity.
+- **Removed AI "Progress Summary" from README** — the AI-generated narrative block is no longer included in the generated repository README; it produced inconsistent output and added noise.
+
+### Fixed
+- **`::submissionId` suffix in problem paths** — `platformId()` now strips the `::number` suffix that the LeetCode bulk importer appended (e.g. `lc-best-time-to-buy-and-sell-stock::1427680302` → `lc-best-time-to-buy-and-sell-stock`). Affected paths are corrected on the next resync.
+- **Stale README stats (one-commit-lag)** — `buildInfraFiles` now accepts an `indexMetaOverride` parameter. Callers pass the freshly-built `index.json` data so README stats reflect the new problem count in the same commit rather than the previous state.
+- **GitHub App `read:org` 401** — `/user/orgs` returns 401 for GitHub App tokens that lack `read:org` scope. The onboarding modal now silently treats this as an empty org list instead of clearing the valid auth token.
+- **Avatar CORS failure** — removed the `Authorization` header from avatar CDN fetches in `library.js`; `avatars.githubusercontent.com` is a public CDN that blocks auth headers via CORS.
+- **LaTeX rendering** — `\times`, `\leq`, `\geq`, `\neq`, `\rightarrow`, Greek letters, and other LaTeX symbols are now substituted to Unicode in AI review output via `substituteLatex()` in `katex-stub.js`. Applied in both `renderMath()` and inline `parseMarkdown()`.
+- **ProblemModal null notes crash** — the Notes tab `show` guard now uses `p?.notes` safe navigation, preventing a crash when `p` is null during modal initialisation.
+- **AI review batch size** — background queue processes 2 items per alarm tick (was 10) to avoid rate-limiting AI providers during backfill.
+- **On-demand AI review no longer commits immediately** — `handleRegenerateAIReview` marks the problem as pending for the MAINTENANCE_COMMIT batch instead of making an individual commit per review.
+
+## [1.2.0] — 2026-05-13
 
 ### Added
 - **AI Review Queue ΓÇö Queue Missing button** ΓÇö dedicated button that queues only problems with no AI review yet, separate from the full re-queue action.
@@ -23,7 +56,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Deduplication engine** ΓÇö `duplicate-detector.js` finds same-slug same-language duplicates; `ai-deduplication.js` generates AI merge proposals stored on the problem. A dedicated `DedupReviewQueue` modal lets users approve/reject proposed merges.
 - **`MissingMetadataModal`** ΓÇö review queue for problems missing tags or difficulty; supports individual refresh, per-problem ignore, and bulk ignore/unignore with persistent state.
 - **Setup completion notification** ΓÇö Library sidebar and main content area show a dismissable amber banner if GitHub is not connected or no repo is linked, with a direct link to the Welcome page.
-- **Welcome page diagnostic tool** ΓÇö second tab "Diagnostics & Migration" scans the repo for layout version mismatches, missing infra files, and uncommitted problems; offers one-click repair and bulk/individual migration commit.
 - **GitHub handler refactor** ΓÇö `commit-builder.js` (tree items + commit payload), `api-client.js` (REST wrappers), and `infra-builder.js` (README/index.html generation) extracted from the monolithic `github/index.js`.
 - **Landing page v1.2** ΓÇö dynamic "Open Library" links (extension URL when installed, web URL otherwise); "What's new in v1.2" features section; new FAQ entries for Behaviour Bank, MCP tools, sync, and migration.
 - **Prettier formatter** ΓÇö `.prettierrc` config; `npm run format` script formats all `src/**/*.js` and `worker/public/assets/**/*.js` files.

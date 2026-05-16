@@ -7,25 +7,30 @@ import { h } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+import { CONSTANTS } from "../../core/constants.js";
+
+const dbg = createDebugger("ProblemCard");
+
 const PLATFORM_META = {
     leetcode: {
         favicon:
             "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
         label: "LeetCode",
-        color: "#FFA116",
-        url: (slug) => `https://leetcode.com/problems/${slug}/`,
+        color: CONSTANTS.PLATFORMS.leetcode.color,
+        url: (slug) => CONSTANTS.PLATFORMS.leetcode.problemsBase + slug + "/",
     },
     geeksforgeeks: {
         favicon: "https://www.geeksforgeeks.org/favicon.ico",
         label: "GeeksForGeeks",
-        color: "#2F8D46",
-        url: (slug) => `https://practice.geeksforgeeks.org/problems/${slug}`,
+        color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
+        url: (slug) => CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + slug,
     },
     codeforces: {
         favicon: "https://codeforces.com/favicon.ico",
         label: "Codeforces",
-        color: "#1F8ACB",
-        url: (slug) => `https://codeforces.com/problemset/problem/${slug}`,
+        color: CONSTANTS.PLATFORMS.codeforces.color,
+        url: (slug) => CONSTANTS.PLATFORMS.codeforces.problemsBase + slug,
     },
 };
 

@@ -15,6 +15,9 @@ import {
 import { buildAIChatContext } from "../lib/ai-chat-context.js";
 import { parseMarkdown } from "./components/AIMarkdownRenderer.js";
 import { Storage } from "../core/storage.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("FloatingAI");
 
 import {
     expandChatVariables,

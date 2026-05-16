@@ -15,7 +15,7 @@ const html = htm.bind(h);
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("ProblemModal");
-import { cleanCode } from "../../lib/syntax-highlight.js";
+import { cleanCode, highlightCode } from "../../lib/syntax-highlight.js";
 import {
     getChatsByProblem,
     saveAIChat,
@@ -28,6 +28,7 @@ import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
 import { modalTabRegistry } from "../../core/modal-tab-registry.js";
 import { expandChatVariables } from "../../lib/chat-variables.js";
+import { CONSTANTS } from "../../core/constants.js";
 // Side-effect: registers LeetCode tabs into modalTabRegistry
 import "../../handlers/platforms/leetcode/modal-tabs.js";
 
@@ -104,20 +105,20 @@ export const PLATFORM_META = {
         favicon:
             "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
         label: "LeetCode",
-        color: "#FFA116",
-        url: (slug) => `https://leetcode.com/problems/${slug}/`,
+        color: CONSTANTS.PLATFORMS.leetcode.color,
+        url: (slug) => CONSTANTS.PLATFORMS.leetcode.problemsBase + slug + "/",
     },
     geeksforgeeks: {
         favicon: "https://www.geeksforgeeks.org/favicon.ico",
         label: "GeeksForGeeks",
-        color: "#2F8D46",
-        url: (slug) => `https://practice.geeksforgeeks.org/problems/${slug}`,
+        color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
+        url: (slug) => CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + slug,
     },
     codeforces: {
         favicon: "https://codeforces.com/favicon.ico",
         label: "Codeforces",
-        color: "#1F8ACB",
-        url: (slug) => `https://codeforces.com/problemset/problem/${slug}`,
+        color: CONSTANTS.PLATFORMS.codeforces.color,
+        url: (slug) => CONSTANTS.PLATFORMS.codeforces.problemsBase + slug,
     },
 };
 
@@ -138,6 +139,9 @@ const DIFF_CLASS = {
 };
 
 const CHAT_KEY = (slug) => `cl-chat-${slug}`;
+
+// Session-level memory of the last active tab — survives problem navigation but not page reload.
+let _lastModalTab = "overview";
 
 export function ProblemModal({
     problem,
@@ -226,9 +230,20 @@ export function ProblemModal({
         setShowAddMethod(false);
     }, [problem?.id]);
 
-    // Reset tab and load chat history when problem changes
+    // Reset (or restore) tab and load chat history when problem changes
     useEffect(() => {
-        setActiveTab("overview");
+        if (settings?.remember_modal_tab && _lastModalTab && _lastModalTab !== "overview") {
+            // Check if the remembered tab exists for this problem
+            const regTabs = modalTabRegistry.getTabs(problem?.platform || "leetcode", problem);
+            const available = new Set([
+                ...regTabs.map((t) => t.id),
+                "notes",
+                ...(problem?.methods?.length > 0 ? ["methods"] : []),
+            ]);
+            setActiveTab(available.has(_lastModalTab) ? _lastModalTab : "overview");
+        } else {
+            setActiveTab("overview");
+        }
         if (problem) {
             setChatMessages([]);
             setChatInput("");
@@ -246,7 +261,7 @@ export function ProblemModal({
                     .catch(() => {});
             }
         }
-    }, [problem?.titleSlug, problem?.id]);
+    }, [problem?.titleSlug, problem?.id, settings?.remember_modal_tab]);
 
     // Escape to close
     useEffect(() => {
@@ -753,7 +768,7 @@ export function ProblemModal({
                             ? html`
                                   <a
                                       href=${problem.submissionsUrl ||
-                                      `https://leetcode.com/problems/${problem.titleSlug}/submissions/`}
+                                      (CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/submissions/")}
                                       target="_blank"
                                       rel="noopener"
                                       class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
@@ -978,7 +993,10 @@ export function ProblemModal({
                               ${tabs.map(
                                   (tab) => html`
                                       <button
-                                          onClick=${() => setActiveTab(tab.id)}
+                                          onClick=${() => {
+                                              _lastModalTab = tab.id;
+                                              setActiveTab(tab.id);
+                                          }}
                                           class="px-3 py-1.5 text-xs rounded-t-lg transition-colors ${activeTab ===
                                           tab.id
                                               ? "bg-white/10 text-white border border-b-0 border-white/10"
@@ -996,7 +1014,7 @@ export function ProblemModal({
 
                 <!-- ── Tab content ── -->
                 <div class="flex-1 overflow-y-auto p-5 min-h-0">
-                    ${activeTab === "notes"
+                    ${activeTab === "methods"
                         ? html`
                               <div class="flex flex-col gap-4 h-full">
                                   ${methods.map(
@@ -1262,6 +1280,90 @@ export function ProblemModal({
             </div>
         </div>
     `;
+}
+
+// ── CodeTab sub-component — shows code or a recovery button when code is missing ──
+
+function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
+    const [recovering, setRecovering] = useState(false);
+    const [recoveryError, setRecoveryError] = useState("");
+
+    if (!problem.code) {
+        const isExtensionCtx = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+        return html`
+            <div class="flex flex-col items-center gap-4 py-12 text-center">
+                <p class="text-slate-500 text-sm">Code was not extracted for this submission.</p>
+                ${isExtensionCtx
+                    ? html`
+                        <button
+                            onClick=${async () => {
+                                setRecovering(true);
+                                setRecoveryError("");
+                                try {
+                                    const res = await new Promise((resolve) =>
+                                        chrome.runtime.sendMessage(
+                                            { type: "TRIGGER_CODE_RECOVERY", problemId: problem.id },
+                                            resolve
+                                        )
+                                    );
+                                    if (res?.ok && res.code) {
+                                        const updated = await Storage.getProblem(problem.id);
+                                        if (updated) onUpdate(updated);
+                                    } else {
+                                        setRecoveryError(res?.error || "Recovery failed — no code returned");
+                                    }
+                                } catch (e) {
+                                    setRecoveryError(e?.message || "Recovery failed");
+                                } finally {
+                                    setRecovering(false);
+                                }
+                            }}
+                            disabled=${recovering}
+                            class="px-4 py-2 rounded-lg bg-cyan-600/15 border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-600/30 disabled:opacity-40 transition-colors"
+                        >
+                            ${recovering ? "Recovering code…" : "Recover Code from LeetCode"}
+                        </button>
+                        ${recoveryError
+                            ? html`
+                                <p class="text-rose-400 text-xs max-w-xs">${recoveryError}</p>
+                                <a
+                                    href=${CONSTANTS.PLATFORMS.leetcode.baseUrl}
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="text-[10px] text-cyan-500 hover:text-cyan-300 underline"
+                                >
+                                    Open LeetCode to log in, then retry
+                                </a>`
+                            : ""}
+                        <p class="text-slate-600 text-[10px] max-w-xs">
+                            Opens a background LeetCode tab to fetch your latest accepted submission.
+                            Make sure you are logged into LeetCode first.
+                        </p>
+                    `
+                    : html`<p class="text-slate-600 text-xs">Open this problem in the extension to recover the code.</p>`}
+            </div>
+        `;
+    }
+
+    const rawLang = problem.lang?.slug || problem.lang?.name || problem.language || "";
+    const highlighted = highlightCode(problem.code, rawLang);
+    return html`<div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+            <span class="text-[10px] uppercase tracking-wider text-slate-600">
+                ${langName || "Solution"}
+            </span>
+            <button
+                onClick=${copyCode}
+                class="text-[10px] px-2.5 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+                ${copied ? "✓ Copied" : "Copy"}
+            </button>
+        </div>
+        <pre
+            class="text-xs leading-relaxed overflow-x-auto bg-black/50 rounded-xl border border-white/5 p-4 whitespace-pre font-mono m-0"
+            dangerouslySetInnerHTML=${{ __html: highlighted }}
+        ></pre>
+    </div>`;
 }
 
 // ── EditTab sub-component — manages its own edit/delete state ───────────────
@@ -1605,13 +1707,146 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
     </div>`;
 }
 
-// ── Global tabs (Notes + Edit) registered for all platforms ─────────────────
+function MethodCard({ method, methodIndex, problem, onUpdate }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+    const [localReview, setLocalReview] = useState(method.aiReview || "");
+
+    const handleGenerateReview = async () => {
+        if (busy || !method.code) return;
+        if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+            setError("Extension not available.");
+            return;
+        }
+        setBusy(true);
+        setError("");
+        let keepAlivePort = null;
+        let keepAliveTimer = null;
+        try {
+            keepAlivePort = chrome.runtime.connect({ name: "ai-review-keepalive" });
+            keepAliveTimer = setInterval(() => {
+                try { keepAlivePort?.postMessage({ type: "ping" }); } catch (_) {}
+            }, 20000);
+        } catch (_) {}
+        const release = () => {
+            clearInterval(keepAliveTimer);
+            try { keepAlivePort?.disconnect(); } catch (_) {}
+        };
+        try {
+            const result = await new Promise((resolve, reject) => {
+                let settled = false;
+                const timer = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    release();
+                    reject(new Error("AI review timed out"));
+                }, 90000);
+                chrome.runtime.sendMessage(
+                    {
+                        type: "REGENERATE_AI_REVIEW",
+                        problem: {
+                            ...problem,
+                            code: method.code,
+                            lang: { name: method.language || problem.lang?.name },
+                            _methodIndex: methodIndex,
+                        },
+                    },
+                    (resp) => {
+                        if (settled) return;
+                        settled = true;
+                        clearTimeout(timer);
+                        release();
+                        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                        else if (resp?.ok) resolve(resp);
+                        else reject(new Error(resp?.error || "AI review failed"));
+                    }
+                );
+            });
+            const methodReview =
+                result.problem?.methods?.[methodIndex]?.aiReview || result.review || "";
+            setLocalReview(methodReview);
+            if (result.problem) onUpdate?.(result.problem);
+        } catch (e) {
+            setError(e.message || String(e));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return html`<div class="border border-white/10 rounded-xl overflow-hidden">
+        <div class="px-4 py-2.5 bg-white/[0.02] border-b border-white/5 flex items-center gap-3">
+            <span class="text-xs font-medium text-slate-300">
+                ${method.title || `Approach ${methodIndex + 1}`}
+            </span>
+            ${method.language
+                ? html`<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500">
+                      ${method.language}
+                  </span>`
+                : ""}
+            ${method.description
+                ? html`<span class="text-[10px] text-slate-600 ml-auto truncate max-w-xs">
+                      ${method.description}
+                  </span>`
+                : ""}
+        </div>
+        <pre
+            class="text-xs leading-relaxed overflow-x-auto bg-black/50 p-4 whitespace-pre font-mono m-0 max-h-96"
+            dangerouslySetInnerHTML=${{
+                __html: highlightCode(
+                    method.code || "// (no code)",
+                    (method.language || "").toLowerCase()
+                ),
+            }}
+        ></pre>
+        <div class="border-t border-white/10 p-3">
+            <${AIReviewPanel}
+                review=${localReview}
+                onGenerate=${handleGenerateReview}
+                loading=${busy}
+                error=${error}
+            />
+        </div>
+    </div>`;
+}
+
+// ── Global tabs (Code, AI Review, Notes, Edit) registered for all platforms ──
+// Platform-specific registrations (e.g. leetcode) override these by tab id.
 
 modalTabRegistry.register("*", [
     {
+        id: "code",
+        label: "Code",
+        show: (p) => !!p.code || p.platform === "leetcode",
+        render(problem, { html, langName, copied, copyCode, onUpdate }) {
+            return html`<${CodeTab}
+                problem=${problem}
+                langName=${langName}
+                copied=${copied}
+                copyCode=${copyCode}
+                onUpdate=${onUpdate}
+            />`;
+        },
+    },
+    {
+        id: "review",
+        label: "AI Review",
+        show: () => true,
+        render(
+            problem,
+            { html, AIReviewPanel, onGenerateAIReview, reviewBusy, reviewError }
+        ) {
+            return html`<${AIReviewPanel}
+                review=${problem.aiReview || ""}
+                onGenerate=${onGenerateAIReview}
+                loading=${reviewBusy}
+                error=${reviewError}
+            />`;
+        },
+    },
+    {
         id: "notes",
         label: "Notes",
-        show: (p) => !!p.notes,
+        show: (p) => !!(p?.notes),
         render(problem, { html }) {
             return html` <div class="prose prose-invert prose-sm max-w-none">
                 <pre
@@ -1619,6 +1854,24 @@ modalTabRegistry.register("*", [
                 >
 ${problem.notes}</pre
                 >
+            </div>`;
+        },
+    },
+    {
+        id: "methods",
+        label: (p) => `Methods (${p.methods?.length || 0})`,
+        show: (p) => p.methods?.length > 0,
+        render(problem, { html, onUpdate }) {
+            return html`<div class="flex flex-col gap-4">
+                ${(problem.methods || []).map(
+                    (method, i) => html`<${MethodCard}
+                        key=${i}
+                        method=${method}
+                        methodIndex=${i}
+                        problem=${problem}
+                        onUpdate=${onUpdate}
+                    />`
+                )}
             </div>`;
         },
     },

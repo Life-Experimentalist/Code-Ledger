@@ -281,111 +281,292 @@ function InsightsSection() {
 
 // ── Roadmap section ───────────────────────────────────────────────────────────
 
-function RoadmapSection() {
-    const [roadmap, setRoadmap] = useState("");
-    const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState("");
+const DIFFICULTY_COLORS = {
+    Easy: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    Medium: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    Hard: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+};
+
+function calcProgress(milestone, problems) {
+    if (!Array.isArray(problems) || !problems.length) return 0;
+    const targets = new Set([
+        (milestone.topic || "").toLowerCase(),
+        ...(milestone.subtopics || []).map((s) => s.toLowerCase()),
+    ]);
+    const matched = problems.filter((p) => {
+        const pTags = (p.tags || []).map((t) => String(t).toLowerCase());
+        const pTopic = String(p.topic || "").toLowerCase();
+        return pTags.some((t) => targets.has(t)) || targets.has(pTopic);
+    });
+    return matched.length;
+}
+
+function MilestoneCard({ milestone, problems, onNavigate }) {
+    const solved = calcProgress(milestone, problems);
+    const target = milestone.targetCount || 5;
+    const pct = Math.min(100, Math.round((solved / target) * 100));
+    const done = solved >= target;
+    const diffClass = DIFFICULTY_COLORS[milestone.difficulty] || DIFFICULTY_COLORS.Medium;
+
+    return html`
+        <div class="p-4 bg-white/3 border ${done ? "border-emerald-500/30" : "border-white/8"} rounded-xl">
+            <div class="flex items-start justify-between gap-3 mb-2">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        ${done
+                            ? html`<span class="text-emerald-400 text-sm">✓</span>`
+                            : html`<span class="w-4 h-4 rounded-full border border-white/20 inline-block flex-shrink-0"></span>`}
+                        <span class="text-sm font-medium text-slate-200">${milestone.topic}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded border ${diffClass}">${milestone.difficulty || "Medium"}</span>
+                        ${milestone.week ? html`<span class="text-[10px] text-slate-600">Week ${milestone.week}</span>` : ""}
+                    </div>
+                    ${milestone.description ? html`<p class="text-xs text-slate-500 ml-6">${milestone.description}</p>` : ""}
+                </div>
+                <span class="text-xs text-slate-400 flex-shrink-0">${solved}/${target}</span>
+            </div>
+            <div class="h-1.5 rounded-full bg-white/8 overflow-hidden mb-2">
+                <div
+                    class="h-full rounded-full transition-all duration-500 ${done ? "bg-emerald-500" : "bg-cyan-500"}"
+                    style="width: ${pct}%"
+                ></div>
+            </div>
+            ${Array.isArray(milestone.subtopics) && milestone.subtopics.length
+                ? html`
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        ${milestone.subtopics.map((s) => html`
+                            <span key=${s} class="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-slate-500 text-[10px]">${s}</span>
+                        `)}
+                    </div>
+                  `
+                : ""}
+        </div>
+    `;
+}
+
+function RoadmapSection({ problems, onNavigate }) {
+    const [roadmaps, setRoadmaps] = useState([]);
+    const [active, setActive] = useState(null); // active roadmap id
+    const [screen, setScreen] = useState("list"); // list | wizard | generating
+    const [form, setForm] = useState({ level: "intermediate", goal: "", timeframe: "1 month", topics: "" });
     const [msg, setMsg] = useState("");
 
     useEffect(() => {
-        Storage.getSettings()
-            .then((s) => {
-                const r = s?.aiRoadmap || "";
-                setRoadmap(r);
-                setDraft(r);
+        Storage.getRoadmaps()
+            .then((list) => {
+                setRoadmaps(list || []);
+                if (list?.length) setActive(list[list.length - 1].id);
             })
             .catch((e) => dbg.error("RoadmapSection load:", e?.message));
     }, []);
 
-    const save = async () => {
+    const currentRoadmap = roadmaps.find((r) => r.id === active) || null;
+
+    const handleGenerate = async () => {
+        if (!form.goal.trim()) { setMsg("Please describe your goal."); return; }
+        setScreen("generating");
+        setMsg("");
         try {
-            await Storage.setSettings({ aiRoadmap: draft });
-            setRoadmap(draft);
-            setEditing(false);
-            setMsg("Roadmap saved.");
+            const resp = await new Promise((resolve, reject) => {
+                if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+                    reject(new Error("Extension not available"));
+                    return;
+                }
+                chrome.runtime.sendMessage({ type: "GENERATE_ROADMAP", ...form }, (r) => {
+                    if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                    else resolve(r);
+                });
+            });
+            if (!resp?.ok) throw new Error(resp?.error || "Generation failed");
+            const roadmap = {
+                id: `rm-${Date.now()}`,
+                createdAt: Date.now(),
+                level: form.level,
+                goal: form.goal,
+                timeframe: form.timeframe,
+                topics: form.topics,
+                ...resp.roadmap,
+            };
+            await Storage.saveRoadmap(roadmap);
+            const updated = await Storage.getRoadmaps();
+            setRoadmaps(updated);
+            setActive(roadmap.id);
+            setScreen("list");
+            setForm({ level: "intermediate", goal: "", timeframe: "1 month", topics: "" });
         } catch (e) {
             setMsg("Failed: " + (e?.message || String(e)));
+            setScreen("wizard");
         }
-        setTimeout(() => setMsg(""), 3000);
     };
 
+    const handleDelete = async (id) => {
+        if (!confirm("Delete this roadmap?")) return;
+        await Storage.deleteRoadmap(id);
+        const updated = await Storage.getRoadmaps();
+        setRoadmaps(updated);
+        setActive(updated.length ? updated[updated.length - 1].id : null);
+    };
+
+    const totalMilestones = currentRoadmap?.milestones?.length || 0;
+    const completedMilestones = currentRoadmap?.milestones?.filter(
+        (m) => calcProgress(m, problems) >= (m.targetCount || 5)
+    ).length || 0;
+
+    if (screen === "generating") return html`
+        <div class="flex flex-col items-center justify-center py-16 gap-4">
+            <div class="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
+            <p class="text-sm text-slate-400">AI is building your roadmap…</p>
+            ${msg && html`<p class="text-xs text-rose-400">${msg}</p>`}
+        </div>
+    `;
+
+    if (screen === "wizard") return html`
+        <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-2">
+                <button onClick=${() => setScreen("list")} class="text-slate-500 hover:text-slate-300 text-xs transition-colors">← Back</button>
+                <h3 class="text-sm font-medium text-slate-200">Create Roadmap with AI</h3>
+            </div>
+            ${msg && html`<p class="text-xs text-rose-400">${msg}</p>`}
+            <div class="flex flex-col gap-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-400 mb-1 block">Current Level</label>
+                        <select
+                            value=${form.level}
+                            onChange=${(e) => setForm((f) => ({ ...f, level: e.target.value }))}
+                            class="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50"
+                        >
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 mb-1 block">Timeframe</label>
+                        <select
+                            value=${form.timeframe}
+                            onChange=${(e) => setForm((f) => ({ ...f, timeframe: e.target.value }))}
+                            class="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50"
+                        >
+                            <option value="2 weeks">2 Weeks</option>
+                            <option value="1 month">1 Month</option>
+                            <option value="3 months">3 Months</option>
+                            <option value="6 months">6 Months</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 mb-1 block">Goal *</label>
+                    <input
+                        type="text"
+                        value=${form.goal}
+                        onInput=${(e) => setForm((f) => ({ ...f, goal: e.target.value }))}
+                        placeholder="e.g. Crack FAANG interviews, master DP, prepare for competitive programming…"
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                    />
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 mb-1 block">Focus Topics (optional)</label>
+                    <input
+                        type="text"
+                        value=${form.topics}
+                        onInput=${(e) => setForm((f) => ({ ...f, topics: e.target.value }))}
+                        placeholder="e.g. graphs, dynamic programming, trees"
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                    />
+                </div>
+                <button
+                    onClick=${handleGenerate}
+                    class="self-start px-5 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-sm rounded-xl transition-colors"
+                >
+                    Generate Roadmap →
+                </button>
+            </div>
+        </div>
+    `;
+
+    // list / viewing screen
     return html`
         <div class="flex flex-col gap-4">
+            <!-- Header row -->
             <div class="flex items-center justify-between">
-                <p class="text-sm text-slate-400">
-                    Your DSA roadmap — the AI uses this to suggest next
-                    problems.
-                </p>
-                ${!editing &&
-                html`
+                <div class="flex items-center gap-2">
+                    ${roadmaps.length > 1
+                        ? html`
+                            <select
+                                value=${active || ""}
+                                onChange=${(e) => setActive(e.target.value)}
+                                class="bg-[#0a0a0f] border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
+                            >
+                                ${roadmaps.map((r) => html`<option key=${r.id} value=${r.id}>${r.title || "Roadmap"}</option>`)}
+                            </select>
+                          `
+                        : currentRoadmap
+                          ? html`<span class="text-sm font-medium text-slate-200">${currentRoadmap.title}</span>`
+                          : html`<span class="text-sm text-slate-500">No roadmap yet</span>`}
+                </div>
+                <div class="flex items-center gap-2">
+                    ${currentRoadmap && onNavigate
+                        ? html`<button
+                              onClick=${() => onNavigate("graph")}
+                              class="text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+                              title="View in graph"
+                          >View in Graph →</button>`
+                        : ""}
+                    ${currentRoadmap
+                        ? html`<button
+                              onClick=${() => handleDelete(currentRoadmap.id)}
+                              class="text-xs text-slate-600 hover:text-rose-400 transition-colors"
+                              title="Delete roadmap"
+                          >Delete</button>`
+                        : ""}
                     <button
-                        onClick=${() => setEditing(true)}
+                        onClick=${() => setScreen("wizard")}
                         class="px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors"
                     >
-                        ${roadmap ? "Edit" : "Set Roadmap"}
+                        + New Roadmap
                     </button>
-                `}
+                </div>
             </div>
 
-            ${msg &&
-            html`<p
-                class="text-xs ${msg.startsWith("Failed")
-                    ? "text-rose-400"
-                    : "text-emerald-400"}"
-            >
-                ${msg}
-            </p>`}
-            ${editing
+            ${currentRoadmap
                 ? html`
-                      <div class="flex flex-col gap-3">
-                          <textarea
-                              value=${draft}
-                              onInput=${(e) => setDraft(e.target.value)}
-                              rows="12"
-                              placeholder="Paste or describe your DSA roadmap. Example:&#10;Week 1: Arrays & Hashing (Easy)&#10;Week 2: Two Pointers, Sliding Window&#10;Week 3: Stacks, Queues&#10;..."
-                              class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 font-mono resize-y"
-                          />
-                          <div class="flex gap-2">
-                              <button
-                                  onClick=${save}
-                                  class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-200 text-xs rounded-lg transition-colors"
-                              >
-                                  Save
-                              </button>
-                              <button
-                                  onClick=${() => {
-                                      setEditing(false);
-                                      setDraft(roadmap);
-                                  }}
-                                  class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs rounded-lg transition-colors"
-                              >
-                                  Cancel
-                              </button>
-                          </div>
-                      </div>
-                  `
-                : roadmap
-                  ? html`
-                        <pre
-                            class="p-4 bg-white/5 border border-white/10 rounded-xl text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed overflow-auto max-h-96"
-                        >
-${roadmap}</pre
-                        >
-                    `
-                  : html`
-                        <div
-                            class="p-6 bg-white/3 border border-white/8 rounded-xl text-center"
-                        >
-                            <p class="text-sm text-slate-500 mb-1">
-                                No roadmap set yet.
-                            </p>
-                            <p class="text-xs text-slate-600">
-                                Add a DSA study plan and the AI will use it to
-                                guide problem suggestions and track your
-                                progress.
-                            </p>
+                    <!-- Progress summary -->
+                    <div class="p-3 bg-white/3 border border-white/8 rounded-xl flex items-center gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs text-slate-400">${completedMilestones}/${totalMilestones} milestones completed</span>
+                                <span class="text-xs text-slate-500">${currentRoadmap.goal}</span>
+                            </div>
+                            <div class="h-1.5 rounded-full bg-white/8 overflow-hidden">
+                                <div
+                                    class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-500"
+                                    style="width: ${totalMilestones ? Math.round((completedMilestones / totalMilestones) * 100) : 0}%"
+                                ></div>
+                            </div>
                         </div>
-                    `}
+                    </div>
+                    <!-- Milestones -->
+                    <div class="flex flex-col gap-3">
+                        ${(currentRoadmap.milestones || []).map((m, i) => html`
+                            <${MilestoneCard}
+                                key=${m.id || i}
+                                milestone=${m}
+                                problems=${problems}
+                                onNavigate=${onNavigate}
+                            />
+                        `)}
+                    </div>
+                  `
+                : html`
+                    <div class="p-8 bg-white/3 border border-white/8 rounded-xl text-center">
+                        <p class="text-2xl mb-3">🗺️</p>
+                        <p class="text-sm font-medium text-slate-300 mb-1">No roadmap yet</p>
+                        <p class="text-xs text-slate-500 max-w-sm mx-auto">
+                            Create an AI-powered study roadmap tailored to your goals.
+                            Progress auto-updates as you solve problems.
+                        </p>
+                    </div>
+                  `}
         </div>
     `;
 }
@@ -730,7 +911,7 @@ function SkillsSection() {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export function BehaviourBankView() {
+export function BehaviourBankView({ problems = [], onNavigate }) {
     const [tab, setTab] = useState("insights");
 
     return html`
@@ -768,7 +949,7 @@ export function BehaviourBankView() {
 
             <!-- Content -->
             ${tab === "insights" && html`<${InsightsSection} />`}
-            ${tab === "roadmap" && html`<${RoadmapSection} />`}
+            ${tab === "roadmap" && html`<${RoadmapSection} problems=${problems} onNavigate=${onNavigate} />`}
             ${tab === "skills" && html`<${SkillsSection} />`}
         </div>
     `;

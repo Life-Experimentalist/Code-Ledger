@@ -9,10 +9,13 @@ import { htm } from "../vendor/preact-bundle.js";
 const html = htm.bind(h);
 import { Storage } from "../core/storage.js";
 import { tabs, runtime } from "../lib/browser-compat.js";
+import { createDebugger } from "../lib/debug.js";
 import {
     applyThemeFromStorage,
     setupThemeListener,
 } from "../core/theme-engine.js";
+
+const dbg = createDebugger("PopupApp");
 
 applyThemeFromStorage().catch(() => {});
 setupThemeListener();

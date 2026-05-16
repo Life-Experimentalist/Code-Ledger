@@ -8,6 +8,9 @@
 import { BaseGitHandler } from "../../_base/BaseGitHandler.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
+import { createDebugger } from "../../../lib/debug.js";
+
+const dbg = createDebugger("GitLabHandler");
 
 export const GITLAB_FEATURE_STATUS =
     CONSTANTS.FEATURE_STATUS.UNDER_CONSTRUCTION;
@@ -34,8 +37,16 @@ export class GitLabHandler extends BaseGitHandler {
         return settings["gitlab_token"] || null;
     }
 
-    /** @param {string} path  @param {string} token  @param {object} [options] */
-    async apiFetch(path, token, options = {}) {
+    async getContents(_owner, _repo, _path) {
+        throw new Error("GitLab getContents: not yet implemented");
+    }
+
+    async getCurrentUser() {
+        throw new Error("GitLab getCurrentUser: not yet implemented");
+    }
+
+    async apiFetch(path, options = {}) {
+        const token = await this.getToken();
         const settings = await Storage.getSettings();
         const base = (
             settings["gitlab_endpoint"] || "https://gitlab.com"
@@ -96,8 +107,7 @@ export class GitLabHandler extends BaseGitHandler {
         let branchExists = false;
         try {
             await this.apiFetch(
-                `/projects/${project}/repository/branches/${branch}`,
-                token
+                `/projects/${project}/repository/branches/${branch}`
             );
             branchExists = true;
         } catch (e) {
@@ -107,7 +117,7 @@ export class GitLabHandler extends BaseGitHandler {
                     const [ns, ...nameParts] =
                         decodeURIComponent(project).split("/");
                     const projectName = nameParts.join("/") || ns;
-                    await this.apiFetch("/projects", token, {
+                    await this.apiFetch("/projects", {
                         method: "POST",
                         body: JSON.stringify({
                             name: projectName,
@@ -145,8 +155,7 @@ export class GitLabHandler extends BaseGitHandler {
         try {
             // List top-level tree paths (not recursive — good enough for infra files)
             const tree = await this.apiFetch(
-                `/projects/${project}/repository/tree?ref=${branch}&recursive=false&per_page=100`,
-                token
+                `/projects/${project}/repository/tree?ref=${branch}&recursive=false&per_page=100`
             );
             if (Array.isArray(tree)) {
                 tree.forEach((item) => existingPaths.add(item.path));
@@ -171,7 +180,7 @@ export class GitLabHandler extends BaseGitHandler {
             payload.committer_date = payload.author_date;
         }
 
-        await this.apiFetch(`/projects/${project}/repository/commits`, token, {
+        await this.apiFetch(`/projects/${project}/repository/commits`, {
             method: "POST",
             body: JSON.stringify(payload),
         });

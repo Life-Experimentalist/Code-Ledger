@@ -14,6 +14,9 @@
 // @ts-nocheck
 
 import { CONSTANTS } from "./constants.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("PathBuilder");
 
 /** Increment when the directory layout changes. Stored in index.json. */
 export const LAYOUT_VERSION = 3;
@@ -28,8 +31,11 @@ export const PROBLEMS_ROOT = "problems";
  * Idempotent: if id already starts with the prefix, returns it unchanged.
  */
 export function platformId(platform, id) {
-    const prefix = CONSTANTS.PLATFORM_CODE[platform] || String(platform).slice(0, 3).toLowerCase();
-    const s = String(id);
+    const prefix =
+        CONSTANTS.PLATFORM_CODE[platform] ||
+        String(platform).slice(0, 3).toLowerCase();
+    // Strip ::submissionId suffix that LeetCode bulk importer appends (e.g. "two-sum::1427680302")
+    const s = String(id).split("::")[0];
     if (s.startsWith(`${prefix}-`)) return s;
     return `${prefix}-${s}`;
 }
@@ -48,7 +54,8 @@ export function platformId(platform, id) {
  * @param {string} [platform]  Platform name — required when canonical is absent
  */
 export function problemBase(id, canonical, _settings = {}, platform = "") {
-    if (canonical?.canonicalId) return `${PROBLEMS_ROOT}/${canonical.canonicalId}`;
+    if (canonical?.canonicalId)
+        return `${PROBLEMS_ROOT}/${canonical.canonicalId}`;
     const pid = platform ? platformId(platform, id) : id;
     return `${PROBLEMS_ROOT}/${pid}`;
 }
@@ -81,7 +88,14 @@ export function problemDir(id, platform, canonical) {
  * @param {object} [_settings]  Reserved for future use
  * @param {string} [methodTitle] Optional approach title (e.g. "greedy")
  */
-export function solutionPath(id, platform, lang, canonical, _settings = {}, methodTitle = "") {
+export function solutionPath(
+    id,
+    platform,
+    lang,
+    canonical,
+    _settings = {},
+    methodTitle = ""
+) {
     const dir = problemDir(id, platform, canonical);
     const pid = platformId(platform, id);
     const ext = lang?.ext || "txt";
@@ -91,12 +105,11 @@ export function solutionPath(id, platform, lang, canonical, _settings = {}, meth
 
 /**
  * Path for the per-platform markdown file (description + AI review + solve info).
- * Always {platformId}.md inside the platform directory.
+ * Uses README.md so GitHub renders it automatically when browsing the directory.
  */
 export function descriptionPath(id, platform, canonical) {
     const dir = problemDir(id, platform, canonical);
-    const pid = platformId(platform, id);
-    return `${dir}/${pid}.md`;
+    return `${dir}/README.md`;
 }
 
 /** Backwards-compat alias. New code should use descriptionPath(). */
@@ -130,13 +143,25 @@ export function buildProblemMarkdown(problem) {
     // Metadata table
     const rows = [];
     if (problem.difficulty) rows.push(`| Difficulty | ${problem.difficulty} |`);
-    if (platform !== "unknown") rows.push(`| Platform | ${_capitalise(platform)} |`);
+    if (platform !== "unknown")
+        rows.push(`| Platform | ${_capitalise(platform)} |`);
     rows.push(`| Problem ID | \`${pid}\` |`);
-    if (problem.tags?.length) rows.push(`| Topics | ${problem.tags.join(", ")} |`);
-    if (problem.timestamp) rows.push(`| Solved | ${new Date(problem.timestamp).toISOString().slice(0, 10)} |`);
-    if (problem.elapsedSeconds) rows.push(`| Solve Time | ${_formatTime(problem.elapsedSeconds)} |`);
-    if (problem.runtime) rows.push(`| Runtime | ${problem.runtime}${problem.runtimePct ? ` (beats ${problem.runtimePct}%)` : ""} |`);
-    if (problem.memory) rows.push(`| Memory | ${problem.memory}${problem.memoryPct ? ` (beats ${problem.memoryPct}%)` : ""} |`);
+    if (problem.tags?.length)
+        rows.push(`| Topics | ${problem.tags.join(", ")} |`);
+    if (problem.timestamp)
+        rows.push(
+            `| Solved | ${new Date(problem.timestamp).toISOString().slice(0, 10)} |`
+        );
+    if (problem.elapsedSeconds)
+        rows.push(`| Solve Time | ${_formatTime(problem.elapsedSeconds)} |`);
+    if (problem.runtime)
+        rows.push(
+            `| Runtime | ${problem.runtime}${problem.runtimePct ? ` (beats ${problem.runtimePct}%)` : ""} |`
+        );
+    if (problem.memory)
+        rows.push(
+            `| Memory | ${problem.memory}${problem.memoryPct ? ` (beats ${problem.memoryPct}%)` : ""} |`
+        );
 
     if (rows.length) {
         lines.push("| Field | Value |");
@@ -154,13 +179,30 @@ export function buildProblemMarkdown(problem) {
         lines.push("");
     }
 
+    // Collapsible hints
+    const hints = Array.isArray(problem.hints) ? problem.hints.filter(Boolean) : [];
+    if (hints.length > 0) {
+        lines.push("## Hints");
+        lines.push("");
+        for (let i = 0; i < hints.length; i++) {
+            lines.push(`<details>`);
+            lines.push(`<summary>Hint ${i + 1}</summary>`);
+            lines.push("");
+            lines.push(_htmlToMarkdown(hints[i]));
+            lines.push("");
+            lines.push(`</details>`);
+            lines.push("");
+        }
+    }
+
     // Code approaches
     if (approaches.length > 0) {
         lines.push("## Solutions");
         lines.push("");
         for (let i = 0; i < approaches.length; i++) {
             const a = approaches[i];
-            const heading = a.title || (approaches.length > 1 ? `Approach ${i + 1}` : "");
+            const heading =
+                a.title || (approaches.length > 1 ? `Approach ${i + 1}` : "");
             if (heading) {
                 lines.push(`### ${heading}`);
                 lines.push("");
@@ -219,7 +261,14 @@ export function buildProblemFiles(problem, _settings = {}) {
         if (!approach.code) continue;
         const lang = _normLangObj(approach.lang || problem.lang);
         files.push({
-            path: solutionPath(id, platform, lang, canonical, {}, approach.title || ""),
+            path: solutionPath(
+                id,
+                platform,
+                lang,
+                canonical,
+                {},
+                approach.title || ""
+            ),
             content: approach.code,
         });
     }
@@ -255,13 +304,15 @@ function _collectApproaches(problem) {
         }));
     }
     if (problem.code) {
-        return [{
-            title: problem.methodTitle || "",
-            description: "",
-            code: problem.code,
-            lang: problem.lang,
-            langName: _normLangObj(problem.lang).name,
-        }];
+        return [
+            {
+                title: problem.methodTitle || "",
+                description: "",
+                code: problem.code,
+                lang: problem.lang,
+                langName: _normLangObj(problem.lang).name,
+            },
+        ];
     }
     return [];
 }
@@ -269,7 +320,10 @@ function _collectApproaches(problem) {
 function _normLangObj(lang) {
     if (!lang) return { ext: "txt", name: "text" };
     if (typeof lang === "string") return { ext: lang, name: lang };
-    return { ext: lang.ext || "txt", name: lang.name || lang.verbose || lang.slug || "text" };
+    return {
+        ext: lang.ext || "txt",
+        name: lang.name || lang.verbose || lang.slug || "text",
+    };
 }
 
 function _safeMethod(title) {
@@ -283,7 +337,11 @@ function _safeMethod(title) {
 }
 
 function _capitalise(str) {
-    return String(str || "").charAt(0).toUpperCase() + String(str || "").slice(1);
+    return (
+        String(str || "")
+            .charAt(0)
+            .toUpperCase() + String(str || "").slice(1)
+    );
 }
 
 function _formatTime(seconds) {
@@ -317,3 +375,4 @@ function _htmlToMarkdown(html) {
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 }
+

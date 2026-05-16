@@ -6,6 +6,8 @@
 import { createDebugger } from "../lib/debug.js";
 const dbg = createDebugger("ProblemGraph");
 
+// Already has createDebugger
+
 /**
  * Builds vis.js graph data from solved problems.
  */

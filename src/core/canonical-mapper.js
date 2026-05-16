@@ -58,7 +58,7 @@ class CanonicalMapper {
             dbg.log(
                 `loadMap(): ✓ using cached data (${this.map.size} entries)`
             );
-            this.populate(data);
+            await this.populate(data);
             return;
         }
 
@@ -81,6 +81,7 @@ class CanonicalMapper {
         try {
             if (res?.status === 304 && data) {
                 this.lastFetch = Date.now();
+                await this._mergeLocalEntries();
                 return;
             }
 
@@ -94,16 +95,16 @@ class CanonicalMapper {
                 dbg.log(
                     `loadMap(): ✓ loaded remote map (entries: ${normalizeCanonicalEntries(json).length})`
                 );
-                this.populate(json);
+                await this.populate(json);
                 this.lastFetch = Date.now();
             }
         } catch (err) {
             dbg.error("Failed to load canonical map", err);
-            if (data) this.populate(data);
+            if (data) await this.populate(data);
         }
     }
 
-    populate(json) {
+    async populate(json) {
         this.map.clear();
         let aliasCount = 0;
         for (const entry of normalizeCanonicalEntries(json)) {
@@ -114,8 +115,29 @@ class CanonicalMapper {
             }
         }
         dbg.log(
-            `populate(): ✓ loaded ${this.map.size} entries (${aliasCount} aliases)`
+            `populate(): ✓ loaded ${this.map.size} CDN entries (${aliasCount} aliases)`
         );
+        await this._mergeLocalEntries();
+    }
+
+    async _mergeLocalEntries() {
+        try {
+            const res = await storage.local.get(CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES);
+            const local = res[CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES];
+            if (!Array.isArray(local) || local.length === 0) return;
+            let added = 0;
+            for (const entry of local) {
+                if (!entry.canonicalId) continue;
+                this.map.set(entry.canonicalId, entry);
+                for (const alias of normalizeAliases(entry)) {
+                    this.map.set(`${alias.platform}:${alias.slug}`, entry);
+                }
+                added++;
+            }
+            dbg.log(`_mergeLocalEntries(): ✓ merged ${added} local entries`);
+        } catch (e) {
+            dbg.warn("_mergeLocalEntries(): failed (non-blocking):", e?.message);
+        }
     }
 
     /**

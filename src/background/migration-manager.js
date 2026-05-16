@@ -301,7 +301,7 @@ export async function resetRepo() {
     const INFRA = new Set([
         "index.html",
         "README.md",
-        ".github/workflows/update-stats.yml",
+        ".github/workflows/deploy-pages.yml",
     ]);
     const strayPaths = [...existingPaths].filter(
         (p) => !desiredFiles.has(p) && !INFRA.has(p)
@@ -353,7 +353,7 @@ export async function forceRebuildRepo() {
     const INFRA = new Set([
         "index.html",
         "README.md",
-        ".github/workflows/update-stats.yml",
+        ".github/workflows/deploy-pages.yml",
     ]);
     const deletable = [...existingPaths].filter((p) => !INFRA.has(p));
 

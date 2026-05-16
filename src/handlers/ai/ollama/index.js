@@ -7,6 +7,9 @@ import { BaseAIHandler } from "../../_base/BaseAIHandler.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { buildReviewPrompt } from "../../../core/ai-prompts.js";
+import { createDebugger } from "../../../lib/debug.js";
+
+const dbg = createDebugger("OllamaHandler");
 
 export class OllamaHandler extends BaseAIHandler {
     constructor() {

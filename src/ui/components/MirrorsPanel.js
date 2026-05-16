@@ -8,8 +8,13 @@
 import { h } from "../../vendor/preact-bundle.js";
 import { useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
-import { Storage } from "../../core/storage.js";
 const html = htm.bind(h);
+
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("MirrorsPanel");
+
+import { Storage } from "../../core/storage.js";
 
 const PROVIDERS = [
     { id: "github", label: "GitHub" },

@@ -24,6 +24,8 @@
  * - `AI_FALLBACK_CHAIN`: ordered provider ids to try when the primary is unavailable.
  */
 
+import { createDebugger } from "../lib/debug.js";
+
 export const FEATURE_STATUS = Object.freeze({
     STABLE: "stable",
     ALPHA: "alpha",
@@ -181,24 +183,50 @@ export const CONSTANTS = Object.freeze({
     },
 
     // ── Platforms ──
+    //
+    // Each entry carries URL constants so every file that needs to build a
+    // link can import CONSTANTS instead of hard-coding the domain.
+    //
+    // Naming:
+    //   baseUrl         — scheme + host, no trailing slash
+    //   problemsBase    — prefix for individual problem pages; append slug + "/"
+    //   problemsetUrl   — public listing / problemset page
+    //   graphqlUrl      — GraphQL endpoint (platform-specific; undefined if absent)
+    //   apiBase         — REST API base (platform-specific; undefined if absent)
     PLATFORMS: {
         leetcode: {
             id: "leetcode",
             name: "LeetCode",
             color: "#FFA116",
             domains: ["leetcode.com"],
+            baseUrl: "https://leetcode.com",
+            problemsBase: "https://leetcode.com/problems/",
+            problemsetUrl: "https://leetcode.com/problemset/",
+            submissionsBase: "https://leetcode.com/problems/",  // append slug + "/submissions/"
+            graphqlUrl: "https://leetcode.com/graphql/",
+            // REST API — append "/problems/all/" or "/submissions/" etc.
+            apiBase: "https://leetcode.com/api",
         },
         geeksforgeeks: {
             id: "geeksforgeeks",
             name: "GeeksForGeeks",
             color: "#2F8D46",
-            domains: ["geeksforgeeks.org", "practice.geeksforgeeks.org"],
+            // Keep all three variants in sync with dom-selectors.js DOMAINS
+            domains: ["geeksforgeeks.org", "practice.geeksforgeeks.org", "www.geeksforgeeks.org"],
+            baseUrl: "https://www.geeksforgeeks.org",
+            problemsBase: "https://www.geeksforgeeks.org/problems/",
+            practiceBase: "https://practice.geeksforgeeks.org/problems/",
+            status: FEATURE_STATUS.UNDER_CONSTRUCTION,
         },
         codeforces: {
             id: "codeforces",
             name: "Codeforces",
             color: "#1F8ACB",
             domains: ["codeforces.com"],
+            baseUrl: "https://codeforces.com",
+            problemsBase: "https://codeforces.com/problemset/problem/",
+            problemsetUrl: "https://codeforces.com/problemset/",
+            status: FEATURE_STATUS.UNDER_CONSTRUCTION,
         },
     },
 
@@ -231,6 +259,12 @@ export const CONSTANTS = Object.freeze({
     HEARTBEAT_PORT_NAME: "heartbeat",
     HEARTBEAT_INTERVAL_MS: 20_000,
 
+    // Duplicate-detection modal timings — change here to affect all dedup UI.
+    DEDUP: {
+        SAME_CODE_COUNTDOWN_S: 10,   // seconds before auto-keeping the better version
+        ADVANCE_DELAY_MS: 1000,      // ms to pause on "✓ resolved" before advancing
+    },
+
     // Storage keys used with `Storage` helper. Values are the keys stored inside browser storage.
     // Naming convention: short, dot-separated, stable across releases.
     SK: {
@@ -245,10 +279,12 @@ export const CONSTANTS = Object.freeze({
         DISABLED_PLATFORMS: "platforms.disabled",
         CANONICAL_MAP_CACHE: "canonical.map.cache",
         CANONICAL_MAP_ETAG: "canonical.map.etag",
+        CANONICAL_LOCAL_ENTRIES: "canonical.local.entries",
         AI_PROMPTS: "ai.prompts",
         SYNC_STATE: "sync.state",
         THEME: "ui.theme",
         BEHAVIOR_BANK: "cl-behavior-bank",
+        ROADMAPS: "cl-roadmaps",
         ROLLING_BACKUPS: "cl-rolling-backups",
         // Optional per-user difficulty mapping for non-standard difficulty labels.
         // Stored shape: { "extra hard": "Hard", "school": "Easy" }
@@ -291,5 +327,20 @@ export const CONSTANTS = Object.freeze({
         const code =
             this.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
         return `${code}-${titleSlug}`;
+    },
+
+    /**
+     * Build the canonical public URL for a problem page.
+     * Falls back to "#" for unknown platforms.
+     *
+     * @param {string} platform   "leetcode" | "geeksforgeeks" | "codeforces"
+     * @param {string} titleSlug  URL-safe problem slug
+     * @returns {string}
+     */
+    makeProblemUrl(platform, titleSlug) {
+        if (!titleSlug) return "#";
+        const p = this.PLATFORMS[platform];
+        if (!p?.problemsBase) return "#";
+        return p.problemsBase + titleSlug + "/";
     },
 });

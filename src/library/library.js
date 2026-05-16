@@ -36,6 +36,9 @@ import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js
 import {
     DuplicateDetectionModal,
     findDuplicates,
+    classifyDuplicatePair,
+    executeAction,
+    pickBetter,
 } from "./components/DuplicateDetectionModal.js";
 import { markSettingsPendingCommit } from "/core/settings-auto-commit.js";
 
@@ -67,6 +70,8 @@ function LibraryApp() {
     const [currentDuplicateGroup, setCurrentDuplicateGroup] = useState(null);
     const [setupIncomplete, setSetupIncomplete] = useState(null);
     const [setupDismissed, setSetupDismissed] = useState(false);
+    const [tokenExpired, setTokenExpired] = useState(false);
+    const [reauthBusy, setReauthBusy] = useState(false);
     const [importReport, setImportReport] = useState(null);
 
     // Reload problems from IndexedDB (used after import or external change)
@@ -148,37 +153,58 @@ function LibraryApp() {
                 if (s?.github_avatar) setGitAvatar(s.github_avatar);
                 if (s?.github_username) setGitUser(s.github_username);
 
-                // Check for duplicate problems
-                const dups = findDuplicates(p || []);
+                // Check for duplicate problems — diff-approach groups first so the
+                // user handles manual decisions before 10-second auto-resolvers run.
+                // Uses classifyDuplicatePair so sort order matches what the modal renders.
+                const dups = findDuplicates(p || []).sort((a, b) => {
+                    const isDiff = (g) => classifyDuplicatePair(g[0], g[1]) === "diff-approach";
+                    return isDiff(b) - isDiff(a);
+                });
                 setDuplicateGroups(dups);
                 if (dups.length > 0) {
                     setCurrentDuplicateGroup(dups[0]);
                 }
 
-                // Resolve GitHub user for header display
-                // Priority 1: OAuth token from auth.tokens (correct path after Connect)
-                // Priority 2: Manual PAT from settings (legacy support)
-                Storage.getAuthToken("github").then((oauthToken) => {
-                    const token = oauthToken || s?.github_token;
+                // Resolve GitHub user via OAuth token only — no PAT fallback.
+                // Validates the token against /user on every load; if the token
+                // is revoked or invalid the user is prompted to reconnect inline.
+                Storage.getAuthToken("github").then(async (oauthToken) => {
                     const hasRepo = !!(s?.github_repo || s?.gitRepo);
-                    if (mounted) setSetupIncomplete(!token || !hasRepo);
-                    if (!token || !mounted) return;
-                    // Hydrate settings display with the OAuth token so SettingsSchema shows "Connected"
-                    // (OAuth tokens are never persisted to settings storage — they live in auth.tokens)
-                    if (oauthToken && !s?.github_token) {
-                        setSettings((prev) => ({
-                            ...prev,
-                            github_token: oauthToken,
-                        }));
+                    if (!oauthToken) {
+                        // Never authenticated — show first-time setup prompt.
+                        if (mounted) setSetupIncomplete(true);
+                        return;
                     }
-                    fetch("https://api.github.com/user", {
-                        headers: { Authorization: `Bearer ${token}` },
-                    })
-                        .then((r) => (r.ok ? r.json() : null))
-                        .then((u) => {
-                            if (u?.login && mounted) setGitUser(u.login);
-                        })
-                        .catch(() => {});
+                    // Inject into local settings state so SettingsSchema "Connected" indicator works.
+                    // This is display-only — never persisted to chrome.storage.
+                    if (mounted) {
+                        setSettings((prev) => ({ ...prev, github_token: oauthToken }));
+                    }
+                    try {
+                        const res = await fetch(`${CONSTANTS.GIT_PROVIDERS.github.apiBase}/user`, {
+                            headers: { Authorization: `Bearer ${oauthToken}` },
+                        });
+                        if (!res.ok) {
+                            if (res.status === 401) {
+                                // Token revoked or invalidated by GitHub — clear and show expired banner.
+                                await Storage.setAuthToken("github", "");
+                                if (mounted) {
+                                    setSettings((prev) => ({ ...prev, github_token: "" }));
+                                    setGitUser(null);
+                                    setTokenExpired(true);
+                                }
+                            }
+                            return;
+                        }
+                        const u = await res.json();
+                        if (!mounted) return;
+                        if (u?.login) setGitUser(u.login);
+                        if (u?.avatar_url && !s?.github_avatar) setGitAvatar(u.avatar_url);
+                        setSetupIncomplete(!hasRepo);
+                    } catch (_) {
+                        // Network failure — don't clear the token, don't show expired banner.
+                        if (mounted) setSetupIncomplete(!hasRepo);
+                    }
                 });
             })
             .finally(() => mounted && setLoading(false));
@@ -274,31 +300,10 @@ function LibraryApp() {
                 if (!currentSettings?.github_owner) {
                     updatedSettings.github_owner = user.login;
                 }
+                // avatars.githubusercontent.com is a public CDN — store and use the URL directly.
+                // Do NOT fetch() it: any non-simple fetch triggers a CORS preflight that the CDN rejects.
                 if (user.avatar_url) {
-                    try {
-                        // Try to fetch avatar and convert to data URL to avoid cross-origin/broken-img issues
-                        const avatarRes = await fetch(user.avatar_url, {
-                            headers: { Authorization: `Bearer ${data.token}` },
-                            cache: "no-store",
-                        });
-                        if (avatarRes.ok) {
-                            const blob = await avatarRes.blob();
-                            const reader = new FileReader();
-                            const dataUrl = await new Promise((res) => {
-                                reader.onloadend = () => res(reader.result);
-                                reader.readAsDataURL(blob);
-                            });
-                            updatedSettings.github_avatar = dataUrl;
-                            setGitAvatar(dataUrl);
-                        } else {
-                            updatedSettings.github_avatar = user.avatar_url;
-                            setGitAvatar(user.avatar_url);
-                        }
-                    } catch (e) {
-                        // fallback to raw URL
-                        updatedSettings.github_avatar = user.avatar_url;
-                        setGitAvatar(user.avatar_url);
-                    }
+                    updatedSettings.github_avatar = user.avatar_url;
                 }
                 await Storage.setSettings(updatedSettings);
 
@@ -315,10 +320,12 @@ function LibraryApp() {
                     setShowGitHubOnboarding(true);
                 }
 
-                // Update user display
+                // Update user display and clear any expired-token state.
                 setGitUser(user.login);
                 setGitAvatar(user.avatar_url || null);
                 setSettings(updatedSettings);
+                setTokenExpired(false);
+                setSetupIncomplete(false);
             } catch (e) {
                 dbg.error("OAuth handler error:", e);
             }
@@ -346,6 +353,19 @@ function LibraryApp() {
         return () => chrome.runtime.onMessage.removeListener(handleImportComplete);
     }, [reloadProblems]);
 
+    // Re-auth prompt: service worker broadcasts this when any GitHub call returns 401.
+    useEffect(() => {
+        if (!window.chrome?.runtime?.onMessage) return;
+        const handleReauthRequired = (msg) => {
+            if (msg?.type !== "GITHUB_REAUTH_REQUIRED") return;
+            setSettings((prev) => ({ ...prev, github_token: "" }));
+            setGitUser(null);
+            setTokenExpired(true);
+        };
+        chrome.runtime.onMessage.addListener(handleReauthRequired);
+        return () => chrome.runtime.onMessage.removeListener(handleReauthRequired);
+    }, []);
+
     const handleOnboardingComplete = async () => {
         setShowGitHubOnboarding(false);
         // Refresh settings to reflect repo setup
@@ -372,6 +392,36 @@ function LibraryApp() {
         [duplicateGroups]
     );
 
+    const autoResolveAllSame = useCallback(async () => {
+        const sameGroups = duplicateGroups.filter(
+            (g) => g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "same-code"
+        );
+        const deletedIds = [];
+        for (const g of sameGroups) {
+            const [first, second] = g;
+            const side = pickBetter(first, second);
+            const action = side === "first" ? "keep-first" : "keep-second";
+            try {
+                const deletedId = await executeAction(action, first, second);
+                deletedIds.push(deletedId);
+            } catch (e) {
+                // non-fatal — continue resolving others
+            }
+        }
+        if (deletedIds.length > 0) {
+            setProblems((prev) => prev.filter((p) => !deletedIds.includes(p.id)));
+        }
+        const remaining = duplicateGroups.filter(
+            (g) => !(g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "same-code")
+        );
+        setDuplicateGroups(remaining);
+        if (remaining.length === 0) {
+            setCurrentDuplicateGroup(null);
+        } else {
+            setCurrentDuplicateGroup(remaining[0]);
+        }
+    }, [duplicateGroups]);
+
     // Called from SettingsSchema "Set up repository" / "Change repo" button
     const handleSetupRepo = useCallback(
         async (token, _owner) => {
@@ -393,6 +443,26 @@ function LibraryApp() {
         },
         [gitUser]
     );
+
+    // Inline OAuth reconnect — opens the OAuth popup without navigating away.
+    // The existing handleOAuthMessage listener picks up the token on success.
+    const triggerReauth = useCallback(() => {
+        const authUrl = `${CONSTANTS.URLS.AUTH_WORKER}/auth/github`;
+        setReauthBusy(true);
+        const popup = window.open(authUrl, "OAuth", "width=600,height=700");
+        if (!popup) {
+            setReauthBusy(false);
+            alert("Please allow popups for this page to reconnect GitHub.");
+            return;
+        }
+        // Stop spinner once popup closes (success clears tokenExpired via handleOAuthMessage)
+        const poll = setInterval(() => {
+            if (popup.closed) {
+                clearInterval(poll);
+                setReauthBusy(false);
+            }
+        }, 500);
+    }, []);
 
     const openProblemInGraph = useCallback((problem) => {
         if (!problem) return;
@@ -426,6 +496,12 @@ function LibraryApp() {
             } else if (durations[value]) {
                 next.incognitoExpiry = Date.now() + durations[value];
             }
+        }
+
+        // When the user changes the target repo or owner, invalidate the cached
+        // git_active_primary so commits go to the new repo immediately.
+        if (key === "github_repo" || key === "github_owner") {
+            delete next.git_active_primary;
         }
 
         // GitHub OAuth tokens should NOT be stored in settings — they belong in auth.tokens.
@@ -503,7 +579,7 @@ function LibraryApp() {
                 settings=${settings}
             />`;
         if (activeTab === "behaviour-bank")
-            return html`<${BehaviourBankView} />`;
+            return html`<${BehaviourBankView} problems=${enrichedProblems} onNavigate=${setActiveTab} />`;
         if (activeTab === "canonical")
             return html`<${CanonicalView} problems=${enrichedProblems} />`;
         if (activeTab === "settings")
@@ -511,13 +587,14 @@ function LibraryApp() {
                 settings=${settings}
                 onSettingsChange=${handleSettingsChange}
                 onSetupRepo=${handleSetupRepo}
+                onConnect=${triggerReauth}
             />`;
 
         return html`<p class="text-slate-400">Unknown view</p>`;
     };
 
     return html`
-        <div class="flex flex-col h-full w-full bg-[#050508]">
+        <div class="flex flex-col h-full w-full bg-[var(--cl-bg)]">
             ${importReport && html`
                 <div class="px-4 py-3 bg-emerald-900/30 border-b border-emerald-500/20 flex items-center gap-3 flex-wrap text-sm shrink-0">
                     <span class="text-emerald-300 font-medium">Import complete:</span>
@@ -545,7 +622,7 @@ function LibraryApp() {
                 </div>
             `}
             <header
-                class="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[#0a0a0f] shrink-0"
+                class="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[var(--cl-surface)] shrink-0"
             >
                 <div class="flex items-center gap-3">
                     <button
@@ -689,7 +766,7 @@ function LibraryApp() {
             <main class="flex-1 flex overflow-hidden">
                 <aside
                     style=${{ width: sidebarCollapsed ? "72px" : "260px" }}
-                    class="border-r border-white/5 bg-[#07070b] flex flex-col p-3 shrink-0 transition-all"
+                    class="border-r border-white/5 bg-[var(--cl-surface)] flex flex-col p-3 shrink-0 transition-all"
                 >
                     <div class="mb-4">
                         <p
@@ -727,38 +804,59 @@ function LibraryApp() {
                         </nav>
                     </div>
 
-                    ${setupIncomplete && !setupDismissed && !sidebarCollapsed
+                    ${tokenExpired && !sidebarCollapsed
                         ? html`
-                              <a
-                                  href=${typeof chrome !== "undefined" &&
-                                  chrome.runtime?.id
-                                      ? chrome.runtime.getURL(
-                                            "welcome/welcome.html"
-                                        )
-                                      : "#"}
-                                  target="_blank"
-                                  class="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 hover:bg-amber-500/15 transition-colors"
+                              <button
+                                  onClick=${triggerReauth}
+                                  disabled=${reauthBusy}
+                                  class="flex items-center gap-2 px-3 py-2 mb-2 w-full rounded-lg bg-rose-500/10 border border-rose-500/25 text-xs text-rose-300 hover:bg-rose-500/20 transition-colors disabled:opacity-60 text-left"
                               >
-                                  <span>⚠</span>
-                                  <span>Complete setup</span>
-                              </a>
+                                  <span class="shrink-0">⚠</span>
+                                  <span>${reauthBusy ? "Opening…" : "Token expired — reconnect"}</span>
+                              </button>
                           `
-                        : setupIncomplete && !setupDismissed && sidebarCollapsed
+                        : tokenExpired && sidebarCollapsed
                           ? html`
-                                <a
-                                    href=${typeof chrome !== "undefined" &&
-                                    chrome.runtime?.id
-                                        ? chrome.runtime.getURL(
-                                              "welcome/welcome.html"
-                                          )
-                                        : "#"}
-                                    target="_blank"
-                                    title="Setup incomplete — click to complete"
-                                    class="flex items-center justify-center w-10 h-10 mx-auto mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/15 transition-colors"
-                                    >⚠</a
+                                <button
+                                    onClick=${triggerReauth}
+                                    disabled=${reauthBusy}
+                                    title="GitHub token expired — click to reconnect"
+                                    class="flex items-center justify-center w-10 h-10 mx-auto mb-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-60"
+                                    >⚠</button
                                 >
                             `
-                          : ""}
+                          : setupIncomplete && !setupDismissed && !sidebarCollapsed
+                            ? html`
+                                  <a
+                                      href=${typeof chrome !== "undefined" &&
+                                      chrome.runtime?.id
+                                          ? chrome.runtime.getURL(
+                                                "welcome/welcome.html"
+                                            )
+                                          : "#"}
+                                      target="_blank"
+                                      class="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 hover:bg-amber-500/15 transition-colors"
+                                  >
+                                      <span>⚠</span>
+                                      <span>Complete setup</span>
+                                  </a>
+                              `
+                            : setupIncomplete && !setupDismissed && sidebarCollapsed
+                              ? html`
+                                    <a
+                                        href=${typeof chrome !== "undefined" &&
+                                        chrome.runtime?.id
+                                            ? chrome.runtime.getURL(
+                                                  "welcome/welcome.html"
+                                              )
+                                            : "#"}
+                                        target="_blank"
+                                        title="Setup incomplete — click to complete"
+                                        class="flex items-center justify-center w-10 h-10 mx-auto mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/15 transition-colors"
+                                        >⚠</a
+                                    >
+                                `
+                              : ""}
 
                     <div class="mt-auto">
                         <div
@@ -803,46 +901,69 @@ function LibraryApp() {
                     </div>
                 </aside>
 
-                <div class="flex-1 bg-[#050508] p-6 overflow-y-auto">
-                    ${setupIncomplete && !setupDismissed
+                <div class="flex-1 bg-[var(--cl-bg)] p-6 overflow-y-auto">
+                    ${tokenExpired
                         ? html`
                               <div
-                                  class="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20"
+                                  class="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/30"
                               >
                                   <div class="flex items-center gap-2 min-w-0">
-                                      <span class="text-amber-400 shrink-0"
-                                          >⚠</span
-                                      >
-                                      <p class="text-xs text-amber-300">
-                                          Setup incomplete — connect GitHub and
-                                          link a repo to start auto-committing
-                                          solutions.
-                                      </p>
+                                      <span class="text-rose-400 shrink-0 text-base">⚠</span>
+                                      <div class="min-w-0">
+                                          <p class="text-xs font-semibold text-rose-300">
+                                              GitHub authentication expired
+                                          </p>
+                                          <p class="text-[11px] text-rose-400/80 mt-0.5">
+                                              Commits are paused. Reconnect to resume auto-syncing.
+                                          </p>
+                                      </div>
                                   </div>
-                                  <div class="flex items-center gap-2 shrink-0">
-                                      <a
-                                          href=${typeof chrome !==
-                                              "undefined" && chrome.runtime?.id
-                                              ? chrome.runtime.getURL(
-                                                    "welcome/welcome.html"
-                                                )
-                                              : "#"}
-                                          target="_blank"
-                                          class="text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors whitespace-nowrap"
-                                          >Complete setup →</a
-                                      >
-                                      <button
-                                          onClick=${() =>
-                                              setSetupDismissed(true)}
-                                          class="text-slate-500 hover:text-slate-300 text-lg leading-none transition-colors"
-                                          title="Dismiss"
-                                      >
-                                          ×
-                                      </button>
-                                  </div>
+                                  <button
+                                      onClick=${triggerReauth}
+                                      disabled=${reauthBusy}
+                                      class="shrink-0 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/35 disabled:opacity-60 border border-rose-500/30 rounded-lg text-xs font-medium text-rose-200 transition-colors whitespace-nowrap"
+                                  >
+                                      ${reauthBusy ? "Opening…" : "Reconnect GitHub →"}
+                                  </button>
                               </div>
                           `
-                        : ""}
+                        : setupIncomplete && !setupDismissed
+                          ? html`
+                                <div
+                                    class="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20"
+                                >
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span class="text-amber-400 shrink-0">⚠</span>
+                                        <p class="text-xs text-amber-300">
+                                            Setup incomplete — connect GitHub and
+                                            link a repo to start auto-committing
+                                            solutions.
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <a
+                                            href=${typeof chrome !==
+                                                "undefined" && chrome.runtime?.id
+                                                ? chrome.runtime.getURL(
+                                                      "welcome/welcome.html"
+                                                  )
+                                                : "#"}
+                                            target="_blank"
+                                            class="text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                                            >Complete setup →</a
+                                        >
+                                        <button
+                                            onClick=${() =>
+                                                setSetupDismissed(true)}
+                                            class="text-slate-500 hover:text-slate-300 text-lg leading-none transition-colors"
+                                            title="Dismiss"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                </div>
+                            `
+                          : ""}
                     ${(() => {
                         const mode = settings.incognitoMode;
                         const expiry = settings.incognitoExpiry ?? 0;
@@ -880,7 +1001,12 @@ function LibraryApp() {
             ${currentDuplicateGroup
                 ? html`
                       <${DuplicateDetectionModal}
+                          key=${currentDuplicateGroup[0]?.id}
                           duplicateGroup=${currentDuplicateGroup}
+                          remaining=${duplicateGroups.length}
+                          diffApproachCount=${duplicateGroups.filter((g) => g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "diff-approach").length}
+                          sameCodeCount=${duplicateGroups.filter((g) => g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "same-code").length}
+                          onAutoResolveAll=${autoResolveAllSame}
                           onResolve=${handleDuplicateResolved}
                           onClose=${() => {
                               setCurrentDuplicateGroup(null);

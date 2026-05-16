@@ -6,15 +6,12 @@
 import { BasePlatformHandler } from "../../_base/BasePlatformHandler.js";
 import { SELECTORS, LEGACY_SELECTORS } from "./dom-selectors.js";
 import { detectPage, PAGE_TYPES } from "./page-detector.js";
-import { eventBus } from "../../../core/event-bus.js";
 import { Storage } from "../../../core/storage.js";
-import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
-import { CONSTANTS } from "../../../core/constants.js";
 
 const dbg = createDebugger("GFG");
 
@@ -48,6 +45,7 @@ function langExt(name = "") {
 export class GFGHandler extends BasePlatformHandler {
     constructor() {
         super("geeksforgeeks", "GeeksForGeeks", {});
+        this._enableKey = "gfg_enable";
         this.mutationObserver = null;
         this.lastDetectedId = null;
         this._processingLock = false;
@@ -131,10 +129,7 @@ Be concise. Max 200 words.`;
                         const meta = this._extractMetadata(slug);
                         const problem = {
                             platform: "geeksforgeeks",
-                            id: CONSTANTS.makeProblemId(
-                                "geeksforgeeks",
-                                String(slug)
-                            ),
+                            id: this.makeProblemId(String(slug)),
                             title: meta.title || slug,
                             titleSlug: slug,
                             difficulty: meta.difficulty || null,
@@ -222,7 +217,7 @@ Be concise. Max 200 words.`;
         this._processingLock = true;
         try {
             const settings = await Storage.getSettings();
-            if (!settings.gfg_enable) return;
+            if (!this.isEnabled(settings)) return;
 
             const slug = page.slug;
             if (!slug) return;
@@ -252,11 +247,7 @@ Be concise. Max 200 words.`;
 
             sessionStorage.setItem(dedupKey, "1");
 
-            // Canonical mapping
-            try {
-                await canonicalMapper.loadMap();
-            } catch (_) {}
-            const canonical = canonicalMapper.resolve("geeksforgeeks", slug);
+            const canonical = await this.resolveCanonical(slug);
 
             // Build file set
             const files = this._buildFileSet(
@@ -271,9 +262,8 @@ Be concise. Max 200 words.`;
 
             const elapsedSeconds = this._timer.getElapsedSeconds();
 
-            eventBus.emit("problem:solved", {
-                platform: "geeksforgeeks",
-                id: CONSTANTS.makeProblemId("geeksforgeeks", slug),
+            this.emitSolved({
+                id: this.makeProblemId(slug),
                 title: meta.title || slug,
                 titleSlug: slug,
                 difficulty: meta.difficulty || null,
@@ -399,7 +389,7 @@ Be concise. Max 200 words.`;
             name: lang.name,
             ext: lang.ext,
         };
-        const problemId = CONSTANTS.makeProblemId("geeksforgeeks", slug);
+        const problemId = this.makeProblemId(slug);
         const files = [];
 
         files.push({

@@ -51,35 +51,11 @@ async function loadHandler() {
             );
         } else if (isHost("geeksforgeeks.org", hostname)) {
             console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): platform detected = GeeksForGeeks`
-            );
-            const url = chrome.runtime.getURL(
-                "handlers/platforms/geeksforgeeks/index.js"
-            );
-            const { GFGHandler } = await import(url);
-            const handler = new GFGHandler();
-            console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): initializing GFGHandler...`
-            );
-            await handler.init();
-            console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): ✓ GFGHandler initialized`
+                `[CodeLedger:HandlerLoader] loadHandler(): GeeksForGeeks handler is under construction — detection only, no submission capture`
             );
         } else if (isHost("codeforces.com", hostname)) {
             console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): platform detected = Codeforces`
-            );
-            const url = chrome.runtime.getURL(
-                "handlers/platforms/codeforces/index.js"
-            );
-            const { CodeforcesHandler } = await import(url);
-            const handler = new CodeforcesHandler();
-            console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): initializing CodeforcesHandler...`
-            );
-            await handler.init();
-            console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): ✓ CodeforcesHandler initialized`
+                `[CodeLedger:HandlerLoader] loadHandler(): Codeforces handler is under construction — detection only, no submission capture`
             );
         } else {
             console.log(
@@ -99,7 +75,15 @@ console.log(`[CodeLedger:HandlerLoader] script loaded`);
 // Code recovery mode: opened by code-recovery-handler.js with a flag in the URL
 const _urlParams = new URLSearchParams(window.location.search);
 if (_urlParams.get("codeledger_code_fetch") === "1" && window.location.hostname.includes("leetcode.com")) {
-    const _problemId = _urlParams.get("codeledger_problemid") || "";
+    // Prefer the query param; fall back to the hash fragment which survives LeetCode
+    // server-side redirects that may strip the query string.
+    const _hashParams = new URLSearchParams(
+        window.location.hash.replace(/^#/, "")
+    );
+    const _problemId =
+        _urlParams.get("codeledger_problemid") ||
+        _hashParams.get("cl-pid") ||
+        "";
     console.log(`[CodeLedger:HandlerLoader] code-fetch mode detected, problemId=${_problemId}`);
     (async () => {
         try {

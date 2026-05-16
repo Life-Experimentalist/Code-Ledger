@@ -103,6 +103,29 @@ export const Storage = {
         await this.setBehaviorBank(bank);
     },
 
+    // ── Roadmaps store: Array<Roadmap> ──────────────────────────────────────
+    async getRoadmaps() {
+        const res = await browserStorage.local.get(CONSTANTS.SK.ROADMAPS);
+        return res[CONSTANTS.SK.ROADMAPS] || [];
+    },
+
+    async setRoadmaps(roadmaps) {
+        await browserStorage.local.set({ [CONSTANTS.SK.ROADMAPS]: roadmaps });
+    },
+
+    async saveRoadmap(roadmap) {
+        const list = await this.getRoadmaps();
+        const idx = list.findIndex((r) => r.id === roadmap.id);
+        if (idx >= 0) list[idx] = roadmap;
+        else list.push(roadmap);
+        await this.setRoadmaps(list);
+    },
+
+    async deleteRoadmap(id) {
+        const list = await this.getRoadmaps();
+        await this.setRoadmaps(list.filter((r) => r.id !== id));
+    },
+
     // ── Backup store: { manual: [], scheduled: [], rolling: null } ──────────
 
     async _getBackupStore() {
@@ -190,6 +213,38 @@ export const Storage = {
     },
     async addRollingBackup(payload) {
         await this.addManualBackup(payload);
+    },
+
+    // ── Local canonical entries ──────────────────────────────────────────────
+    // User-owned overrides merged with the CDN canonical-map on lookup.
+
+    async getLocalCanonicalEntries() {
+        const res = await browserStorage.local.get(CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES);
+        return res[CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES] || [];
+    },
+
+    async setLocalCanonicalEntries(entries) {
+        await browserStorage.local.set({
+            [CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES]: entries,
+        });
+    },
+
+    async addLocalCanonicalEntry(entry) {
+        const entries = await this.getLocalCanonicalEntries();
+        const idx = entries.findIndex((e) => e.canonicalId === entry.canonicalId);
+        if (idx >= 0) {
+            entries[idx] = entry;
+        } else {
+            entries.push(entry);
+        }
+        await this.setLocalCanonicalEntries(entries);
+    },
+
+    async deleteLocalCanonicalEntry(canonicalId) {
+        const entries = await this.getLocalCanonicalEntries();
+        await this.setLocalCanonicalEntries(
+            entries.filter((e) => e.canonicalId !== canonicalId)
+        );
     },
 
     async getAIPrompts() {

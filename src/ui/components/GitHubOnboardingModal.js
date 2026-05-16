@@ -7,7 +7,9 @@ import { h } from "../../vendor/preact-bundle.js";
 import { useState, useEffect, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 import { Storage } from "../../core/storage.js";
+import { CONSTANTS } from "../../core/constants.js";
 import { createDebugger } from "../../lib/debug.js";
+import { registry } from "../../core/handler-registry.js";
 import { getPagesHtml } from "../../handlers/git/github/pages-template.js";
 import { importFromRepo, applyImport } from "../../background/sync-engine.js";
 import { ConflictResolutionModal } from "../../library/components/ConflictResolutionModal.js";
@@ -64,8 +66,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     // Conflict resolution
     const [importData, setImportData] = useState(null);
 
-    // Post-link sync state: null | 'syncing' | { committed: number } | 'error'
+    // Post-link sync state: null | { phase: 'syncing', current: number, total: number } | { committed: number } | 'error'
     const [postSyncState, setPostSyncState] = useState(null);
+    const syncPortRef = useRef(null);
 
     // ── Init on open ──────────────────────────────────────────────────────────
 
@@ -94,9 +97,12 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
             .catch(() => setStep("choice"));
     }, [isOpen]);
 
+    const [tokenExpired, setTokenExpired] = useState(false);
+
     // Load orgs when the modal opens (so the dropdown is ready)
     useEffect(() => {
         if (!isOpen || !token) return;
+        setTokenExpired(false);
         setOrgsLoading(true);
         fetch("https://api.github.com/user/orgs?per_page=100", {
             headers: {
@@ -104,7 +110,12 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                 Accept: "application/vnd.github.v3+json",
             },
         })
-            .then((r) => (r.ok ? r.json() : []))
+            .then((r) => {
+                // 401 here means the GitHub App token lacks read:org scope — not a token expiry.
+                // Silently fall back to personal-account-only mode.
+                if (!r.ok) return [];
+                return r.json();
+            })
             .then((data) => setOrgs(Array.isArray(data) ? data : []))
             .catch(() => setOrgs([]))
             .finally(() => setOrgsLoading(false));
@@ -146,7 +157,25 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
     const triggerPostLinkSync = () => {
         if (typeof chrome === "undefined" || !chrome.runtime?.id) return;
-        setPostSyncState("syncing");
+        setPostSyncState({ phase: "syncing", current: 0, total: 0 });
+
+        // Open a port so the SW can stream sync-progress events back
+        const port = chrome.runtime.connect({ name: "sync-keepalive" });
+        syncPortRef.current = port;
+
+        port.onMessage.addListener((msg) => {
+            if (msg.type === "sync-progress") {
+                setPostSyncState({ phase: "syncing", current: msg.current, total: msg.total });
+            } else if (msg.type === "sync-done") {
+                port.disconnect();
+                syncPortRef.current = null;
+            }
+        });
+
+        port.onDisconnect.addListener(() => {
+            syncPortRef.current = null;
+        });
+
         chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode: "individual" }, (resp) => {
             if (chrome.runtime.lastError || !resp?.ok) {
                 setPostSyncState("error");
@@ -222,7 +251,11 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
             setUserRepos(repos);
             if (repos.length > 0) setSelectedRepo(repos[0].name);
         } catch (e) {
-            setError("Could not load repositories: " + e.message);
+            if (e.status === 401) {
+                setTokenExpired(true);
+            } else {
+                setError("Could not load repositories: " + e.message);
+            }
         } finally {
             setReposLoading(false);
         }
@@ -334,8 +367,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
             if (Array.isArray(contents) && contents.some((f) => f.name === "index.json")) {
                 setProgress("Reading existing problems from repository…");
                 try {
+                    const _git = registry.getGitProvider("github");
                     const { remoteOnly, conflicts } = await importFromRepo(
-                        repoData.owner.login, repoData.name, token
+                        repoData.owner.login, repoData.name, _git
                     );
                     if (conflicts.length > 0) {
                         setImportData({ remoteOnly, conflicts });
@@ -477,6 +511,33 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
                 <!-- Body (scrollable) -->
                 <div class="px-8 py-8 overflow-y-auto">
+
+                    <!-- Token expired banner -->
+                    ${tokenExpired
+                        ? html`
+                              <div class="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-3">
+                                  <div class="flex items-start gap-2">
+                                      <span class="text-rose-400 shrink-0">⚠</span>
+                                      <div>
+                                          <p class="text-sm font-medium text-rose-300">GitHub token expired or revoked</p>
+                                          <p class="text-xs text-rose-400/70 mt-0.5">
+                                              Your saved token is no longer valid. Please reconnect your
+                                              GitHub account to continue.
+                                          </p>
+                                      </div>
+                                  </div>
+                                  <button
+                                      onClick=${() => {
+                                          const authUrl = CONSTANTS.URLS.AUTH_WORKER + "/auth/github";
+                                          window.open(authUrl, "OAuth", "width=600,height=700");
+                                      }}
+                                      class="w-full px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-sm rounded-lg transition-colors"
+                                  >
+                                      Reconnect GitHub →
+                                  </button>
+                              </div>
+                          `
+                        : ""}
 
                     <!-- check -->
                     ${step === "check"
@@ -726,7 +787,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     ${step === "done"
                         ? html`
                               <div class="space-y-4 text-center">
-                                  <div class="text-5xl">${postSyncState === "error" ? "⚠️" : "✅"}</div>
+                                  <div class="text-5xl">${postSyncState === "error" ? "⚠️" : postSyncState?.phase === "syncing" ? "⏳" : "✅"}</div>
                                   <div>
                                       <h3 class="text-base font-semibold text-white">GitHub Setup Complete!</h3>
                                       <p class="text-sm text-slate-400 mt-2">
@@ -745,11 +806,29 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                                           View on GitHub ↗
                                       </a>
                                   </div>
-                                  ${postSyncState === "syncing"
+                                  ${postSyncState?.phase === "syncing"
                                       ? html`
-                                            <div class="flex items-center justify-center gap-2 text-xs text-cyan-400">
-                                                <div class="w-3 h-3 rounded-full border border-cyan-500/50 border-t-cyan-500 animate-spin shrink-0"></div>
-                                                Syncing your existing solutions…
+                                            <div class="space-y-2">
+                                                <div class="flex items-center justify-between text-xs text-cyan-400">
+                                                    <span class="flex items-center gap-1.5">
+                                                        <div class="w-2.5 h-2.5 rounded-full border border-cyan-500/50 border-t-cyan-500 animate-spin shrink-0"></div>
+                                                        Syncing solutions to GitHub…
+                                                    </span>
+                                                    ${postSyncState.total > 0
+                                                        ? html`<span class="text-slate-400">${postSyncState.current}/${postSyncState.total}</span>`
+                                                        : ""}
+                                                </div>
+                                                ${postSyncState.total > 0
+                                                    ? html`
+                                                          <div class="h-1.5 rounded-full bg-slate-700/60 overflow-hidden">
+                                                              <div
+                                                                  class="h-full rounded-full bg-cyan-500 transition-all duration-300"
+                                                                  style="width:${Math.round((postSyncState.current / postSyncState.total) * 100)}%"
+                                                              ></div>
+                                                          </div>
+                                                      `
+                                                    : ""}
+                                                <p class="text-[11px] text-slate-500">You can close this — sync continues in the background.</p>
                                             </div>
                                         `
                                       : postSyncState && typeof postSyncState === "object"
@@ -765,10 +844,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                                       : ""}
                                   <button
                                       onClick=${onComplete}
-                                      disabled=${postSyncState === "syncing"}
-                                      class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors mt-2 disabled:opacity-50"
+                                      class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors mt-2"
                                   >
-                                      ${postSyncState === "syncing" ? "Syncing…" : "Start Coding 🚀"}
+                                      Start Coding 🚀
                                   </button>
                               </div>
                           `

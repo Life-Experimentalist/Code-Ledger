@@ -18,6 +18,10 @@ import {
 } from "../../core/difficulty-map.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("HeatMap");
+
 function fmtDateLabel(dateStr) {
     try {
         const d = new Date(dateStr + "T12:00:00");

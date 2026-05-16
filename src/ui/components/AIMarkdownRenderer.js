@@ -7,8 +7,12 @@ import { h } from "../../vendor/preact-bundle.js";
 import { useState, useEffect, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 import { renderMermaid } from "../../vendor/mermaid-stub.js";
-import { renderMath } from "../../vendor/katex-stub.js";
+import { renderMath, substituteLatex } from "../../vendor/katex-stub.js";
 const html = htm.bind(h);
+
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("AIMarkdownRenderer");
 
 function escapeHtml(text) {
     return String(text)
@@ -128,6 +132,9 @@ export function parseMarkdown(text) {
             `<code class="px-1 py-0.5 rounded bg-white/10 text-cyan-300 text-[0.85em] font-mono">${escapeHtml(code)}</code>`
         )
     );
+
+    // 5b. Replace LaTeX commands in plain text (outside math/code stashes)
+    t = substituteLatex(t);
 
     // 6. Now escape the remaining non-stash text
     t = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

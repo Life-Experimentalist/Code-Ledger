@@ -6,10 +6,96 @@
  * Registers with modalTabRegistry on import.
  */
 
+import { h, useState } from "../../../vendor/preact-bundle.js";
+import { htm } from "../../../vendor/preact-bundle.js";
 import { modalTabRegistry } from "../../../core/modal-tab-registry.js";
 import { highlightCode } from "../../../lib/syntax-highlight.js";
+import { Storage } from "../../../core/storage.js";
+import { CONSTANTS } from "../../../core/constants.js";
 
+const html = htm.bind(h);
 const IS_EXTENSION = !!globalThis.chrome?.runtime?.id;
+
+function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
+    const [recovering, setRecovering] = useState(false);
+    const [recoveryError, setRecoveryError] = useState("");
+
+    if (!problem.code) {
+        return html`
+            <div class="flex flex-col items-center gap-4 py-12 text-center">
+                <p class="text-slate-500 text-sm">Code was not extracted for this submission.</p>
+                ${IS_EXTENSION
+                    ? html`
+                        <button
+                            onClick=${async () => {
+                                setRecovering(true);
+                                setRecoveryError("");
+                                try {
+                                    const res = await new Promise((resolve) =>
+                                        chrome.runtime.sendMessage(
+                                            { type: "TRIGGER_CODE_RECOVERY", problemId: problem.id },
+                                            resolve
+                                        )
+                                    );
+                                    if (res?.ok && res.code) {
+                                        const updated = await Storage.getProblem(problem.id);
+                                        if (updated) onUpdate(updated);
+                                    } else {
+                                        setRecoveryError(res?.error || "Recovery failed — no code returned");
+                                    }
+                                } catch (e) {
+                                    setRecoveryError(e?.message || "Recovery failed");
+                                } finally {
+                                    setRecovering(false);
+                                }
+                            }}
+                            disabled=${recovering}
+                            class="px-4 py-2 rounded-lg bg-cyan-600/15 border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-600/30 disabled:opacity-40 transition-colors"
+                        >
+                            ${recovering ? "Recovering code…" : "Recover Code from LeetCode"}
+                        </button>
+                        ${recoveryError
+                            ? html`
+                                <p class="text-rose-400 text-xs max-w-xs">${recoveryError}</p>
+                                <a
+                                    href=${CONSTANTS.PLATFORMS.leetcode.baseUrl}
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="text-[10px] text-cyan-500 hover:text-cyan-300 underline"
+                                >
+                                    Open LeetCode to log in, then retry
+                                </a>`
+                            : ""}
+                        <p class="text-slate-600 text-[10px] max-w-xs">
+                            Opens a background LeetCode tab to fetch your latest accepted submission.
+                            Make sure you are logged into LeetCode first.
+                        </p>
+                    `
+                    : html`<p class="text-slate-600 text-xs">Open this problem in the extension to recover the code.</p>`}
+            </div>
+        `;
+    }
+
+    const rawLang = problem.lang?.slug || problem.lang?.name || problem.language || "";
+    const highlighted = highlightCode(problem.code, rawLang);
+    return html`<div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+            <span class="text-[10px] uppercase tracking-wider text-slate-600">
+                ${langName || "Solution"}
+            </span>
+            <button
+                onClick=${copyCode}
+                class="text-[10px] px-2.5 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+                ${copied ? "✓ Copied" : "Copy"}
+            </button>
+        </div>
+        <pre
+            class="text-xs leading-relaxed overflow-x-auto bg-black/50 rounded-xl border border-white/5 p-4 whitespace-pre font-mono m-0"
+            dangerouslySetInnerHTML=${{ __html: highlighted }}
+        ></pre>
+    </div>`;
+}
 
 modalTabRegistry.register("leetcode", [
     {
@@ -85,7 +171,7 @@ ${problem.constraints}</pre
                               </p>
                               <div class="flex flex-col gap-1">
                                   ${problem.similar.slice(0, 5).map((s) => {
-                                      const sUrl = `https://leetcode.com/problems/${s.titleSlug}/`;
+                                      const sUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
                                       const sDiffClass =
                                           {
                                               Easy: "text-emerald-400",
@@ -145,35 +231,15 @@ ${problem.constraints}</pre
     {
         id: "code",
         label: "Code",
-        show: (p) => !!p.code,
-        render(problem, { html, langName, copied, copyCode }) {
-            const rawLang =
-                problem.lang?.slug ||
-                problem.lang?.name ||
-                problem.language ||
-                "";
-            const highlighted = highlightCode(
-                problem.code || "// No code saved for this problem.",
-                rawLang
-            );
-            return html` <div class="flex flex-col gap-2">
-                <div class="flex justify-between items-center">
-                    <span
-                        class="text-[10px] uppercase tracking-wider text-slate-600"
-                        >${langName || "Solution"}</span
-                    >
-                    <button
-                        onClick=${copyCode}
-                        class="text-[10px] px-2.5 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                    >
-                        ${copied ? "✓ Copied" : "Copy"}
-                    </button>
-                </div>
-                <pre
-                    class="text-xs leading-relaxed overflow-x-auto bg-black/50 rounded-xl border border-white/5 p-4 whitespace-pre font-mono m-0"
-                    dangerouslySetInnerHTML=${{ __html: highlighted }}
-                ></pre>
-            </div>`;
+        show: () => true,
+        render(problem, { langName, copied, copyCode, onUpdate }) {
+            return html`<${LCCodeTab}
+                problem=${problem}
+                langName=${langName}
+                copied=${copied}
+                copyCode=${copyCode}
+                onUpdate=${onUpdate}
+            />`;
         },
     },
     {
@@ -201,7 +267,7 @@ ${problem.constraints}</pre
         render(problem, { html }) {
             return html` <div class="flex flex-col gap-2">
                 ${(problem.similar || []).map((s) => {
-                    const sUrl = `https://leetcode.com/problems/${s.titleSlug}/`;
+                    const sUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
                     const sDiffClass =
                         {
                             Easy: "text-emerald-400",

@@ -8,11 +8,13 @@
 import { h } from "../../vendor/preact-bundle.js";
 import { useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
-import { BUILT_IN_MAP } from "../../core/difficulty-map.js";
-import { Storage } from "../../core/storage.js";
 const html = htm.bind(h);
 
-const CANONICAL = ["Easy", "Medium", "Hard"];
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("DifficultyMapPanel");
+
+import { BUILT_IN_MAP } from "../../core/difficulty-map.js";
 
 const DIFF_COLOR = {
     Easy: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",

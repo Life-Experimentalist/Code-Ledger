@@ -6,6 +6,10 @@
 import { h, useState } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("SettingsPageView");
+
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 
 import { PanelGeneral } from "../settings-panels/PanelGeneral.js";
@@ -14,7 +18,6 @@ import { PanelGit } from "../settings-panels/PanelGit.js";
 import { PanelPlatforms } from "../settings-panels/PanelPlatforms.js";
 import { PanelBackups } from "../settings-panels/PanelBackups.js";
 import { PanelAdvanced } from "../settings-panels/PanelAdvanced.js";
-import { PanelMCP } from "../settings-panels/PanelMCP.js";
 
 const NAV_ITEMS = [
     { id: "general", emoji: "🎨", label: "General" },
@@ -22,18 +25,16 @@ const NAV_ITEMS = [
     { id: "git", emoji: "🔗", label: "Git" },
     { id: "platforms", emoji: "🌐", label: "Platforms" },
     { id: "backups", emoji: "💾", label: "Backups" },
-    { id: "mcp", emoji: "🔧", label: "MCP Tools" },
     { id: "advanced", emoji: "⚙️", label: "Advanced" },
 ];
 
-export function SettingsPageView({ settings, onSettingsChange, onSetupRepo }) {
+export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onConnect }) {
     const VALID_PANELS = new Set([
         "general",
         "ai",
         "git",
         "platforms",
         "backups",
-        "mcp",
         "advanced",
     ]);
     const initPanel = getQueryParam("settingsTab", "general");
@@ -42,7 +43,7 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo }) {
     );
 
     function renderPanel() {
-        const props = { settings, onSettingsChange, onSetupRepo };
+        const props = { settings, onSettingsChange, onSetupRepo, onConnect };
         switch (activePanel) {
             case "general":
                 return html`<${PanelGeneral} ...${props} />`;
@@ -54,8 +55,6 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo }) {
                 return html`<${PanelPlatforms} ...${props} />`;
             case "backups":
                 return html`<${PanelBackups} ...${props} />`;
-            case "mcp":
-                return html`<${PanelMCP} />`;
             case "advanced":
                 return html`<${PanelAdvanced} ...${props} />`;
             default:

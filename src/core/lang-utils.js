@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("LangUtils");
+
 /**
  * Normalize language from various formats to a consistent lowercase string.
  * Handles: lang.name, lang.slug, lang.ext, or plain string.

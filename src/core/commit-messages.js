@@ -5,6 +5,10 @@
  * Centralised commit message taxonomy for CodeLedger.
  */
 
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("CommitMessages");
+
 export const COMMIT_TYPES = {
     SOLVED: "solved",
     UPDATE: "update",

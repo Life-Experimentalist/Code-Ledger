@@ -9,6 +9,10 @@ import Chart from "../../vendor/chart-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("ChartWrapper");
+
 /**
  * onElementClick(label, value) — called when user clicks a chart segment/bar.
  * label = data label string, value = numeric data point.

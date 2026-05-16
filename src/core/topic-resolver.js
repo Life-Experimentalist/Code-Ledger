@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("TopicResolver");
+
 /**
  * DSA Topic Hierarchy & Weights
  * Lower weight = higher priority (selected first)

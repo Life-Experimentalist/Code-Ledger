@@ -7,10 +7,20 @@ import { h, useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("PanelAI");
+
 import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { ModelSelector } from "../../ui/components/ModelSelector.js";
 import { testAIKey } from "../../core/model-fetch.js";
+import {
+    getMCPConfig,
+    updateMCPConfig,
+    setMCPToolEnabled,
+    getEnabledMCPTools,
+} from "../../core/mcp-config.js";
 
 const PROVIDERS = Object.values(CONSTANTS.AI_PROVIDERS);
 
@@ -28,6 +38,16 @@ function parseKeys(raw) {
         .filter(Boolean);
 }
 
+const MCP_TOOL_INFO = {
+    "query-problems": { name: "Query Problems", description: "Search for problems by platform, difficulty, topic, or time", category: "Context" },
+    "get-problem-stats": { name: "Get Problem Stats", description: "Detailed statistics for a single problem (time, complexity, percentiles)", category: "Context" },
+    "get-next-suggestion": { name: "Get Next Suggestion", description: "Analyze weak topics and suggest the next best problem to practice", category: "Suggestions" },
+    "analyze-code-quality": { name: "Analyze Code Quality", description: "Analyze code for complexity, edge cases, and improvement opportunities", category: "Analysis" },
+    "get-trend-analysis": { name: "Get Trend Analysis", description: "Analyze 30-day solving trends, platform distribution, difficulty progression", category: "Analysis" },
+    "find-similar-problems": { name: "Find Similar Problems", description: "Find problems similar to a given one based on difficulty, platform, tags", category: "Context" },
+    "get-user-profile": { name: "Get User Profile", description: "Comprehensive user context: total problems, top platforms/languages/topics", category: "Context" },
+};
+
 export function PanelAI({ settings, onSettingsChange }) {
     const [savedKeys, setSavedKeys] = useState({});
     const [keyDraft, setKeyDraft] = useState({});
@@ -35,6 +55,9 @@ export function PanelAI({ settings, onSettingsChange }) {
     const [testing, setTesting] = useState({});
     const [saving, setSaving] = useState({});
     const [endpointDraft, setEndpointDraft] = useState({});
+    const [mcpConfig, setMcpConfig] = useState(null);
+    const [mcpEnabledIds, setMcpEnabledIds] = useState(new Set());
+    const [mcpOpen, setMcpOpen] = useState(false);
 
     useEffect(() => {
         Storage.getAIKeys()
@@ -47,6 +70,13 @@ export function PanelAI({ settings, onSettingsChange }) {
             if (settings?.[key]) drafts[p.id] = settings[key];
         });
         setEndpointDraft(drafts);
+        // Load MCP config
+        Promise.all([getMCPConfig(), getEnabledMCPTools()])
+            .then(([cfg, enabled]) => {
+                setMcpConfig(cfg);
+                setMcpEnabledIds(new Set(enabled));
+            })
+            .catch(() => {});
     }, []);
 
     const primaryProvider =
@@ -464,6 +494,82 @@ export function PanelAI({ settings, onSettingsChange }) {
                         </div>
                     `;
                 })}
+            </div>
+
+            <!-- MCP Tools (collapsed by default) -->
+            <div class="p-4 rounded-xl border border-white/8 bg-white/2">
+                <button
+                    onClick=${() => setMcpOpen((v) => !v)}
+                    class="flex items-center justify-between w-full text-left"
+                >
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-widest">MCP Tools</p>
+                        <p class="text-[11px] text-slate-600 mt-0.5">Context tools available to AI providers during chat and review</p>
+                    </div>
+                    <span class="text-slate-500 text-xs">${mcpOpen ? "▲" : "▼"}</span>
+                </button>
+
+                ${mcpOpen && mcpConfig
+                    ? html`
+                        <div class="mt-4 flex flex-col gap-4">
+                            <div class="flex flex-wrap gap-3">
+                                ${[
+                                    ["useInChat", "Use in Chat"],
+                                    ["useInReview", "Use in Review"],
+                                    ["cacheResults", "Cache Results (5 min)"],
+                                ].map(([k, label]) => html`
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked=${mcpConfig[k] === true}
+                                            onChange=${async (e) => {
+                                                const v = e.target.checked;
+                                                await updateMCPConfig({ [k]: v });
+                                                setMcpConfig((c) => ({ ...c, [k]: v }));
+                                            }}
+                                            class="w-3.5 h-3.5 rounded"
+                                        />
+                                        <span class="text-xs text-slate-400">${label}</span>
+                                    </label>
+                                `)}
+                            </div>
+                            ${["Context", "Suggestions", "Analysis"].map((cat) => {
+                                const tools = Object.entries(MCP_TOOL_INFO).filter(([, i]) => i.category === cat);
+                                return html`
+                                    <div>
+                                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-widest mb-2">${cat}</p>
+                                        <div class="flex flex-col gap-1">
+                                            ${tools.map(([toolId, toolInfo]) => html`
+                                                <label class="flex items-start gap-3 p-2.5 rounded-lg bg-white/3 border border-white/6 cursor-pointer hover:bg-white/5 transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked=${mcpEnabledIds.has(toolId)}
+                                                        onChange=${async () => {
+                                                            const on = !mcpEnabledIds.has(toolId);
+                                                            await setMCPToolEnabled(toolId, on);
+                                                            setMcpEnabledIds((prev) => {
+                                                                const next = new Set(prev);
+                                                                on ? next.add(toolId) : next.delete(toolId);
+                                                                return next;
+                                                            });
+                                                        }}
+                                                        class="w-3.5 h-3.5 rounded mt-0.5 flex-shrink-0"
+                                                    />
+                                                    <div>
+                                                        <p class="text-xs font-medium text-slate-300">${toolInfo.name}</p>
+                                                        <p class="text-[10px] text-slate-500">${toolInfo.description}</p>
+                                                    </div>
+                                                </label>
+                                            `)}
+                                        </div>
+                                    </div>
+                                `;
+                            })}
+                        </div>
+                      `
+                    : mcpOpen
+                      ? html`<p class="mt-3 text-xs text-slate-500">Loading MCP config…</p>`
+                      : ""}
             </div>
         </div>
     `;

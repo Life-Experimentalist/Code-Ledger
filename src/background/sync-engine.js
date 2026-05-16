@@ -12,7 +12,6 @@ import {
     importChatsFromRepo,
 } from "../core/chat-sync.js";
 import { importChatsLocal } from "../core/ai-chat-storage.js";
-import { getContents } from "../handlers/git/github/api-client.js";
 
 const dbg = createDebugger("SyncEngine");
 
@@ -62,15 +61,15 @@ function _fieldsEqual(a, b) {
  *
  * @param {string} owner
  * @param {string} repo
- * @param {string} token
+ * @param {object} git  GitHandler instance (from registry)
  * @returns {Promise<{ remoteOnly: object[], conflicts: Array<{local: object, remote: object}> }>}
  */
-export async function importFromRepo(owner, repo, token) {
+export async function importFromRepo(owner, repo, git) {
     dbg.log(`importFromRepo(): fetching index.json from ${owner}/${repo}...`);
 
     let res;
     try {
-        res = await getContents(owner, repo, "index.json", token);
+        res = await git.getContents(owner, repo, "index.json");
     } catch (e) {
         dbg.warn(`importFromRepo(): API fetch failed:`, e?.message);
         res = null;
@@ -172,8 +171,36 @@ export async function importFromRepo(owner, repo, token) {
 }
 
 /**
+ * Link multi-language solutions for the same problem.
+ * Groups problems by platform+titleSlug. If the same problem was solved in
+ * multiple languages, each copy gets a `linkedSolutions` array of the other
+ * problem IDs so the UI can show "also solved in X".
+ *
+ * Mutates the problems array in place.
+ */
+function _linkMultiLangSolutions(problems) {
+    // Group by platform+titleSlug (the stable canonical identity)
+    const bySlug = new Map();
+    for (const p of problems) {
+        const key = `${p.platform || ""}::${p.titleSlug || p.id || ""}`;
+        if (!bySlug.has(key)) bySlug.set(key, []);
+        bySlug.get(key).push(p);
+    }
+    for (const group of bySlug.values()) {
+        if (group.length < 2) continue;
+        for (const p of group) {
+            p.linkedSolutions = group
+                .filter((other) => other !== p)
+                .map((other) => other.id)
+                .filter(Boolean);
+        }
+    }
+}
+
+/**
  * Bulk-save resolved problems into local storage.
  * Call this after user resolves conflicts in ConflictResolutionModal.
+ * Takes a scheduled backup before writing so the user can undo.
  *
  * @param {object[]} resolvedProblems
  */
@@ -181,6 +208,21 @@ export async function applyImport(resolvedProblems) {
     dbg.log(
         `applyImport(): saving ${resolvedProblems.length} resolved problem(s)...`
     );
+
+    // Snapshot existing data before overwriting — rolling backup
+    try {
+        const existing = await Storage.getAllProblems();
+        if (existing.length > 0) {
+            await Storage.addScheduledBackup(existing, "pre-import");
+            dbg.log(`applyImport(): ✓ pre-import backup created (${existing.length} problems)`);
+        }
+    } catch (e) {
+        dbg.warn("applyImport(): backup failed (non-blocking):", e?.message);
+    }
+
+    // Link multi-language solutions before saving
+    _linkMultiLangSolutions(resolvedProblems);
+
     let saved = 0;
     for (const p of resolvedProblems) {
         try {
@@ -229,7 +271,7 @@ export const SyncEngine = {
             const { remoteOnly, conflicts } = await importFromRepo(
                 owner,
                 repo,
-                token
+                git
             );
             dbg.log(
                 `performSync(): import complete — ${remoteOnly.length} new, ${conflicts.length} conflicts`

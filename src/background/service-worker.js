@@ -27,6 +27,7 @@ import {
     problemBase,
     LAYOUT_VERSION,
 } from "../core/path-builder.js";
+import { canonicalMapper } from "../core/canonical-mapper.js";
 import { getChatsByProblem } from "../core/ai-chat-storage.js";
 import {
     buildCommitMessage,
@@ -46,6 +47,7 @@ import {
     autoSyncSettings,
     syncSettingsToGitHub,
     syncSettingsFromGitHub,
+    buildSyncPayload,
 } from "../core/settings-sync.js";
 import {
     initializeReviewQueueStore,
@@ -80,11 +82,7 @@ import {
     fetchBackupSnapshot,
 } from "../core/backup/backup-manager.js";
 import { findDuplicatesForProblem, compareSolutions as compareSolutionsForDedup } from "../core/ai-deduplication.js";
-import {
-    apiFetch as ghApiFetch,
-    getCurrentUser as ghGetCurrentUser,
-    getContents as ghGetContents,
-} from "../handlers/git/github/api-client.js";
+import { recordAIReview, getProblemStats, recordAIInsights } from "../core/behavior-bank.js";
 
 let _syncAlarmBound = false;
 let _reviewQueueAlarmBound = false;
@@ -150,7 +148,10 @@ async function init() {
             chrome.alarms.create(CONSTANTS.ALARM_NAMES.SYNC, {
                 periodInMinutes: CONSTANTS.SYNC_ALARM_PERIOD_MIN || 30,
             });
-            chrome.alarms.create("AI_REVIEW_QUEUE", { periodInMinutes: 5 }); // Check queue every 5 minutes
+            chrome.alarms.create("AI_REVIEW_QUEUE", { periodInMinutes: 5 });
+            // Batch-commit pending AI reviews and metadata edits every 10 minutes.
+            // This prevents one-commit-per-problem clutter for maintenance operations.
+            chrome.alarms.create("MAINTENANCE_COMMIT", { periodInMinutes: 10 });
 
             chrome.alarms.onAlarm.addListener((alarm) => {
                 if (alarm?.name === CONSTANTS.ALARM_NAMES.SYNC) {
@@ -159,10 +160,22 @@ async function init() {
                     );
                 } else if (alarm?.name === "AI_REVIEW_QUEUE") {
                     processAIReviewQueue().catch((e) =>
-                        dbg.warn(
-                            "AI review queue processing failed:",
-                            e.message
-                        )
+                        dbg.warn("AI review queue processing failed:", e.message)
+                    );
+                } else if (alarm?.name === "MAINTENANCE_COMMIT") {
+                    (async () => {
+                        const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
+                        if (Object.keys(pendingMap || {}).length > 0) {
+                            dbg.log(`MAINTENANCE_COMMIT: ${Object.keys(pendingMap).length} pending key(s), running bulk commit`);
+                            await handleResyncAll("bulk", "chore").catch((e) =>
+                                dbg.warn("maintenance batch commit failed:", e.message)
+                            );
+                        }
+                    })().catch(() => {});
+                } else if (alarm?.name === "BULK_IMPORT_RESUME") {
+                    dbg.log("BULK_IMPORT_RESUME: resuming interrupted bulk import after delay");
+                    handleResyncAll("individual", "feat").catch((e) =>
+                        dbg.warn("BULK_IMPORT_RESUME: resume failed:", e.message)
                     );
                 }
             });
@@ -170,6 +183,21 @@ async function init() {
             dbg.warn("failed to initialize alarms:", e.message);
         }
     }
+
+    // Resume an interrupted bulk import (browser was closed mid-commit).
+    // Wait 45 seconds on startup to let the browser stabilize before heavy API work.
+    (async () => {
+        const res = await browserStorage.local.get(_BULK_IMPORT_KEY).catch(() => ({}));
+        const pending = res?.[_BULK_IMPORT_KEY];
+        if (pending?.startedAt) {
+            const ageMs = Date.now() - pending.startedAt;
+            // Don't resume if it just started within the last 60s (likely a reload, not a crash)
+            if (ageMs > 60_000) {
+                dbg.log(`init(): found interrupted bulk import from ${Math.round(ageMs / 60000)}min ago — scheduling resume in 45s`);
+                chrome.alarms.create("BULK_IMPORT_RESUME", { delayInMinutes: 0.75 });
+            }
+        }
+    })().catch(() => {});
 
     // Initialize AI review queue store
     await initializeReviewQueueStore().catch((e) =>
@@ -246,6 +274,14 @@ function getProblemCommitKey(problem = {}) {
 }
 
 function getProblemFiles(problem = {}, settings = {}) {
+    // Enrich with canonical if missing (map must be pre-loaded via canonicalMapper.loadMap())
+    if (!problem.canonical) {
+        const resolved = canonicalMapper.resolve(
+            problem.platform || "",
+            problem.titleSlug || problem.id || ""
+        );
+        if (resolved) problem = { ...problem, canonical: resolved };
+    }
     const files = buildProblemFiles(problem, settings);
     if (files.length > 0) return files;
 
@@ -285,6 +321,9 @@ function _stableJSON(value) {
 
 function _isProblemDrifted(local, remote) {
     if (!remote) return true;
+    // Compare only stable metadata fields. `files` is regenerated from `code` on
+    // every commit so it always differs; `canonical` is enriched client-side and
+    // never persisted to index.json. Including either causes false-positive drift.
     const keys = [
         "title",
         "difficulty",
@@ -292,8 +331,8 @@ function _isProblemDrifted(local, remote) {
         "tags",
         "lang",
         "aiReview",
-        "canonical",
-        "files",
+        "notes",
+        "methodTitle",
     ];
     return keys.some(
         (k) => _stableJSON(local?.[k]) !== _stableJSON(remote?.[k])
@@ -331,6 +370,42 @@ function _buildAIReviewProviders(settings = {}) {
     });
 }
 
+function _buildBehaviorContext(stats) {
+    if (!stats) return null;
+    const lines = [];
+    if (Array.isArray(stats.solves) && stats.solves.length > 1) {
+        lines.push(`User has solved this problem ${stats.solves.length} times.`);
+        const avg = Math.round(
+            stats.solves.reduce((s, x) => s + (x.elapsedSeconds || 0), 0) / stats.solves.length
+        );
+        if (avg > 0) lines.push(`Average solve time: ${Math.round(avg / 60)} min.`);
+    } else if (Array.isArray(stats.solves) && stats.solves.length === 1) {
+        const t = stats.solves[0].elapsedSeconds;
+        if (t > 0) lines.push(`Solve time: ${Math.round(t / 60)} min.`);
+    }
+    if (stats.hintViews > 0) lines.push(`Viewed hints ${stats.hintViews} time(s).`);
+    if (Array.isArray(stats.aiInsights) && stats.aiInsights.length) {
+        const latest = stats.aiInsights[stats.aiInsights.length - 1];
+        if (Array.isArray(latest?.weakAreas) && latest.weakAreas.length) {
+            lines.push(`Previous review flagged: ${latest.weakAreas.join(", ")}.`);
+        }
+    }
+    return lines.length ? lines.join(" ") : null;
+}
+
+function _extractWeakAreas(reviewText = "") {
+    const text = reviewText.toLowerCase();
+    const found = [];
+    if (/edge case/i.test(text)) found.push("edge cases");
+    if (/o\(n[²2]\)|quadratic|nested loop/i.test(text)) found.push("O(n²) complexity");
+    if (/overflow|int overflow/i.test(text)) found.push("integer overflow");
+    if (/off.by.one/i.test(text)) found.push("off-by-one");
+    if (/null|undefined|empty input/i.test(text)) found.push("null/empty input");
+    if (/memory|space complexity/i.test(text)) found.push("space complexity");
+    if (/time complexity|could be faster/i.test(text)) found.push("time complexity");
+    return found;
+}
+
 async function generateAIReview(problem = {}, settings = null) {
     dbg.log(
         `generateAIReview(): starting for ${problem.titleSlug || "unknown"}`
@@ -340,6 +415,14 @@ async function generateAIReview(problem = {}, settings = null) {
     dbg.log(
         `generateAIReview(): ${providers.length} provider(s) in fallback chain`
     );
+
+    // Inject behavior bank context so the AI is aware of solve history / past struggles
+    const behaviorStats = await getProblemStats(
+        problem.titleSlug || problem.id || "",
+        problem.platform || ""
+    ).catch(() => null);
+    const behaviorContext = _buildBehaviorContext(behaviorStats);
+    if (behaviorContext) dbg.log(`generateAIReview(): injecting behavior context: ${behaviorContext}`);
 
     let inferredTags = null;
     for (let idx = 0; idx < providers.length; idx++) {
@@ -374,6 +457,7 @@ async function generateAIReview(problem = {}, settings = null) {
             let review = await Promise.race([
                 ai.review(problem.code, {
                     ...problem,
+                    _behaviorContext: behaviorContext || undefined,
                     aiModelOverride: provider.model || "",
                 }),
                 new Promise((_, rej) =>
@@ -408,6 +492,14 @@ async function generateAIReview(problem = {}, settings = null) {
                     review = review.replace(/^TAGS:\s*.+$/m, "").trim();
                 }
             }
+
+            // Write back insights to behavior bank (non-blocking)
+            recordAIInsights({
+                slug: problem.titleSlug || problem.id || "",
+                platform: problem.platform || "",
+                weakAreas: _extractWeakAreas(review),
+                summary: review.slice(0, 200),
+            }).catch(() => {});
 
             return { review, providerId, inferredTags };
         } catch (err) {
@@ -490,9 +582,8 @@ async function commitUpdatedProblem(problem, settings) {
                 currentSettings.github_owner ||
                 currentSettings.github_username ||
                 "";
-            const _token = await _git.getToken().catch(() => null);
-            if (_owner && _token) {
-                maybeCommitRollingBackup(_owner, repoName, _token, _git).catch(
+            if (_owner) {
+                maybeCommitRollingBackup(_owner, repoName, _git).catch(
                     () => {}
                 );
             }
@@ -507,6 +598,29 @@ async function commitUpdatedProblem(problem, settings) {
     }
 
     return { committed: 1, repo: repoName };
+}
+
+/**
+ * Broadcast GITHUB_REAUTH_REQUIRED to all extension pages.
+ * Called whenever a GitHub API call returns 401 so the UI can prompt
+ * the user to reconnect immediately rather than silently swallowing the error.
+ */
+async function _broadcastAuthExpired() {
+    await Storage.setAuthToken("github", "").catch(() => {});
+    dbg.warn("_broadcastAuthExpired(): OAuth token rejected — cleared, notifying tabs");
+    chrome.tabs.query({}, (allTabs) => {
+        for (const tab of allTabs || []) {
+            chrome.tabs.sendMessage(
+                tab.id,
+                { type: "GITHUB_REAUTH_REQUIRED" },
+                () => { void chrome.runtime.lastError; }
+            );
+        }
+    });
+    chrome.runtime.sendMessage(
+        { type: "GITHUB_REAUTH_REQUIRED" },
+        () => { void chrome.runtime.lastError; }
+    );
 }
 
 function _normalizeGitTarget(target) {
@@ -606,6 +720,7 @@ async function _commitWithFailover(
             return { handler, target, newSha };
         } catch (e) {
             lastErr = e;
+            if (e.status === 401) await _broadcastAuthExpired().catch(() => {});
             dbg.warn(
                 `_commitWithFailover(): ✗ target ${target.provider}/${target.owner ? target.owner + "/" : ""}${target.repo} failed:`,
                 e.message
@@ -629,20 +744,28 @@ async function _resolveGitHubContext(settings = null) {
     const git = registry.getGitProvider("github");
     if (!git) throw new Error("No git provider configured");
     const token = await git.getToken();
-    if (!token) throw new Error("Not authenticated with GitHub");
+    if (!token) {
+        await _broadcastAuthExpired().catch(() => {});
+        throw new Error("Not authenticated with GitHub — please reconnect");
+    }
 
     let owner = (target.owner || "").trim();
     if (!owner) {
-        const userRes = await ghGetCurrentUser(token);
-        owner = userRes.login;
+        try {
+            const userRes = await git.getCurrentUser();
+            owner = userRes.login;
+        } catch (err) {
+            if (err.status === 401) await _broadcastAuthExpired().catch(() => {});
+            throw err;
+        }
     }
 
     return { settings: s, git, token, owner, repoName: target.repo, target };
 }
 
 async function handleSyncPreview() {
-    const { settings, token, owner, repoName } = await _resolveGitHubContext();
-    return importFromRepo(owner, repoName, token).then((result) => ({
+    const { settings, git, owner, repoName } = await _resolveGitHubContext();
+    return importFromRepo(owner, repoName, git).then((result) => ({
         ...result,
         pendingConflicts: result.conflicts?.length || 0,
         pendingRemoteOnly: result.remoteOnly?.length || 0,
@@ -741,7 +864,9 @@ async function handleSolved(data) {
         }
     }
     // Decide whether to run AI review:
-    // - global `autoReview` setting
+    // - global `autoReview` setting AND per-submission flag set by the platform handler
+    const shouldAutoReview =
+        settings.autoReview !== false && data._requestAIReview === true;
     if (shouldAutoReview) {
         try {
             const { review, providerId } = await generateAIReview(
@@ -1074,7 +1199,7 @@ async function performPendingRenames() {
     const token = await git.getToken().catch(() => null);
     if (!token) return;
 
-    const userRes = await ghGetCurrentUser(token).catch(() => null);
+    const userRes = await git.getCurrentUser().catch(() => null);
     const owner = settings.github_owner?.trim() || userRes?.login;
     const repo = (settings.github_repo || settings.gitRepo || "").replace(
         /\s+/g,
@@ -1087,18 +1212,16 @@ async function performPendingRenames() {
 
     for (const r of renames) {
         try {
-            const tree = await ghApiFetch(
-                `/repos/${owner}/${repo}/git/trees/main?recursive=1`,
-                token
+            const tree = await git.apiFetch(
+                `/repos/${owner}/${repo}/git/trees/main?recursive=1`
             );
             const relevant = (tree.tree || []).filter(
                 (f) => f.type === "blob" && f.path.startsWith(r.oldBase + "/")
             );
             for (const f of relevant) {
                 const newPath = f.path.replace(r.oldBase, r.newBase);
-                const blob = await ghApiFetch(
-                    `/repos/${owner}/${repo}/git/blobs/${f.sha}`,
-                    token
+                const blob = await git.apiFetch(
+                    `/repos/${owner}/${repo}/git/blobs/${f.sha}`
                 );
                 const content = atob((blob.content || "").replace(/\n/g, ""));
                 filesToAdd.push({ path: newPath, content });
@@ -1262,10 +1385,10 @@ async function _maybeGenerateAISummary(settings) {
 /** Counts how many local problems are missing from the remote repo, without committing. */
 async function handleResyncCount() {
     dbg.log(`handleResyncCount(): starting count of missing problems...`);
-    const { token, owner, repoName } = await _resolveGitHubContext();
+    const { git, owner, repoName } = await _resolveGitHubContext();
     const remoteProblems = [];
     try {
-        const indexRes = await ghGetContents(owner, repoName, "index.json", token);
+        const indexRes = await git.getContents(owner, repoName, "index.json");
         const raw = atob((indexRes.content || "").replace(/\n/g, ""));
         const index = JSON.parse(raw);
         remoteProblems.push(...(index.problems || []));
@@ -1273,10 +1396,13 @@ async function handleResyncCount() {
             `handleResyncCount(): fetched ${remoteProblems.length} remote problem(s)`
         );
     } catch (e) {
-        dbg.warn(
-            `handleResyncCount(): failed to fetch remote index:`,
-            e?.message
-        );
+        if (e?.status !== 404) {
+            // Auth/network/rate-limit failure — don't show a misleading count
+            dbg.warn(`handleResyncCount(): remote index unreachable (${e?.status}):`, e?.message);
+            return { count: null };
+        }
+        // 404 = empty repo / no index.json yet — treat as zero remote problems
+        dbg.log(`handleResyncCount(): no index.json yet, treating remote as empty`);
     }
 
     // Build a map of remote problems by commit key (same logic as getProblemCommitKey)
@@ -1315,16 +1441,27 @@ async function handleResyncCount() {
  * mode="bulk"       — one atomic commit for all missing problems (default, rate-limit safe).
  * mode="individual" — one commit per problem with correct backdated timestamps.
  */
+const _BULK_IMPORT_KEY = "cl-bulk-import-pending";
+
 async function handleResyncAll(mode = "bulk", commitType = "chore") {
     if (_resyncInProgress) {
         dbg.warn("handleResyncAll(): already in progress — skipping duplicate call");
         return { committed: 0, skipped: true };
     }
     _resyncInProgress = true;
+    // Persist intent for individual-mode syncs so a browser close can resume
+    if (mode === "individual") {
+        await browserStorage.local.set({ [_BULK_IMPORT_KEY]: { startedAt: Date.now(), mode } }).catch(() => {});
+    }
     try {
-        return await _handleResyncAllInner(mode, commitType);
+        const result = await _handleResyncAllInner(mode, commitType);
+        return result;
     } finally {
         _resyncInProgress = false;
+        // Clear the resume flag once done (whether succeeded or failed)
+        if (mode === "individual") {
+            await browserStorage.local.remove(_BULK_IMPORT_KEY).catch(() => {});
+        }
         try { _activeSyncPort?.postMessage({ type: "sync-done" }); } catch (_) {}
     }
 }
@@ -1339,7 +1476,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     // Fetch existing index.json to find already-committed slugs/langs
     const remoteByCommitKey = new Map();
     try {
-        const indexRes = await ghGetContents(owner, repoName, "index.json", token);
+        const indexRes = await git.getContents(owner, repoName, "index.json");
         const raw = atob((indexRes.content || "").replace(/\n/g, ""));
         const index = JSON.parse(raw);
         (index.problems || []).forEach((p) => {
@@ -1356,6 +1493,11 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         );
     }
 
+    // Pre-load canonical map so resolve() is available synchronously for path building
+    await canonicalMapper.loadMap().catch((e) =>
+        dbg.warn("handleResyncAll(): canonical map load failed (non-blocking):", e?.message)
+    );
+
     const allProblems = await Storage.getAllProblems();
     const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
     const pendingKeys = new Set(Object.keys(pendingMap || {}));
@@ -1370,50 +1512,106 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     dbg.log(
         `handleResyncAll(): found ${missing.length} missing/drifted problem(s)`
     );
-    if (missing.length === 0) {
-        // Index may be stale even though no problems are missing (e.g. empty onboarding
-        // index.json while all problem files exist from a previous session).
-        if (remoteByCommitKey.size < allProblems.length) {
-            dbg.log(
-                `handleResyncAll(): nothing to commit but remote index is stale ` +
-                `(${remoteByCommitKey.size} vs ${allProblems.length} local) — repairing`
-            );
-            const repairContent = _buildIndexJsonFromList(allProblems, settings);
-            await _commitWithFailover(
-                [{ path: "index.json", content: repairContent }],
-                "chore: repair repository index [CodeLedger]",
-                repoName,
-                { skipInfra: false },
-                settings
-            );
-            return { committed: 1, repaired: true };
+
+    // ── Helper: single infra commit with fresh index.json from ALL local problems ──
+    // Called after all problem commits (or directly when there's nothing to commit).
+    // Uses indexMetaOverride so README is generated from the new index data in the
+    // same commit — not from the stale repo copy.
+    const _doInfraCommit = async (knownParentSha = null) => {
+        const freshIndexContent = await buildIndexJson();
+        let infraMetaOverride = null;
+        try {
+            const parsed = JSON.parse(freshIndexContent);
+            infraMetaOverride = {
+                stats: parsed.stats || null,
+                updatedAt: parsed.updatedAt || null,
+                problems: (parsed.problems || [])
+                    .filter((p) => p.timestamp)
+                    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+                    .slice(0, 10),
+            };
+        } catch (_) {}
+
+        // Bundle portable settings + behaviour bank + roadmaps into the same tree
+        const infraFiles = [{ path: "index.json", content: freshIndexContent }];
+        try {
+            const syncPayload = await buildSyncPayload();
+            infraFiles.push({ path: ".codeledger/sync.json", content: syncPayload });
+        } catch (e) {
+            dbg.warn("_doInfraCommit(): sync.json build failed (non-fatal):", e?.message);
         }
-        dbg.log(`handleResyncAll(): nothing to sync, returning`);
-        return { committed: 0 };
+        try {
+            const bank = await Storage.getBehaviorBank();
+            infraFiles.push({
+                path: ".codeledger/behaviour-bank.json",
+                content: JSON.stringify(bank || {}, null, 2),
+            });
+        } catch (e) {
+            dbg.warn("_doInfraCommit(): behaviour-bank.json build failed (non-fatal):", e?.message);
+        }
+        try {
+            const roadmaps = await Storage.getRoadmaps();
+            infraFiles.push({
+                path: ".codeledger/roadmaps.json",
+                content: JSON.stringify(roadmaps || [], null, 2),
+            });
+        } catch (e) {
+            dbg.warn("_doInfraCommit(): roadmaps.json build failed (non-fatal):", e?.message);
+        }
+
+        await _commitWithFailover(
+            infraFiles,
+            "chore: update repository stats [CodeLedger]",
+            repoName,
+            { date: new Date(), skipInfra: false, indexMetaOverride: infraMetaOverride, knownParentSha: knownParentSha || undefined },
+            settings
+        );
+        dbg.log(`handleResyncAll(): ✓ infra commit done (${infraMetaOverride?.stats?.total ?? "?"} problems)`);
+    };
+
+    if (missing.length === 0) {
+        // Always push a fresh infra commit so stats/README/index.html are up to date
+        // even when all problem files are already on the remote.
+        dbg.log(
+            `handleResyncAll(): no problems to commit — pushing infra-only update ` +
+            `(remote index: ${remoteByCommitKey.size}, local: ${allProblems.length})`
+        );
+        await _doInfraCommit();
+        return { committed: 0, repaired: remoteByCommitKey.size < allProblems.length };
     }
 
     if (mode === "individual") {
         dbg.log(
             `handleResyncAll(): creating ${missing.length} individual backdated commit(s)`
         );
-        // Sort FIRST so index.json always lands on the chronologically final commit,
-        // not on whatever happened to be last in the unsorted missing[] array.
-        const sorted = missing.map((p) => ({
-            problem: p,
-            files: getProblemFiles(p, settings),
-            message:
-                "[" +
-                (p.topic || "Untagged") +
-                "] " +
-                (p.title || p.titleSlug) +
-                " solved",
-            date: p.timestamp
-                ? new Date(
-                      p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000
-                  )
-                : new Date(),
-            repoName,
-        })).sort((a, b) => new Date(a.date) - new Date(b.date));
+        // Sort chronologically so history is ordered correctly.
+        const sorted = missing.map((p) => {
+            // Enrich with canonical if not already set
+            let enriched = p;
+            if (!p.canonical) {
+                const resolved = canonicalMapper.resolve(
+                    p.platform || "",
+                    p.titleSlug || p.id || ""
+                );
+                if (resolved) enriched = { ...p, canonical: resolved };
+            }
+            return {
+                problem: enriched,
+                files: getProblemFiles(enriched, settings),
+                message:
+                    "[" +
+                    (enriched.topic || "Untagged") +
+                    "] " +
+                    (enriched.title || enriched.titleSlug) +
+                    " solved",
+                date: enriched.timestamp
+                    ? new Date(
+                          enriched.timestamp > 1e10 ? enriched.timestamp : enriched.timestamp * 1000
+                      )
+                    : new Date(),
+                repoName,
+            };
+        }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
         // Problems already confirmed in the remote index before this session
         const alreadyRemote = Array.from(remoteByCommitKey.values());
@@ -1427,9 +1625,10 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         for (let i = 0; i < sorted.length; i++) {
             const entry = sorted[i];
             const isLast = i === sorted.length - 1;
-            // Checkpoint: update index.json every 25 commits AND always on the last.
-            // Index reflects only problems actually committed so far, so if the loop
-            // is interrupted the next sync correctly skips what was already done.
+            // Checkpoint: update index.json every 25 commits AND on the last problem commit.
+            // Index reflects only problems committed so far so resume works correctly.
+            // Infra (README + index.html) is always skipped here — the trailing infra
+            // commit handles that with a complete, fresh index from ALL local problems.
             const isCheckpoint = isLast || (i > 0 && i % 25 === 0);
             if (isCheckpoint) {
                 const committedSoFar = [...alreadyRemote, ...sessionCommitted, entry.problem];
@@ -1447,23 +1646,31 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
                 entry.files,
                 entry.message,
                 entry.repoName,
-                // Skip expensive infra rebuild (README + Pages HTML) on every commit
-                // except the last, which updates the repo to its final state.
-                // Pass the SHA returned by the previous commit to avoid a getRepoRef
-                // round-trip and sidestep GitHub's ref propagation delay.
-                { date: entry.date, skipInfra: !isLast, knownParentSha: knownParentSha || undefined },
+                // All problem commits skip infra — the trailing infra commit updates README + index.html.
+                { date: entry.date, skipInfra: true, knownParentSha: knownParentSha || undefined },
                 settings
             );
             knownParentSha = result?.newSha || null;
             sessionCommitted.push(entry.problem);
         }
+
+        // Trailing infra commit: complete index.json from ALL local problems + README + index.html
+        await _doInfraCommit(knownParentSha);
     } else {
         dbg.log(
             `handleResyncAll(): creating bulk atomic commit with ${missing.length} problem(s)`
         );
-        // Bulk: single atomic commit
+        // Bulk: single atomic commit for all problem files (no infra — handled separately after)
         const filesToCommit = [];
-        for (const problem of missing) {
+        for (let problem of missing) {
+            // Enrich with canonical if not already set
+            if (!problem.canonical) {
+                const resolved = canonicalMapper.resolve(
+                    problem.platform || "",
+                    problem.titleSlug || problem.id || ""
+                );
+                if (resolved) problem = { ...problem, canonical: resolved };
+            }
             for (const f of getProblemFiles(problem, settings))
                 filesToCommit.push(f);
             try {
@@ -1503,24 +1710,23 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
                 }
             } catch (_) {}
         }
-        filesToCommit.push({
-            path: "index.json",
-            content: await buildIndexJson(),
-        });
         dbg.log(
             `handleResyncAll(): prepared ${filesToCommit.length} file(s) for bulk commit`
         );
-        await _commitWithFailover(
+        const bulkResult = await _commitWithFailover(
             filesToCommit,
             buildCommitMessage(resolveCommitType(commitType), {
                 count: missing.length,
                 platform: "LeetCode",
             }),
             repoName,
-            { date: new Date() },
+            { date: new Date(), skipInfra: true },
             settings
         );
         dbg.log(`handleResyncAll(): ✓ bulk commit succeeded`);
+
+        // Trailing infra commit: complete index.json from ALL local problems + README + index.html
+        await _doInfraCommit(bulkResult?.newSha || null);
     }
 
     if (typeof git.ensureRepoTopics === "function") {
@@ -1665,6 +1871,9 @@ async function handleBulkImport(problems = []) {
             if (!["Easy", "Medium", "Hard"].includes(p.difficulty)) missingDifficulty++;
         }
     }
+
+    // Kick review queue immediately if there are problems without code needing recovery
+    if (missingCode > 0) processAIReviewQueue().catch(() => {});
 
     // Broadcast import report to any open library tabs
     const report = { saved: pendingKeys.length, autoMerged, conflicts, missingCode, missingTags, missingDifficulty };
@@ -1837,27 +2046,35 @@ async function handleRegenerateAIReview(problem = {}) {
     if (!problem.code)
         throw new Error("Problem code is required for AI review");
 
+    const methodIndex = (problem._methodIndex != null && Number(problem._methodIndex) >= 0)
+        ? Number(problem._methodIndex) : -1;
+
     const settings = await Storage.getSettings();
-    dbg.log(`handleRegenerateAIReview(): requesting new AI review...`);
+    dbg.log(`handleRegenerateAIReview(): requesting new AI review${methodIndex >= 0 ? ` (method ${methodIndex})` : ""}...`);
     const { review, providerId } = await generateAIReview(problem, settings);
-    const updated = { ...problem, aiReview: review };
+
+    let updated;
+    if (methodIndex >= 0) {
+        // Per-method review: fetch the stored problem to avoid overwriting other fields,
+        // then update only that method's aiReview.
+        const stored = (await Storage.getProblem(slug)) || problem;
+        const methods = [...(stored.methods || [])];
+        if (methods[methodIndex]) {
+            methods[methodIndex] = { ...methods[methodIndex], aiReview: review };
+        }
+        updated = { ...stored, methods };
+    } else {
+        updated = { ...problem, aiReview: review };
+    }
+
     await Storage.saveProblem(updated);
     dbg.log(`handleRegenerateAIReview(): saved review via ${providerId}`);
-    // Commit asynchronously so the UI gets the review immediately without
-    // waiting for GitHub API round-trips.
-    commitUpdatedProblem(updated, settings)
-        .then((r) =>
-            dbg.log(
-                `handleRegenerateAIReview(): background commit done, committed=${r?.committed || 0}`
-            )
-        )
-        .catch((e) =>
-            dbg.warn(
-                `handleRegenerateAIReview(): background commit failed (non-fatal):`,
-                e?.message
-            )
-        );
-    return { problem: updated, review, providerId };
+    // Mark as pending for maintenance batch commit instead of committing immediately.
+    // The MAINTENANCE_COMMIT alarm batches all AI reviews + metadata into one atomic commit.
+    const pendingKey = getProblemCommitKey(updated);
+    if (pendingKey) await Storage.markPendingProblemKeys([pendingKey]).catch(() => {});
+    dbg.log(`handleRegenerateAIReview(): marked pending (${pendingKey}) for maintenance batch`);
+    return { problem: updated, review, providerId, ...(methodIndex >= 0 ? { methodIndex } : {}) };
 }
 
 /**
@@ -1881,13 +2098,28 @@ async function handleQueueAllAIReviews(missingOnly = false) {
     let queued = 0;
     let skipped = 0;
     for (let i = 0; i < candidates.length; i++) {
-        const problemId = candidates[i].id || candidates[i].titleSlug;
+        const p = candidates[i];
+        const problemId = p.id || p.titleSlug;
         if (!problemId) continue;
+        // Queue main-code review
         const result = await enqueueReview(problemId, i);
         if (result.skipped) skipped++; else queued++;
+        // Queue per-method reviews for methods that don't yet have one
+        if (Array.isArray(p.methods)) {
+            for (let j = 0; j < p.methods.length; j++) {
+                const method = p.methods[j];
+                if (method?.code && (!method.aiReview || !method.aiReview.trim())) {
+                    const methodId = `${problemId}::method::${j}`;
+                    const mr = await enqueueReview(methodId, i + 0.5);
+                    if (mr.skipped) skipped++; else queued++;
+                }
+            }
+        }
     }
 
     dbg.log(`handleQueueAllAIReviews(): queued=${queued} skipped(dedup)=${skipped}`);
+    // Kick the processor immediately rather than waiting for the next alarm tick
+    if (queued > 0) processAIReviewQueue().catch(() => {});
     return { queued, skipped };
 }
 
@@ -1900,83 +2132,132 @@ async function processAIReviewQueue() {
         dbg.log(
             `processAIReviewQueue(): alarm tick - starting queue processing...`
         );
-        // Process multiple items in a single run to improve throughput.
-        const BATCH_SIZE = 10;
+        // Process only a couple at a time to avoid flooding the AI provider during background backfill.
+        // On-demand reviews (user clicking "Start Review") bypass the queue entirely.
+        const BATCH_SIZE = 2;
         let processed = 0;
         let item = await getNextPendingReview();
+        const METHOD_ID_PATTERN = /^(.+)::method::(\d+)$/;
         while (item && processed < BATCH_SIZE) {
             dbg.log(
                 `processAIReviewQueue(): item ${item.id} for problem ${item.problemId}`
             );
             await markProcessing(item.id);
             try {
-                let problem = await Storage.getProblem(item.problemId);
-                if (!problem) {
-                    await markDone(item.id);
-                    dbg.warn(
-                        `processAIReviewQueue(): problem ${item.problemId} not found in storage`
-                    );
-                    processed++;
-                    item = await getNextPendingReview();
-                    continue;
-                }
+                const methodMatch = item.problemId.match(METHOD_ID_PATTERN);
 
-                if (!problem.code) {
-                    if (problem.platform === "leetcode" && problem.titleSlug) {
-                        dbg.log(`processAIReviewQueue(): ${item.problemId} has no code — attempting recovery`);
-                        const recovery = await triggerCodeRecovery(problem);
-                        if (!recovery.ok) {
-                            await markFailedWithRetry(item.id, `Code recovery failed: ${recovery.error}`);
-                            dbg.warn(`processAIReviewQueue(): recovery failed for ${item.problemId}: ${recovery.error}`);
-                            processed++;
-                            item = await getNextPendingReview();
-                            continue;
-                        }
-                        // Reload problem — triggerCodeRecovery already saved the code
-                        problem = await Storage.getProblem(item.problemId);
-                        if (!problem?.code) {
-                            await markFailedWithRetry(item.id, "Code recovery succeeded but code still empty");
-                            processed++;
-                            item = await getNextPendingReview();
-                            continue;
-                        }
-                        dbg.log(`processAIReviewQueue(): ✓ recovery succeeded for ${item.problemId}`);
-                    } else {
-                        await markFailedWithRetry(item.id, "No code stored and automatic recovery not supported for this platform");
-                        dbg.warn(`processAIReviewQueue(): non-recoverable no-code for ${item.problemId}`);
+                if (methodMatch) {
+                    // Per-method review: ID format is `${parentId}::method::${index}`
+                    const parentId = methodMatch[1];
+                    const methodIdx = parseInt(methodMatch[2], 10);
+                    const problem = await Storage.getProblem(parentId);
+                    if (!problem || !problem.methods?.[methodIdx]?.code) {
+                        await markDone(item.id);
+                        dbg.warn(`processAIReviewQueue(): method ${item.problemId} — parent or method code not found`);
                         processed++;
                         item = await getNextPendingReview();
                         continue;
                     }
+                    const method = problem.methods[methodIdx];
+                    const settings = await Storage.getSettings();
+                    dbg.log(`processAIReviewQueue(): generating method review for ${item.problemId} (${processed + 1}/${BATCH_SIZE})`);
+                    const reviewProblem = {
+                        ...problem,
+                        code: method.code,
+                        lang: { name: method.language || problem.lang?.name, ext: problem.lang?.ext },
+                    };
+                    const { review, providerId } = await generateAIReview(reviewProblem, settings);
+                    const updatedMethods = [...problem.methods];
+                    updatedMethods[methodIdx] = { ...updatedMethods[methodIdx], aiReview: review };
+                    const updatedProblem = { ...problem, methods: updatedMethods };
+                    await Storage.saveProblem(updatedProblem);
+                    const pKey = getProblemCommitKey(problem);
+                    if (pKey) await Storage.markPendingProblemKeys([pKey]).catch(() => {});
+                    await markDone(item.id);
+                    recordAIReview({
+                        slug: (problem.titleSlug || problem.id) + `::method::${methodIdx}`,
+                        platform: problem.platform || "unknown",
+                        providerId,
+                        reviewLength: review?.length || 0,
+                    }).catch(() => {});
+                    dbg.log(`processAIReviewQueue(): processed method ${item.problemId} via ${providerId}`);
+                    await new Promise((resolve) => setTimeout(resolve, REVIEW_RATE_LIMIT_MS));
+                } else {
+                    // Standard problem-level review
+                    let problem = await Storage.getProblem(item.problemId);
+                    if (!problem) {
+                        await markDone(item.id);
+                        dbg.warn(
+                            `processAIReviewQueue(): problem ${item.problemId} not found in storage`
+                        );
+                        processed++;
+                        item = await getNextPendingReview();
+                        continue;
+                    }
+
+                    if (!problem.code) {
+                        if (problem.platform === "leetcode" && problem.titleSlug) {
+                            dbg.log(`processAIReviewQueue(): ${item.problemId} has no code — attempting recovery`);
+                            const recovery = await triggerCodeRecovery(problem);
+                            if (!recovery.ok) {
+                                await markFailedWithRetry(item.id, `Code recovery failed: ${recovery.error}`);
+                                dbg.warn(`processAIReviewQueue(): recovery failed for ${item.problemId}: ${recovery.error}`);
+                                processed++;
+                                item = await getNextPendingReview();
+                                continue;
+                            }
+                            // Reload problem — triggerCodeRecovery already saved the code
+                            problem = await Storage.getProblem(item.problemId);
+                            if (!problem?.code) {
+                                await markFailedWithRetry(item.id, "Code recovery succeeded but code still empty");
+                                processed++;
+                                item = await getNextPendingReview();
+                                continue;
+                            }
+                            dbg.log(`processAIReviewQueue(): ✓ recovery succeeded for ${item.problemId}`);
+                        } else {
+                            await markFailedWithRetry(item.id, "No code stored and automatic recovery not supported for this platform");
+                            dbg.warn(`processAIReviewQueue(): non-recoverable no-code for ${item.problemId}`);
+                            processed++;
+                            item = await getNextPendingReview();
+                            continue;
+                        }
+                    }
+
+                    const settings = await Storage.getSettings();
+                    dbg.log(
+                        `processAIReviewQueue(): generating review (${processed + 1}/${BATCH_SIZE})`
+                    );
+                    const { review, providerId, inferredTags } = await generateAIReview(
+                        problem,
+                        settings
+                    );
+                    const base = inferredTags ? { ...problem, tags: inferredTags, topic: inferredTags[0] } : problem;
+                    const updated = { ...base, aiReview: review };
+                    await Storage.saveProblem(updated);
+
+                    // Mark as pending for next sync (reviews will be committed together, not as special commit)
+                    const key = getProblemCommitKey(updated);
+                    if (key) {
+                        await Storage.markPendingProblemKeys([key]).catch(() => {});
+                    }
+
+                    await markDone(item.id);
+                    recordAIReview({
+                        slug: updated.titleSlug || updated.id,
+                        platform: updated.platform || "unknown",
+                        providerId,
+                        reviewLength: review?.length || 0,
+                    }).catch(() => {});
+                    dbg.log(
+                        `processAIReviewQueue(): processed ${item.problemId} via ${providerId}`
+                    );
+
+                    // Space out requests to respect rate limits
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, REVIEW_RATE_LIMIT_MS)
+                    );
                 }
-
-                const settings = await Storage.getSettings();
-                dbg.log(
-                    `processAIReviewQueue(): generating review (${processed + 1}/${BATCH_SIZE})`
-                );
-                const { review, providerId, inferredTags } = await generateAIReview(
-                    problem,
-                    settings
-                );
-                const base = inferredTags ? { ...problem, tags: inferredTags, topic: inferredTags[0] } : problem;
-                const updated = { ...base, aiReview: review };
-                await Storage.saveProblem(updated);
-
-                // Mark as pending for next sync (reviews will be committed together, not as special commit)
-                const key = getProblemCommitKey(updated);
-                if (key) {
-                    await Storage.markPendingProblemKeys([key]).catch(() => {});
-                }
-
-                await markDone(item.id);
-                dbg.log(
-                    `processAIReviewQueue(): processed ${item.problemId} via ${providerId}`
-                );
-
-                // Space out requests to respect rate limits
-                await new Promise((resolve) =>
-                    setTimeout(resolve, REVIEW_RATE_LIMIT_MS)
-                );
             } catch (e) {
                 const willRetry = await markFailedWithRetry(item.id, e.message);
                 if (!willRetry) {
@@ -2068,6 +2349,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
         })();
         return true;
+    }
+    if (msg.type === "PROCESS_REVIEW_QUEUE") {
+        processAIReviewQueue().catch(() => {});
+        sendResponse({ ok: true });
+        return false;
     }
     if (msg.type === "CANCEL_AI_REVIEW_QUEUE") {
         (async () => {
@@ -2391,6 +2677,55 @@ try {
             return true; // async response
         }
 
+        if (msg && msg.type === "REFRESH_INFRA") {
+            dbg.log("onMessage(REFRESH_INFRA): refreshing index.json + README + index.html...");
+            (async () => {
+                try {
+                    const { settings, repoName } = await _resolveGitHubContext();
+                    const indexContent = await buildIndexJson();
+                    // Parse the freshly-built index so the README is generated from NEW stats
+                    // in the same commit — not from the stale repo copy (one-commit-lag fix).
+                    let indexMetaOverride = null;
+                    try {
+                        const parsed = JSON.parse(indexContent);
+                        indexMetaOverride = {
+                            stats: parsed.stats || null,
+                            updatedAt: parsed.updatedAt || null,
+                            problems: (parsed.problems || [])
+                                .filter((p) => p.timestamp)
+                                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+                                .slice(0, 10),
+                        };
+                    } catch (_) {}
+                    const refreshFiles = [{ path: "index.json", content: indexContent }];
+                    try {
+                        refreshFiles.push({ path: ".codeledger/sync.json", content: await buildSyncPayload() });
+                    } catch (_) {}
+                    try {
+                        const bank = await Storage.getBehaviorBank();
+                        refreshFiles.push({ path: ".codeledger/behaviour-bank.json", content: JSON.stringify(bank || {}, null, 2) });
+                    } catch (_) {}
+                    try {
+                        const roadmaps = await Storage.getRoadmaps();
+                        refreshFiles.push({ path: ".codeledger/roadmaps.json", content: JSON.stringify(roadmaps || [], null, 2) });
+                    } catch (_) {}
+                    await _commitWithFailover(
+                        refreshFiles,
+                        "chore: refresh repository stats [CodeLedger]",
+                        repoName,
+                        { date: new Date(), skipInfra: false, indexMetaOverride },
+                        settings
+                    );
+                    dbg.log("onMessage(REFRESH_INFRA): ✓ done");
+                    sendResponse({ ok: true });
+                } catch (e) {
+                    dbg.error("onMessage(REFRESH_INFRA): failed:", e?.message);
+                    sendResponse({ ok: false, error: e.message });
+                }
+            })();
+            return true;
+        }
+
         if (msg && msg.type === "BACKUP_TO_REPO") {
             dbg.log("onMessage(BACKUP_TO_REPO): committing settings backup...");
             (async () => {
@@ -2691,7 +3026,7 @@ try {
                         sendResponse({ ok: false, error: "Not configured" });
                         return;
                     }
-                    const backups = await listBackups(owner, repo, token);
+                    const backups = await listBackups(owner, repo, git);
                     sendResponse({ ok: true, backups });
                 } catch (e) {
                     dbg.error(
@@ -2730,7 +3065,7 @@ try {
                         1,
                         parseInt(settings.githubBackupKeep || "10", 10)
                     );
-                    await commitBackupToGitHub(owner, repo, token, git, keep);
+                    await commitBackupToGitHub(owner, repo, git, keep);
                     sendResponse({ ok: true });
                 } catch (e) {
                     dbg.error(
@@ -2769,7 +3104,7 @@ try {
                         owner,
                         repo,
                         msg.filePath,
-                        token
+                        git
                     );
                     if (!snapshot?.problems) {
                         sendResponse({ ok: false, error: "Invalid snapshot" });
@@ -2784,6 +3119,25 @@ try {
                         e?.message
                     );
                     sendResponse({ ok: false, error: e.message });
+                }
+            })();
+            return true;
+        }
+
+        if (msg && msg.type === "TRIGGER_CODE_RECOVERY") {
+            dbg.log(`onMessage(TRIGGER_CODE_RECOVERY): problemId=${msg.problemId}`);
+            (async () => {
+                try {
+                    const problem = await Storage.getProblem(msg.problemId);
+                    if (!problem) {
+                        sendResponse({ ok: false, error: "Problem not found" });
+                        return;
+                    }
+                    const result = await triggerCodeRecovery(problem);
+                    sendResponse(result);
+                } catch (e) {
+                    dbg.error(`onMessage(TRIGGER_CODE_RECOVERY): failed:`, e?.message);
+                    sendResponse({ ok: false, error: e?.message || "Recovery failed" });
                 }
             })();
             return true;
@@ -2819,6 +3173,85 @@ try {
                 dbg.log(`onMessage(OPEN_LIBRARY): tab created`);
             } catch (_) {}
             sendResponse({ ok: true });
+            return true;
+        }
+
+        if (msg && msg.type === "GENERATE_ROADMAP") {
+            dbg.log(`onMessage(GENERATE_ROADMAP): generating for level=${msg.level}, goal=${msg.goal}`);
+            (async () => {
+                try {
+                    const settings = await Storage.getSettings();
+                    const allProblems = await Storage.getAllProblems();
+
+                    // Build a topic frequency snapshot for context
+                    const byTopic = {};
+                    allProblems.forEach((p) => {
+                        (p.tags || []).forEach((t) => { byTopic[t] = (byTopic[t] || 0) + 1; });
+                    });
+                    const topTopics = Object.entries(byTopic)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 8)
+                        .map(([t, n]) => `${t}(${n})`)
+                        .join(", ");
+
+                    const userCtx = `User has solved ${allProblems.length} problems. Top topics: ${topTopics || "none yet"}.`;
+
+                    const prompt = `You are a DSA curriculum designer. Create a structured learning roadmap.
+
+User profile:
+- Current level: ${msg.level || "unknown"}
+- Goal: ${msg.goal || "general DSA mastery"}
+- Timeframe: ${msg.timeframe || "1 month"}
+- Focus areas: ${msg.topics || "general DSA"}
+- ${userCtx}
+
+Return ONLY valid JSON (no markdown, no explanation) in this exact format:
+{
+  "title": "short roadmap title",
+  "milestones": [
+    {
+      "id": "m1",
+      "topic": "Arrays & Hashing",
+      "subtopics": ["hash-table", "two-pointers"],
+      "difficulty": "Easy",
+      "targetCount": 8,
+      "week": 1,
+      "description": "one-sentence goal"
+    }
+  ]
+}
+
+Include 5-8 milestones. Build progressively. subtopics must be lowercase-hyphenated tag names.`;
+
+                    const providers = _buildAIReviewProviders(settings);
+                    let roadmapData = null;
+                    for (const provider of providers) {
+                        if (settings[`${provider.id}_enabled`] === false) continue;
+                        const ai = registry.getAIProvider(provider.id);
+                        if (!ai) continue;
+                        try {
+                            const raw = await Promise.race([
+                                ai.review(prompt, { _rawPrompt: true }),
+                                new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000)),
+                            ]);
+                            // Strip any markdown fences if the model added them
+                            const cleaned = String(raw || "").replace(/```json\n?|\n?```/g, "").trim();
+                            roadmapData = JSON.parse(cleaned);
+                            break;
+                        } catch (e) {
+                            dbg.warn(`GENERATE_ROADMAP: provider ${provider.id} failed:`, e?.message);
+                        }
+                    }
+                    if (!roadmapData) {
+                        sendResponse({ ok: false, error: "All AI providers failed or no provider configured." });
+                        return;
+                    }
+                    sendResponse({ ok: true, roadmap: roadmapData });
+                } catch (e) {
+                    dbg.error(`onMessage(GENERATE_ROADMAP): failed:`, e?.message);
+                    sendResponse({ ok: false, error: e?.message || "Generation failed" });
+                }
+            })();
             return true;
         }
 

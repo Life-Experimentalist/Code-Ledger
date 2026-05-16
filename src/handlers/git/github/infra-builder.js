@@ -48,12 +48,13 @@ export async function buildInfraFiles(
     branch,
     token,
     settings,
-    isNewRepo = false
+    isNewRepo = false,
+    indexMetaOverride = null
 ) {
     const items = [];
 
     // Dynamic files — always up to date
-    const dynamic = await _buildDynamicFiles(owner, repo, token, settings);
+    const dynamic = await _buildDynamicFiles(owner, repo, token, settings, indexMetaOverride);
     items.push(...dynamic);
 
     // Bootstrap files — only on first commit so they never re-dirty the tree
@@ -67,14 +68,80 @@ export async function buildInfraFiles(
     return items;
 }
 
-// ── Dynamic files (index.html + README.md) ────────────────────────────────────
+// ── Dynamic files (index.html + README.md + deploy workflow) ─────────────────
 
-async function _buildDynamicFiles(owner, repo, token, settings) {
+const STATS_START = "<!-- CODELEDGER_AUTO_GENERATED_START -->";
+const STATS_END = "<!-- CODELEDGER_AUTO_GENERATED_END -->";
+
+/**
+ * Merge the auto-generated stats block into an existing README.
+ * Preserves any content the user wrote outside the CodeLedger markers.
+ * If markers are absent (new repo or user removed them), returns the full block.
+ */
+function _mergeReadme(existing, newBlock) {
+    const si = existing.indexOf(STATS_START);
+    const ei = existing.indexOf(STATS_END);
+    if (si === -1 || ei === -1 || ei < si) return newBlock;
+    return existing.slice(0, si) + newBlock + existing.slice(ei + STATS_END.length);
+}
+
+/** Decode GitHub's base64-encoded file content (handles line-wrapped base64). */
+function _decodeContent(encoded) {
+    try {
+        return atob(encoded.replace(/\n/g, ""));
+    } catch (_) {
+        return null;
+    }
+}
+
+/** The deploy-pages workflow written to the user's repo (kept up-to-date on every infra build). */
+const DEPLOY_PAGES_YML = `name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    # Only re-deploy when site content actually changes.
+    # README-only commits (e.g. from external stats bots) are skipped,
+    # preventing the tug-of-war where two workflows fight over README.md.
+    paths:
+      - "index.html"
+      - "index.json"
+      - "problems/**"
+      - "chats/**"
+
+# Cancel any queued/running build when a newer commit arrives.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+`;
+
+async function _buildDynamicFiles(owner, repo, token, settings, indexMetaOverride = null) {
     const theme = await Storage.getTheme().catch(() => null);
     const pagesTheme = _buildPagesTheme(theme);
-    const indexMeta = await _readIndexMeta(owner, repo, token).catch(
-        () => null
-    );
+    // Use caller-supplied meta when available (e.g. REFRESH_INFRA passes fresh local data).
+    // Avoids the one-commit-lag where README is generated from the OLD repo index.json.
+    const indexMeta = indexMetaOverride ?? await _readIndexMeta(owner, repo, token).catch(() => null);
 
     const items = [];
 
@@ -94,21 +161,54 @@ async function _buildDynamicFiles(owner, repo, token, settings) {
         });
     }
 
+    // ── README: read-before-write so user content outside the markers is kept ──
     const pagesUrl =
         settings?.github_pages_url || `https://${owner}.github.io/${repo}/`;
-    items.push({
-        path: "README.md",
-        mode: "100644",
-        type: "blob",
-        content: getRepoReadme(
-            owner,
-            repo,
-            pagesUrl,
-            pagesTheme,
-            settings,
-            indexMeta
-        ),
-    });
+    const newStatsBlock = getRepoReadme(
+        owner,
+        repo,
+        pagesUrl,
+        pagesTheme,
+        settings,
+        indexMeta
+    );
+    try {
+        const existing = await getContents(owner, repo, "README.md", token);
+        const currentText = existing?.content ? _decodeContent(existing.content) : null;
+        const merged = currentText ? _mergeReadme(currentText, newStatsBlock) : newStatsBlock;
+        if (merged !== currentText) {
+            items.push({ path: "README.md", mode: "100644", type: "blob", content: merged });
+            dbg.log("_buildDynamicFiles(): README updated (stats section changed)");
+        } else {
+            dbg.log("_buildDynamicFiles(): README unchanged — skipping");
+        }
+    } catch (_) {
+        // 404 or network error — write fresh
+        items.push({ path: "README.md", mode: "100644", type: "blob", content: newStatsBlock });
+    }
+
+    // ── deploy-pages.yml: keep current so existing repos get path-filter fix ──
+    try {
+        const existing = await getContents(owner, repo, ".github/workflows/deploy-pages.yml", token);
+        const currentText = existing?.content ? _decodeContent(existing.content) : null;
+        if (currentText !== DEPLOY_PAGES_YML) {
+            items.push({ path: ".github/workflows/deploy-pages.yml", mode: "100644", type: "blob", content: DEPLOY_PAGES_YML });
+            dbg.log("_buildDynamicFiles(): deploy-pages.yml updated");
+        }
+    } catch (_) {
+        // Not present — will be created by bootstrap or skip (non-fatal)
+    }
+
+    // ── update-stats.yml: delete if present — it commits README changes that
+    //    conflict with CodeLedger's own per-commit README management. ──────────
+    try {
+        await getContents(owner, repo, ".github/workflows/update-stats.yml", token);
+        // File exists — mark for deletion by committing a null-sha blob
+        items.push({ path: ".github/workflows/update-stats.yml", mode: "100644", type: "blob", sha: null });
+        dbg.log("_buildDynamicFiles(): scheduling update-stats.yml for deletion");
+    } catch (_) {
+        // Not present — nothing to do
+    }
 
     return items;
 }
@@ -119,6 +219,47 @@ async function _buildBootstrapFiles(owner, repo, token, settings) {
     const year = new Date().getFullYear();
 
     const items = [
+        {
+            // GitHub Pages deploy workflow — cancel-in-progress prevents wasted builds
+            // when CodeLedger commits multiple times in quick succession.
+            // Pairs with build_type:"workflow" set by enablePages() in api-client.js.
+            path: ".github/workflows/deploy-pages.yml",
+            mode: "100644",
+            type: "blob",
+            content: `name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+# Cancel any queued/running build when a newer commit arrives.
+# This prevents wasted builds from rapid consecutive CodeLedger commits.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+`,
+        },
         {
             path: "LICENSE",
             mode: "100644",

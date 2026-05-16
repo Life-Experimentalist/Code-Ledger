@@ -13,7 +13,6 @@
 import { createDebugger } from "../../lib/debug.js";
 import { Storage } from "../storage.js";
 import { getAllInsights } from "../memory/knowledge-bank.js";
-import { getContents } from "../../handlers/git/github/api-client.js";
 
 const dbg = createDebugger("BackupManager");
 
@@ -75,15 +74,13 @@ export function backupFilePath(ts = new Date()) {
  *
  * @param {string} owner
  * @param {string} repo
- * @param {string} token
- * @param {object} git - GitHandler instance (has `.commit(files, msg, repo, opts)`)
+ * @param {object} git - GitHandler instance
  * @param {number} [keep=10] - Number of backups to retain
  * @returns {Promise<void>}
  */
 export async function commitBackupToGitHub(
     owner,
     repo,
-    token,
     git,
     keep = DEFAULT_KEEP
 ) {
@@ -97,7 +94,7 @@ export async function commitBackupToGitHub(
         );
 
         // Find existing backups so we can prune
-        const toDelete = await _getOldBackupPaths(owner, repo, token, keep);
+        const toDelete = await _getOldBackupPaths(owner, repo, git, keep);
 
         await git.commit(
             [{ path: filePath, content }],
@@ -114,18 +111,9 @@ export async function commitBackupToGitHub(
     }
 }
 
-/**
- * List backup file paths in the repo, sorted newest-first.
- * Returns paths that should be deleted to stay within `keep` limit.
- * @param {string} owner
- * @param {string} repo
- * @param {string} token
- * @param {number} keep
- * @returns {Promise<string[]>} paths to delete
- */
-async function _getOldBackupPaths(owner, repo, token, keep) {
+async function _getOldBackupPaths(owner, repo, git, keep) {
     try {
-        const listing = await getContents(owner, repo, BACKUP_DIR, token);
+        const listing = await git.getContents(owner, repo, BACKUP_DIR);
         if (!Array.isArray(listing)) return [];
         const files = listing
             .filter((f) => f.type === "file" && f.name.endsWith(".json"))
@@ -147,10 +135,9 @@ async function _getOldBackupPaths(owner, repo, token, keep) {
  *
  * @param {string} owner
  * @param {string} repo
- * @param {string} token
- * @param {object} git
+ * @param {object} git - GitHandler instance
  */
-export async function maybeCommitRollingBackup(owner, repo, token, git) {
+export async function maybeCommitRollingBackup(owner, repo, git) {
     try {
         const settings = await Storage.getSettings();
         const enabled = settings.githubRollingBackups !== false; // default on
@@ -175,7 +162,7 @@ export async function maybeCommitRollingBackup(owner, repo, token, git) {
             dbg.log(
                 `maybeCommitRollingBackup(): triggering backup at commit #${count}`
             );
-            await commitBackupToGitHub(owner, repo, token, git, keep);
+            await commitBackupToGitHub(owner, repo, git, keep);
         }
     } catch (e) {
         dbg.warn(`maybeCommitRollingBackup(): failed:`, e?.message || e);
@@ -188,12 +175,12 @@ export async function maybeCommitRollingBackup(owner, repo, token, git) {
  * List all available backup files in the repo.
  * @param {string} owner
  * @param {string} repo
- * @param {string} token
+ * @param {object} git - GitHandler instance
  * @returns {Promise<Array<{name, path, sha, size}>>}
  */
-export async function listBackups(owner, repo, token) {
+export async function listBackups(owner, repo, git) {
     try {
-        const listing = await getContents(owner, repo, BACKUP_DIR, token);
+        const listing = await git.getContents(owner, repo, BACKUP_DIR);
         if (!Array.isArray(listing)) return [];
         return listing
             .filter((f) => f.type === "file" && f.name.endsWith(".json"))
@@ -216,12 +203,12 @@ export async function listBackups(owner, repo, token) {
  * @param {string} owner
  * @param {string} repo
  * @param {string} filePath
- * @param {string} token
+ * @param {object} git - GitHandler instance
  * @returns {Promise<object|null>}
  */
-export async function fetchBackupSnapshot(owner, repo, filePath, token) {
+export async function fetchBackupSnapshot(owner, repo, filePath, git) {
     try {
-        const fileData = await getContents(owner, repo, filePath, token);
+        const fileData = await git.getContents(owner, repo, filePath);
         if (!fileData?.content) return null;
         const raw = atob(fileData.content.replace(/\n/g, ""));
         return JSON.parse(raw);

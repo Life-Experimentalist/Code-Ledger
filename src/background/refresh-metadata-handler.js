@@ -1,4 +1,5 @@
 import { createDebugger } from "../lib/debug.js";
+import { CONSTANTS } from "../core/constants.js";
 
 const dbg = createDebugger("RefreshMetadataHandler");
 
@@ -93,10 +94,13 @@ export async function handleRefreshMetadata(problems = []) {
                 return null;
             }
 
+            const lc = CONSTANTS.PLATFORMS.leetcode;
+            const gfg = CONSTANTS.PLATFORMS.geeksforgeeks;
+            const cf = CONSTANTS.PLATFORMS.codeforces;
             const base = {
-                leetcode: `https://leetcode.com/problems/${titleSlug}/`,
-                geeksforgeeks: `https://practice.geeksforgeeks.org/problems/${titleSlug}`,
-                codeforces: `https://codeforces.com/problemset/problem/${titleSlug}`,
+                leetcode: `${lc.problemsBase}${titleSlug}/`,
+                geeksforgeeks: `${gfg.practiceBase}${titleSlug}`,
+                codeforces: `${cf.problemsBase}${titleSlug}`,
             }[platform];
 
             if (!base) {

@@ -7,6 +7,10 @@ import { h, useState } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("PanelPlatforms");
+
 import { CONSTANTS } from "../../core/constants.js";
 
 const PLATFORMS = Object.values(CONSTANTS.PLATFORMS);
@@ -14,14 +18,14 @@ const DIFFICULTY_LABELS = ["Easy", "Medium", "Hard"];
 
 const PLATFORM_SYNC_URLS = {
     leetcode: {
-        profile: "https://leetcode.com/",
-        progress: "https://leetcode.com/progress/",
+        profile: CONSTANTS.PLATFORMS.leetcode.baseUrl + "/",
+        progress: CONSTANTS.PLATFORMS.leetcode.baseUrl + "/progress/",
     },
     geeksforgeeks: {
-        profile: "https://www.geeksforgeeks.org/",
+        profile: CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl + "/",
     },
     codeforces: {
-        profile: "https://codeforces.com/",
+        profile: CONSTANTS.PLATFORMS.codeforces.baseUrl + "/",
     },
 };
 

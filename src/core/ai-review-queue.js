@@ -446,6 +446,54 @@ export async function exportQueueState() {
 }
 
 /**
+ * Remove a queue item by ID (any status, including processing).
+ * @param {string} itemId
+ * @returns {Promise<boolean>}
+ */
+export async function removeQueueItem(itemId) {
+    try {
+        const db = await _openDB();
+        const tx = db.transaction([QUEUE_STORE], "readwrite");
+        const store = tx.objectStore(QUEUE_STORE);
+        return new Promise((resolve) => {
+            const req = store.delete(itemId);
+            req.onsuccess = () => { db.close(); resolve(true); };
+            req.onerror = () => { db.close(); resolve(false); };
+        });
+    } catch (e) {
+        dbg.warn("Failed to remove queue item:", e?.message);
+        return false;
+    }
+}
+
+/**
+ * Get all queue items, optionally filtered by status, sorted newest-updated first.
+ * @param {string|null} status - filter by status, or null for all
+ * @returns {Promise<object[]>}
+ */
+export async function getAllQueueItems(status = null) {
+    try {
+        const db = await _openDB();
+        const tx = db.transaction([QUEUE_STORE], "readonly");
+        const store = tx.objectStore(QUEUE_STORE);
+        return new Promise((resolve) => {
+            const req = store.getAll();
+            req.onsuccess = () => {
+                let items = req.result || [];
+                if (status) items = items.filter((i) => i.status === status);
+                items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+                db.close();
+                resolve(items);
+            };
+            req.onerror = () => { db.close(); resolve([]); };
+        });
+    } catch (e) {
+        dbg.warn("Failed to get all queue items:", e?.message);
+        return [];
+    }
+}
+
+/**
  * Internal: Update a queue item.
  * @param {string} itemId
  * @param {object} updates - fields to update

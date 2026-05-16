@@ -8,6 +8,10 @@ import { useState } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("TelemetryPrompt");
+
 export function TelemetryPrompt({ onComplete }) {
     return html`
         <div

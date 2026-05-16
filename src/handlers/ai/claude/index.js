@@ -8,6 +8,9 @@ import { APIKeyPool } from "../../../core/api-key-pool.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { buildReviewPrompt } from "../../../core/ai-prompts.js";
+import { createDebugger } from "../../../lib/debug.js";
+
+const dbg = createDebugger("ClaudeHandler");
 
 export class ClaudeHandler extends BaseAIHandler {
     constructor() {

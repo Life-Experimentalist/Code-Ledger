@@ -119,11 +119,30 @@ export class GitHubHandler extends BaseGitHandler {
 
     // ── Token resolution ──────────────────────────────────────────────────────
 
+    // OAuth-only: never falls back to a stored PAT.
+    // If this returns null the caller must prompt re-authentication.
     async getToken() {
-        const oauth = await Storage.getAuthToken("github");
-        if (oauth) return oauth;
-        const settings = await Storage.getSettings();
-        return settings["github_token"] || null;
+        return Storage.getAuthToken("github");
+    }
+
+    /**
+     * Validate the stored OAuth token against GET /user.
+     * Returns { valid: true, login, avatar_url } or { valid: false }.
+     * On HTTP 401 the stored token is cleared automatically.
+     */
+    async validateToken() {
+        const token = await this.getToken();
+        if (!token) return { valid: false };
+        try {
+            const user = await api.getCurrentUser(token);
+            return { valid: true, login: user.login, avatar_url: user.avatar_url };
+        } catch (err) {
+            if (err.status === 401) {
+                dbg.warn("validateToken(): token rejected by GitHub — clearing");
+                await Storage.setAuthToken("github", "");
+            }
+            return { valid: false };
+        }
     }
 
     // ── Co-author trailer ─────────────────────────────────────────────────────
@@ -134,6 +153,20 @@ export class GitHubHandler extends BaseGitHandler {
         if (!/^Co-authored-by:\s+.+\s+<.+>$/.test(trailer)) return message;
         if (message.includes(trailer)) return message;
         return `${message}\n\n${trailer}`;
+    }
+
+    // ── Generic provider interface ────────────────────────────────────────────
+
+    async getContents(owner, repo, path) {
+        return api.getContents(owner, repo, path, await this.getToken());
+    }
+
+    async getCurrentUser() {
+        return api.getCurrentUser(await this.getToken());
+    }
+
+    async apiFetch(path, opts = {}) {
+        return api.apiFetch(path, await this.getToken(), opts);
     }
 
     // ── Primary commit method ─────────────────────────────────────────────────
@@ -203,7 +236,7 @@ export class GitHubHandler extends BaseGitHandler {
 
         // Add infrastructure files unless this is a mirror commit or explicitly skipped
         if (!opts.isMirror && !opts.skipInfra) {
-            const infra = await buildInfraFiles(owner, name, BRANCH, token, settings, isNewRepo);
+            const infra = await buildInfraFiles(owner, name, BRANCH, token, settings, isNewRepo, opts.indexMetaOverride ?? null);
             treeItems.push(...infra);
             dbg.log(`commit(): +${infra.length} infra file(s) (isNewRepo=${isNewRepo})`);
         }

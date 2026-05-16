@@ -1,12 +1,34 @@
 // KaTeX CDN loading is blocked by the extension's Content Security Policy.
 // Math expressions are rendered as styled code blocks instead.
 
+const LATEX_SYMBOLS = [
+    [/\\times/g, "×"], [/\\cdot/g, "·"],
+    [/\\leq|\\le(?!q)/g, "≤"], [/\\geq|\\ge(?!q)/g, "≥"], [/\\neq|\\ne(?!q)/g, "≠"],
+    [/\\sqrt/g, "√"], [/\\infty/g, "∞"], [/\\ldots|\\cdots/g, "…"],
+    [/\\rightarrow|\\to(?!p)/g, "→"], [/\\leftarrow/g, "←"],
+    [/\\Rightarrow/g, "⇒"], [/\\Leftarrow/g, "⇐"],
+    [/\\sum/g, "∑"], [/\\prod/g, "∏"], [/\\int/g, "∫"],
+    [/\\alpha/g, "α"], [/\\beta/g, "β"], [/\\gamma/g, "γ"],
+    [/\\delta/g, "δ"], [/\\epsilon/g, "ε"], [/\\theta/g, "θ"],
+    [/\\lambda/g, "λ"], [/\\mu/g, "μ"], [/\\pi/g, "π"],
+    [/\\sigma/g, "σ"], [/\\omega/g, "ω"], [/\\log/g, "log"],
+    [/\\ln/g, "ln"], [/\\max/g, "max"], [/\\min/g, "min"],
+    [/\\lfloor/g, "⌊"], [/\\rfloor/g, "⌋"], [/\\lceil/g, "⌈"], [/\\rceil/g, "⌉"],
+];
+
+export function substituteLatex(text) {
+    let t = text;
+    for (const [re, sym] of LATEX_SYMBOLS) t = t.replace(re, sym);
+    return t;
+}
+
 export async function ensureKatex() {
     return null;
 }
 
 export function renderMath(tex, display = false) {
-    const escaped = tex
+    const substituted = substituteLatex(tex);
+    const escaped = substituted
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");

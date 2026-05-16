@@ -3,6 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createDebugger } from "../lib/debug.js";
+import { CONSTANTS } from "./constants.js";
+
+const dbg = createDebugger("MarkdownGenerator");
+
 /**
  * Generates a markdown file for a single problem.
  * Includes problem metadata, solution code, stats, and links.
@@ -35,15 +40,7 @@ export function generateProblemMarkdown(problem) {
     const langName = lang.name || lang.slug || "Unknown";
     const langExt = lang.ext || "txt";
 
-    // Build problem URL based on platform
-    let problemUrl = "#";
-    if (platform.toLowerCase() === "leetcode" && titleSlug) {
-        problemUrl = `https://leetcode.com/problems/${titleSlug}/`;
-    } else if (platform.toLowerCase() === "geeksforgeeks" && titleSlug) {
-        problemUrl = `https://practice.geeksforgeeks.org/problems/${titleSlug}/`;
-    } else if (platform.toLowerCase() === "codeforces" && titleSlug) {
-        problemUrl = `https://codeforces.com/problemset/problem/${titleSlug}`;
-    }
+    const problemUrl = CONSTANTS.makeProblemUrl(platform.toLowerCase(), titleSlug);
 
     // Format timestamp
     const dateStr = timestamp
@@ -139,7 +136,7 @@ export function generateProblemMarkdown(problem) {
             if (sim.title && sim.titleSlug) {
                 let simUrl = "#";
                 if (platform.toLowerCase() === "leetcode") {
-                    simUrl = `https://leetcode.com/problems/${sim.titleSlug}/`;
+                    simUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + sim.titleSlug + "/";
                 }
                 lines.push(`- [${sim.title}](${simUrl})`);
             }

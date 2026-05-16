@@ -11,6 +11,12 @@ import {
     useRef,
 } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
+const html = htm.bind(h);
+
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("SettingsSchema");
+
 import {
     testAIKey,
     testProviderEndpoint,
@@ -29,7 +35,6 @@ import { DifficultyMapPanel } from "./DifficultyMapPanel.js";
 import { MirrorsPanel } from "./MirrorsPanel.js";
 import { ConflictResolutionModal } from "../../library/components/ConflictResolutionModal.js";
 import { FEATURE_STATUS, FEATURE_STATUS_META } from "../../core/constants.js";
-const html = htm.bind(h);
 
 // ── Backup / Restore helpers (rendered at bottom of git tab) ──────────────────
 
@@ -284,7 +289,7 @@ function LeetCodeImportPanel({ username }) {
           id title titleSlug timestamp lang
         }
       }`;
-            const res = await fetch("https://leetcode.com/graphql", {
+            const res = await fetch(CONSTANTS.PLATFORMS.leetcode.graphqlUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -313,7 +318,7 @@ function LeetCodeImportPanel({ username }) {
                     tags: [],
                     timestamp: Number(sub.timestamp) * 1000,
                     code: "",
-                    url: "https://leetcode.com/problems/" + sub.titleSlug + "/",
+                    url: CONSTANTS.PLATFORMS.leetcode.problemsBase + sub.titleSlug + "/",
                 });
                 await Storage.markPendingProblemKey(
                     `${sub.titleSlug}::${slug || "unknown"}`

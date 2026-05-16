@@ -28,7 +28,9 @@ try {
   if (pkg.version !== VERSION) {
     pkg.version = VERSION;
     fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-    console.log(`✓ Synced package.json version to ${VERSION} (from manifest.json)`);
+    console.log(
+      `✓ Synced package.json version to ${VERSION} (from manifest.json)`,
+    );
   }
 } catch (e) {
   console.warn("Could not sync package.json version:", e.message);
@@ -65,7 +67,7 @@ const baseManifest = {
   name: "CodeLedger",
   version: VERSION,
   description:
-    "Your DSA journey, committed. Unify LeetCode, GFG, and Codeforces solves into a personal Git-backed repository.",
+    "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
   icons: {
     16: "assets/images/icon-transparent.png",
     48: "assets/images/icon-transparent.png",

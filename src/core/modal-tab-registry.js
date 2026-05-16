@@ -4,6 +4,15 @@
  *
  * Platform-agnostic modal tab registry.
  *
+ * @ts-check
+ */
+
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("ModalTabRegistry");
+
+/**
+ *
  * Usage (in a platform handler or handler init):
  *   import { modalTabRegistry } from "../../../core/modal-tab-registry.js";
  *   modalTabRegistry.register("leetcode", [
@@ -43,16 +52,22 @@ class ModalTabRegistry {
     getTabs(platform, problem) {
         const global = this._tabs.get("*") || [];
         const specific = this._tabs.get(platform) || [];
-        const all = [...global, ...specific];
-        return all.filter((tab) => !tab.show || tab.show(problem));
+        // Platform-specific tabs override global "*" tabs with the same id
+        const specificIds = new Set(specific.map((t) => t.id));
+        const merged = [
+            ...global.filter((t) => !specificIds.has(t.id)),
+            ...specific,
+        ];
+        return merged.filter((tab) => !tab.show || tab.show(problem));
     }
 
-    /** Return a tab's render function by id and platform. */
+    /** Return a tab's render function by id and platform. Platform-specific overrides global. */
     getRenderer(platform, tabId) {
-        const global = this._tabs.get("*") || [];
         const specific = this._tabs.get(platform) || [];
-        const all = [...global, ...specific];
-        return all.find((t) => t.id === tabId)?.render || null;
+        const fromSpecific = specific.find((t) => t.id === tabId);
+        if (fromSpecific) return fromSpecific.render;
+        const global = this._tabs.get("*") || [];
+        return global.find((t) => t.id === tabId)?.render || null;
     }
 }
 

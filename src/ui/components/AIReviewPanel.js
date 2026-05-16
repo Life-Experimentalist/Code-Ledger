@@ -5,7 +5,12 @@
 
 import { h } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
+import { AIMarkdownRenderer } from "./AIMarkdownRenderer.js";
 const html = htm.bind(h);
+
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("AIReviewPanel");
 
 export function AIReviewPanel({ review, onGenerate, loading, error }) {
     if (loading) {
@@ -58,10 +63,8 @@ export function AIReviewPanel({ review, onGenerate, loading, error }) {
                 <span class="text-lg">✨</span>
                 <h3 class="text-sm font-semibold text-white">AI Analysis</h3>
             </div>
-            <div
-                class="prose prose-invert prose-sm prose-cyan max-w-none text-slate-300"
-            >
-                ${review}
+            <div class="max-w-none text-slate-300">
+                <${AIMarkdownRenderer} content=${review} />
             </div>
             <div class="flex justify-end">
                 <button

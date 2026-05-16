@@ -7,20 +7,15 @@ import { BasePlatformHandler } from "../../_base/BasePlatformHandler.js";
 import { SELECTORS } from "./dom-selectors.js";
 import { detectPage, PAGE_TYPES } from "./page-detector.js";
 import { QUERIES } from "./graphql-queries.js";
-import { eventBus } from "../../../core/event-bus.js";
 import { injectQoL } from "./qol.js";
 import { Storage } from "../../../core/storage.js";
-import { canonicalMapper } from "../../../core/canonical-mapper.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
-import { CONSTANTS } from "../../../core/constants.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
 import { runtime, tabs } from "../../../lib/browser-compat.js";
+import { CONSTANTS } from "../../../core/constants.js";
 
 const dbg = createDebugger("LeetCode");
-
-// Module-level debounce timer — prevents rapid-fire MutationObserver callbacks
-let _debounceTimer = null;
 
 const LANG_EXT = {
     python: "py",
@@ -318,7 +313,7 @@ Be concise. Max 200 words.`;
             const merged = {
                 ...(existing || {}),
                 platform: "leetcode",
-                id: CONSTANTS.makeProblemId("leetcode", slug),
+                id: this.makeProblemId(slug),
                 title: meta?.title || existing?.title || slug,
                 titleSlug: slug,
                 difficulty: normalizeDifficulty(
@@ -537,8 +532,7 @@ Be concise. Max 200 words.`;
 
         // On submission detail pages, trigger a check immediately after render settles
         if (page.type === PAGE_TYPES.SUBMISSION) {
-            clearTimeout(_debounceTimer);
-            _debounceTimer = setTimeout(() => this._checkSubmission(), 1200);
+            this._scheduleDebounce(() => this._checkSubmission(), 1200);
         }
 
         // Profile page import button
@@ -563,18 +557,31 @@ Be concise. Max 200 words.`;
         const detailSyncBtn = document.getElementById("cl-sync-btn");
         const listSyncBtn = document.getElementById("cl-submission-list-sync");
 
-        // Show detail sync button only on submission detail pages
         if (page.type === PAGE_TYPES.SUBMISSION) {
+            // Submission detail page — always show the detail sync button.
             if (listSyncBtn) listSyncBtn.remove();
             if (!detailSyncBtn) this._injectDetailSyncBtn(page);
-        }
-        // Show list sync button only on submission list pages
-        else if (page.type === PAGE_TYPES.SUBMISSION_LIST) {
+        } else if (page.type === PAGE_TYPES.PROBLEM) {
+            // Problem/editor page — show sync button only when a result is actually
+            // visible (accepted panel appeared). Hides itself automatically once the
+            // result element leaves the DOM.
+            if (listSyncBtn) listSyncBtn.remove();
+            const resultEl = document.querySelector(
+                '[data-e2e-locator="submission-result"]'
+            );
+            if (resultEl && resultEl.offsetParent) {
+                if (!detailSyncBtn) this._injectDetailSyncBtn(page);
+            } else {
+                if (detailSyncBtn) detailSyncBtn.remove();
+                if (this._syncBtnObserver) {
+                    this._syncBtnObserver.disconnect();
+                    this._syncBtnObserver = null;
+                }
+            }
+        } else if (page.type === PAGE_TYPES.SUBMISSION_LIST) {
             if (detailSyncBtn) detailSyncBtn.remove();
             if (!listSyncBtn) this._injectSubmissionListSyncBtn(page);
-        }
-        // Hide both buttons on other pages
-        else {
+        } else {
             if (this._syncBtnObserver) {
                 this._syncBtnObserver.disconnect();
                 this._syncBtnObserver = null;
@@ -587,15 +594,29 @@ Be concise. Max 200 words.`;
     _injectDetailSyncBtn(page) {
         if (document.getElementById("cl-sync-btn")) return;
 
-        const findRow = () => {
-            const row =
-                document.querySelector(
-                    ".flex.flex-none.gap-2:not(.justify-center):not(.justify-between)"
-                ) ||
-                document.querySelector(
-                    ".flex.gap-2:not(.justify-center):not(.justify-between)"
-                );
-            return row && row.offsetParent ? row : null;
+        // Find the flex row that CONTAINS the submission result element — not a generic
+        // flex row, to avoid accidentally injecting into the nav breadcrumb or panel header.
+        const findResultRow = () => {
+            const resultEl = document.querySelector(
+                '[data-e2e-locator="submission-result"]'
+            );
+            if (!resultEl || !resultEl.offsetParent) return null;
+            // Walk up to find the nearest flex/grid ancestor that's a sensible row.
+            let el = resultEl;
+            for (let i = 0; i < 8; i++) {
+                if (!el.parentElement || el.parentElement === document.body) break;
+                el = el.parentElement;
+                const { display, flexDirection } =
+                    window.getComputedStyle(el);
+                if (
+                    (display === "flex" || display === "grid") &&
+                    flexDirection !== "column"
+                ) {
+                    return el;
+                }
+            }
+            // Fallback: direct parent so button at least appears near the result.
+            return resultEl.parentElement;
         };
 
         const inject = (row) => {
@@ -610,17 +631,16 @@ Be concise. Max 200 words.`;
             row.appendChild(btn);
         };
 
-        const row = findRow();
+        const row = findResultRow();
         if (row) {
             inject(row);
             return;
         }
 
-        // Button row not in DOM yet — watch for it immediately via MutationObserver
-        // instead of a fixed setTimeout so the button appears as soon as the row renders.
+        // Result element not rendered yet — watch for it.
         if (this._syncBtnObserver) this._syncBtnObserver.disconnect();
         this._syncBtnObserver = new MutationObserver(() => {
-            const r = findRow();
+            const r = findResultRow();
             if (!r) return;
             this._syncBtnObserver.disconnect();
             this._syncBtnObserver = null;
@@ -929,7 +949,7 @@ Be concise. Max 200 words.`;
 
             try {
                 const apiRes = await fetch(
-                    "https://leetcode.com/api/problems/all/",
+                    CONSTANTS.PLATFORMS.leetcode.apiBase + "/problems/all/",
                     { credentials: "include" }
                 );
                 if (apiRes.ok) {
@@ -964,16 +984,28 @@ Be concise. Max 200 words.`;
             while (true) {
                 show(`Fetching submissions page ${++pageNum}…`);
                 let pageData;
-                try {
-                    const res = await fetch(
-                        `https://leetcode.com/api/submissions/?offset=${offset}&limit=${PAGE}`,
-                        { credentials: "include" }
-                    );
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    pageData = await res.json();
-                } catch (e) {
+                let lastErr;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    try {
+                        const res = await fetch(
+                            `${CONSTANTS.PLATFORMS.leetcode.apiBase}/submissions/?offset=${offset}&limit=${PAGE}`,
+                            { credentials: "include" }
+                        );
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        pageData = await res.json();
+                        lastErr = null;
+                        break;
+                    } catch (e) {
+                        lastErr = e;
+                        if (attempt < 2) {
+                            show(`Page ${pageNum} failed (${e.message}) — retrying…`);
+                            await new Promise((r) => setTimeout(r, 2000));
+                        }
+                    }
+                }
+                if (lastErr) {
                     throw new Error(
-                        `Submission fetch failed (page ${pageNum}): ${e.message}. Make sure you are logged in to LeetCode.`
+                        `Submission fetch failed (page ${pageNum}): ${lastErr.message}. Make sure you are logged in to LeetCode.`
                     );
                 }
 
@@ -1073,32 +1105,42 @@ Be concise. Max 200 words.`;
 
             // ── Phase 4b: Fetch submission code via GraphQL submissionDetails ──
             // Three concurrent requests with a 400ms gap between batches.
+            // Each submission gets one automatic retry on failure (1 s delay).
             const BATCH = 3;
+            let codeFailed = 0;
             show(`Fetching code for ${picks.length} submissions…`);
             for (let i = 0; i < picks.length; i += BATCH) {
                 const batch = picks.slice(i, i + BATCH);
                 await Promise.all(
                     batch.map(async (sub) => {
                         if (!sub.id) return;
-                        try {
-                            const res = await this._gql(
-                                QUERIES.SUBMISSION_DETAIL,
-                                { submissionId: +sub.id }
-                            );
-                            const d = res.data?.submissionDetails;
-                            if (d) {
-                                if (d.code) sub.code = d.code;
-                                if (d.runtimeDisplay)
-                                    sub.runtime = d.runtimeDisplay;
-                                if (d.memoryDisplay)
-                                    sub.memory = d.memoryDisplay;
-                                if (d.runtimePercentile)
-                                    sub.runtimePct = d.runtimePercentile;
-                                if (d.memoryPercentile)
-                                    sub.memoryPct = d.memoryPercentile;
+                        for (let attempt = 0; attempt < 2; attempt++) {
+                            try {
+                                const res = await this._gql(
+                                    QUERIES.SUBMISSION_DETAIL,
+                                    { submissionId: +sub.id }
+                                );
+                                const d = res.data?.submissionDetails;
+                                if (d) {
+                                    if (d.code) sub.code = d.code;
+                                    if (d.runtimeDisplay)
+                                        sub.runtime = d.runtimeDisplay;
+                                    if (d.memoryDisplay)
+                                        sub.memory = d.memoryDisplay;
+                                    if (d.runtimePercentile)
+                                        sub.runtimePct = d.runtimePercentile;
+                                    if (d.memoryPercentile)
+                                        sub.memoryPct = d.memoryPercentile;
+                                }
+                                break; // success
+                            } catch (e) {
+                                if (attempt === 0) {
+                                    await new Promise((r) => setTimeout(r, 1000));
+                                } else {
+                                    dbg.warn(`[import] code fetch failed for sub ${sub.id} (${sub.titleSlug}):`, e?.message);
+                                    codeFailed++;
+                                }
                             }
-                        } catch (_) {
-                            /* leave code empty — non-fatal */
                         }
                     })
                 );
@@ -1110,12 +1152,30 @@ Be concise. Max 200 words.`;
                     );
                 }
             }
+            // Filter out submissions where code could not be fetched — these would
+            // create empty-code records in the database ("contaminants"). They can be
+            // recovered individually via the Problem Modal's "Recover Code" button.
+            const withCode = picks.filter((s) => !!s.code);
+            const noCodeCount = picks.length - withCode.length;
+            if (noCodeCount > 0) {
+                show(
+                    `Note: ${noCodeCount} submission(s) had no code after retry and will be skipped.` +
+                    ` Use the Problem Modal "Recover Code" button to fetch them individually.`
+                );
+                await new Promise((r) => setTimeout(r, 2500));
+            }
+
+            if (withCode.length === 0) {
+                show("No submissions with code found — nothing to import.");
+                btn.disabled = false;
+                return;
+            }
 
             // ── Phase 5: Send all problems as one atomic BULK_IMPORT to avoid concurrent write races ──
-            show(`Importing ${picks.length} submissions…`);
+            show(`Importing ${withCode.length} submission(s)${noCodeCount > 0 ? ` (${noCodeCount} skipped, no code)` : ""}…`);
 
             const settings = await Storage.getSettings();
-            const bulkProblems = picks.map((sub) => {
+            const bulkProblems = withCode.map((sub) => {
                 const lang = resolveLang(sub.lang || sub.langName);
                 const tags = tagsMap[sub.titleSlug] || [];
                 const topic = resolvePrimaryTopic(tags);
@@ -1159,8 +1219,7 @@ Be concise. Max 200 words.`;
 
                 return {
                     // Use submission-scoped ID to preserve multiple accepted submissions per problem.
-                    id: CONSTANTS.makeProblemId(
-                        "leetcode",
+                    id: this.makeProblemId(
                         `${sub.titleSlug}::${sub.id || Date.now()}`
                     ),
                     submissionId: sub.id || null,
@@ -1199,7 +1258,8 @@ Be concise. Max 200 words.`;
             });
             const imported = result.saved ?? bulkProblems.length;
 
-            show(`Done! Imported ${imported} submissions.`);
+            const skippedMsg = noCodeCount > 0 ? ` (${noCodeCount} skipped — no code)` : "";
+            show(`Done! Imported ${imported} submission(s)${skippedMsg}.`);
             btn.textContent = `✓ Imported ${imported} solves`;
             btn.style.color = "#34d399";
             btn.style.borderColor = "rgba(52,211,153,0.4)";
@@ -1356,32 +1416,59 @@ Be concise. Max 200 words.`;
             this._resultPollTimer = null;
         }
 
+        // Snapshot the current result text so we can detect when LeetCode
+        // clears it and replaces it with the NEW submission's verdict.
+        // Without this, if a previous "Wrong Answer" is already in the DOM
+        // the poll finds it immediately, stops, and misses the real new result.
+        const initialText =
+            document
+                .querySelector('[data-e2e-locator="submission-result"]')
+                ?.textContent?.trim() ?? null;
+
+        // wasCleared: true once we've seen the element disappear or show a
+        // transient "Judging…" state — meaning LeetCode reset it for new judging.
+        let wasCleared = initialText === null;
         let attempts = 0;
-        const MAX_ATTEMPTS = 30; // 30 s timeout
+        const MAX_ATTEMPTS = 60; // 60 s timeout (slow judge queues)
 
         this._resultPollTimer = setInterval(() => {
             attempts++;
             if (attempts > MAX_ATTEMPTS) {
                 clearInterval(this._resultPollTimer);
                 this._resultPollTimer = null;
+                dbg.log("_onSubmitFired: result poll timed out");
                 return;
             }
 
-            // Wait for the result element to appear (any result — WA, TLE, Accepted…)
             const resultEl = document.querySelector(
                 '[data-e2e-locator="submission-result"]'
             );
-            if (!resultEl) return;
 
-            // Result is visible — stop polling
+            // Element gone or empty — LeetCode cleared it for fresh judging
+            if (!resultEl || !/\S/.test(resultEl.textContent || "")) {
+                wasCleared = true;
+                return;
+            }
+
+            const currentText = (resultEl.textContent || "").trim();
+
+            // Still in a transient judging state — treat as cleared
+            if (/judging|running|pending|submitting/i.test(currentText)) {
+                wasCleared = true;
+                return;
+            }
+
+            // Haven't seen a reset yet — old stale result still showing
+            if (!wasCleared) return;
+
+            // We have a fresh, final verdict — stop polling
             clearInterval(this._resultPollTimer);
             this._resultPollTimer = null;
 
-            // Only process accepted submissions
-            if (!/accepted/i.test(resultEl.textContent || "")) {
+            if (!/accepted/i.test(currentText)) {
                 dbg.log(
                     "Submission result not Accepted — skipping",
-                    resultEl.textContent?.trim()
+                    currentText
                 );
                 return;
             }
@@ -1525,7 +1612,7 @@ Be concise. Max 200 words.`;
             );
             let node;
             while ((node = walker.nextNode())) {
-                if (/^\s*accepted\s*$/i.test(node.textContent)) {
+                if (/\baccepted\b/i.test(node.textContent) && !/submissions?\s+accepted/i.test(node.textContent)) {
                     const el = node.parentElement;
                     if (!el) continue;
                     // Use getComputedStyle — works for fixed/sticky positioned elements too
@@ -1548,7 +1635,7 @@ Be concise. Max 200 words.`;
         this._processingLock = true;
         try {
             const settings = await Storage.getSettings();
-            if (!settings.leetcode_enable && !isManual) return;
+            if (!this.isEnabled(settings) && !isManual) return;
 
             let submission = null;
             let slug = page.slug;
@@ -1630,11 +1717,7 @@ Be concise. Max 200 words.`;
             // Fetch rich metadata
             const meta = await this._fetchMetadata(slug);
 
-            // Canonical mapping
-            try {
-                await canonicalMapper.loadMap();
-            } catch (_) {}
-            const canonical = canonicalMapper.resolve("leetcode", slug);
+            const canonical = await this.resolveCanonical(slug);
             this._canonical = canonical; // stored for _buildFileSet
 
             const lang = resolveLang(submission.lang);
@@ -1659,7 +1742,7 @@ Be concise. Max 200 words.`;
             // If so, set a flag so the background can trigger an AI review when appropriate.
             try {
                 const existingProblem = await Storage.getProblem(
-                    CONSTANTS.makeProblemId("leetcode", slug)
+                    this.makeProblemId(slug)
                 ).catch(() => null);
                 if (existingProblem) {
                     const existingCode = String(
@@ -1678,9 +1761,8 @@ Be concise. Max 200 words.`;
                 dbg.error("Code-diff detection failed", e);
             }
 
-            eventBus.emit("problem:solved", {
-                platform: "leetcode",
-                id: CONSTANTS.makeProblemId("leetcode", slug),
+            this.emitSolved({
+                id: this.makeProblemId(slug),
                 forceCommit: isManual,
                 submissionId: submission.id || null,
                 title: meta?.title || submission.question?.title || slug,
@@ -1717,7 +1799,7 @@ Be concise. Max 200 words.`;
                 problemStatement: meta?.content || null,
                 elapsedSeconds,
                 hasSimilar: meta?.hasSimilar ?? null, // explicit "no similar" field: true|false|null
-                submissionsUrl: `https://leetcode.com/problems/${slug}/submissions/`, // direct link to submissions page
+                submissionsUrl: `${CONSTANTS.PLATFORMS.leetcode.problemsBase}${slug}/submissions/`, // direct link to submissions page
                 notes: "", // user-editable notes about this solution
                 methodTitle: "", // algorithm name: "Greedy", "DP", "Two-Pointer", etc.
                 isDuplicate: false, // will be set by AI duplicate detection
@@ -1729,7 +1811,28 @@ Be concise. Max 200 words.`;
                 canonical: canonical?.canonicalId,
             });
         } catch (err) {
-            dbg.error("Failed to process submission", err);
+            if (/extension context invalidated/i.test(err?.message || "")) {
+                // Extension was reloaded while this content script was still running.
+                // Tear everything down — no point polling a dead context.
+                dbg.warn(
+                    "Extension context invalidated — stopping all polling and observers"
+                );
+                this._stopSubmissionPolling();
+                if (this._resultPollTimer) {
+                    clearInterval(this._resultPollTimer);
+                    this._resultPollTimer = null;
+                }
+                if (this.mutationObserver) {
+                    this.mutationObserver.disconnect();
+                    this.mutationObserver = null;
+                }
+                if (this._submitHookObserver) {
+                    this._submitHookObserver.disconnect();
+                    this._submitHookObserver = null;
+                }
+            } else {
+                dbg.error("Failed to process submission", err);
+            }
         } finally {
             this._processingLock = false;
         }
@@ -1740,7 +1843,7 @@ Be concise. Max 200 words.`;
         const lang = resolveLang(submission.lang);
         const canonical = this._canonical || null;
         const title = meta?.title || slug;
-        const problemId = CONSTANTS.makeProblemId("leetcode", slug);
+        const problemId = this.makeProblemId(slug);
 
         const files = [];
 
@@ -1838,7 +1941,7 @@ Be concise. Max 200 words.`;
             "",
             ...similar.map(
                 (q) =>
-                    `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`
+                    `- [${q.title}](${CONSTANTS.PLATFORMS.leetcode.problemsBase}${q.titleSlug}/) — ${q.difficulty}`
             ),
             "",
         ].join("\n");
@@ -1896,7 +1999,7 @@ Be concise. Max 200 words.`;
                 "",
                 ...simList.map(
                     (q) =>
-                        `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`
+                        `- [${q.title}](${CONSTANTS.PLATFORMS.leetcode.problemsBase}${q.titleSlug}/) — ${q.difficulty}`
                 ),
                 ""
             );
@@ -1933,7 +2036,7 @@ Be concise. Max 200 words.`;
 
     async _gql(query, variables) {
         const csrf = this._getCsrf();
-        const res = await fetch("https://leetcode.com/graphql/", {
+        const res = await fetch(CONSTANTS.PLATFORMS.leetcode.graphqlUrl, {
             method: "POST",
             credentials: "include",
             headers: {
@@ -1951,33 +2054,65 @@ Be concise. Max 200 words.`;
     }
 
     async handleCodeFetch(problemId) {
-        const slug = window.location.pathname.split("/problems/")[1]?.replace(/\//g, "");
+        // Take only the first path segment after /problems/ — LeetCode redirects to
+        // /problems/{slug}/description/ so replace(/\//g,"") would give "slugdescription".
+        const slug = window.location.pathname.split("/problems/")[1]?.split("/")[0] || "";
         dbg.log(`handleCodeFetch(${problemId}): slug=${slug}`);
+
+        if (!problemId) {
+            // URL redirect stripped codeledger_problemid and hash fallback also missing.
+            // Can't match the listener without the ID — report error so the queue
+            // doesn't silently wait 30 s for a response that will never match.
+            dbg.error("handleCodeFetch: problemId is empty — URL params lost in redirect");
+            runtime.sendMessage({
+                type: "CODELEDGER_CODE_FETCH_ID_MISSING",
+                slug,
+                error: "URL redirect stripped problemId — cannot identify which queue item to resolve",
+            });
+            return;
+        }
+
         try {
-            // 1. Latest accepted submission
-            const listRes = await this._gql(QUERIES.SUBMISSION_LIST, {
-                questionSlug: slug,
-                offset: 0,
-                limit: 10,
-                lastKey: null,
-            });
-            const submissions = listRes?.data?.questionSubmissionList?.submissions || [];
-            const accepted = submissions.find((s) => /accepted/i.test(s.statusDisplay));
-            if (!accepted) throw new Error("No accepted submissions found");
+            // If the problemId has an embedded submissionId (bulk-import format:
+            // "lc-<titleSlug>::<submissionId>"), use it directly — avoids SUBMISSION_LIST
+            // which can return HTTP 400 if LeetCode's schema has changed.
+            const embeddedSubId = problemId.match(/::(\d+)$/)?.[1];
 
-            // 2. Submission details (code + runtime)
-            const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, {
-                submissionId: +accepted.id,
-            });
-            const detail = detailRes?.data?.submissionDetails;
-            if (!detail?.code) throw new Error("Submission details returned no code");
+            let detail;
+            if (embeddedSubId) {
+                dbg.log(`handleCodeFetch(${problemId}): using embedded submissionId=${embeddedSubId}`);
+                const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, {
+                    submissionId: +embeddedSubId,
+                });
+                detail = detailRes?.data?.submissionDetails;
+                if (!detail?.code) throw new Error("Submission details returned no code");
+            } else {
+                // Fallback: find the latest accepted submission via submission list
+                const listRes = await this._gql(QUERIES.SUBMISSION_LIST, {
+                    questionSlug: slug,
+                    offset: 0,
+                    limit: 10,
+                    lastKey: null,
+                });
+                const submissions = listRes?.data?.questionSubmissionList?.submissions || [];
+                const accepted = submissions.find((s) => /accepted/i.test(s.statusDisplay));
+                if (!accepted) throw new Error("No accepted submissions found");
+                const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, {
+                    submissionId: +accepted.id,
+                });
+                detail = detailRes?.data?.submissionDetails;
+                if (!detail?.code) throw new Error("Submission details returned no code");
+            }
 
-            // 3. Topic tags — non-fatal
-            let tags = [];
-            try {
-                const metaRes = await this._gql(QUERIES.QUESTION, { titleSlug: slug });
-                tags = metaRes?.data?.question?.topicTags?.map((t) => t.name) || [];
-            } catch (_) {}
+            // Tags come directly from submissionDetails — no extra QUESTION call needed.
+            // Fall back to QUESTION query only when submission returned none.
+            let tags = detail.topicTags?.map((t) => t.name) || [];
+            if (!tags.length) {
+                try {
+                    const metaRes = await this._gql(QUERIES.QUESTION, { titleSlug: slug });
+                    tags = metaRes?.data?.question?.topicTags?.map((t) => t.name) || [];
+                } catch (_) {}
+            }
 
             const lang = resolveLang(detail.lang);
 
@@ -1991,6 +2126,8 @@ Be concise. Max 200 words.`;
                 runtimePct: Math.round(detail.runtimePercentile || 0),
                 memoryPct: Math.round(detail.memoryPercentile || 0),
                 tags,
+                notes: detail.notes || null,
+                timestamp: detail.timestamp ? detail.timestamp * 1000 : null,
             });
         } catch (e) {
             dbg.error(`handleCodeFetch(${problemId}): ✗`, e?.message);

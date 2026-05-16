@@ -11,6 +11,9 @@
  *   3. Heuristic pattern matching
  */
 import { Storage } from "./storage.js";
+import { createDebugger } from "../lib/debug.js";
+
+const dbg = createDebugger("DifficultyMap");
 
 /**
  * Built-in normalizations for known non-standard difficulty labels.

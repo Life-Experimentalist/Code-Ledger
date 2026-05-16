@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { CONSTANTS } from "../../../core/constants.js";
+
 /**
  * Returns a self-contained HTML stats page for GitHub Pages.
  * The page fetches ./index.json at runtime and renders a full dashboard.
@@ -446,13 +448,18 @@ export function getPagesHtml(opts = {}) {
     }
 
     function repoFileUrl(problem) {
-      // Reconstruct path from the problem shape used by path-builder
+      // Reconstruct v3 path: problems/{canonicalId}/{platform}/README.md
+      //                   or: problems/{platformId}/README.md
       if (!ALL_REPO_URL) return '';
-      var slug = problem.titleSlug || problem.id || '';
-      var langName = (problem.lang && (problem.lang.verbose || problem.lang.name)) || 'Solution';
-      var ext = (problem.lang && problem.lang.ext) || 'txt';
-      var path = 'problems/' + slug + '/' + langName.replace(/\s+/g, '_') + '.' + ext;
-      return ALL_REPO_URL + '/blob/main/' + path;
+      var PLAT_CODE = { leetcode: 'lc', geeksforgeeks: 'gfg', codeforces: 'cf' };
+      var plat = (problem.platform || '').toLowerCase();
+      var prefix = PLAT_CODE[plat] || plat.slice(0, 3) || 'xx';
+      var rawId = String(problem.id || problem.titleSlug || '').split('::')[0];
+      var pid = rawId.startsWith(prefix + '-') ? rawId : (prefix + '-' + rawId);
+      var dir = (problem.canonical && problem.canonical.canonicalId)
+        ? 'problems/' + problem.canonical.canonicalId + '/' + plat
+        : 'problems/' + pid;
+      return ALL_REPO_URL + '/blob/main/' + dir + '/README.md';
     }
 
     function filterProblems() {
@@ -788,7 +795,7 @@ export function getRepoReadme(
 ) {
     const url = pagesUrl || "https://" + owner + ".github.io/" + repo + "/";
     const stats = indexMeta?.stats || null;
-    const summary = indexMeta?.summary || null;
+
     const updatedAt = indexMeta?.updatedAt
         ? new Date(indexMeta.updatedAt).toLocaleDateString("en-US", {
               month: "short",
@@ -813,48 +820,46 @@ export function getRepoReadme(
     const hard = stats?.hard || 0;
 
     const lines = [
-        "<!-- CODELEDGER_AUTO_GENERATED_START -->",
-        "",
-        '<div align="center">',
-        "",
-        "[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")",
-        "",
-        '<img src="' +
-            ICON_URL +
-            '" alt="CodeLedger" width="72" height="72" />',
-        "",
-        "# " + owner + "'s DSA Solutions",
-        "",
-        "[![Solutions](https://img.shields.io/badge/Solutions-" +
-            total +
-            "-06b6d4?style=flat-square&logo=github)](" +
-            url +
-            ")" +
-            "  [![Easy](https://img.shields.io/badge/Easy-" +
-            easy +
-            "-22c55e?style=flat-square)](" +
-            url +
-            ")" +
-            "  [![Medium](https://img.shields.io/badge/Medium-" +
-            medium +
-            "-f59e0b?style=flat-square)](" +
-            url +
-            ")" +
-            "  [![Hard](https://img.shields.io/badge/Hard-" +
-            hard +
-            "-ef4444?style=flat-square)](" +
-            url +
-            ")",
-        "",
-        "> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — every problem solved, committed to Git.",
-        "",
-        "**[View Live Dashboard →](" + url + ")**",
-        updatedAt ? "*Last updated: " + updatedAt + "*" : "",
-        "",
-        "</div>",
-        "",
-        "---",
-        "",
+      "<!-- CODELEDGER_AUTO_GENERATED_START -->",
+      "",
+      '<div align="center">',
+      "",
+      '<img src="' + ICON_URL + '" alt="CodeLedger" width="72" height="72" />',
+      "",
+      "# " + owner + "'s DSA Solutions",
+      "",
+      "[![Solutions](https://img.shields.io/badge/Solutions-" +
+        total +
+        "-06b6d4?style=flat-square&logo=github)](" +
+        url +
+        ")" +
+        "  [![Easy](https://img.shields.io/badge/Easy-" +
+        easy +
+        "-22c55e?style=flat-square)](" +
+        url +
+        ")" +
+        "  [![Medium](https://img.shields.io/badge/Medium-" +
+        medium +
+        "-f59e0b?style=flat-square)](" +
+        url +
+        ")" +
+        "  [![Hard](https://img.shields.io/badge/Hard-" +
+        hard +
+        "-ef4444?style=flat-square)](" +
+        url +
+        ")",
+      "",
+      "> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — every problem solved, committed to Git.",
+      "",
+      "**[View Live Dashboard →](" + url + ")**",
+      updatedAt ? "*Last updated: " + updatedAt + "*" : "",
+      "",
+      "[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")",
+      "",
+      "</div>",
+      "",
+      "---",
+      "",
     ];
 
     // Stats table
@@ -914,35 +919,45 @@ export function getRepoReadme(
         lines.push("---", "");
     }
 
-    // AI narrative summary
-    if (summary) {
-        lines.push("## Progress Summary", "");
-        lines.push("> " + summary.replace(/\n/g, "\n> "));
-        lines.push("");
-        lines.push("*Generated by AI based on solve history.*", "");
-        lines.push("---", "");
-    }
-
     // Recent solves
+    const LANG_DISPLAY = {
+        pythondata: "Python (Pandas)",
+        python3: "Python3",
+        python: "Python",
+        javascript: "JavaScript",
+        typescript: "TypeScript",
+        java: "Java",
+        cpp: "C++",
+        c: "C",
+        csharp: "C#",
+        kotlin: "Kotlin",
+        swift: "Swift",
+        go: "Go",
+        rust: "Rust",
+        scala: "Scala",
+        ruby: "Ruby",
+        php: "PHP",
+    };
     if (recentProblems.length) {
         lines.push("## Recent Solves", "");
         lines.push("| Problem | Difficulty | Language | Platform | Date |");
         lines.push("|---------|-----------|----------|----------|------|");
+        const thisYear = new Date().getFullYear();
         recentProblems.forEach((p) => {
             const ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
-            const date = new Date(ts).toLocaleDateString("en-US", {
+            const d = new Date(ts);
+            const isSameYear = d.getFullYear() === thisYear;
+            const date = d.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
+                ...(isSameYear ? {} : { year: "numeric" }),
             });
-            const lang = (p.lang && (p.lang.name || p.lang)) || "?";
+            const rawLang = (p.lang && (p.lang.name || p.lang)) || "?";
+            const lang = LANG_DISPLAY[rawLang.toLowerCase()] || rawLang;
             const slug = p.titleSlug || "";
             const titleText = p.title || slug || "?";
             const titleCell = slug
-                ? "[" +
-                  titleText +
-                  "](https://leetcode.com/problems/" +
-                  slug +
-                  "/)"
+                ? "[" + titleText + "](" + CONSTANTS.makeProblemUrl(p.platform || "leetcode", slug) + ")"
                 : titleText;
             const diff = p.difficulty || "?";
             const plat = p.platform || "?";
@@ -962,7 +977,7 @@ export function getRepoReadme(
         "  lc-{slug}/                  ← one directory per problem",
         "    lc-{slug}.py              ← your solution (named after the slug)",
         "    lc-{slug}.md              ← problem statement + runtime + memory + AI review",
-        "  lc-{slug}/",
+        "  {canonical-slug}/",
         "    leetcode/                 ← platform subdir (when canonical ID is assigned)",
         "      lc-{slug}.py",
         "index.json                    ← machine-readable index (all problems + stats)",

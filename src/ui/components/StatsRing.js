@@ -6,9 +6,13 @@
 import { h } from "../../vendor/preact-bundle.js";
 import { useEffect, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
-import { Chart } from "../../vendor/chart-bundle.js";
-
 const html = htm.bind(h);
+
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("StatsRing");
+
+import { Chart } from "../../vendor/chart-bundle.js";
 
 export function StatsRing({ completed, total, label }) {
     const canvasRef = useRef(null);

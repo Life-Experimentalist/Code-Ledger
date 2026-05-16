@@ -13,6 +13,10 @@ import {
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("AIChatsView");
+
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";

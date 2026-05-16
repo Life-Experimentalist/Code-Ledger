@@ -7,6 +7,10 @@
  * Colors use inline styles (no CSS class dependencies).
  */
 
+import { createDebugger } from "./debug.js";
+
+const dbg = createDebugger("SyntaxHighlight");
+
 function escHtml(s) {
     return String(s)
         .replace(/&/g, "&amp;")
@@ -578,6 +582,7 @@ const KEYWORDS = {
 };
 
 const LANG_ALIASES = {
+    // Short aliases
     js: "javascript",
     ts: "typescript",
     py: "python",
@@ -585,6 +590,18 @@ const LANG_ALIASES = {
     "c++": "cpp",
     kt: "kotlin",
     rs: "rust",
+    // LeetCode lang slugs
+    python3: "python",
+    python3_11: "python",
+    golang: "go",
+    csharp: "cpp",      // close enough for keyword colouring
+    "c#": "cpp",
+    scala: "java",      // close enough
+    ruby: "python",     // close enough for basic colouring
+    php: "javascript",  // close enough
+    dart: "java",
+    elixir: "python",
+    erlang: "python",
 };
 
 // Colors matching the dark theme (inline styles — no CSS class dependencies)

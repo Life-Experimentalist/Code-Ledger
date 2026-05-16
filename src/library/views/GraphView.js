@@ -13,6 +13,10 @@ import {
 } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
+
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("GraphView");
 import {
     buildKnowledgeGraph,
     DIFFICULTY_COLOR,
@@ -20,6 +24,7 @@ import {
 } from "../../core/knowledge-graph.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { ProblemModal } from "../components/ProblemModal.js";
+import { CONSTANTS } from "../../core/constants.js";
 
 /* ── Force simulation constants ─────────────────────────────────────── */
 const REPULSION = 3500;
@@ -493,10 +498,9 @@ function getLogicalSize(canvas) {
 }
 
 const PLATFORM_FAVICON = {
-    leetcode:
-        "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
-    geeksforgeeks: "https://www.geeksforgeeks.org/favicon.ico",
-    codeforces: "https://codeforces.com/favicon.ico",
+    leetcode: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    geeksforgeeks: `${CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl}/favicon.ico`,
+    codeforces: `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/favicon.ico`,
 };
 
 const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
@@ -1129,11 +1133,7 @@ export function GraphView({
     /* ── Problem URL ─────────────────────────────────────────────────── */
     function problemUrl(node) {
         if (!node?.titleSlug) return null;
-        if (node.platform === "geeksforgeeks")
-            return `https://practice.geeksforgeeks.org/problems/${node.titleSlug}`;
-        if (node.platform === "codeforces")
-            return `https://codeforces.com/problemset/problem/${node.titleSlug}`;
-        return `https://leetcode.com/problems/${node.titleSlug}/`;
+        return CONSTANTS.makeProblemUrl(node.platform || "leetcode", node.titleSlug);
     }
 
     /* ── Node detail (tooltip + selected panel) ─────────────────────── */
@@ -1707,7 +1707,7 @@ export function GraphView({
                     </div>
                     <div class="flex items-center gap-2">
                         <img
-                            src="https://assets.leetcode.com/static_assets/public/icons/favicon.ico"
+                            src=${PLATFORM_FAVICON.leetcode}
                             class="w-3 h-3 object-contain"
                             alt=""
                         />
@@ -1715,7 +1715,7 @@ export function GraphView({
                     </div>
                     <div class="flex items-center gap-2">
                         <img
-                            src="https://www.geeksforgeeks.org/favicon.ico"
+                            src=${PLATFORM_FAVICON.geeksforgeeks}
                             class="w-3 h-3 object-contain"
                             alt=""
                         />
@@ -1723,7 +1723,7 @@ export function GraphView({
                     </div>
                     <div class="flex items-center gap-2">
                         <img
-                            src="https://codeforces.com/favicon.ico"
+                            src=${PLATFORM_FAVICON.codeforces}
                             class="w-3 h-3 object-contain"
                             alt=""
                         />

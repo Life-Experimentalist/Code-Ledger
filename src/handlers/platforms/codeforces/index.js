@@ -8,11 +8,14 @@ import { SELECTORS } from "./dom-selectors.js";
 import { detectPage } from "./page-detector.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { Storage } from "../../../core/storage.js";
-import { CONSTANTS } from "../../../core/constants.js";
+import { createDebugger } from "../../../lib/debug.js";
+
+const dbg = createDebugger("CodeforcesHandler");
 
 export class CodeforcesHandler extends BasePlatformHandler {
     constructor() {
         super("codeforces", "Codeforces", {});
+        this._enableKey = "cf_enable";
         registerPlatformPrompt("codeforces", this.getDefaultPrompt());
     }
 
@@ -102,7 +105,7 @@ Be concise. Max 200 words.`;
         await Storage.saveProblem({
             ...(existing || {}),
             platform: "codeforces",
-            id: CONSTANTS.makeProblemId("codeforces", String(slug)),
+            id: this.makeProblemId(String(slug)),
             title: existing?.title || titleText,
             titleSlug: slug,
             tags: existing?.tags || [],

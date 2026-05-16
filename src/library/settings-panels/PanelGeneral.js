@@ -12,11 +12,16 @@ import {
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("PanelGeneral");
+
 import { Storage } from "../../core/storage.js";
 import {
     DEFAULT_THEME,
     THEME_PRESETS,
     getPresetList,
+    setThemeVariables,
     applyThemeFromStorage,
 } from "../../core/theme-engine.js";
 
@@ -32,7 +37,7 @@ const AUTO_BEHAVIOR_OPTIONS = [
     { id: "schedule", label: "Custom schedule" },
 ];
 
-export function PanelGeneral() {
+export function PanelGeneral({ settings, onSettingsChange }) {
     const [theme, setThemeState] = useState(DEFAULT_THEME);
     const [presets, setPresets] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -51,7 +56,12 @@ export function PanelGeneral() {
     }, [theme.customPresets]);
 
     const update = useCallback((key, val) => {
-        setThemeState((prev) => ({ ...prev, [key]: val }));
+        setThemeState((prev) => {
+            const next = { ...prev, [key]: val };
+            // Live preview — apply immediately so the user sees the change
+            setThemeVariables(next);
+            return next;
+        });
     }, []);
 
     const save = async () => {
@@ -174,7 +184,8 @@ export function PanelGeneral() {
                 <select
                     value=${theme.preset || "material-dark"}
                     onChange=${(e) => update("preset", e.target.value)}
-                    class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-cyan-500/40"
+                    style="background-color:#0d0d14;color:#cbd5e1"
+                    class="w-full border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500/40"
                 >
                     ${Object.entries(presetsByGroup).map(
                         ([group, items]) => html`
@@ -182,10 +193,11 @@ export function PanelGeneral() {
                                 key=${group}
                                 label=${group.charAt(0).toUpperCase() +
                                 group.slice(1)}
+                                style="background-color:#0d0d14;color:#94a3b8"
                             >
                                 ${items.map(
                                     (p) => html`
-                                        <option key=${p.id} value=${p.id}>
+                                        <option key=${p.id} value=${p.id} style="background-color:#0d0d14;color:#cbd5e1">
                                             ${p.emoji} ${p.name}
                                         </option>
                                     `
@@ -295,6 +307,48 @@ export function PanelGeneral() {
                         >${saveMsg}</span
                     >
                 `}
+            </div>
+
+            <!-- Behaviour -->
+            <div
+                class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4"
+            >
+                <h3
+                    class="text-xs font-medium text-slate-400 uppercase tracking-widest"
+                >
+                    Behaviour
+                </h3>
+                <div class="flex items-start gap-3">
+                    <button
+                        onClick=${() =>
+                            onSettingsChange?.(
+                                "remember_modal_tab",
+                                !settings?.remember_modal_tab
+                            )}
+                        class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
+                            ${settings?.remember_modal_tab
+                            ? "bg-cyan-500/30 border-cyan-500/40"
+                            : "bg-white/5 border-white/10"}"
+                    >
+                        <span
+                            class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
+                            ${settings?.remember_modal_tab
+                                ? "translate-x-4"
+                                : "translate-x-0.5"}"
+                        >
+                        </span>
+                    </button>
+                    <div>
+                        <p class="text-sm text-slate-300">
+                            Remember last problem tab
+                        </p>
+                        <p class="text-[11px] text-slate-500 leading-snug">
+                            When navigating between problems, reopen the same
+                            tab (Overview, Code, Review, etc.) if it exists.
+                            Falls back to Overview when the tab is unavailable.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     `;

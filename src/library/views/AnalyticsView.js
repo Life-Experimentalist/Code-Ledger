@@ -12,8 +12,14 @@ import {
 } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
+
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("AnalyticsView");
+
 import { ProblemModal } from "../components/ProblemModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
+import { CONSTANTS } from "../../core/constants.js";
 
 import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
@@ -1234,9 +1240,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                             : unsolvedNext.map(
                                   (rec) => html`
                                       <a
-                                          href=${"https://leetcode.com/problems/" +
-                                          rec.slug +
-                                          "/"}
+                                          href=${CONSTANTS.PLATFORMS.leetcode.problemsBase + rec.slug + "/"}
                                           target="_blank"
                                           rel="noreferrer"
                                           class="p-3 bg-white/[0.02] border border-white/5 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all rounded-lg flex items-center justify-between group"

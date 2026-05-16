@@ -8,22 +8,28 @@ import { useState, useMemo, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
+import { createDebugger } from "../../lib/debug.js";
+
+const dbg = createDebugger("ProblemsView");
+
 import { ProblemCard } from "../../ui/components/ProblemCard.js";
 import { ProblemModal } from "../components/ProblemModal.js";
+import { QueueModal } from "../../ui/components/QueueModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { Storage } from "../../core/storage.js";
+import { CONSTANTS } from "../../core/constants.js";
 
 const PLATFORMS = [
     {
         id: "leetcode",
         name: "LeetCode",
-        url: "https://leetcode.com/problemset/",
+        url: CONSTANTS.PLATFORMS.leetcode.problemsetUrl,
         profileUrl: (s) =>
             s?.leetcode_username
-                ? `https://leetcode.com/u/${s.leetcode_username}/`
-                : null,
-        progressUrl: () => "https://leetcode.com/progress",
-        color: "#FFA116",
+                ? `${CONSTANTS.PLATFORMS.leetcode.baseUrl}/u/${s.leetcode_username}/`
+                : `${CONSTANTS.PLATFORMS.leetcode.baseUrl}/profile/`,
+        progressUrl: () => `${CONSTANTS.PLATFORMS.leetcode.baseUrl}/progress`,
+        color: CONSTANTS.PLATFORMS.leetcode.color,
         bg: "rgba(255,161,22,0.08)",
         border: "rgba(255,161,22,0.25)",
         favicon:
@@ -32,12 +38,12 @@ const PLATFORMS = [
     {
         id: "geeksforgeeks",
         name: "GeeksForGeeks",
-        url: "https://practice.geeksforgeeks.org/explore",
+        url: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + "explore",
         profileUrl: (s) =>
             s?.gfg_username
                 ? `https://auth.geeksforgeeks.org/user/${s.gfg_username}/`
                 : null,
-        color: "#2F8D46",
+        color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
         bg: "rgba(47,141,70,0.08)",
         border: "rgba(47,141,70,0.25)",
         favicon: "https://www.geeksforgeeks.org/favicon.ico",
@@ -45,12 +51,12 @@ const PLATFORMS = [
     {
         id: "codeforces",
         name: "Codeforces",
-        url: "https://codeforces.com/problemset",
+        url: CONSTANTS.PLATFORMS.codeforces.problemsetUrl,
         profileUrl: (s) =>
             s?.cf_username
-                ? `https://codeforces.com/profile/${s.cf_username}`
+                ? `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/profile/${s.cf_username}`
                 : null,
-        color: "#1F8ACB",
+        color: CONSTANTS.PLATFORMS.codeforces.color,
         bg: "rgba(31,138,203,0.08)",
         border: "rgba(31,138,203,0.25)",
         favicon: "https://codeforces.com/favicon.ico",
@@ -60,6 +66,7 @@ const PLATFORMS = [
 const SORT_OPTIONS = [
     { value: "newest", label: "Newest First" },
     { value: "oldest", label: "Oldest First" },
+    { value: "last-modified", label: "Last Modified" },
     { value: "diff-asc", label: "Easy → Hard" },
     { value: "diff-desc", label: "Hard → Easy" },
     { value: "title", label: "Title A-Z" },
@@ -87,7 +94,9 @@ export function ProblemsView({
         getQueryParam("language", "All")
     );
     const [filterTag, setFilterTag] = useState(getQueryParam("tag", "All"));
-    const [filterOverview, setFilterOverview] = useState("All");
+    const [filterAIReview, setFilterAIReview] = useState(
+        getQueryParam("aiReview", "All")
+    );
     const [query, setQuery] = useState(searchQuery || getQueryParam("q", ""));
     const [sortBy, setSortBy] = useState(getQueryParam("sort", "newest"));
     const [selectedProblem, setSelectedProblem] = useState(null);
@@ -99,6 +108,7 @@ export function ProblemsView({
     const [queueStats, setQueueStats] = useState(null);
     const [reviewQueueBusy, setReviewQueueBusy] = useState(false);
     const [reviewQueueMsg, setReviewQueueMsg] = useState("");
+    const [showQueueModal, setShowQueueModal] = useState(false);
 
     const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
 
@@ -191,9 +201,10 @@ export function ProblemsView({
             platform: filterPlatform !== "All" ? filterPlatform : null,
             language: filterLanguage !== "All" ? filterLanguage : null,
             tag: filterTag !== "All" ? filterTag : null,
+            aiReview: filterAIReview !== "All" ? filterAIReview : null,
             sort: sortBy !== "newest" ? sortBy : null,
         });
-    }, [filterDifficulty, filterPlatform, filterLanguage, filterTag, sortBy]);
+    }, [filterDifficulty, filterPlatform, filterLanguage, filterTag, filterAIReview, sortBy]);
 
     function tokenizeSearch(value) {
         const raw = String(value || "").trim();
@@ -271,10 +282,10 @@ export function ProblemsView({
                 (p) =>
                     (p.tags || []).includes(filterTag) || p.topic === filterTag
             );
-        if (filterOverview === "Missing")
-            out = out.filter((p) => !p.problemStatement);
-        if (filterOverview === "Present")
-            out = out.filter((p) => !!p.problemStatement);
+        if (filterAIReview === "With Review")
+            out = out.filter((p) => !!p.aiReview);
+        if (filterAIReview === "Without Review")
+            out = out.filter((p) => !p.aiReview);
         if (query && String(query).trim()) {
             const structured = buildSearchSpec(query);
 
@@ -371,6 +382,13 @@ export function ProblemsView({
                         (a.title || "").localeCompare(b.title || "")
                 );
                 break;
+            case "last-modified":
+                arr.sort(
+                    (a, b) =>
+                        (b.updatedAt || b.timestamp || 0) -
+                        (a.updatedAt || a.timestamp || 0)
+                );
+                break;
             case "tags":
                 arr.sort(
                     (a, b) =>
@@ -386,40 +404,27 @@ export function ProblemsView({
         filterPlatform,
         filterLanguage,
         filterTag,
-        filterOverview,
+        filterAIReview,
         query,
         sortBy,
     ]);
 
     const buildRefreshUrl = (problem) => {
         if (!problem?.titleSlug) return null;
-        if (problem.platform === "leetcode") {
-            return `https://leetcode.com/problems/${problem.titleSlug}/?codeledger_fetch=1&cl_fetch_id=${encodeURIComponent(problem.titleSlug)}`;
-        }
-        if (problem.platform === "geeksforgeeks") {
-            return `https://practice.geeksforgeeks.org/problems/${problem.titleSlug}?codeledger_fetch=1&cl_fetch_id=${encodeURIComponent(problem.titleSlug)}`;
-        }
-        if (problem.platform === "codeforces") {
-            return `https://codeforces.com/problemset/problem/${problem.titleSlug}?codeledger_fetch=1&cl_fetch_id=${encodeURIComponent(problem.titleSlug)}`;
-        }
-        return null;
+        const slug = encodeURIComponent(problem.titleSlug);
+        const suffix = `?codeledger_fetch=1&cl_fetch_id=${slug}`;
+        const base = {
+            leetcode: CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/",
+            geeksforgeeks: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + problem.titleSlug,
+            codeforces: CONSTANTS.PLATFORMS.codeforces.problemsBase + problem.titleSlug,
+        }[problem.platform];
+        return base ? base + suffix : null;
     };
 
     const refreshProblemData = (problem) => {
         const url = buildRefreshUrl(problem);
         if (!url) return;
         window.open(url, "_blank");
-    };
-
-    const refreshMissingFiltered = () => {
-        const missing = filtered
-            .filter((p) => !p.problemStatement)
-            .slice(0, 20);
-        missing.forEach((p, idx) => {
-            const url = buildRefreshUrl(p);
-            if (!url) return;
-            setTimeout(() => window.open(url, "_blank"), idx * 400);
-        });
     };
 
     const toggleSelect = (problem) => {
@@ -554,20 +559,23 @@ export function ProblemsView({
                       <div
                           class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs"
                       >
-                          <div class="flex items-center gap-2 text-violet-300">
+                          <button
+                              onClick=${() => setShowQueueModal(true)}
+                              class="flex items-center gap-2 text-violet-300 hover:text-violet-100 transition-colors text-left"
+                          >
                               ${queueStats?.pending > 0 ||
                               queueStats?.processing > 0
                                   ? html`
                                         <span
                                             class="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"
                                         ></span>
-                                        <span
-                                            >AI reviews:
-                                            ${queueStats?.processing || 0}
-                                            processing ·
-                                            ${queueStats?.pending || 0} pending
-                                            · ${queueStats?.failed || 0}
-                                            failed</span
+                                        <span>AI reviews:
+                                            ${queueStats?.processing > 0
+                                                ? html`<span class="text-violet-200">${queueStats.processing} running</span> · `
+                                                : ""}
+                                            ${queueStats?.pending || 0} queued${queueStats?.failed > 0
+                                                ? html` · <span class="text-rose-400">${queueStats.failed} failed</span>`
+                                                : ""}</span
                                         >
                                     `
                                   : ""}
@@ -576,14 +584,24 @@ export function ProblemsView({
                                         >${reviewQueueMsg}</span
                                     >`
                                   : ""}
-                          </div>
-                          <button
-                              onClick=${handleQueueAllReviews}
-                              disabled=${reviewQueueBusy}
-                              class="px-2.5 py-1 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40"
-                          >
-                              ${reviewQueueBusy ? "Queuing…" : "Re-queue all"}
                           </button>
+                          <div class="flex items-center gap-2">
+                              <button
+                                  onClick=${() => setShowQueueModal(true)}
+                                  class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors text-[11px]"
+                              >
+                                  View queue
+                              </button>
+                              <button
+                                  onClick=${handleQueueAllReviews}
+                                  disabled=${reviewQueueBusy}
+                                  class="px-2.5 py-1 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40"
+                              >
+                                  ${reviewQueueBusy
+                                      ? "Queuing…"
+                                      : "Re-queue all"}
+                              </button>
+                          </div>
                       </div>
                   `
                 : isExtension
@@ -595,16 +613,35 @@ export function ProblemsView({
                                 ${(problems || []).filter((p) => !p.aiReview)
                                     .length}
                                 problems missing AI review
+                                ${queueStats?.failed > 0
+                                    ? html`·
+                                          <span class="text-rose-400"
+                                              >${queueStats.failed} failed</span
+                                          >`
+                                    : ""}
                             </span>
-                            <button
-                                onClick=${handleQueueAllReviews}
-                                disabled=${reviewQueueBusy}
-                                class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors disabled:opacity-40 text-[11px]"
-                            >
-                                ${reviewQueueBusy
-                                    ? "Queuing…"
-                                    : "Generate all AI reviews"}
-                            </button>
+                            <div class="flex items-center gap-2">
+                                ${queueStats?.failed > 0
+                                    ? html`
+                                          <button
+                                              onClick=${() =>
+                                                  setShowQueueModal(true)}
+                                              class="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-colors text-[11px]"
+                                          >
+                                              View errors
+                                          </button>
+                                      `
+                                    : ""}
+                                <button
+                                    onClick=${handleQueueAllReviews}
+                                    disabled=${reviewQueueBusy}
+                                    class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors disabled:opacity-40 text-[11px]"
+                                >
+                                    ${reviewQueueBusy
+                                        ? "Queuing…"
+                                        : "Generate all AI reviews"}
+                                </button>
+                            </div>
                         </div>
                     `
                   : ""}
@@ -767,13 +804,13 @@ export function ProblemsView({
                         )}
                     </select>
                     <select
-                        value=${filterOverview}
-                        onChange=${(e) => setFilterOverview(e.target.value)}
+                        value=${filterAIReview}
+                        onChange=${(e) => setFilterAIReview(e.target.value)}
                         class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
                     >
-                        <option value="All">All Overview</option>
-                        <option value="Missing">Missing Overview</option>
-                        <option value="Present">Has Overview</option>
+                        <option value="All">All Reviews</option>
+                        <option value="With Review">Has AI Review</option>
+                        <option value="Without Review">No AI Review</option>
                     </select>
                     ${query
                         ? html`
@@ -787,13 +824,6 @@ export function ProblemsView({
                         : ""}
                 </div>
                 <div class="flex items-center gap-2 justify-end flex-wrap">
-                    <button
-                        onClick=${refreshMissingFiltered}
-                        disabled=${!filtered.some((p) => !p.problemStatement)}
-                        class="text-[11px] px-2.5 py-1 rounded border border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                    >
-                        Refresh missing overviews
-                    </button>
                     <button
                         onClick=${() => {
                             const next = !selectionMode;
@@ -886,7 +916,7 @@ export function ProblemsView({
                     filterPlatform !== "All" ||
                     filterLanguage !== "All" ||
                     filterTag !== "All" ||
-                    filterOverview !== "All" ||
+                    filterAIReview !== "All" ||
                     query
                         ? " (filtered)"
                         : ""}
@@ -896,7 +926,7 @@ export function ProblemsView({
                 filterPlatform !== "All" ||
                 filterLanguage !== "All" ||
                 filterTag !== "All" ||
-                filterOverview !== "All" ||
+                filterAIReview !== "All" ||
                 query
                     ? html`
                           <button
@@ -905,7 +935,7 @@ export function ProblemsView({
                                   setFilterPlatform("All");
                                   setFilterLanguage("All");
                                   setFilterTag("All");
-                                  setFilterOverview("All");
+                                  setFilterAIReview("All");
                                   setQuery("");
                               }}
                               class="text-[10px] text-slate-500 hover:text-slate-300 underline"
@@ -955,6 +985,23 @@ export function ProblemsView({
                 onOpenGraphProblem=${onOpenGraphProblem}
                 onNavigate=${onNavigate}
             />
+
+            <!-- Queue detail modal -->
+            ${showQueueModal
+                ? html`
+                      <${QueueModal}
+                          onClose=${() => setShowQueueModal(false)}
+                          onOpenProblem=${(problemId) => {
+                              const p = (problems || []).find(
+                                  (x) =>
+                                      x.id === problemId ||
+                                      x.titleSlug === problemId
+                              );
+                              if (p) setSelectedProblem(p);
+                          }}
+                      />
+                  `
+                : ""}
         </div>
     `;
 }

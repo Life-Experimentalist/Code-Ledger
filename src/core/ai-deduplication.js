@@ -7,7 +7,7 @@ const dbg = createDebugger("AIDeduplication");
 // Exports comparator utilities and a driver that tries an AI provider when available,
 // falling back to a lightweight normalization equality test.
 
-function normalizeCode(code) {
+export function normalizeCode(code) {
     return String(code || "")
         .replace(/\/\*.*?\*\//gs, "") // remove block comments
         .replace(/\/\/.*$/gm, "") // remove line comments
