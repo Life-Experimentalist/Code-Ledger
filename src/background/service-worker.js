@@ -25,6 +25,8 @@ import { triggerCodeRecovery } from "./code-recovery-handler.js";
 import {
     buildProblemFiles,
     problemBase,
+    platformId,
+    PROBLEMS_ROOT,
     LAYOUT_VERSION,
 } from "../core/path-builder.js";
 import { canonicalMapper } from "../core/canonical-mapper.js";
@@ -1086,6 +1088,15 @@ async function handleSolved(data) {
                 .filter(Boolean);
             await Storage.clearPendingProblemKeys(clearedKeys).catch(() => {});
 
+            // Record committed paths per-problem so future resyncs can detect
+            // structural drift (path renames, layout changes) and compute deletions.
+            for (const p of pendingProblems) {
+                const paths = getProblemFiles(p, settings).map(f => f.path);
+                if (paths.length > 0) {
+                    await Storage.saveProblem({ ...p, _committedPaths: paths }).catch(() => {});
+                }
+            }
+
             // Clear settings commit flag after successful commit
             await clearSettingsCommitFlag().catch(() => {});
 
@@ -1466,6 +1477,42 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
     }
 }
 
+/**
+ * Find all file paths currently in the remote repo that belong to a given problem.
+ * Used for migration: problems committed before _committedPaths tracking started.
+ * Handles ::submissionId suffix in directory names (old format).
+ */
+function _inferCommittedPaths(problem, remoteFileTree) {
+    if (!remoteFileTree || remoteFileTree.length === 0) return [];
+
+    const platform = (problem.platform || "").toLowerCase();
+    const rawId = String(problem.id || problem.titleSlug || "");
+
+    // Clean platformId (::suffix stripped) — what path-builder produces now
+    const cleanPid = platformId(platform, rawId);
+
+    // Raw platformId as actually stored (may retain ::submissionId suffix)
+    const code = CONSTANTS.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
+    const rawPid = rawId.startsWith(`${code}-`) ? rawId : `${code}-${rawId}`;
+
+    const prefixes = [`${PROBLEMS_ROOT}/${cleanPid}/`];
+    if (rawPid !== cleanPid) prefixes.push(`${PROBLEMS_ROOT}/${rawPid}/`);
+    if (problem.canonical?.canonicalId) {
+        prefixes.push(`${PROBLEMS_ROOT}/${problem.canonical.canonicalId}/${platform}/`);
+    }
+
+    return remoteFileTree
+        .filter(f => prefixes.some(pfx => f.path.startsWith(pfx)))
+        .map(f => f.path);
+}
+
+/** True when old and new path sets are identical (order-independent). */
+function _pathSetsMatch(oldPaths, newPaths) {
+    if (oldPaths.length !== newPaths.length) return false;
+    const oldSet = new Set(oldPaths);
+    return newPaths.every(p => oldSet.has(p));
+}
+
 async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     dbg.log(
         `handleResyncAll(): starting - mode=${mode}, commitType=${commitType}`
@@ -1473,8 +1520,15 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     const { settings, git, token, owner, repoName } =
         await _resolveGitHubContext();
 
+    // Pre-load canonical map so resolve() is available synchronously for path building
+    await canonicalMapper.loadMap().catch((e) =>
+        dbg.warn("handleResyncAll(): canonical map load failed (non-blocking):", e?.message)
+    );
+
+    // ── Phase 0: Fetch remote state ───────────────────────────────────────────
     // Fetch existing index.json to find already-committed slugs/langs
     const remoteByCommitKey = new Map();
+    let headSha = null;
     try {
         const indexRes = await git.getContents(owner, repoName, "index.json");
         const raw = atob((indexRes.content || "").replace(/\n/g, ""));
@@ -1493,30 +1547,79 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         );
     }
 
-    // Pre-load canonical map so resolve() is available synchronously for path building
-    await canonicalMapper.loadMap().catch((e) =>
-        dbg.warn("handleResyncAll(): canonical map load failed (non-blocking):", e?.message)
-    );
+    // Fetch HEAD SHA so we can load the full recursive file tree (for inferring old paths)
+    try {
+        const ref = await git.apiFetch(`/repos/${owner}/${repoName}/git/ref/heads/main`);
+        headSha = ref?.object?.sha || null;
+    } catch (_) {
+        try {
+            const ref = await git.apiFetch(`/repos/${owner}/${repoName}/git/ref/heads/master`);
+            headSha = ref?.object?.sha || null;
+        } catch (_2) { /* new or inaccessible repo */ }
+    }
 
+    // Fetch remote file tree once — used to infer old committed paths for maintenance
+    let remoteFileTree = [];
+    if (headSha) {
+        try {
+            const treeRes = await git.apiFetch(
+                `/repos/${owner}/${repoName}/git/trees/${headSha}?recursive=1`
+            );
+            remoteFileTree = (treeRes?.tree || []).filter(
+                (f) => f.type === "blob" && f.path.startsWith(`${PROBLEMS_ROOT}/`)
+            );
+            dbg.log(`handleResyncAll(): remote tree has ${remoteFileTree.length} problem blob(s)`);
+        } catch (e) {
+            dbg.warn("handleResyncAll(): remote tree fetch failed (non-blocking):", e?.message);
+        }
+    }
+
+    // ── Categorize local problems ─────────────────────────────────────────────
     const allProblems = await Storage.getAllProblems();
     const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
     const pendingKeys = new Set(Object.keys(pendingMap || {}));
-    const missing = allProblems.filter((p) => {
+
+    const newProblems = [];       // never committed — need initial commit
+    const maintenanceItems = [];  // committed but paths/content drifted — need maintenance
+
+    for (let p of allProblems) {
+        // Enrich with canonical data before path computation
+        if (!p.canonical) {
+            const resolved = canonicalMapper.resolve(p.platform || "", p.titleSlug || p.id || "");
+            if (resolved) p = { ...p, canonical: resolved };
+        }
+
         const key = getProblemCommitKey(p);
-        if (!key) return false;
-        if (pendingKeys.has(key)) return true;
-        const remote = remoteByCommitKey.get(key);
-        return _isProblemDrifted(p, remote);
-    });
+        if (!key) continue;
+
+        const newPaths = getProblemFiles(p, settings).map((f) => f.path);
+        const isPending = pendingKeys.has(key);
+        const remoteEntry = remoteByCommitKey.get(key);
+
+        // Determine old committed paths: prefer stored _committedPaths, then infer from remote tree
+        const storedOldPaths = Array.isArray(p._committedPaths) ? p._committedPaths : null;
+        const inferredOldPaths = _inferCommittedPaths(p, remoteFileTree);
+        const oldPaths = storedOldPaths || (inferredOldPaths.length > 0 ? inferredOldPaths : null);
+
+        const hasRemote = !!remoteEntry || inferredOldPaths.length > 0;
+        const pathsDrifted = oldPaths ? !_pathSetsMatch(oldPaths, newPaths) : false;
+        const contentDrifted = _isProblemDrifted(p, remoteEntry);
+
+        if (!hasRemote || isPending) {
+            // Never been committed (or explicitly pending) — needs initial commit
+            newProblems.push(p);
+        } else if (pathsDrifted || contentDrifted) {
+            // Already on remote but layout changed or content updated
+            maintenanceItems.push({ problem: p, oldPaths: oldPaths || [], newPaths });
+        }
+        // else: already committed, paths match, content matches — skip
+    }
 
     dbg.log(
-        `handleResyncAll(): found ${missing.length} missing/drifted problem(s)`
+        `handleResyncAll(): newProblems=${newProblems.length}, maintenanceItems=${maintenanceItems.length}`
     );
 
-    // ── Helper: single infra commit with fresh index.json from ALL local problems ──
-    // Called after all problem commits (or directly when there's nothing to commit).
-    // Uses indexMetaOverride so README is generated from the new index data in the
-    // same commit — not from the stale repo copy.
+    // ── Helper: single infra commit ───────────────────────────────────────────
     const _doInfraCommit = async (knownParentSha = null) => {
         const freshIndexContent = await buildIndexJson();
         let infraMetaOverride = null;
@@ -1532,7 +1635,6 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
             };
         } catch (_) {}
 
-        // Bundle portable settings + behaviour bank + roadmaps into the same tree
         const infraFiles = [{ path: "index.json", content: freshIndexContent }];
         try {
             const syncPayload = await buildSyncPayload();
@@ -1569,202 +1671,187 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         dbg.log(`handleResyncAll(): ✓ infra commit done (${infraMetaOverride?.stats?.total ?? "?"} problems)`);
     };
 
-    if (missing.length === 0) {
-        // Always push a fresh infra commit so stats/README/index.html are up to date
-        // even when all problem files are already on the remote.
+    if (newProblems.length === 0 && maintenanceItems.length === 0) {
         dbg.log(
-            `handleResyncAll(): no problems to commit — pushing infra-only update ` +
-            `(remote index: ${remoteByCommitKey.size}, local: ${allProblems.length})`
+            `handleResyncAll(): everything up-to-date — pushing infra-only update ` +
+            `(remote: ${remoteByCommitKey.size}, local: ${allProblems.length})`
         );
         await _doInfraCommit();
-        return { committed: 0, repaired: remoteByCommitKey.size < allProblems.length };
+        return { committed: 0, repaired: false };
     }
 
-    if (mode === "individual") {
-        dbg.log(
-            `handleResyncAll(): creating ${missing.length} individual backdated commit(s)`
-        );
-        // Sort chronologically so history is ordered correctly.
-        const sorted = missing.map((p) => {
-            // Enrich with canonical if not already set
-            let enriched = p;
-            if (!p.canonical) {
-                const resolved = canonicalMapper.resolve(
-                    p.platform || "",
-                    p.titleSlug || p.id || ""
-                );
-                if (resolved) enriched = { ...p, canonical: resolved };
-            }
-            return {
-                problem: enriched,
-                files: getProblemFiles(enriched, settings),
+    // ── Phase A: Initial commits for new problems ─────────────────────────────
+    let lastCommitSha = null;
+    let phaseACount = 0;
+
+    if (newProblems.length > 0) {
+        if (mode === "individual") {
+            dbg.log(`handleResyncAll(): Phase A — ${newProblems.length} individual backdated commit(s)`);
+            const alreadyRemote = Array.from(remoteByCommitKey.values());
+            const sessionCommitted = [];
+
+            const sorted = newProblems.map((p) => ({
+                problem: p,
+                files: getProblemFiles(p, settings),
                 message:
-                    "[" +
-                    (enriched.topic || "Untagged") +
-                    "] " +
-                    (enriched.title || enriched.titleSlug) +
-                    " solved",
-                date: enriched.timestamp
-                    ? new Date(
-                          enriched.timestamp > 1e10 ? enriched.timestamp : enriched.timestamp * 1000
-                      )
+                    "[" + (p.topic || "Untagged") + "] " +
+                    (p.title || p.titleSlug) + " solved",
+                date: p.timestamp
+                    ? new Date(p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000)
                     : new Date(),
-                repoName,
-            };
-        }).sort((a, b) => new Date(a.date) - new Date(b.date));
+            })).sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        // Problems already confirmed in the remote index before this session
-        const alreadyRemote = Array.from(remoteByCommitKey.values());
-        // Accumulates as commits succeed — used for incremental index.json snapshots
-        const sessionCommitted = [];
-        // Thread the commit SHA between sequential commits so each one uses the
-        // SHA returned by the previous instead of re-fetching from GitHub.  This
-        // avoids 422 "not a fast-forward" caused by GitHub's ref propagation lag.
-        let knownParentSha = null;
-
-        for (let i = 0; i < sorted.length; i++) {
-            const entry = sorted[i];
-            const isLast = i === sorted.length - 1;
-            // Checkpoint: update index.json every 25 commits AND on the last problem commit.
-            // Index reflects only problems committed so far so resume works correctly.
-            // Infra (README + index.html) is always skipped here — the trailing infra
-            // commit handles that with a complete, fresh index from ALL local problems.
-            const isCheckpoint = isLast || (i > 0 && i % 25 === 0);
-            if (isCheckpoint) {
-                const committedSoFar = [...alreadyRemote, ...sessionCommitted, entry.problem];
-                entry.files.push({
-                    path: "index.json",
-                    content: _buildIndexJsonFromList(committedSoFar, settings),
-                });
-            }
-            // Report progress so the UI can show "Committing N/M"
-            try { _activeSyncPort?.postMessage({ type: "sync-progress", current: i + 1, total: sorted.length }); } catch (_) {}
-            dbg.log(
-                `handleResyncAll(): committing ${i + 1}/${sorted.length} (backdated to ${entry.date.toISOString()})`
-            );
-            const result = await _commitWithFailover(
-                entry.files,
-                entry.message,
-                entry.repoName,
-                // All problem commits skip infra — the trailing infra commit updates README + index.html.
-                { date: entry.date, skipInfra: true, knownParentSha: knownParentSha || undefined },
-                settings
-            );
-            knownParentSha = result?.newSha || null;
-            sessionCommitted.push(entry.problem);
-        }
-
-        // Trailing infra commit: complete index.json from ALL local problems + README + index.html
-        await _doInfraCommit(knownParentSha);
-    } else {
-        dbg.log(
-            `handleResyncAll(): creating bulk atomic commit with ${missing.length} problem(s)`
-        );
-        // Bulk: single atomic commit for all problem files (no infra — handled separately after)
-        const filesToCommit = [];
-        for (let problem of missing) {
-            // Enrich with canonical if not already set
-            if (!problem.canonical) {
-                const resolved = canonicalMapper.resolve(
-                    problem.platform || "",
-                    problem.titleSlug || problem.id || ""
-                );
-                if (resolved) problem = { ...problem, canonical: resolved };
-            }
-            for (const f of getProblemFiles(problem, settings))
-                filesToCommit.push(f);
-            try {
-                if (
-                    problem.notes &&
-                    typeof problem.notes === "string" &&
-                    problem.notes.trim()
-                ) {
-                    const base = problemBase(
-                        problem.id || problem.titleSlug,
-                        problem.canonical,
-                        settings,
-                        problem.platform
-                    );
-                    filesToCommit.push({
-                        path: `${base}/notes.md`,
-                        content: problem.notes,
+            for (let i = 0; i < sorted.length; i++) {
+                const entry = sorted[i];
+                const isLast = i === sorted.length - 1;
+                const isCheckpoint = isLast || (i > 0 && i % 25 === 0);
+                if (isCheckpoint) {
+                    const committedSoFar = [...alreadyRemote, ...sessionCommitted, entry.problem];
+                    entry.files.push({
+                        path: "index.json",
+                        content: _buildIndexJsonFromList(committedSoFar, settings),
                     });
                 }
-            } catch (_) {}
-            try {
-                const slug = problem.titleSlug || problem.id || "";
-                if (slug) {
-                    const chats = await getChatsByProblem(slug).catch(() => []);
-                    const base = problemBase(
-                        problem.id || problem.titleSlug,
-                        problem.canonical,
-                        settings,
-                        problem.platform
-                    );
-                    for (const chat of chats || []) {
-                        filesToCommit.push({
-                            path: `${base}/ai-chats/chat-${chat.id}.json`,
-                            content: JSON.stringify(chat, null, 2),
-                        });
+                try { _activeSyncPort?.postMessage({ type: "sync-progress", current: i + 1, total: sorted.length }); } catch (_) {}
+                dbg.log(`handleResyncAll(): Phase A ${i + 1}/${sorted.length} (${entry.date.toISOString()})`);
+                const result = await _commitWithFailover(
+                    entry.files,
+                    entry.message,
+                    repoName,
+                    { date: entry.date, skipInfra: true, knownParentSha: lastCommitSha || undefined },
+                    settings
+                );
+                lastCommitSha = result?.newSha || null;
+                sessionCommitted.push(entry.problem);
+                // Record which paths are now on the remote for this problem
+                const committedPaths = entry.files.filter((f) => f.path !== "index.json").map((f) => f.path);
+                await Storage.saveProblem({ ...entry.problem, _committedPaths: committedPaths }).catch(() => {});
+            }
+        } else {
+            dbg.log(`handleResyncAll(): Phase A — bulk commit with ${newProblems.length} problem(s)`);
+            const filesToCommit = [];
+            for (const problem of newProblems) {
+                for (const f of getProblemFiles(problem, settings)) filesToCommit.push(f);
+                try {
+                    if (problem.notes?.trim()) {
+                        const base = problemBase(problem.id || problem.titleSlug, problem.canonical, settings, problem.platform);
+                        filesToCommit.push({ path: `${base}/notes.md`, content: problem.notes });
                     }
-                }
-            } catch (_) {}
+                } catch (_) {}
+                try {
+                    const slug = problem.titleSlug || problem.id || "";
+                    if (slug) {
+                        const chats = await getChatsByProblem(slug).catch(() => []);
+                        const base = problemBase(problem.id || problem.titleSlug, problem.canonical, settings, problem.platform);
+                        for (const chat of chats || []) {
+                            filesToCommit.push({ path: `${base}/ai-chats/chat-${chat.id}.json`, content: JSON.stringify(chat, null, 2) });
+                        }
+                    }
+                } catch (_) {}
+            }
+            dbg.log(`handleResyncAll(): Phase A prepared ${filesToCommit.length} file(s)`);
+            const bulkResult = await _commitWithFailover(
+                filesToCommit,
+                buildCommitMessage(resolveCommitType(commitType), { count: newProblems.length, platform: "LeetCode" }),
+                repoName,
+                { date: new Date(), skipInfra: true },
+                settings
+            );
+            lastCommitSha = bulkResult?.newSha || null;
+            dbg.log(`handleResyncAll(): ✓ Phase A bulk commit done`);
+            // Save _committedPaths for all newly committed problems
+            for (const problem of newProblems) {
+                const committedPaths = getProblemFiles(problem, settings).map((f) => f.path);
+                await Storage.saveProblem({ ...problem, _committedPaths: committedPaths }).catch(() => {});
+            }
         }
-        dbg.log(
-            `handleResyncAll(): prepared ${filesToCommit.length} file(s) for bulk commit`
-        );
-        const bulkResult = await _commitWithFailover(
-            filesToCommit,
-            buildCommitMessage(resolveCommitType(commitType), {
-                count: missing.length,
-                platform: "LeetCode",
-            }),
-            repoName,
-            { date: new Date(), skipInfra: true },
-            settings
-        );
-        dbg.log(`handleResyncAll(): ✓ bulk commit succeeded`);
-
-        // Trailing infra commit: complete index.json from ALL local problems + README + index.html
-        await _doInfraCommit(bulkResult?.newSha || null);
+        phaseACount = newProblems.length;
     }
 
+    // ── Phase B: Single maintenance commit for drifted problems ──────────────
+    // Collects all deletions and all new writes into ONE atomic commit so
+    // each problem appears in history exactly once per maintenance cycle.
+    if (maintenanceItems.length > 0) {
+        dbg.log(`handleResyncAll(): Phase B — maintenance commit for ${maintenanceItems.length} drifted problem(s)`);
+        const maintFiles = [];
+        const maintDeletes = [];
+
+        for (const { problem, oldPaths, newPaths } of maintenanceItems) {
+            // Files to write (new layout)
+            for (const f of getProblemFiles(problem, settings)) maintFiles.push(f);
+            try {
+                if (problem.notes?.trim()) {
+                    const base = problemBase(problem.id || problem.titleSlug, problem.canonical, settings, problem.platform);
+                    maintFiles.push({ path: `${base}/notes.md`, content: problem.notes });
+                }
+            } catch (_) {}
+
+            // Paths to delete — only those NOT present in the new layout
+            const newPathSet = new Set(newPaths);
+            for (const oldPath of oldPaths) {
+                if (!newPathSet.has(oldPath)) maintDeletes.push(oldPath);
+            }
+        }
+
+        dbg.log(
+            `handleResyncAll(): Phase B — writing ${maintFiles.length} file(s), ` +
+            `deleting ${maintDeletes.length} stale path(s)`
+        );
+        const maintResult = await _commitWithFailover(
+            maintFiles,
+            `chore(maintenance): update ${maintenanceItems.length} problem(s) [CodeLedger]`,
+            repoName,
+            { date: new Date(), skipInfra: true, deletes: maintDeletes, knownParentSha: lastCommitSha || undefined },
+            settings
+        );
+        lastCommitSha = maintResult?.newSha || null;
+        dbg.log(`handleResyncAll(): ✓ Phase B maintenance commit done`);
+
+        // Save updated _committedPaths for all maintained problems
+        for (const { problem, newPaths: updatedPaths } of maintenanceItems) {
+            await Storage.saveProblem({ ...problem, _committedPaths: updatedPaths }).catch(() => {});
+        }
+    }
+
+    // ── Phase C: Trailing infra commit ────────────────────────────────────────
     if (typeof git.ensureRepoTopics === "function") {
         await git.ensureRepoTopics(repoName).catch(() => {});
     }
+    await _doInfraCommit(lastCommitSha);
 
-    // Mark newly synced problems as committed
-    for (const p of missing) {
+    // ── Post-commit bookkeeping ───────────────────────────────────────────────
+    const allChanged = [...newProblems, ...maintenanceItems.map((m) => m.problem)];
+    for (const p of allChanged) {
         await Storage.markSlugLangCommitted(
             p.titleSlug,
             p.lang?.name || p.lang?.slug || p.lang?.ext || ""
         ).catch(() => {});
     }
     await Storage.clearPendingProblemKeys(
-        missing.map((p) => getProblemCommitKey(p)).filter(Boolean)
+        allChanged.map((p) => getProblemCommitKey(p)).filter(Boolean)
     ).catch(() => {});
 
-    // Mirror the bulk sync
-    const allFiles = [];
-    for (const p of missing)
-        for (const f of getProblemFiles(p, settings)) allFiles.push(f);
-    allFiles.push({ path: "index.json", content: await buildIndexJson() });
+    // Mirror
+    const mirrorFiles = [];
+    for (const p of allChanged)
+        for (const f of getProblemFiles(p, settings)) mirrorFiles.push(f);
+    mirrorFiles.push({ path: "index.json", content: await buildIndexJson() });
     const activeTarget = _normalizeGitTarget(
         (await Storage.getSettings().catch(() => settings))
             .git_active_primary || _getDefaultPrimaryTarget(settings)
     );
     await pushToMirrors(
-        allFiles,
-        "chore: sync " + missing.length + " problem(s) [CodeLedger]",
+        mirrorFiles,
+        `chore: sync ${allChanged.length} problem(s) [CodeLedger]`,
         {},
         settings,
         activeTarget ? _targetKey(activeTarget) : ""
     );
 
     dbg.log(
-        `handleResyncAll(): sync complete - committed ${missing.length} problem(s)`
+        `handleResyncAll(): complete — new=${phaseACount}, maintenance=${maintenanceItems.length}`
     );
-    return { committed: missing.length };
+    return { committed: phaseACount, maintained: maintenanceItems.length };
 }
 
 async function handleBulkImport(problems = []) {
