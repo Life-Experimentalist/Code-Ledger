@@ -15,7 +15,6 @@ docs/superpowers
 settings.local.json
 
 # Generated files
-*.zip
 *.pem
 *.pdf
 
