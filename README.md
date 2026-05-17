@@ -91,12 +91,20 @@ You grind DSA every day. Your GitHub looks empty. Your solutions disappear into 
 After you solve a problem on LeetCode, your repo gets a commit like this — automatically:
 
 ```
-[solved] Two Sum
+[Arrays] Two Sum solved
 
 problems/lc-two-sum/
-├── lc-two-sum.py      ← your code, clean
-├── lc-two-sum.md      ← problem statement + runtime + memory
-└── (lc-two-sum.md)    ← includes AI review if provider configured
+├── Python3.py          ← your code, clean
+├── README.md           ← problem statement + hints + runtime + memory
+└── README.md           ← includes AI review inline if provider configured
+
+index.json              ← machine-readable stats (synced on every commit)
+README.md               ← live stats dashboard auto-updated in same commit
+index.html              ← GitHub Pages dashboard updated in same commit
+.codeledger/
+├── sync.json           ← portable settings backup
+├── behaviour-bank.json ← your AI skill definitions & insights
+└── roadmaps.json       ← learning roadmaps (all updated in same commit)
 ```
 
 Your GitHub contribution graph fills up. Your profile becomes a living portfolio.
@@ -224,7 +232,7 @@ src/
 │   └── git/github/                ← Trees API commit engine + GitHub Pages template
 ├── core/
 │   ├── constants.js               ← single source of truth for URLs, keys, storage key names
-│   ├── path-builder.js            ← v3 repo layout: problems/{id}/{id}.{ext}
+│   ├── path-builder.js            ← v3 repo layout: problems/{canonicalId}/{platform}/README.md
 │   └── storage.js                 ← unified abstraction over IndexedDB + chrome.storage
 └── library/                       ← dashboard (extension sidebar + standalone web app)
 ```

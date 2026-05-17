@@ -550,6 +550,17 @@ async function commitUpdatedProblem(problem, settings) {
         if (file?.path) filesToCommit.push(file);
     }
     filesToCommit.push({ path: "index.json", content: await buildIndexJson() });
+    try {
+        filesToCommit.push({ path: ".codeledger/sync.json", content: await buildSyncPayload() });
+    } catch (_) {}
+    try {
+        const bank = await Storage.getBehaviorBank();
+        filesToCommit.push({ path: ".codeledger/behaviour-bank.json", content: JSON.stringify(bank || {}, null, 2) });
+    } catch (_) {}
+    try {
+        const roadmaps = await Storage.getRoadmaps();
+        filesToCommit.push({ path: ".codeledger/roadmaps.json", content: JSON.stringify(roadmaps || [], null, 2) });
+    } catch (_) {}
     dbg.log(`commitUpdatedProblem(): prepared ${filesToCommit.length} file(s)`);
 
     const commitKey = getProblemCommitKey(problem);
@@ -1045,6 +1056,19 @@ async function handleSolved(data) {
                 path: "index.json",
                 content: await buildIndexJson(),
             });
+
+            // Bundle .codeledger/* so settings/bank/roadmaps stay in sync with every solve
+            try {
+                filesToCommit.push({ path: ".codeledger/sync.json", content: await buildSyncPayload() });
+            } catch (_) {}
+            try {
+                const bank = await Storage.getBehaviorBank();
+                filesToCommit.push({ path: ".codeledger/behaviour-bank.json", content: JSON.stringify(bank || {}, null, 2) });
+            } catch (_) {}
+            try {
+                const roadmaps = await Storage.getRoadmaps();
+                filesToCommit.push({ path: ".codeledger/roadmaps.json", content: JSON.stringify(roadmaps || [], null, 2) });
+            } catch (_) {}
 
             // Auto-commit settings if they've changed
             const configFile = await getConfigFileForCommit();
@@ -1619,66 +1643,66 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         `handleResyncAll(): newProblems=${newProblems.length}, maintenanceItems=${maintenanceItems.length}`
     );
 
-    // ── Helper: single infra commit ───────────────────────────────────────────
-    const _doInfraCommit = async (knownParentSha = null) => {
-        const freshIndexContent = await buildIndexJson();
-        let infraMetaOverride = null;
-        try {
-            const parsed = JSON.parse(freshIndexContent);
-            infraMetaOverride = {
-                stats: parsed.stats || null,
-                updatedAt: parsed.updatedAt || null,
-                problems: (parsed.problems || [])
-                    .filter((p) => p.timestamp)
-                    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-                    .slice(0, 10),
-            };
-        } catch (_) {}
+    // ── Build infra bundle once ───────────────────────────────────────────────
+    // index.json + .codeledger/* are explicit files; README.md + index.html are
+    // added by the GitHub handler when skipInfra:false triggers buildInfraFiles().
+    // We build this once and staple it to the LAST commit that's already
+    // happening — no separate trailing infra commit needed.
+    const freshIndexContent = await buildIndexJson();
+    let infraMetaOverride = null;
+    try {
+        const parsed = JSON.parse(freshIndexContent);
+        infraMetaOverride = {
+            stats: parsed.stats || null,
+            updatedAt: parsed.updatedAt || null,
+            problems: (parsed.problems || [])
+                .filter((p) => p.timestamp)
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+                .slice(0, 10),
+        };
+    } catch (_) {}
 
-        const infraFiles = [{ path: "index.json", content: freshIndexContent }];
-        try {
-            const syncPayload = await buildSyncPayload();
-            infraFiles.push({ path: ".codeledger/sync.json", content: syncPayload });
-        } catch (e) {
-            dbg.warn("_doInfraCommit(): sync.json build failed (non-fatal):", e?.message);
-        }
-        try {
-            const bank = await Storage.getBehaviorBank();
-            infraFiles.push({
-                path: ".codeledger/behaviour-bank.json",
-                content: JSON.stringify(bank || {}, null, 2),
-            });
-        } catch (e) {
-            dbg.warn("_doInfraCommit(): behaviour-bank.json build failed (non-fatal):", e?.message);
-        }
-        try {
-            const roadmaps = await Storage.getRoadmaps();
-            infraFiles.push({
-                path: ".codeledger/roadmaps.json",
-                content: JSON.stringify(roadmaps || [], null, 2),
-            });
-        } catch (e) {
-            dbg.warn("_doInfraCommit(): roadmaps.json build failed (non-fatal):", e?.message);
-        }
+    const infraBundle = [{ path: "index.json", content: freshIndexContent }];
+    try {
+        infraBundle.push({ path: ".codeledger/sync.json", content: await buildSyncPayload() });
+    } catch (e) {
+        dbg.warn("handleResyncAll(): sync.json build failed (non-fatal):", e?.message);
+    }
+    try {
+        const bank = await Storage.getBehaviorBank();
+        infraBundle.push({ path: ".codeledger/behaviour-bank.json", content: JSON.stringify(bank || {}, null, 2) });
+    } catch (e) {
+        dbg.warn("handleResyncAll(): behaviour-bank.json build failed (non-fatal):", e?.message);
+    }
+    try {
+        const roadmaps = await Storage.getRoadmaps();
+        infraBundle.push({ path: ".codeledger/roadmaps.json", content: JSON.stringify(roadmaps || [], null, 2) });
+    } catch (e) {
+        dbg.warn("handleResyncAll(): roadmaps.json build failed (non-fatal):", e?.message);
+    }
 
-        await _commitWithFailover(
-            infraFiles,
-            "chore: update repository stats [CodeLedger]",
-            repoName,
-            { date: new Date(), skipInfra: false, indexMetaOverride: infraMetaOverride, knownParentSha: knownParentSha || undefined },
-            settings
-        );
-        dbg.log(`handleResyncAll(): ✓ infra commit done (${infraMetaOverride?.stats?.total ?? "?"} problems)`);
-    };
+    // infra opts that trigger README + index.html generation via buildInfraFiles()
+    const withInfra = { skipInfra: false, indexMetaOverride: infraMetaOverride };
 
     if (newProblems.length === 0 && maintenanceItems.length === 0) {
         dbg.log(
             `handleResyncAll(): everything up-to-date — pushing infra-only update ` +
             `(remote: ${remoteByCommitKey.size}, local: ${allProblems.length})`
         );
-        await _doInfraCommit();
+        await _commitWithFailover(
+            infraBundle,
+            "chore: update repository stats [CodeLedger]",
+            repoName,
+            { date: new Date(), ...withInfra },
+            settings
+        );
+        dbg.log(`handleResyncAll(): ✓ infra-only commit done (${infraMetaOverride?.stats?.total ?? "?"} problems)`);
         return { committed: 0, repaired: false };
     }
+
+    // Phase B runs after Phase A (if any) — it is always the LAST commit when present.
+    // Phase A is the last commit only when there is no Phase B.
+    const phaseAIsLast = maintenanceItems.length === 0;
 
     // ── Phase A: Initial commits for new problems ─────────────────────────────
     let lastCommitSha = null;
@@ -1705,26 +1729,31 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
                 const entry = sorted[i];
                 const isLast = i === sorted.length - 1;
                 const isCheckpoint = isLast || (i > 0 && i % 25 === 0);
-                if (isCheckpoint) {
+
+                // Intermediate checkpoints write a partial index.json so a resume
+                // after a crash can find the correct committed set.  The last commit
+                // in Phase A gets the full infra bundle (if Phase B won't run).
+                if (isLast && phaseAIsLast) {
+                    entry.files.push(...infraBundle);
+                } else if (isCheckpoint) {
                     const committedSoFar = [...alreadyRemote, ...sessionCommitted, entry.problem];
                     entry.files.push({
                         path: "index.json",
                         content: _buildIndexJsonFromList(committedSoFar, settings),
                     });
                 }
+
                 try { _activeSyncPort?.postMessage({ type: "sync-progress", current: i + 1, total: sorted.length }); } catch (_) {}
                 dbg.log(`handleResyncAll(): Phase A ${i + 1}/${sorted.length} (${entry.date.toISOString()})`);
-                const result = await _commitWithFailover(
-                    entry.files,
-                    entry.message,
-                    repoName,
-                    { date: entry.date, skipInfra: true, knownParentSha: lastCommitSha || undefined },
-                    settings
-                );
+                const commitOpts = isLast && phaseAIsLast
+                    ? { date: entry.date, ...withInfra, knownParentSha: lastCommitSha || undefined }
+                    : { date: entry.date, skipInfra: true, knownParentSha: lastCommitSha || undefined };
+                const result = await _commitWithFailover(entry.files, entry.message, repoName, commitOpts, settings);
                 lastCommitSha = result?.newSha || null;
                 sessionCommitted.push(entry.problem);
-                // Record which paths are now on the remote for this problem
-                const committedPaths = entry.files.filter((f) => f.path !== "index.json").map((f) => f.path);
+                // Record committed paths — exclude infra bundle paths
+                const infraPaths = new Set(infraBundle.map((f) => f.path));
+                const committedPaths = entry.files.filter((f) => !infraPaths.has(f.path)).map((f) => f.path);
                 await Storage.saveProblem({ ...entry.problem, _committedPaths: committedPaths }).catch(() => {});
             }
         } else {
@@ -1749,19 +1778,24 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
                     }
                 } catch (_) {}
             }
+            // Bundle infra into the bulk commit if Phase B won't run (bulk commit is last)
+            if (phaseAIsLast) filesToCommit.push(...infraBundle);
             dbg.log(`handleResyncAll(): Phase A prepared ${filesToCommit.length} file(s)`);
             const bulkResult = await _commitWithFailover(
                 filesToCommit,
                 buildCommitMessage(resolveCommitType(commitType), { count: newProblems.length, platform: "LeetCode" }),
                 repoName,
-                { date: new Date(), skipInfra: true },
+                phaseAIsLast ? { date: new Date(), ...withInfra } : { date: new Date(), skipInfra: true },
                 settings
             );
             lastCommitSha = bulkResult?.newSha || null;
             dbg.log(`handleResyncAll(): ✓ Phase A bulk commit done`);
             // Save _committedPaths for all newly committed problems
+            const infraPaths = new Set(infraBundle.map((f) => f.path));
             for (const problem of newProblems) {
-                const committedPaths = getProblemFiles(problem, settings).map((f) => f.path);
+                const committedPaths = getProblemFiles(problem, settings)
+                    .map((f) => f.path)
+                    .filter((p) => !infraPaths.has(p));
                 await Storage.saveProblem({ ...problem, _committedPaths: committedPaths }).catch(() => {});
             }
         }
@@ -1769,15 +1803,13 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     }
 
     // ── Phase B: Single maintenance commit for drifted problems ──────────────
-    // Collects all deletions and all new writes into ONE atomic commit so
-    // each problem appears in history exactly once per maintenance cycle.
+    // Always the last commit — infra bundle always included here.
     if (maintenanceItems.length > 0) {
         dbg.log(`handleResyncAll(): Phase B — maintenance commit for ${maintenanceItems.length} drifted problem(s)`);
         const maintFiles = [];
         const maintDeletes = [];
 
         for (const { problem, oldPaths, newPaths } of maintenanceItems) {
-            // Files to write (new layout)
             for (const f of getProblemFiles(problem, settings)) maintFiles.push(f);
             try {
                 if (problem.notes?.trim()) {
@@ -1785,13 +1817,14 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
                     maintFiles.push({ path: `${base}/notes.md`, content: problem.notes });
                 }
             } catch (_) {}
-
-            // Paths to delete — only those NOT present in the new layout
             const newPathSet = new Set(newPaths);
             for (const oldPath of oldPaths) {
                 if (!newPathSet.has(oldPath)) maintDeletes.push(oldPath);
             }
         }
+
+        // Infra always bundled into Phase B (it is always the last commit)
+        maintFiles.push(...infraBundle);
 
         dbg.log(
             `handleResyncAll(): Phase B — writing ${maintFiles.length} file(s), ` +
@@ -1801,23 +1834,21 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
             maintFiles,
             `chore(maintenance): update ${maintenanceItems.length} problem(s) [CodeLedger]`,
             repoName,
-            { date: new Date(), skipInfra: true, deletes: maintDeletes, knownParentSha: lastCommitSha || undefined },
+            { date: new Date(), ...withInfra, deletes: maintDeletes, knownParentSha: lastCommitSha || undefined },
             settings
         );
         lastCommitSha = maintResult?.newSha || null;
         dbg.log(`handleResyncAll(): ✓ Phase B maintenance commit done`);
 
-        // Save updated _committedPaths for all maintained problems
+        const infraPaths = new Set(infraBundle.map((f) => f.path));
         for (const { problem, newPaths: updatedPaths } of maintenanceItems) {
-            await Storage.saveProblem({ ...problem, _committedPaths: updatedPaths }).catch(() => {});
+            await Storage.saveProblem({ ...problem, _committedPaths: updatedPaths.filter((p) => !infraPaths.has(p)) }).catch(() => {});
         }
     }
 
-    // ── Phase C: Trailing infra commit ────────────────────────────────────────
     if (typeof git.ensureRepoTopics === "function") {
         await git.ensureRepoTopics(repoName).catch(() => {});
     }
-    await _doInfraCommit(lastCommitSha);
 
     // ── Post-commit bookkeeping ───────────────────────────────────────────────
     const allChanged = [...newProblems, ...maintenanceItems.map((m) => m.problem)];
