@@ -203,7 +203,5 @@ export function buildConversationSystemPrompt(context = {}) {
     dbg.log(
         `buildConversationSystemPrompt(): surface=${surface} (${hints.length} hints)`
     );
-    return base;
-
     return hints.length ? `${base}\n\nContext:\n${hints.join("\n")}` : base;
 }

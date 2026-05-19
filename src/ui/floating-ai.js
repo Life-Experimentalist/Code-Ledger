@@ -783,6 +783,14 @@ export function createFloatingAI(slug = "", opts = {}) {
             (typeof platform.readEditorCode === "function"
                 ? platform.readEditorCode({ slug, window, document })
                 : readEditorCode()) || "";
+        const langName =
+            (typeof platform.readEditorLang === "function"
+                ? platform.readEditorLang()
+                : "") || "";
+        const problemStatement =
+            (typeof platform.readProblemStatement === "function"
+                ? platform.readProblemStatement()
+                : "") || "";
         const pageMeta =
             typeof platform.readPageMeta === "function"
                 ? platform.readPageMeta({ slug, window, document })
@@ -798,16 +806,17 @@ export function createFloatingAI(slug = "", opts = {}) {
             difficulty: pageMeta.difficulty || "",
             platform: platform.chatPlatform || "leetcode",
             code: code || "",
-            lang: { name: "" },
+            lang: langName ? { name: langName } : { name: "" },
+            problemStatement: problemStatement || "",
             problem: {
                 title: pageMeta.title || platform.titleFallback || slug,
-                statement: "",
-                description: "",
+                statement: problemStatement || "",
+                description: problemStatement || "",
                 constraints: "",
                 code: code || "",
                 platform: platform.chatPlatform || "leetcode",
                 difficulty: pageMeta.difficulty || "",
-                lang: { name: "" },
+                lang: langName ? { name: langName } : { name: "" },
             },
             attachedProblemSlugs: slug ? [slug] : [],
             attachedProblems: slug

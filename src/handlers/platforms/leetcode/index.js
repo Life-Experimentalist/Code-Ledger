@@ -292,11 +292,33 @@ Be concise. Max 200 words.`;
         setTimeout(() => this._syncButtonsForCurrentPage(), 800);
         setTimeout(() => this._syncButtonsForCurrentPage(), 2000);
 
-        // Watch for mutations and re-evaluate button state
-        const observer = new MutationObserver(() =>
-            this._syncButtonsForCurrentPage()
-        );
+        // Watch for mutations and re-evaluate button state; also recover QoL buttons
+        const observer = new MutationObserver(() => {
+            this._syncButtonsForCurrentPage();
+            this._maybeReinjectQoL();
+        });
         observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    /** Re-inject QoL copy/paste buttons if React removed them from the toolbar. */
+    _maybeReinjectQoL() {
+        if (detectPage(window.location.pathname).type !== PAGE_TYPES.PROBLEM) return;
+        const copyMissing = !document.getElementById("cl-code-copy")?.isConnected;
+        const pasteMissing = !document.getElementById("cl-code-paste")?.isConnected;
+        if (!copyMissing && !pasteMissing) return;
+        this._scheduleDebounce(() => {
+            Storage.getSettings()
+                .then((s) => {
+                    import("./qol.js").then(({ resetQoL, injectQoL }) => {
+                        resetQoL();
+                        injectQoL({
+                            showCopy: s.leetcode_copy_btn !== false,
+                            showPaste: s.leetcode_paste_btn !== false,
+                        });
+                    }).catch(() => {});
+                })
+                .catch(() => {});
+        }, 600);
     }
 
     async _handleOnDemandFetch(page) {
@@ -417,19 +439,47 @@ Be concise. Max 200 words.`;
                 this._stopAIPanel();
                 this._aiPanelSlug = slug;
                 this._aiPanel = createFloatingAI(slug, {
-                    position: { bottom: "110px", right: "20px" },
+                    position: { bottom: "20px", right: "20px" },
                     platform: {
                         id: "leetcode",
                         label: "LeetCode AI Assistant",
                         chatPlatform: "leetcode",
                         readPageMeta: () => this._readFloatingAIPageMeta(),
                         readEditorCode: () => this._readFloatingAIEditorCode(),
+                        readEditorLang: () => this._getEditorLanguage(),
+                        readProblemStatement: () => this._readProblemStatement(),
                         readTestFailures: () =>
                             this._readFloatingAITestFailures(),
                     },
                 });
             })
             .catch(() => {});
+    }
+
+    _getEditorLanguage() {
+        try {
+            const langId = window.monaco?.editor?.getModels?.()?.[0]?.getLanguageId?.();
+            if (langId) return LANG_VERBOSE[langId.toLowerCase()] || langId;
+        } catch (_) {}
+        try {
+            const btn = document.querySelector(
+                '[id*="headlessui-listbox-button"] button, button[aria-haspopup="listbox"]'
+            );
+            if (btn) return btn.textContent?.trim() || "";
+        } catch (_) {}
+        return "";
+    }
+
+    _readProblemStatement() {
+        try {
+            const descEl = document.querySelector(
+                '[data-track-load="description_content"]'
+            );
+            if (descEl) {
+                return (descEl.textContent || "").trim().slice(0, 3000);
+            }
+        } catch (_) {}
+        return "";
     }
 
     _stopAIPanel() {
@@ -668,39 +718,55 @@ Be concise. Max 200 words.`;
     /**
      * Manual sync triggered by user clicking sync button.
      * Provides clear state feedback: "Syncing…" → "✓ Synced" → restore button.
+     * If auto-sync is in progress (lock held), waits up to 8 s for it to finish.
      */
     async _manualSync(page, btn) {
         const originalHTML = btn.innerHTML;
         const originalText = btn.textContent;
 
         try {
-            // State: Syncing
             if (btn) {
                 btn.disabled = true;
                 btn.textContent = "⏳ Syncing…";
             }
 
-            await this._processSubmission(page, true);
+            // If auto-sync is currently running, wait for it rather than calling
+            // _processSubmission and silently returning (which would show false success).
+            if (this._processingLock) {
+                let waited = 0;
+                while (this._processingLock && waited < 8000) {
+                    await new Promise((r) => setTimeout(r, 200));
+                    waited += 200;
+                }
+                // Auto-sync completed — reflect its outcome without a second sync.
+                if (btn) {
+                    btn.textContent = "✓ Auto-synced";
+                    setTimeout(() => {
+                        if (btn && btn.parentElement) {
+                            btn.innerHTML = originalHTML;
+                            btn.disabled = false;
+                        }
+                    }, 2500);
+                }
+                return;
+            }
 
-            // State: Success
+            const processed = await this._processSubmission(page, true);
+
             if (btn) {
-                btn.textContent = "✓ Synced";
-                // Restore after 2.5s
+                btn.textContent = processed ? "✓ Synced" : "✓ Already saved";
                 setTimeout(() => {
                     if (btn && btn.parentElement) {
                         btn.innerHTML = originalHTML;
-                        btn.textContent = originalText;
                         btn.disabled = false;
                     }
                 }, 2500);
             }
         } catch (e) {
             dbg.error("Manual sync failed", e);
-            // State: Error
             if (btn && btn.parentElement) {
                 btn.textContent = "✗ Failed";
                 btn.disabled = false;
-                // Restore after 3s
                 setTimeout(() => {
                     if (btn && btn.parentElement) {
                         btn.innerHTML = originalHTML;
@@ -1633,9 +1699,10 @@ Be concise. Max 200 words.`;
     }
     async _processSubmission(page, isManual) {
         this._processingLock = true;
+        let _emitted = false;
         try {
             const settings = await Storage.getSettings();
-            if (!this.isEnabled(settings) && !isManual) return;
+            if (!this.isEnabled(settings) && !isManual) return false;
 
             let submission = null;
             let slug = page.slug;
@@ -1647,7 +1714,7 @@ Be concise. Max 200 words.`;
                 submission = res.data?.submissionDetails;
                 slug = submission?.question?.titleSlug || slug;
                 // Auto-detection: skip non-accepted submissions (statusCode 10 = Accepted)
-                if (!isManual && submission?.statusCode !== 10) return;
+                if (!isManual && submission?.statusCode !== 10) return false;
             } else {
                 // Problem page: find the latest accepted submission
                 const listRes = await this._gql(QUERIES.SUBMISSION_LIST, {
@@ -1660,7 +1727,7 @@ Be concise. Max 200 words.`;
                 const latest =
                     subs.find((s) => /accepted/i.test(s.statusDisplay)) ||
                     subs[0];
-                if (!latest) return;
+                if (!latest) return false;
 
                 // Dedup: skip if we already committed this submission this browser session
                 const dedupKey = `cl_committed_${slug}`;
@@ -1681,14 +1748,14 @@ Be concise. Max 200 words.`;
                         slug,
                         latest.id
                     );
-                    return;
+                    return false;
                 }
 
                 const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, {
                     submissionId: +latest.id,
                 });
                 submission = detailRes.data?.submissionDetails;
-                if (!submission) return;
+                if (!submission) return false;
 
                 // Monaco has the live editor content — use it when GraphQL returns empty code
                 if (!submission.code) {
@@ -1804,8 +1871,10 @@ Be concise. Max 200 words.`;
                 methodTitle: "", // algorithm name: "Greedy", "DP", "Two-Pointer", etc.
                 isDuplicate: false, // will be set by AI duplicate detection
                 duplicateOf: null, // references original problem ID if this is a duplicate solution
+                _requestAIReview: submission._requestAIReview === true,
             });
 
+            _emitted = true;
             dbg.log("Solve emitted", {
                 slug,
                 canonical: canonical?.canonicalId,
@@ -1836,6 +1905,7 @@ Be concise. Max 200 words.`;
         } finally {
             this._processingLock = false;
         }
+        return _emitted;
     }
 
     /* ── File set builder ────────────────────────────────────────────── */

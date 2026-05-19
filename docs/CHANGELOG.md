@@ -6,6 +6,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.3.1] — 2026-05-19
+
+### Fixed
+- **Auto AI review not triggering** — `_requestAIReview` flag was set on the local submission object but never included in the `emitSolved()` payload; the service worker always saw `undefined` and skipped the review. Flag is now forwarded correctly.
+- **"Sync to Ledger" false positive** — clicking the button while auto-sync was in progress caused `_processSubmission` to exit early due to `_processingLock`, but `_manualSync` still showed "✓ Synced". The button now waits up to 8 s for the in-progress sync to finish before reporting "✓ Auto-synced", and only shows "✓ Synced" when `_processSubmission` actually emitted a solve event.
+- **Floating AI panel position** — panel was anchored at `bottom: 110px`, sitting high above the window bottom. Moved to `bottom: 20px` to sit at the bottom edge.
+- **AI system prompt context dropped** — `buildConversationSystemPrompt` had a dead `return base` statement that prevented the context hints array (problem title, difficulty, request-type behaviour modifiers like "Return useful tests" for `/test`) from ever reaching the system prompt.
+- **QoL copy/paste buttons lost on React re-render** — LeetCode's React occasionally re-mounts the editor toolbar, silently removing injected buttons. A `_maybeReinjectQoL()` check is now wired to the existing MutationObserver so buttons are restored within ~600 ms of being removed.
+
+### Added
+- **Monaco language detection in AI panel** — `_getEditorLanguage()` reads the language from `monaco.editor.getModels()[0].getLanguageId()` and maps it to a human-readable name (e.g. `python3` → `Python3`). Language is now passed to the floating AI context so code blocks include the correct syntax identifier.
+- **Problem statement auto-injected into AI panel context** — `_readProblemStatement()` reads the problem description from the DOM (`[data-track-load="description_content"]`) and passes it as `problemStatement` in the AI chat context, giving the AI full problem context without the user needing `/problem`.
+
+---
+
 ## [1.3.0] — 2026-05-17
 
 ### Added
