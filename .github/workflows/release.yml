@@ -55,36 +55,25 @@ jobs:
           fi
           echo "Versions match: $MANIFEST_VER"
 
-      # ── Build ────────────────────────────────────────────────────────────
-      - name: Build CSS
-        run: npm run build:css
-
-      - name: Build distribution
-        run: npm run build:dist
-
-      # ── Package Chrome + Firefox ─────────────────────────────────────────
-      - name: Package Chrome extension
-        run: node dev/package-chrome.js
-
-      - name: Package Firefox extension
-        run: node dev/package-firefox.js
+      # ── Build + Package (CSS → dist → chromium + firefox + source zips) ────
+      - name: Build and package all artifacts
+        run: npm run publish
 
       # ── Locate built archives ────────────────────────────────────────────
       - name: List dist artifacts
-        run: ls -lh releases/*.zip 2>/dev/null || ls -lh releases/
+        run: ls -lh releases/${{ steps.version.outputs.version }}/
 
       # ── Generate release notes from CHANGELOG ────────────────────────────
       - name: Extract release notes
         id: release_notes
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Extract section for this version from CHANGELOG.md
-          NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/{if(/^## \[/ && !/^## \[$VERSION\]/) exit; print}" docs/CHANGELOG.md | tail -n +2)
-          if [ -z "$NOTES" ]; then
-            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for full details."
+          # Use the Node script — handles --- separators and multi-line content correctly
+          if node dev/v2/tasks/extract-changelog.js "$VERSION" > /tmp/release_notes.md; then
+            printf '\n\nSee [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for full details.' >> /tmp/release_notes.md
+          else
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for full details." > /tmp/release_notes.md
           fi
-          # Write to file to preserve newlines
-          echo "$NOTES" > /tmp/release_notes.md
           echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
 
       # ── Create GitHub Release ────────────────────────────────────────────
@@ -98,8 +87,9 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
           files: |
-            releases/codeledger-chromium-v*.zip
-            releases/codeledger-firefox-v*.zip
+            releases/${{ steps.version.outputs.version }}/codeledger-chromium-v*.zip
+            releases/${{ steps.version.outputs.version }}/codeledger-firefox-v*.zip
+            releases/${{ steps.version.outputs.version }}/codeledger-source-v*.zip
 
       # ── Summary ─────────────────────────────────────────────────────────
       - name: Print release URL

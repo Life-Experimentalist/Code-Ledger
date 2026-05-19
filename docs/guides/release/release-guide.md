@@ -12,7 +12,7 @@ How to cut a new release of CodeLedger.
 
 ### 1. Update the changelog
 
-Add a new section at the top of `docs/archive/changelog.md`:
+Add a new section at the top of `docs/CHANGELOG.md`:
 
 ```markdown
 ## [X.Y.Z] — YYYY-MM-DD
@@ -60,12 +60,14 @@ npm run release
 ```
 
 This does **everything automatically**:
-1. ✅ Validates versions match
-2. ✅ Checks CHANGELOG has entry
+1. ✅ Validates versions match (`package.json` ↔ `src/manifest.json`)
+2. ✅ Checks `docs/CHANGELOG.md` has an entry for the version
 3. ✅ Runs sync regression checks
-4. ✅ Builds zips (Chrome, Firefox, source)
-5. ✅ Creates tag: `vX.Y.Z`
-6. ✅ Pushes to GitHub (triggers GitHub Actions)
+4. ✅ Builds CSS + extension distributions
+5. ✅ Packages `releases/X.Y.Z/` with 3 zips (chromium, firefox, source)
+6. ✅ Commits the release artifacts
+7. ✅ Creates tag: `vX.Y.Z`
+8. ✅ Pushes to GitHub (triggers GitHub Actions)
 
 ### 5. Verify on GitHub
 
@@ -74,22 +76,13 @@ Once the push completes:
 1. Go to [Releases](https://github.com/Life-Experimentalist/Code-Ledger/releases)
 2. GitHub Actions job `release.yml` runs automatically
 3. It creates a GitHub Release with:
-   - Release notes (extracted from CHANGELOG)
+   - Release notes extracted directly from the `## [X.Y.Z]` section in `docs/CHANGELOG.md`
    - 3 attached zips:
-     - `codeledger-chrome-vX.Y.Z.zip`
+     - `codeledger-chromium-vX.Y.Z.zip`
      - `codeledger-firefox-vX.Y.Z.zip`
      - `codeledger-source-vX.Y.Z.zip`
 
-## Command reference
-
-```bash
-npm run release                    # Full automated release
-npm run release -- --dry-run       # Preview without git changes
-npm run publish                    # Just build zips (no git)
-npm run build:css                  # Compile Tailwind only
-npm run lint                       # Type-check before release
-npm run test:sync-regression       # Sync keying regression safety check
-```
+> The zips are also committed to `releases/X.Y.Z/` in the repository itself for direct download without going through the GitHub Release UI.
 
 ## Troubleshooting
 
@@ -131,23 +124,41 @@ git push origin :vX.Y.Z         # Delete remote tag (if already pushed)
 
 Then fix the issue and try again.
 
+## Command reference
+
+```bash
+npm run release                    # Full automated release
+npm run release -- --dry-run       # Preview without git changes
+npm run publish                    # Just build + package zips locally (no git ops)
+npm run build:css                  # Compile Tailwind only
+npm run lint                       # Type-check before release
+npm run test:sync-regression       # Sync regression safety check
+```
+
 ## Architecture
 
-The release process uses:
+The release process uses the v2 build system in `dev/v2/`:
 
-- **`npm run publish`** — builds the release artifacts (zips)
-  - Runs `npm run clean && npm run build && node dev/package.js`
-  - Produces `releases/codeledger-{chrome,firefox,source}-vX.Y.Z.zip`
+- **`npm run publish`** (`dev/v2/cli.js publish`)
+  - Validates `package.json` ↔ `manifest.json` versions match
+  - Compiles Tailwind CSS
+  - Builds extension distributions (`npm run build:dist`)
+  - Packages 3 zips into `releases/X.Y.Z/`:
+    - `codeledger-chromium-vX.Y.Z.zip` — Chrome/Chromium extension
+    - `codeledger-firefox-vX.Y.Z.zip` — Firefox extension (side_panel removed from manifest)
+    - `codeledger-source-vX.Y.Z.zip` — Full source snapshot (`src/`, `dev/`, `docs/`, `worker/`, root configs)
 
-- **`npm run release`** — orchestrator script (`dev/release.js`)
-  - Validates versions and CHANGELOG
-  - Runs `npm run publish`
-  - Commits and tags
-  - Pushes to GitHub
+- **`npm run release`** (`dev/v2/cli.js release`)
+  - All of the above, plus:
+  - Validates `docs/CHANGELOG.md` has an entry for the version
+  - Runs sync regression tests
+  - `git add -A && git commit -m "chore: release vX.Y.Z"` (commits built zips)
+  - `git tag vX.Y.Z`
+  - `git push origin main vX.Y.Z`
 
-- **`.github/workflows/release.yml`** — GitHub Actions workflow
-  - Triggered by tag push (`v*.*.*`)
-  - Validates manifest version matches tag
-  - Extracts CHANGELOG section
-  - Creates GitHub Release
-  - Attaches the 3 zips
+- **`.github/workflows/release.yml`** — triggered by tag push (`v*.*.*`)
+  - Validates manifest version matches the git tag
+  - Runs `npm run publish` to build fresh artifacts in CI
+  - Extracts the `## [X.Y.Z]` section from `docs/CHANGELOG.md` via `dev/v2/tasks/extract-changelog.js`
+  - Creates a GitHub Release with the extracted notes
+  - Attaches all 3 zips from `releases/X.Y.Z/` as release assets
