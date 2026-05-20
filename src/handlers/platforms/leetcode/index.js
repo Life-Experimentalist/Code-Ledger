@@ -93,6 +93,12 @@ import {
     querySubmissionResult,
     isAcceptedVisibleExtended,
 } from "./enhanced-selectors.js";
+import {
+    gql as _gqlCall,
+    fetchMetadata as _fetchMetadataFn,
+    buildFileSet as _buildFileSetFn,
+    buildBulkReadme as _buildBulkReadmeFn,
+} from "./file-builder.js";
 function resolveLang(rawLang) {
     if (!rawLang) return { verbose: "Unknown", slug: "txt", ext: "txt" };
     // Handle string form first
@@ -305,7 +311,8 @@ Be concise. Max 200 words.`;
         if (detectPage(window.location.pathname).type !== PAGE_TYPES.PROBLEM) return;
         const copyMissing = !document.getElementById("cl-code-copy")?.isConnected;
         const pasteMissing = !document.getElementById("cl-code-paste")?.isConnected;
-        if (!copyMissing && !pasteMissing) return;
+        const aiMissing = !document.getElementById("cl-ai-toolbar-btn")?.isConnected;
+        if (!copyMissing && !pasteMissing && !aiMissing) return;
         this._scheduleDebounce(() => {
             Storage.getSettings()
                 .then((s) => {
@@ -314,6 +321,8 @@ Be concise. Max 200 words.`;
                         injectQoL({
                             showCopy: s.leetcode_copy_btn !== false,
                             showPaste: s.leetcode_paste_btn !== false,
+                            showAI: s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
+                            onAIClick: () => this._aiPanel?.expand(),
                         });
                     }).catch(() => {});
                 })
@@ -386,9 +395,10 @@ Be concise. Max 200 words.`;
                     const opts = {
                         showCopy: s.leetcode_copy_btn !== false,
                         showPaste: s.leetcode_paste_btn !== false,
+                        showAI: s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
+                        onAIClick: () => this._aiPanel?.expand(),
                     };
-                    if (opts.showCopy || opts.showPaste)
-                        setTimeout(() => injectQoL(opts), 1500);
+                    setTimeout(() => injectQoL(opts), 1500);
                 })
                 .catch(() => {
                     setTimeout(() => injectQoL(), 1500);
@@ -555,6 +565,8 @@ Be concise. Max 200 words.`;
                     const opts = {
                         showCopy: s.leetcode_copy_btn !== false,
                         showPaste: s.leetcode_paste_btn !== false,
+                        showAI: s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
+                        onAIClick: () => this._aiPanel?.expand(),
                     };
                     setTimeout(() => injectQoL(opts), 1500);
                 })
@@ -1908,219 +1920,24 @@ Be concise. Max 200 words.`;
         return _emitted;
     }
 
-    /* ── File set builder ────────────────────────────────────────────── */
+    /* ── File set builder (delegates to file-builder.js) ────────────── */
     _buildFileSet(submission, meta, settings, slug, elapsedSeconds = null) {
         const lang = resolveLang(submission.lang);
         const canonical = this._canonical || null;
-        const title = meta?.title || slug;
-        const problemId = this.makeProblemId(slug);
-
-        const files = [];
-
-        // 1. Solution file
-        files.push({
-            path: solutionPath(
-                problemId,
-                "leetcode",
-                lang,
-                canonical,
-                settings
-            ),
-            content: submission.code || "// (no code retrieved)",
-        });
-
-        // 2. README (problem description + stats)
-        if (settings.leetcode_readme !== false && meta?.content) {
-            const stats = this._formatStats(submission, meta, elapsedSeconds);
-            const similar = this._formatSimilar(meta, settings);
-
-            files.push({
-                path: readmePath(problemId, canonical, settings, "leetcode"),
-                content: [
-                    `# ${meta.questionFrontendId ? `[${meta.questionFrontendId}] ` : ""}${title}`,
-                    "",
-                    `**Difficulty:** ${meta.difficulty || "?"}  |  **Acceptance:** ${meta.acRate ? meta.acRate.toFixed(1) + "%" : "?"}  |  **Likes:** ${meta.likes ?? "?"} / **Dislikes:** ${meta.dislikes ?? "?"}`,
-                    "",
-                    `**Tags:** ${(meta.topicTags || []).map((t) => `\`${t.name}\``).join(", ") || "—"}`,
-                    "",
-                    "## Problem",
-                    "",
-                    meta.content
-                        .replace(/<[^>]+>/g, "")
-                        .replace(/&lt;/g, "<")
-                        .replace(/&gt;/g, ">")
-                        .replace(/&amp;/g, "&")
-                        .replace(/&#39;/g, "'")
-                        .replace(/&quot;/g, '"')
-                        .replace(/\n{3,}/g, "\n\n")
-                        .trim(),
-                    "",
-                    stats,
-                    similar,
-                ]
-                    .filter(Boolean)
-                    .join("\n"),
-            });
-        }
-
-        // 3. Hints (separate file if enabled)
-        if (settings.leetcode_sync_hints && meta?.hints?.length) {
-            files.push({
-                path: hintsPath(problemId, canonical, settings, "leetcode"),
-                content: [
-                    `# Hints — ${title}`,
-                    "",
-                    ...meta.hints.map((h, i) => `### Hint ${i + 1}\n\n${h}\n`),
-                ].join("\n"),
-            });
-        }
-
-        return files;
+        return _buildFileSetFn(submission, meta, settings, slug, lang, canonical, elapsedSeconds);
     }
 
-    _formatStats(submission, meta, elapsedSeconds = null) {
-        const parts = [];
-        if (submission.runtimeDisplay)
-            parts.push(
-                `Runtime: ${submission.runtimeDisplay}${submission.runtimePercentile ? ` (beats ${submission.runtimePercentile.toFixed(1)}%)` : ""}`
-            );
-        if (submission.memoryDisplay)
-            parts.push(
-                `Memory: ${submission.memoryDisplay}${submission.memoryPercentile ? ` (beats ${submission.memoryPercentile.toFixed(1)}%)` : ""}`
-            );
-        if (elapsedSeconds && elapsedSeconds > 0) {
-            const h = Math.floor(elapsedSeconds / 3600);
-            const m = Math.floor((elapsedSeconds % 3600) / 60);
-            const s = elapsedSeconds % 60;
-            const timeStr =
-                h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
-            parts.push(`Solve time: ${timeStr}`);
-        }
-        if (!parts.length) return "";
-        return `## My Submission\n\n${parts.map((p) => `- ${p}`).join("\n")}\n`;
+    _buildBulkReadme(sub, opts) {
+        return _buildBulkReadmeFn(sub, opts);
     }
 
-    _formatSimilar(meta, settings) {
-        if (settings.leetcode_similar === false) return "";
-        const similar = (meta?.similarQuestionList || [])
-            .filter((q) => !q.isPaidOnly)
-            .slice(0, 5);
-        if (!similar.length) return "";
-        return [
-            "## Similar Problems",
-            "",
-            ...similar.map(
-                (q) =>
-                    `- [${q.title}](${CONSTANTS.PLATFORMS.leetcode.problemsBase}${q.titleSlug}/) — ${q.difficulty}`
-            ),
-            "",
-        ].join("\n");
-    }
-
-    /** Build a README.md string for a bulk-imported problem. */
-    _buildBulkReadme(
-        sub,
-        { title, difficulty, tags, acRate, similar, descHtml }
-    ) {
-        const tagStr = tags.length
-            ? tags.map((t) => `\`${t}\``).join(", ")
-            : "—";
-        const simList = (similar || [])
-            .filter((q) => !q.isPaidOnly)
-            .slice(0, 5);
-        const parts = [
-            `# ${title}`,
-            "",
-            `**Difficulty:** ${difficulty || "?"}  |  **Acceptance:** ${acRate != null ? acRate.toFixed(1) + "%" : "?"}`,
-            "",
-            `**Tags:** ${tagStr}`,
-            "",
-        ];
-        if (descHtml) {
-            parts.push(
-                "## Problem",
-                "",
-                descHtml
-                    .replace(/<[^>]+>/g, "")
-                    .replace(/&lt;/g, "<")
-                    .replace(/&gt;/g, ">")
-                    .replace(/&amp;/g, "&")
-                    .replace(/&#39;/g, "'")
-                    .replace(/&quot;/g, '"')
-                    .replace(/\n{3,}/g, "\n\n")
-                    .trim(),
-                ""
-            );
-        }
-        if (sub.runtime || sub.memory) {
-            const perf = [];
-            if (sub.runtime) perf.push(`Runtime: ${sub.runtime}`);
-            if (sub.memory) perf.push(`Memory: ${sub.memory}`);
-            parts.push(
-                "## My Submission",
-                "",
-                ...perf.map((p) => `- ${p}`),
-                ""
-            );
-        }
-        if (simList.length) {
-            parts.push(
-                "## Similar Problems",
-                "",
-                ...simList.map(
-                    (q) =>
-                        `- [${q.title}](${CONSTANTS.PLATFORMS.leetcode.problemsBase}${q.titleSlug}/) — ${q.difficulty}`
-                ),
-                ""
-            );
-        }
-        return parts.join("\n");
-    }
-
-    /* ── GraphQL + metadata ──────────────────────────────────────────── */
-    /**
-     * GraphQL-first metadata fetching with explicit "no similar" field.
-     * Returns: { title, difficulty, content, topicTags, hints, acRate, likes, dislikes,
-     *           similarQuestionList, hasSimilar: true|false|null }
-     * - hasSimilar: true (has similar problems), false (queried, none found), null (not yet queried)
-     */
+    /* ── GraphQL + metadata (delegates to file-builder.js) ──────────── */
     async _fetchMetadata(slug) {
-        try {
-            const res = await this._gql(QUERIES.QUESTION, { titleSlug: slug });
-            const question = res.data?.question || null;
-            if (!question) return null;
-
-            // Explicitly mark similar field: null = not queried, false = queried & none found, true = has similar
-            const similar = question.similarQuestionList || [];
-            const hasSimilar = similar.length > 0 ? true : false; // explicit: either has some or none
-
-            return {
-                ...question,
-                hasSimilar, // new field: explicitly marks if similar questions were queried
-                similarQuestionList: similar.filter((q) => !q.isPaidOnly),
-            };
-        } catch (_) {
-            return null;
-        }
+        return _fetchMetadataFn(slug, QUERIES, this._getCsrf());
     }
 
     async _gql(query, variables) {
-        const csrf = this._getCsrf();
-        const res = await fetch(CONSTANTS.PLATFORMS.leetcode.graphqlUrl, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Requested-With": "XMLHttpRequest",
-                ...(csrf ? { "x-csrftoken": csrf } : {}),
-            },
-            body: JSON.stringify({ query, variables }),
-        });
-        if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`);
-        const json = await res.json();
-        if (json.errors?.length)
-            throw new Error(json.errors[0]?.message || "GraphQL error");
-        return json;
+        return _gqlCall(query, variables, this._getCsrf());
     }
 
     async handleCodeFetch(problemId) {

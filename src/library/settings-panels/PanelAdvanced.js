@@ -14,7 +14,6 @@ const dbg = createDebugger("PanelAdvanced");
 import { Storage } from "../../core/storage.js";
 import { MissingMetadataModal } from "../../ui/components/MissingMetadataModal.js";
 import { DedupReviewQueue } from "../../ui/components/DedupReviewQueue.js";
-import { QueueModal } from "../../ui/components/QueueModal.js";
 
 export function PanelAdvanced({ settings, onSettingsChange }) {
     const [problems, setProblems] = useState([]);
@@ -26,18 +25,8 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
     const [commitCacheClearedMsg, setCommitCacheClearedMsg] = useState("");
     const [showMissingModal, setShowMissingModal] = useState(false);
     const [showDedupQueue, setShowDedupQueue] = useState(false);
-    const [showQueueModal, setShowQueueModal] = useState(false);
     const [forceBusy, setForceBusy] = useState(false);
     const [forceMsg, setForceMsg] = useState("");
-    const [queueBusy, setQueueBusy] = useState(false);
-    const [queueMsg, setQueueMsg] = useState("");
-    const [queueStats, setQueueStats] = useState({
-        pending: 0,
-        processing: 0,
-        done: 0,
-        failed: 0,
-        total: 0,
-    });
     const [settingsSyncBusy, setSettingsSyncBusy] = useState(false);
     const [settingsSyncMsg, setSettingsSyncMsg] = useState("");
 
@@ -55,28 +44,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
             })
             .catch(() => {});
 
-        // Poll queue stats every 2 seconds
-        const pollStats = () => {
-            if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-                chrome.runtime.sendMessage(
-                    { type: "GET_QUEUE_STATS" },
-                    (resp) => {
-                        if (!chrome.runtime.lastError && resp?.ok) {
-                            setQueueStats({
-                                pending: resp.pending || 0,
-                                processing: resp.processing || 0,
-                                done: resp.done || 0,
-                                failed: resp.failed || 0,
-                                total: resp.total || 0,
-                            });
-                        }
-                    }
-                );
-            }
-        };
-        const interval = setInterval(pollStats, 2000);
-        pollStats(); // Initial poll
-        return () => clearInterval(interval);
+        return undefined;
     }, [settings]);
 
     // Count problems missing BOTH tags AND difficulty (not just one or the other), excluding ignored
@@ -166,81 +134,6 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
             setResetMsg("Reset failed: " + e.message);
         } finally {
             setResetBusy(false);
-        }
-    };
-
-    const _sendQueueMsg = (type) =>
-        new Promise((resolve, reject) => {
-            if (typeof chrome === "undefined" || !chrome.runtime?.id)
-                return reject(new Error("Extension not available"));
-            chrome.runtime.sendMessage({ type }, (resp) => {
-                if (chrome.runtime.lastError)
-                    reject(new Error(chrome.runtime.lastError.message));
-                else if (resp?.ok) resolve(resp);
-                else reject(new Error(resp?.error || "Request failed"));
-            });
-        });
-
-    const handleQueueMissing = async () => {
-        if (queueBusy) return;
-        const missing = problems.filter(
-            (p) => !p.aiReview || p.aiReview.trim() === ""
-        );
-        if (!missing.length) {
-            setQueueMsg("All problems already have AI reviews.");
-            setTimeout(() => setQueueMsg(""), 4000);
-            return;
-        }
-        setQueueBusy(true);
-        setQueueMsg("Queuing missing reviews…");
-        try {
-            const res = await _sendQueueMsg("QUEUE_MISSING_AI_REVIEWS");
-            setQueueMsg(`Queued ${res.queued || 0} problem(s) for review.`);
-            setTimeout(() => setQueueMsg(""), 5000);
-        } catch (e) {
-            setQueueMsg(`Failed: ${e.message}`);
-        } finally {
-            setQueueBusy(false);
-        }
-    };
-
-    const handleRequeueAll = async () => {
-        if (queueBusy) return;
-        if (
-            !confirm(
-                `Re-queue all ${problems.length} problem(s) for AI review (including ones already reviewed)?`
-            )
-        )
-            return;
-        setQueueBusy(true);
-        setQueueMsg("Queuing all reviews…");
-        try {
-            const res = await _sendQueueMsg("QUEUE_ALL_AI_REVIEWS");
-            const skipped = res.skipped || 0;
-            setQueueMsg(
-                `Queued ${res.queued || 0} problem(s)${skipped ? ` · ${skipped} already in queue` : ""}.`
-            );
-            setTimeout(() => setQueueMsg(""), 5000);
-        } catch (e) {
-            setQueueMsg(`Failed: ${e.message}`);
-        } finally {
-            setQueueBusy(false);
-        }
-    };
-
-    const handleCancelQueue = async () => {
-        if (
-            !confirm(
-                "Cancel pending reviews? Any review currently processing will finish first, then the rest will be removed."
-            )
-        )
-            return;
-        try {
-            const res = await _sendQueueMsg("CANCEL_AI_REVIEW_QUEUE");
-            setQueueMsg(`Cancelled ${res.cancelled || 0} pending review(s).`);
-            setTimeout(() => setQueueMsg(""), 4000);
-        } catch (e) {
-            setQueueMsg(`Failed: ${e.message}`);
         }
     };
 
@@ -338,11 +231,6 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
             ${showDedupQueue &&
             html`<${DedupReviewQueue}
                 onClose=${() => setShowDedupQueue(false)}
-            />`}
-            ${showQueueModal &&
-            html`<${QueueModal}
-                onClose=${() => setShowQueueModal(false)}
-                onOpenProblem=${() => setShowQueueModal(false)}
             />`}
             <div>
                 <h2 class="text-base font-semibold text-white mb-1">
@@ -468,64 +356,6 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
                     : ""}
             </div>
 
-            <!-- AI Review Queue -->
-            <div
-                class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3"
-            >
-                <h3
-                    class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-                >
-                    AI Review Queue
-                </h3>
-                <div
-                    class="flex items-center gap-4 text-xs text-slate-400 flex-wrap"
-                >
-                    <span
-                        class="${queueStats.processing > 0
-                            ? "text-violet-300"
-                            : ""}"
-                    >
-                        ${queueStats.processing} processing
-                    </span>
-                    <span
-                        class="${queueStats.pending > 0
-                            ? "text-amber-300"
-                            : ""}"
-                    >
-                        ${queueStats.pending} pending
-                    </span>
-                    <span
-                        class="${queueStats.done > 0 ? "text-emerald-400" : ""}"
-                    >
-                        ${queueStats.done} done
-                    </span>
-                    <span
-                        class="${queueStats.failed > 0 ? "text-rose-400" : ""}"
-                    >
-                        ${queueStats.failed} failed
-                    </span>
-                </div>
-                <div class="flex gap-2 flex-wrap">
-                    <button
-                        onClick=${() => setShowQueueModal(true)}
-                        class="px-4 py-2 bg-violet-600/20 hover:bg-violet-600/40 border border-violet-500/30 text-violet-200 text-xs rounded-lg transition-colors"
-                    >
-                        View Queue
-                    </button>
-                    ${queueStats.failed > 0
-                        ? html`<button
-                              onClick=${() => {
-                                  setShowQueueModal(true);
-                              }}
-                              class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 text-rose-200 text-xs rounded-lg transition-colors"
-                          >
-                              ${queueStats.failed}
-                              Error${queueStats.failed !== 1 ? "s" : ""} — View
-                          </button>`
-                        : ""}
-                </div>
-            </div>
-
             <!-- Metadata refresh -->
             <div
                 class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3"
@@ -568,93 +398,6 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
                             : "text-emerald-400"}"
                     >
                         ${refreshMsg}
-                    </p>
-                `}
-            </div>
-
-            <!-- AI Review Queue -->
-            <div
-                class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3"
-            >
-                <h3
-                    class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-                >
-                    AI Review Queue
-                </h3>
-                <p class="text-[11px] text-slate-500">
-                    Queue AI code reviews — processed in the background with
-                    rate limiting and automatic retry.
-                </p>
-                <div class="flex flex-wrap items-center gap-2">
-                    <button
-                        onClick=${handleQueueMissing}
-                        disabled=${queueBusy ||
-                        problems.every((p) => p.aiReview && p.aiReview.trim())}
-                        class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-200 text-xs rounded-lg transition-colors disabled:opacity-50"
-                        title="Add only problems that have no AI review yet"
-                    >
-                        ${queueBusy ? "Queuing…" : "Queue Missing"}
-                    </button>
-                    <button
-                        onClick=${handleRequeueAll}
-                        disabled=${queueBusy || !problems.length}
-                        class="px-3 py-1.5 bg-purple-600/10 hover:bg-purple-600/30 border border-purple-500/20 text-purple-300 text-xs rounded-lg transition-colors disabled:opacity-50"
-                        title="Re-queue all problems, including those already reviewed"
-                    >
-                        Requeue All
-                    </button>
-                    ${(queueStats.pending > 0 || queueStats.processing > 0) &&
-                    html`
-                        <button
-                            onClick=${handleCancelQueue}
-                            class="px-3 py-1.5 bg-rose-600/15 hover:bg-rose-600/30 border border-rose-500/25 text-rose-300 text-xs rounded-lg transition-colors"
-                            title="Stop after current item finishes — removes all remaining pending reviews"
-                        >
-                            Cancel Queue
-                        </button>
-                    `}
-                </div>
-                ${queueStats.total > 0 &&
-                html`
-                    <div class="flex flex-wrap gap-3 text-xs text-slate-400">
-                        ${queueStats.pending > 0 &&
-                        html`<span
-                            ><span class="text-slate-300 font-medium"
-                                >${queueStats.pending}</span
-                            >
-                            pending</span
-                        >`}
-                        ${queueStats.processing > 0 &&
-                        html`<span class="text-cyan-400"
-                            ><span class="font-medium"
-                                >${queueStats.processing}</span
-                            >
-                            processing</span
-                        >`}
-                        ${queueStats.done > 0 &&
-                        html`<span
-                            ><span class="text-emerald-400 font-medium"
-                                >${queueStats.done}</span
-                            >
-                            done</span
-                        >`}
-                        ${queueStats.failed > 0 &&
-                        html`<span
-                            ><span class="text-rose-400 font-medium"
-                                >${queueStats.failed}</span
-                            >
-                            failed</span
-                        >`}
-                    </div>
-                `}
-                ${queueMsg &&
-                html`
-                    <p
-                        class="text-xs ${queueMsg.startsWith("Failed")
-                            ? "text-rose-400"
-                            : "text-emerald-400"}"
-                    >
-                        ${queueMsg}
                     </p>
                 `}
             </div>
