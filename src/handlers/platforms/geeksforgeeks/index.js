@@ -8,6 +8,7 @@ import { SELECTORS, LEGACY_SELECTORS } from "./dom-selectors.js";
 import { detectPage, PAGE_TYPES } from "./page-detector.js";
 import { Storage } from "../../../core/storage.js";
 import { createDebugger } from "../../../lib/debug.js";
+import { runtime } from "../../../lib/browser-compat.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
@@ -140,7 +141,7 @@ Be concise. Max 200 words.`;
                         await Storage.saveProblem(problem).catch(() => {});
                         await new Promise((resolve) => {
                             try {
-                                chrome.runtime.sendMessage(
+                                runtime.sendMessage(
                                     {
                                         type: "REFRESH_METADATA_DONE",
                                         platform: "geeksforgeeks",
@@ -261,6 +262,7 @@ Be concise. Max 200 words.`;
             const readmeFile = files.find((f) => f.path.endsWith("README.md"));
 
             const elapsedSeconds = this._timer.getElapsedSeconds();
+            const langSlug = lang.name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
             this.emitSolved({
                 id: this.makeProblemId(slug),
@@ -278,10 +280,10 @@ Be concise. Max 200 words.`;
                 readmeContent: readmeFile?.content || null,
                 code,
                 files,
-                lang: { name: lang.name, ext: lang.ext },
+                lang: { name: lang.name, ext: lang.ext, slug: langSlug },
                 runtime: meta.runtime || null,
                 memory: meta.memory || null,
-                timestamp: Math.floor(Date.now() / 1000),
+                timestamp: Date.now(),
                 elapsedSeconds,
             });
 
