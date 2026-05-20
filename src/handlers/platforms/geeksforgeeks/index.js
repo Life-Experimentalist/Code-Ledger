@@ -14,10 +14,10 @@ import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
 import { extractEditorCode } from "./ace-extractor.js";
+import { setupSubmitHook, isAcceptedVisible } from "./submission-detector.js";
 
 const dbg = createDebugger("GFG");
 
-let _debounceTimer = null;
 
 const LANG_EXT = {
     c: "c",
@@ -51,6 +51,7 @@ export class GFGHandler extends BasePlatformHandler {
         this.mutationObserver = null;
         this.lastDetectedId = null;
         this._processingLock = false;
+        this._cleanupSubmitHook = null;
         registerPlatformPrompt("geeksforgeeks", this.getDefaultPrompt());
     }
 
@@ -168,9 +169,20 @@ Be concise. Max 200 words.`;
     }
 
     _setupMutationObserver() {
+        // Primary: hook submit button (fires only after user submits)
+        this._cleanupSubmitHook = setupSubmitHook(() =>
+            this._processSubmission(detectPage(window.location.pathname))
+        );
+
+        // Fallback: passive MutationObserver for edge cases (e.g., page opened mid-result)
+        let debounce = null;
         this.mutationObserver = new MutationObserver(() => {
-            clearTimeout(_debounceTimer);
-            _debounceTimer = setTimeout(() => this._checkSubmission(), 2000);
+            clearTimeout(debounce);
+            debounce = setTimeout(() => {
+                if (!this._processingLock && isAcceptedVisible()) {
+                    this._checkSubmission();
+                }
+            }, 1500);
         });
         this.mutationObserver.observe(document.body, {
             childList: true,
