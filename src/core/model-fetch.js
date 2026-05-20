@@ -86,11 +86,14 @@ export async function fetchModelsForProvider(
             });
             if (!res.ok) return [];
             const data = await res.json();
-            const oaModels = (data.data || []).map((m) => ({
-                id: m.id,
-                label: `${provider.name}: ${m.id}`,
-                group: provider.name,
-            }));
+            // Return all models (no filter) — includes gpt-4o, o1, o3, o4-mini, etc.
+            const oaModels = (data.data || [])
+                .sort((a, b) => a.id.localeCompare(b.id))
+                .map((m) => ({
+                    id: m.id,
+                    label: `${provider.name}: ${m.id}`,
+                    group: provider.name,
+                }));
             models.push(...oaModels);
         }
 
@@ -105,23 +108,31 @@ export async function fetchModelsForProvider(
                     : me.replace(/\/$/, "")
                 : `${epFor()}/models`;
             try {
-                const res = await fetch(ep, { headers: { "x-api-key": key } });
+                const res = await fetch(ep, {
+                    headers: {
+                        "x-api-key": key,
+                        "anthropic-version": "2023-06-01",
+                        "anthropic-dangerously-allow-browser": "true",
+                    },
+                });
                 if (res.ok) {
                     const data = await res.json();
-                    const claudeModels = (data.data || []).map((m) => ({
-                        id: m.id,
-                        label: `${provider.name}: ${m.display_name || m.id}`,
-                        group: provider.name,
-                    }));
+                    const claudeModels = (data.data || [])
+                        .filter((m) => m.id.startsWith("claude"))
+                        .sort((a, b) => b.id.localeCompare(a.id)) // newest first
+                        .map((m) => ({
+                            id: m.id,
+                            label: `${provider.name}: ${m.display_name || m.id}`,
+                            group: provider.name,
+                        }));
                     models.push(...claudeModels);
                 }
             } catch (e) {
-                // ignore
+                // ignore — browser CORS may block this
             }
         }
 
         if (providerId === "ollama") {
-            // Ollama: tags endpoint typically returns model tags. Use modelsEndpoint directly if present.
             const me = provider.modelsEndpoint;
             const ep = me
                 ? endpointOverride && me.startsWith(provider.endpoint)
@@ -130,20 +141,18 @@ export async function fetchModelsForProvider(
                     : me.replace(/\/$/, "")
                 : `${epFor()}/tags`;
             try {
-                const res = await fetch(ep);
+                const res = await fetch(ep, { signal: AbortSignal.timeout(3000) });
                 if (!res.ok) {
                     if (throwOnError) throw new Error(`Status ${res.status}`);
                     return models;
                 }
                 const data = await res.json();
-                const tags = data.tags || data;
-                const ollamaModels = (Array.isArray(tags) ? tags : []).map(
-                    (t) => ({
-                        id: t,
-                        label: `${provider.name}: ${t}`,
-                        group: provider.name,
-                    })
-                );
+                // Ollama /api/tags → { models: [{ name, size, modified_at }] }
+                const ollamaModels = (data.models || []).map((m) => ({
+                    id: m.name,
+                    label: `${provider.name}: ${m.name}`,
+                    group: provider.name,
+                }));
                 models.push(...ollamaModels);
             } catch (e) {
                 if (throwOnError) throw e;
@@ -190,21 +199,25 @@ export async function fetchModelsForProvider(
                 : `${epFor()}/models`;
             try {
                 const res = await fetch(ep, {
-                    headers: { Authorization: `Bearer ${key}` },
+                    headers: {
+                        Authorization: `Bearer ${key}`,
+                        "HTTP-Referer": "https://codeledger.vkrishna04.me",
+                        "X-Title": "CodeLedger",
+                    },
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    const orModels = (data.data || data.models || []).map(
-                        (m) => ({
+                    const orModels = (data.data || data.models || [])
+                        .sort((a, b) => (a.id || "").localeCompare(b.id || ""))
+                        .map((m) => ({
                             id: m.id || m.name,
                             label: `${provider.name}: ${m.name || m.id}`,
                             group: provider.name,
-                        })
-                    );
+                        }));
                     models.push(...orModels);
                 }
             } catch (e) {
-                // ignore
+                if (throwOnError) throw e;
             }
         }
     } catch (e) {
@@ -280,7 +293,13 @@ export async function testAIKey(providerId, key, endpointOverride = "") {
         if (providerId === "claude") {
             const ep = endpointForModels();
             try {
-                const res = await fetch(ep, { headers: { "x-api-key": key } });
+                const res = await fetch(ep, {
+                    headers: {
+                        "x-api-key": key,
+                        "anthropic-version": "2023-06-01",
+                        "anthropic-dangerously-allow-browser": "true",
+                    },
+                });
                 if (res.ok) return { ok: true };
                 const text = await res.text();
                 return { ok: false, error: `Status ${res.status}: ${text}` };
@@ -319,7 +338,11 @@ export async function testAIKey(providerId, key, endpointOverride = "") {
             const ep = endpointForModels();
             try {
                 const res = await fetch(ep, {
-                    headers: { Authorization: `Bearer ${key}` },
+                    headers: {
+                        Authorization: `Bearer ${key}`,
+                        "HTTP-Referer": "https://codeledger.vkrishna04.me",
+                        "X-Title": "CodeLedger",
+                    },
                 });
                 if (res.ok) return { ok: true };
                 const text = await res.text();

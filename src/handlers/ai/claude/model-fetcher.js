@@ -12,12 +12,13 @@ export async function fetchClaudeModels(
         headers: {
             "x-api-key": apiKey,
             "anthropic-version": "2023-06-01",
+            "anthropic-dangerously-allow-browser": "true",
         },
     });
     if (!res.ok) throw new Error(`Claude models fetch failed: ${res.status}`);
     const { data } = await res.json();
     return (data || [])
-        .filter((m) => m.id.includes("claude"))
+        .filter((m) => m.id.startsWith("claude"))
         .map((m) => ({ id: m.id, displayName: m.display_name || m.id }))
-        .sort((a, b) => a.id.localeCompare(b.id));
+        .sort((a, b) => b.id.localeCompare(a.id)); // newest first
 }

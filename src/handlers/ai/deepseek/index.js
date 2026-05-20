@@ -52,6 +52,7 @@ export class DeepSeekHandler extends BaseAIHandler {
                     type: "text",
                     default: "",
                     advanced: true,
+                    placeholder: "https://api.deepseek.com/v1",
                 },
             ],
         };
@@ -64,14 +65,14 @@ export class DeepSeekHandler extends BaseAIHandler {
             settings.deepseek_model ||
             settings.aiModel ||
             CONSTANTS.AI_PROVIDERS.deepseek.defaultModel;
-
-        const prompts = await Storage.getAIPrompts();
-        const prompt = buildReviewPrompt(problemContext, code, prompts);
-
         const endpoint =
             settings.deepseek_endpoint ||
             settings.aiEndpoint ||
             CONSTANTS.AI_PROVIDERS.deepseek.endpoint;
+        this.dbg.log(`review(): model=${model}, endpoint=${endpoint}`);
+
+        const prompts = await Storage.getAIPrompts();
+        const prompt = buildReviewPrompt(problemContext, code, prompts);
 
         const keyCount = await this.keyPool.getKeyCount();
         if (!keyCount) throw new Error("No DeepSeek API key available.");

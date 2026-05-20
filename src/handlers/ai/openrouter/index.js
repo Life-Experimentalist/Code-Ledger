@@ -52,12 +52,14 @@ export class OpenRouterHandler extends BaseAIHandler {
                     type: "text",
                     default: "",
                     advanced: true,
+                    placeholder: "https://openrouter.ai/api/v1",
                 },
             ],
         };
     }
 
     async review(code, problemContext) {
+        dbg.log(`review(): starting OpenRouter review for ${problemContext?.titleSlug || "unknown"}`);
         const settings = await Storage.getSettings();
         const model =
             problemContext?.aiModelOverride ||
@@ -68,6 +70,7 @@ export class OpenRouterHandler extends BaseAIHandler {
             settings.openrouter_endpoint ||
             settings.aiEndpoint ||
             CONSTANTS.AI_PROVIDERS.openrouter.endpoint;
+        dbg.log(`review(): model=${model}, endpoint=${endpoint}`);
 
         const prompts = await Storage.getAIPrompts();
         const prompt = buildReviewPrompt(problemContext, code, prompts);
@@ -87,6 +90,8 @@ export class OpenRouterHandler extends BaseAIHandler {
                     headers: {
                         "Content-Type": "application/json",
                         Authorization: `Bearer ${key}`,
+                        "HTTP-Referer": "https://codeledger.vkrishna04.me",
+                        "X-Title": "CodeLedger",
                     },
                     body: JSON.stringify({
                         model,
