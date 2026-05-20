@@ -118,6 +118,16 @@ Be concise. Max 200 words.`;
                     description:
                         "Show a floating AI chat panel for instant code feedback on GFG problem pages.",
                 },
+                {
+                    key: "gfg_username",
+                    label: "GFG username",
+                    type: "text",
+                    default: "",
+                    description:
+                        "Your GeeksForGeeks username for importing your profile history.",
+                    advanced: true,
+                    placeholder: "e.g. vkrishna04",
+                },
             ],
         };
     }

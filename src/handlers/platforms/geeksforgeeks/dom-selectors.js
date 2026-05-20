@@ -4,8 +4,8 @@
  */
 
 export const SELECTORS = {
-    version: "2026-04-28",
-    lastVerified: "2026-04-28",
+    version: "2026-05-21",
+    lastVerified: "2026-05-21",
 
     page: {
         isProblemPage:
@@ -13,24 +13,30 @@ export const SELECTORS = {
     },
 
     problem: {
-        // GFG's CSS modules use obfuscated class prefixes — match by prefix
+        // CSS-module prefixed class — match by prefix
         title: '[class^="problems_header_content__title"] h3, .problems-header h3, .problem-title h3',
         difficulty:
-            '[class^="problems_header_description"] [class*="difficulty"], .difficulty-block .difficulty-tag',
-        tags: '[class*="problems_tag_container"] [class*="tag"], .topic-tag',
+            '[class^="problems_header_description"] > :first-child, .difficulty-block .difficulty-tag, [class*="difficulty"]',
+        tags: '[class*="problems_tag_container"] [class*="tag"], .topic-tag, [class*="tag_container"] a',
         description:
             '[class^="problems_problem_content"], .problem-statement, .problem-description',
         platformId: null,
     },
 
     submission: {
-        // "Problem Solved Successfully" banner
+        // "Problem Solved Successfully" banner — multiple fallback patterns
         successIndicator:
-            '[class^="problems_content"] [class*="accepted"], [class*="submission-success"], .problems-submission-result.accepted',
-        // Code editor — CodeMirror or Ace
-        code: ".CodeMirror-code, .ace_content .ace_text-layer, #editor .CodeMirror-code",
+            '[class^="problems_content"] [class*="accepted"],' +
+            '[class*="submission-success"],' +
+            '.problems-submission-result.accepted,' +
+            '[class*="correct"]',
+        // Ace editor (primary) — script injection reads window.ace
+        aceEditorId: "ace-editor",
+        // Fallback: CodeMirror (older GFG pages)
+        codeMirrorCode: ".CodeMirror-code",
+        // Language selector
         language:
-            '.divider.text, [class*="language"] [class*="selected"], select[name="language"] option:checked, [class*="selectedLang"]',
+            '.divider.text, [class*="selectedLang"], [class*="language"] [class*="selected"], select[name="language"] option:checked',
         runtime: ".result-table tr:nth-child(2) td:last-child",
         memory: ".result-table tr:nth-child(3) td:last-child",
     },
@@ -38,8 +44,14 @@ export const SELECTORS = {
     qol: {
         editorContainer: "#editor, .ace_editor, .CodeMirror",
         submitButton:
-            '[class^="ui button problems_submit_button"], .problems-submit-btn, button[type="submit"]',
+            '[class^="ui button problems_submit_button"], .problems-submit-btn, button[type="submit"][class*="submit"]',
         resultContainer: '[class^="problems_content"], .result-container',
+        toolbar: '.ace_toolbar, [class*="editor_header"], [class*="problems_editor"] [class*="header"]',
+    },
+
+    profile: {
+        nextData: "#__NEXT_DATA__",
+        header: '[class*="profile_head"], [class*="userHandle"], h1',
     },
 };
 
@@ -55,6 +67,7 @@ export const LEGACY_SELECTORS = {
         "#result-accepted",
         ".submission-success",
         '[class*="correct-answer"]',
+        '[class*="solved"]',
     ],
     "submission.code": [
         ".CodeMirror-line",
