@@ -6,6 +6,31 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.0] — 2026-05-21
+
+### Added
+- **GFG: Floating AI chat panel** — AI review/chat panel injected on GeeksForGeeks problem pages, matching LeetCode parity.
+- **GFG: Copy code button** — copy-to-clipboard button injected into the GFG editor toolbar alongside the existing QoL buttons.
+- **GFG: Bulk profile import** — import all accepted submissions from a GFG user profile page in one click (same flow as LeetCode profile import).
+- **GFG: Hook-based submission detection** — hooks the submit button and polls the result panel to catch accepted submissions automatically.
+- **GFG: Ace editor code extraction** — on-demand fetch now recovers the current editor code via script injection into the page context (GFG uses Ace, not CodeMirror).
+- **GFG: PROFILE page type** — `detectPage()` now recognises `/user/{username}` as a distinct `PROFILE` page type.
+- **GFG: `gfg_username` setting** — new settings key for specifying the GFG username used in profile import.
+- **LeetCode: Handler split into focused modules** — `index.js` reduced from ~2 000 to ~740 lines by extracting `file-builder.js`, `lang-utils.js`, `profile-import.js`, `submission-detector.js`, and `ui-injection.js`.
+
+### Fixed
+- **AI: Stale default model names** — updated to `gemini-2.0-flash`, `gpt-4o-mini`, and the current OpenRouter free-tier model slug.
+- **AI: Ollama model listing** — was parsing `data.tags` (wrong key); now correctly reads `data.models`.
+- **AI: Claude model fetch** — added missing `anthropic-version` header to model-fetch and key-test requests.
+- **AI: OpenRouter headers** — added required `HTTP-Referer` header to all OpenRouter API calls.
+- **AI: OpenAI model filter** — filter now returns all models; previously excluded `o1`/`o3`/`o4` reasoning models unintentionally.
+- **GFG: Timestamp in milliseconds** — timestamp was emitted in seconds; now correctly multiplied to milliseconds so the library sort order is correct.
+- **GFG: browser-compat runtime** — replaced direct `chrome.runtime.sendMessage` call with `browser-compat.js` runtime for Firefox compatibility.
+- **GFG: Lang slug field** — lang object now includes the `slug` field (was missing, causing path-builder failures).
+- **GFG: Code extraction via Ace** — submission code is now read from the Ace editor model; the previous CodeMirror approach was a no-op on GFG.
+
+---
+
 ## [1.3.1] — 2026-05-19
 
 ### Fixed
