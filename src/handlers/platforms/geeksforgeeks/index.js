@@ -13,6 +13,7 @@ import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
+import { extractEditorCode } from "./ace-extractor.js";
 
 const dbg = createDebugger("GFG");
 
@@ -237,11 +238,11 @@ Be concise. Max 200 words.`;
 
             // Extract problem data from DOM
             const meta = this._extractMetadata(slug);
-            const code = this._extractCode();
+            const code = await extractEditorCode();
             const lang = this._extractLanguage();
             const topic = resolvePrimaryTopic(meta.tags || []);
 
-            if (!code || code.includes("extraction failed")) {
+            if (!code || !code.trim()) {
                 dbg.warn("Code extraction failed, skipping commit");
                 return;
             }
