@@ -182,7 +182,7 @@ Be concise. Max 200 words.`;
                     readEditorCode: () => extractEditorCode(),
                     readEditorLang: () => this._extractLanguage().name,
                     readProblemStatement: () => this._readProblemStatement(),
-                    readTestFailures: () => "",
+                    readTestFailures: () => this._readTestFailures(),
                 },
             });
         }).catch(() => {});
@@ -479,6 +479,52 @@ Be concise. Max 200 words.`;
         const name = raw || "C++";
         const ext = langExt(name);
         return { name, ext };
+    }
+
+    _readTestFailures() {
+        try {
+            const lines = [];
+            const SKIP = /problem\s+solved|correct\s+answer|accepted|compilation\s+success/i;
+
+            // Result/verdict container used after submission
+            const resultContainers = document.querySelectorAll(
+                '[class^="problems_content"], .problems-content, #problems-content, ' +
+                '[class*="result"], [class*="verdict"]'
+            );
+            for (const el of resultContainers) {
+                const t = (el.textContent || "").trim();
+                if (t && t.length > 4 && !SKIP.test(t)) {
+                    lines.push(t.slice(0, 800));
+                    break;
+                }
+            }
+
+            // Compilation / runtime error blocks
+            document.querySelectorAll(
+                '[class*="error"] pre, [class*="compile"] pre, ' +
+                '.error-output, [class*="ErrorOutput"]'
+            ).forEach((el) => {
+                const t = (el.textContent || "").trim();
+                if (t && t.length > 4 && !lines.some((l) => l.includes(t.slice(0, 40)))) {
+                    lines.push(t.slice(0, 600));
+                }
+            });
+
+            // Wrong answer test case diff panels
+            document.querySelectorAll(
+                '[class*="wrong"], [class*="WrongAnswer"], ' +
+                '[class*="testCase"] pre, [class*="test_case"] pre'
+            ).forEach((el) => {
+                const t = (el.textContent || "").trim();
+                if (t && t.length > 4 && !lines.some((l) => l.includes(t.slice(0, 40)))) {
+                    lines.push(t.slice(0, 400));
+                }
+            });
+
+            return lines.slice(0, 5).join("\n\n");
+        } catch (_) {
+            return "";
+        }
     }
 
     _queryFirst(selectors) {

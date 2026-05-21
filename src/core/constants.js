@@ -219,7 +219,7 @@ export const CONSTANTS = Object.freeze({
       baseUrl: "https://www.geeksforgeeks.org",
       problemsBase: "https://www.geeksforgeeks.org/problems/",
       practiceBase: "https://practice.geeksforgeeks.org/problems/",
-      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
+      status: FEATURE_STATUS.ALPHA,
     },
     codeforces: {
       id: "codeforces",
@@ -229,7 +229,9 @@ export const CONSTANTS = Object.freeze({
       baseUrl: "https://codeforces.com",
       problemsBase: "https://codeforces.com/problemset/problem/",
       problemsetUrl: "https://codeforces.com/problemset/",
-      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
+      apiBase: "https://codeforces.com/api",
+      contestsBase: "https://codeforces.com/contest/",
+      status: FEATURE_STATUS.ALPHA,
     },
   },
 

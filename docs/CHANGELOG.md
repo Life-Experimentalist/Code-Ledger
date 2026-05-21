@@ -6,6 +6,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.1] — 2026-05-21
+
+### Added
+- **Codeforces: Full platform handler (alpha)** — complete submission detection, code capture, language resolution, and GitHub commit for all CF problem types (`/contest`, `/gym`, `/problemset`). Uses sessionStorage to preserve code across CF's full-page reloads.
+- **Codeforces: Floating AI panel** — AI chat injected on CF problem pages; reads editor code (`<textarea id="editor">`), language, problem statement, and test failure verdicts.
+- **Codeforces: QoL buttons** — "Copy Code" and "AI Review" buttons injected above the CF editor.
+- **Codeforces: Verdict detection** — MutationObserver on `span[submissionverdict="OK"]`; works on both inline problem table and `/my` page without any API calls.
+- **Codeforces: Difficulty normalisation** — numeric CF ratings mapped to Easy (≤1200) / Medium (1201–1900) / Hard (≥1901) following community standard.
+- **GFG: AI test-failure connector** — `readTestFailures()` now reads the GFG result/verdict container and error pre-elements, filtered to exclude success messages.
+- **Platforms: Alpha/Beta status badges** — GFG and Codeforces platform cards in Settings → Platforms now show an amber "Alpha" badge.
+- **Handler activation** — GFG and Codeforces handlers are now fully activated in `handler-loader.js` (previously logged "under construction" and exited).
+- **Docs: Testing guide** — `docs/TESTING_GUIDE.md` with per-platform test steps and common issue resolutions.
+
+### Fixed
+- **Codeforces: Title prefix stripped** — CF problem titles like "A. Theatre Square" are stored as "Theatre Square" (letter prefix removed).
+- **Codeforces: Language prefix matching** — verbose CF lang strings ("GNU G++17 7.3.0") resolved by keyword prefix so future compiler bumps don't break detection.
+
 ## [1.4.0] — 2026-05-21
 
 ### Added

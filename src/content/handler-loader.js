@@ -51,11 +51,35 @@ async function loadHandler() {
             );
         } else if (isHost("geeksforgeeks.org", hostname)) {
             console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): GeeksForGeeks handler is under construction — detection only, no submission capture`
+                `[CodeLedger:HandlerLoader] loadHandler(): platform detected = GeeksForGeeks`
+            );
+            const gfgUrl = chrome.runtime.getURL(
+                "handlers/platforms/geeksforgeeks/index.js"
+            );
+            const { GFGHandler } = await import(gfgUrl);
+            const gfgHandler = new GFGHandler();
+            console.log(
+                `[CodeLedger:HandlerLoader] loadHandler(): initializing GFGHandler...`
+            );
+            await gfgHandler.init();
+            console.log(
+                `[CodeLedger:HandlerLoader] loadHandler(): ✓ GFGHandler initialized`
             );
         } else if (isHost("codeforces.com", hostname)) {
             console.log(
-                `[CodeLedger:HandlerLoader] loadHandler(): Codeforces handler is under construction — detection only, no submission capture`
+                `[CodeLedger:HandlerLoader] loadHandler(): platform detected = Codeforces`
+            );
+            const cfUrl = chrome.runtime.getURL(
+                "handlers/platforms/codeforces/index.js"
+            );
+            const { CodeforcesHandler } = await import(cfUrl);
+            const cfHandler = new CodeforcesHandler();
+            console.log(
+                `[CodeLedger:HandlerLoader] loadHandler(): initializing CodeforcesHandler...`
+            );
+            await cfHandler.init();
+            console.log(
+                `[CodeLedger:HandlerLoader] loadHandler(): ✓ CodeforcesHandler initialized`
             );
         } else {
             console.log(

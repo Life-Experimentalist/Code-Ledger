@@ -100,6 +100,13 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                                 class="text-sm font-semibold text-slate-200 flex-1"
                                 >${p.name}</span
                             >
+                            ${(() => {
+                                const s = p.status;
+                                if (!s || s === CONSTANTS.FEATURE_STATUS.STABLE) return null;
+                                const meta = CONSTANTS.FEATURE_STATUS_META[s];
+                                if (!meta) return null;
+                                return html`<span class="text-[10px] font-medium px-1.5 py-0.5 rounded border ${meta.className}">${meta.label}</span>`;
+                            })()}
                             <button
                                 onClick=${() => togglePlatform(p.id)}
                                 class="relative inline-flex h-5 w-9 items-center rounded-full border transition-colors
