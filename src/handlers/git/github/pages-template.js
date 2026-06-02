@@ -445,9 +445,9 @@ export function getPagesHtml(opts = {}) {
       }
 
       var now = new Date();
-      var prevYear = now.getFullYear() - 1;
-      var rangeStart = new Date(prevYear, 0, 1);   // Jan 1 of previous year
-      var rangeEnd   = new Date(prevYear, 11, 31); // Dec 31 of previous year
+      var rangeEnd = new Date(now);
+      var rangeStart = new Date(now);
+      rangeStart.setFullYear(rangeStart.getFullYear() - 1); // exactly 1 year back (leap-year aware)
 
       var cur = new Date(rangeStart);
       cur.setDate(cur.getDate() - cur.getDay()); // snap to Sunday
@@ -679,9 +679,8 @@ export function getPagesHtml(opts = {}) {
 
         // Heatmap
         buildHeatmap(problems);
-        var prevYr = new Date().getFullYear() - 1;
         var hmlEl = document.getElementById('hm-label');
-        if (hmlEl) hmlEl.textContent = 'Activity — ' + prevYr;
+        if (hmlEl) hmlEl.textContent = 'Activity — Last 12 Months';
         function resizeHeatmap() {
           var outer = document.querySelector('.hm-outer');
           var cols = document.querySelectorAll('.hm-col').length;
