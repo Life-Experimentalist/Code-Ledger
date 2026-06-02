@@ -69,9 +69,14 @@ export class Packager {
       ".prettierrc",
     ];
 
+    // Exclude generated directories that can be reproduced with npm install / build
+    const EXCLUDE_SEGMENTS = new Set(["node_modules", "dist"]);
+    const shouldInclude = (filePath) =>
+      !filePath.split(/[\\/]/).some((seg) => EXCLUDE_SEGMENTS.has(seg));
+
     for (const dir of sourceDirs) {
       try {
-        zip.addLocalFolder(resolve(this.ctx.rootDir, dir), dir);
+        zip.addLocalFolder(resolve(this.ctx.rootDir, dir), dir, shouldInclude);
       } catch (_) {
         /* skip missing */
       }
