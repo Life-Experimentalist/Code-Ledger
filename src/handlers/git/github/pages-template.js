@@ -438,7 +438,9 @@ export function getPagesHtml(opts = {}) {
       for (var i = 0; i < problems.length; i++) {
         var p = problems[i];
         if (!p.timestamp) continue;
-        var k = dayKey(new Date(p.timestamp));
+        var ts = p.timestamp;
+        var tsMs = (typeof ts === 'number' && ts < 1e10) ? ts * 1000 : ts;
+        var k = dayKey(new Date(tsMs));
         dayMap[k] = (dayMap[k] || 0) + 1;
       }
 
