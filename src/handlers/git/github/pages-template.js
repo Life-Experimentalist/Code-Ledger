@@ -85,8 +85,9 @@ export function getPagesHtml(opts = {}) {
     .card-label { font-size: .55rem; text-transform: uppercase; letter-spacing: .15em; color: var(--muted); font-weight: 700; margin-bottom: .875rem; }
 
     /* Stats row */
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .875rem; margin-bottom: 1rem; }
-    @media (max-width: 560px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
+    .stats-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: .875rem; margin-bottom: 1rem; }
+    @media (max-width: 760px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 480px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
     .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; }
     .stat-n { font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: .2rem; }
     .stat-l { font-size: .55rem; text-transform: uppercase; letter-spacing: .15em; color: var(--muted); }
@@ -94,6 +95,9 @@ export function getPagesHtml(opts = {}) {
     .stat.e .stat-n { color: var(--easy); }
     .stat.m .stat-n { color: var(--med); }
     .stat.h .stat-n { color: var(--hard); }
+    .stat.s .stat-n { color: #10b981; }
+    .stat.b .stat-n { color: #f59e0b; }
+    .vc-box { position: relative; height: 170px; }
 
     /* 2-col grid */
     .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
@@ -190,10 +194,12 @@ export function getPagesHtml(opts = {}) {
       <div class="stat e"><div class="stat-n" id="sn-e">0</div><div class="stat-l">Easy</div></div>
       <div class="stat m"><div class="stat-n" id="sn-m">0</div><div class="stat-l">Medium</div></div>
       <div class="stat h"><div class="stat-n" id="sn-h">0</div><div class="stat-l">Hard</div></div>
+      <div class="stat s"><div class="stat-n" id="sn-cs">—</div><div class="stat-l">Streak</div></div>
+      <div class="stat b"><div class="stat-n" id="sn-ms">—</div><div class="stat-l">Best Streak</div></div>
     </div>
 
     <div class="card hm-outer">
-      <div class="card-label">Activity — Last 12 Months</div>
+      <div class="card-label" id="hm-label">Activity</div>
       <div class="hm-scroll">
         <div class="hm-wrap">
           <div class="hm-side">
@@ -215,6 +221,17 @@ export function getPagesHtml(opts = {}) {
           <div class="hm-cell l4"></div>
         </div>
         <span>More</span>
+      </div>
+    </div>
+
+    <div class="g2" style="margin-bottom:1rem">
+      <div class="card">
+        <div class="card-label">Solve Velocity (24 Weeks)</div>
+        <div class="vc-box"><canvas id="vc"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Difficulty Split</div>
+        <div class="vc-box"><canvas id="dd"></canvas></div>
       </div>
     </div>
 
@@ -305,9 +322,112 @@ export function getPagesHtml(opts = {}) {
     var PALETTE = ['#06b6d4','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#f97316','#a855f7'];
     var PLATFORM_COLORS = { leetcode: '#FFA116', geeksforgeeks: '#2F8D46', codeforces: '#1F8ACB' };
     var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var DOW_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    // Heatmap month label state — stored globally so resizeHeatmap can update them
+    var hmMonthSpans = [];
+    var hmTotalCols = 0;
 
     function paletteColor(i) { return PALETTE[i % PALETTE.length]; }
     function platformColor(name) { return PLATFORM_COLORS[(name || '').toLowerCase()] || '#64748b'; }
+
+    // Re-renders month labels using current --hm-cell size (fixes alignment after resize)
+    function renderMonthLabels() {
+      var cellStyleVal = getComputedStyle(document.documentElement).getPropertyValue('--hm-cell').trim();
+      var cellW = parseFloat(cellStyleVal) || 11;
+      var gap = 3;
+      var monthsEl = document.getElementById('hm-m');
+      if (!monthsEl) return;
+      monthsEl.innerHTML = '';
+      for (var j = 0; j < hmMonthSpans.length; j++) {
+        var ms = hmMonthSpans[j];
+        var nextIdx = (j + 1 < hmMonthSpans.length) ? hmMonthSpans[j + 1].idx : hmTotalCols;
+        var colCount = nextIdx - ms.idx;
+        var span = document.createElement('span');
+        span.textContent = ms.label;
+        // Width = colCount cells + (colCount-1) gaps — matches exact flex layout of hm-cols
+        span.style.minWidth = (colCount * cellW + (colCount > 1 ? (colCount - 1) * gap : 0)) + 'px';
+        monthsEl.appendChild(span);
+      }
+    }
+
+    function computeStreaks(problems) {
+      var daySet = {};
+      for (var i = 0; i < problems.length; i++) {
+        var p = problems[i];
+        if (!p.timestamp) continue;
+        var ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
+        daySet[dayKey(new Date(ts))] = true;
+      }
+      var today = new Date();
+      var max = 0, run = 0;
+      for (var i = 0; i < 730; i++) {
+        var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (729 - i));
+        if (daySet[dayKey(d)]) { run++; if (run > max) max = run; } else { run = 0; }
+      }
+      var cur = 0;
+      for (var j = 0; j < 730; j++) {
+        var d2 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - j);
+        if (daySet[dayKey(d2)]) { cur++; } else { break; }
+      }
+      return { current: cur, max: max };
+    }
+
+    function buildVelocityChart(problems) {
+      var canvas = document.getElementById('vc');
+      if (!canvas || typeof Chart === 'undefined') return;
+      var now = new Date();
+      var wks = [], wkMap = {};
+      for (var i = 23; i >= 0; i--) {
+        var ref = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i * 7);
+        var ws = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - ref.getDay());
+        var wk = dayKey(ws);
+        wks.push({ key: wk, label: MONTH_NAMES[ws.getMonth()] + ' ' + ws.getDate() });
+        wkMap[wk] = 0;
+      }
+      for (var i = 0; i < problems.length; i++) {
+        var p = problems[i];
+        if (!p.timestamp) continue;
+        var ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
+        var pd = new Date(ts);
+        var pws = new Date(pd.getFullYear(), pd.getMonth(), pd.getDate() - pd.getDay());
+        var pk = dayKey(pws);
+        if (wkMap[pk] !== undefined) wkMap[pk]++;
+      }
+      new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: wks.map(function(w) { return w.label; }),
+          datasets: [{ label: 'Solved', data: wks.map(function(w) { return wkMap[w.key]; }),
+            borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,.08)', fill: true,
+            tension: 0.4, pointRadius: 2, pointBackgroundColor: '#06b6d4', borderWidth: 2 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#64748b', maxTicksLimit: 7 } },
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#64748b', precision: 0 } }
+          }
+        }
+      });
+    }
+
+    function buildDifficultyDonut(easy, medium, hard) {
+      var canvas = document.getElementById('dd');
+      if (!canvas || typeof Chart === 'undefined') return;
+      new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Easy', 'Medium', 'Hard'],
+          datasets: [{ data: [easy, medium, hard],
+            backgroundColor: ['#34d399', '#fbbf24', '#f87171'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
+          plugins: { legend: { position: 'right',
+            labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 10, padding: 8 } } }
+        }
+      });
+    }
 
     function dayKey(d) {
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -323,8 +443,9 @@ export function getPagesHtml(opts = {}) {
       }
 
       var now = new Date();
-      var rangeStart = new Date(now);
-      rangeStart.setFullYear(rangeStart.getFullYear() - 1);
+      var prevYear = now.getFullYear() - 1;
+      var rangeStart = new Date(prevYear, 0, 1);   // Jan 1 of previous year
+      var rangeEnd   = new Date(prevYear, 11, 31); // Dec 31 of previous year
 
       var cur = new Date(rangeStart);
       cur.setDate(cur.getDate() - cur.getDay()); // snap to Sunday
@@ -338,7 +459,7 @@ export function getPagesHtml(opts = {}) {
       var prevMonth = -1;
       var monthSpans = [];
 
-      while (cur <= now) {
+      while (cur <= rangeEnd) {
         if (cur.getDay() === 0) {
           colEl = document.createElement('div');
           colEl.className = 'hm-col';
@@ -354,7 +475,7 @@ export function getPagesHtml(opts = {}) {
         if (colEl) {
           var k2 = dayKey(cur);
           var cnt = dayMap[k2] || 0;
-          var inRange = cur >= rangeStart && cur <= now;
+          var inRange = cur >= rangeStart && cur <= rangeEnd;
           var cell = document.createElement('div');
           var cls = 'hm-cell';
           if (inRange && cnt > 0) cls += cnt >= 4 ? ' l4' : cnt >= 3 ? ' l3' : cnt >= 2 ? ' l2' : ' l1';
@@ -367,16 +488,10 @@ export function getPagesHtml(opts = {}) {
         cur.setDate(cur.getDate() + 1);
       }
 
-      // Render month labels with approximate spacing
-      var totalCols = grid.children.length;
-      for (var j = 0; j < monthSpans.length; j++) {
-        var ms = monthSpans[j];
-        var nextIdx = j + 1 < monthSpans.length ? monthSpans[j + 1].idx : totalCols;
-        var span = document.createElement('span');
-        span.textContent = ms.label;
-        span.style.minWidth = ((nextIdx - ms.idx) * 14) + 'px';
-        monthsEl.appendChild(span);
-      }
+      // Store month data globally so renderMonthLabels() can recompute widths after resize
+      hmMonthSpans = monthSpans;
+      hmTotalCols = grid.children.length;
+      renderMonthLabels();
     }
 
     function renderBars(containerId, items, maxN, colorFn) {
@@ -546,13 +661,25 @@ export function getPagesHtml(opts = {}) {
         rl.textContent = repo.label + ' ↗';
 
         // Quick stats
-        document.getElementById('sn-t').textContent = stats.total !== undefined ? stats.total : problems.length;
-        document.getElementById('sn-e').textContent = stats.easy !== undefined ? stats.easy : problems.filter(function(p) { return p.difficulty === 'Easy'; }).length;
-        document.getElementById('sn-m').textContent = stats.medium !== undefined ? stats.medium : problems.filter(function(p) { return p.difficulty === 'Medium'; }).length;
-        document.getElementById('sn-h').textContent = stats.hard !== undefined ? stats.hard : problems.filter(function(p) { return p.difficulty === 'Hard'; }).length;
+        var sTotal = stats.total !== undefined ? stats.total : problems.length;
+        var sEasy  = stats.easy   !== undefined ? stats.easy   : problems.filter(function(p) { return p.difficulty === 'Easy';   }).length;
+        var sMed   = stats.medium !== undefined ? stats.medium : problems.filter(function(p) { return p.difficulty === 'Medium'; }).length;
+        var sHard  = stats.hard   !== undefined ? stats.hard   : problems.filter(function(p) { return p.difficulty === 'Hard';   }).length;
+        document.getElementById('sn-t').textContent = sTotal;
+        document.getElementById('sn-e').textContent = sEasy;
+        document.getElementById('sn-m').textContent = sMed;
+        document.getElementById('sn-h').textContent = sHard;
+
+        // Streak stats
+        var streakData = computeStreaks(problems);
+        document.getElementById('sn-cs').textContent = streakData.current + 'd';
+        document.getElementById('sn-ms').textContent = streakData.max + 'd';
 
         // Heatmap
         buildHeatmap(problems);
+        var prevYr = new Date().getFullYear() - 1;
+        var hmlEl = document.getElementById('hm-label');
+        if (hmlEl) hmlEl.textContent = 'Activity — ' + prevYr;
         function resizeHeatmap() {
           var outer = document.querySelector('.hm-outer');
           var cols = document.querySelectorAll('.hm-col').length;
@@ -561,9 +688,14 @@ export function getPagesHtml(opts = {}) {
           var avail = outer.clientWidth - sideW - cols * 3;
           var cell = Math.max(8, Math.floor(avail / cols));
           document.documentElement.style.setProperty('--hm-cell', cell + 'px');
+          renderMonthLabels();
         }
         resizeHeatmap();
         window.addEventListener('resize', resizeHeatmap);
+
+        // Velocity + difficulty charts
+        buildVelocityChart(problems);
+        buildDifficultyDonut(sEasy, sMed, sHard);
 
         // Language donut
         var langMap = countBy(problems, function(p) {
