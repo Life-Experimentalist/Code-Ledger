@@ -17,6 +17,9 @@ export function getPagesHtml(opts = {}) {
         ? opts.reportImages
         : [];
     const commitList = Array.isArray(opts.commitList) ? opts.commitList : [];
+    // GitHub owner and repo embedded at generation time so custom domains work correctly
+    const repoOwner = opts.owner || "";
+    const repoName = opts.repo || "";
     // Default raw image URLs (can be overridden via settings passed to generator)
     const ASSETS = {
         iconDark:
@@ -323,6 +326,9 @@ export function getPagesHtml(opts = {}) {
     var PLATFORM_COLORS = { leetcode: '#FFA116', geeksforgeeks: '#2F8D46', codeforces: '#1F8ACB' };
     var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var DOW_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    // Embedded at commit time by CodeLedger — correct regardless of custom domain
+    var REPO_OWNER = '${repoOwner}';
+    var REPO_NAME  = '${repoName}';
 
     // Heatmap month label state — stored globally so resizeHeatmap can update them
     var hmMonthSpans = [];
@@ -534,8 +540,17 @@ export function getPagesHtml(opts = {}) {
     }
 
     function getRepoUrl() {
+      // Use values embedded at commit time — works on any custom domain
+      if (REPO_OWNER && REPO_NAME) {
+        return {
+          url: 'https://github.com/' + REPO_OWNER + '/' + REPO_NAME,
+          label: REPO_OWNER + '/' + REPO_NAME
+        };
+      }
+      // Fallback: derive from URL (only works reliably on *.github.io paths)
       var host = window.location.hostname;
-      var owner = host.split('.')[0];
+      var parts = host.split('.');
+      var owner = parts.length >= 3 ? parts[0] : host.replace('.github.io', '');
       var pathParts = window.location.pathname.split('/').filter(Boolean);
       var repo = pathParts[0] || '';
       return { url: 'https://github.com/' + owner + '/' + repo, label: owner + (repo ? '/' + repo : '') };

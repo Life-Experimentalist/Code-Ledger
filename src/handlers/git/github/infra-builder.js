@@ -397,6 +397,8 @@ async function _buildPagesContent(owner, repo, token, pagesTheme, settings) {
         commitSummary,
         reportImages,
         commitList,
+        owner,
+        repo,
     });
 }
 
