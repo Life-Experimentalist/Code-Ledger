@@ -55,12 +55,38 @@ export function PanelGit({
   const [mirrorCheckState, setMirrorCheckState] = useState(null); // null|checking|ok|err
   const mirrorCheckTimer = useRef(null);
 
+  // Auto-detected CodeLedger repo suggestion
+  const [detectedRepo, setDetectedRepo] = useState(null); // { owner, repo } | null
+  const [detectedDismissed, setDetectedDismissed] = useState(false);
+
   useEffect(() => {
     Storage.getAuthToken("github")
       .then((t) => setOauthToken(t || ""))
       .catch(() => {});
     loadSyncCount();
   }, [settings]);
+
+  // Auto-detect a CodeLedger-managed repo when token exists but none is configured
+  useEffect(() => {
+    const currentRepo = settings?.github_repo || settings?.gitRepo || "";
+    if (currentRepo || detectedDismissed) return;
+    Storage.getAuthToken("github").then((token) => {
+      if (!token) return;
+      fetch("https://api.github.com/user/repos?type=all&per_page=100&sort=updated", {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+      })
+        .then((r) => r.json())
+        .then((repos) => {
+          if (!Array.isArray(repos)) return;
+          const found = repos.find(
+            (r) => Array.isArray(r.topics) && r.topics.includes("code-ledger")
+          );
+          if (found) setDetectedRepo({ owner: found.owner?.login || found.full_name.split("/")[0], repo: found.name });
+        })
+        .catch(() => {});
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.github_repo, settings?.gitRepo, detectedDismissed]);
 
   useEffect(() => {
     if (!window.chrome?.runtime?.onMessage) return;
@@ -385,9 +411,18 @@ export function PanelGit({
 
   // ── Mirror helpers ────────────────────────────────────────────────────────
 
-  const mirrors = Array.isArray(settings?.git_mirrors)
+  const mirrors = (Array.isArray(settings?.git_mirrors)
     ? settings.git_mirrors
-    : [];
+    // De-duplicate: remove any mirror whose owner/repo matches the main repo
+    : []
+  ).filter(
+    (m) =>
+      !(
+        repoName &&
+        m.repo === repoName &&
+        (m.owner || "") === (repoOwner || "")
+      ),
+  );
 
   const saveMirrors = (updated) => onSettingsChange("git_mirrors", updated);
 
@@ -592,6 +627,36 @@ export function PanelGit({
             `}
       </div>
 
+      <!-- Auto-detected repo suggestion -->
+      ${detectedRepo && !repoName && !detectedDismissed
+        ? html`
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-cyan-500/8 border border-cyan-500/20">
+              <span class="text-cyan-400 text-base leading-none">🔍</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-cyan-300 font-medium">CodeLedger repo found</p>
+                <p class="text-xs text-cyan-500/80 font-mono truncate">${detectedRepo.owner}/${detectedRepo.repo}</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  onClick=${() => {
+                    onSettingsChange("github_owner", detectedRepo.owner);
+                    onSettingsChange("github_repo", detectedRepo.repo);
+                    setDetectedRepo(null);
+                  }}
+                  class="px-3 py-1.5 text-xs font-medium bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-200 rounded-lg transition-colors"
+                >
+                  Use this
+                </button>
+                <button
+                  onClick=${() => setDetectedDismissed(true)}
+                  class="text-slate-600 hover:text-slate-400 text-xs px-1 transition-colors"
+                  title="Dismiss"
+                >✕</button>
+              </div>
+            </div>
+          `
+        : ""}
+
       <!-- Repository (read-only — managed via setup wizard) -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
         <div class="flex items-center justify-between">
@@ -664,8 +729,9 @@ export function PanelGit({
             `}
       </div>
 
-      <!-- Mirror Repositories -->
-      <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
+      <!-- Mirror Repositories — only show when main repo exists (mirrors need a primary) OR when adding -->
+      <div class="${repoName ? '' : 'opacity-50 pointer-events-none'} p-4 rounded-xl border border-white/8 bg-white/2 space-y-3"
+           title="${!repoName ? 'Set up a main repository first before configuring mirrors' : ''}">
         <div class="flex items-center justify-between">
           <div>
             <h3
@@ -980,19 +1046,31 @@ export function PanelGit({
       ${settings._pendingConflicts > 0
         ? html`
             <div
-              class="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
+              class="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
             >
-              <span class="text-amber-400 text-sm"
-                >⚠ ${settings._pendingConflicts}
-                ${" conflict"}${settings._pendingConflicts !== 1 ? "s" : ""}
-                detected during background sync.</span
-              >
-              <button
-                onClick=${handleImport}
-                class="text-xs text-amber-300 underline hover:no-underline"
-              >
-                Resolve now
-              </button>
+              <span class="text-amber-400 text-base leading-none mt-0.5">⚠</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-amber-300 font-medium">
+                  ${settings._pendingConflicts}
+                  ${" conflict"}${settings._pendingConflicts !== 1 ? "s" : ""}
+                  detected during background sync.
+                </p>
+                ${!repoName
+                  ? html`<p class="text-xs text-amber-500/80 mt-0.5">Set up a repository below to resolve conflicts.</p>`
+                  : importing
+                  ? html`<p class="text-xs text-amber-400/70 mt-0.5 flex items-center gap-1.5">
+                      <span class="inline-block w-3 h-3 rounded-full border-2 border-amber-400/40 border-t-amber-400 animate-spin"></span>
+                      Fetching conflicts from repository…
+                    </p>`
+                  : importMsg && !importData
+                  ? html`<p class="text-xs text-rose-400 mt-0.5">${importMsg}</p>`
+                  : html`<button
+                      onClick=${handleImport}
+                      class="text-xs text-amber-300 underline hover:no-underline mt-0.5"
+                    >
+                      Resolve now →
+                    </button>`}
+              </div>
             </div>
           `
         : ""}

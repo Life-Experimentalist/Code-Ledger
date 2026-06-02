@@ -28,6 +28,7 @@ function PopupApp() {
         hard: 0,
     });
     const [recent, setRecent] = useState([]);
+    const [pendingConflicts, setPendingConflicts] = useState(0);
 
     useEffect(() => {
         Storage.getAllProblems().then((problems) => {
@@ -43,6 +44,9 @@ function PopupApp() {
                 problems.sort((a, b) => b.timestamp - a.timestamp).slice(0, 3)
             );
         });
+        Storage.getSettings().then((s) => {
+            setPendingConflicts(Number(s?._pendingConflicts) || 0);
+        }).catch(() => {});
     }, []);
 
     const openLibrary = (tab = "dashboard") => {
@@ -181,6 +185,25 @@ function PopupApp() {
                       `}
             </div>
 
+            ${pendingConflicts > 0
+                ? html`
+                      <button
+                          onClick=${() => openLibrary("settings")}
+                          class="w-full mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-left hover:bg-amber-500/20 transition-colors"
+                      >
+                          <span class="text-amber-400 text-base leading-none">⚠</span>
+                          <div class="flex-1 min-w-0">
+                              <p class="text-[11px] font-medium text-amber-300">
+                                  ${pendingConflicts} conflict${pendingConflicts !== 1 ? "s" : ""} need review
+                              </p>
+                              <p class="text-[10px] text-amber-500/80 truncate">
+                                  Go to Settings → Git to resolve
+                              </p>
+                          </div>
+                          <span class="text-amber-500 text-xs shrink-0">→</span>
+                      </button>
+                  `
+                : ""}
             <div class="flex flex-col gap-2 mb-2">
                 <button
                     class="w-full py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-xs font-bold uppercase tracking-widest hover:bg-cyan-500/20 transition-colors"

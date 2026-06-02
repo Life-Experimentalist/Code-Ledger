@@ -604,7 +604,9 @@ export function ProblemsView({
                           </div>
                       </div>
                   `
-                : isExtension
+                : isExtension &&
+                  ((problems || []).filter((p) => !p.aiReview).length > 0 ||
+                      queueStats?.failed > 0)
                   ? html`
                         <div
                             class="flex items-center justify-between gap-3 px-4 py-2 rounded-xl bg-white/3 border border-white/5 text-xs"
