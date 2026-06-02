@@ -2274,7 +2274,20 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                           conflicts=${syncConflictData.conflicts}
                           remoteOnly=${syncConflictData.remoteOnly}
                           providerName=${syncConflictData.provider || "GitHub"}
-                          onCancel=${() => setSyncConflictData(null)}
+                          onCancel=${async (resolvedSoFar, remaining) => {
+                              const provider = syncConflictData.provider;
+                              const mode = syncConflictData.mode || "bulk";
+                              // Persist any choices the user made before closing
+                              if (resolvedSoFar?.length > 0) {
+                                  try { await applySyncImport(resolvedSoFar); } catch (_) {}
+                              }
+                              // Re-queue unresolved conflicts so the banner reappears
+                              if (remaining?.length > 0) {
+                                  setSyncConflictData((prev) => ({ ...prev, conflicts: remaining }));
+                              } else {
+                                  setSyncConflictData(null);
+                              }
+                          }}
                           onResolve=${async (resolvedProblems) => {
                               const provider = syncConflictData.provider;
                               const mode = syncConflictData.mode || "bulk";

@@ -70,6 +70,7 @@ export function inferChatRequestType(text = "") {
 
 export function buildAIChatContext({
     surface = "default",
+    chatMode = "guided",
     problem = null,
     title = "",
     difficulty = "",
@@ -116,6 +117,7 @@ export function buildAIChatContext({
 
     return {
         surface,
+        chatMode,
         title: title || normalizedProblem.title || "",
         difficulty: difficulty || normalizedProblem.difficulty || "",
         platform: platform || normalizedProblem.platform || "",

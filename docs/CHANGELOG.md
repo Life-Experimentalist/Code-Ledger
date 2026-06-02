@@ -6,6 +6,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.2] — 2026-06-02
+
+### Added
+- **Analytics: Monthly activity chart** — AnalyticsView now shows a rolling 12-month bar chart of solve activity alongside the existing weekly chart.
+- **Analytics: Day-of-week heatmap** — New bar chart showing which day of the week you solve most; peak day is highlighted and surfaced as a "Best Day" stat.
+- **Analytics: Rolling 7/30-day counts** — `last7Days` and `last30Days` replace the previous calendar-week/month counters so the numbers always reflect a true rolling window.
+- **Floating AI: Guided (Socratic) mode** — Default panel mode now leads the learner through questions instead of handing over the answer. A "Guided / Direct" toggle chip in the panel header lets you switch modes; selection is persisted to storage.
+- **Floating AI: Apply-code button** — AI-suggested code blocks now render an "Apply" button that writes the code directly into the active Monaco editor without copy-paste.
+- **Floating AI: Alt+\` keyboard hint** — Keyboard shortcut hint displayed in the panel title bar.
+- **Floating AI: Improved Monaco code extraction** — `getActiveCodeEditor()` is tried first, then `getEditors()`, then `getModels()`, then DOM view-lines sorted by `top` CSS value for correct ordering; covers all LeetCode editor states.
+- **Conflict Resolution Modal: SameCodeStep** — When both versions have identical (normalised) code, the modal shows a compact three-way choice (local / remote / both) with an 8 s auto-resolve countdown and progress bar.
+- **Conflict Resolution Modal: DiffApproachStep** — When code differs the modal shows a three-way choice with per-side metadata (difficulty, language, date, AI review status, tag count) and the fields that differ.
+- **PanelAI: Queue management controls** — Settings → AI now polls and displays real-time review queue stats; exposes "Queue Missing Reviews", "Requeue All", and "Cancel" actions.
+- **AIReviewPanel: QueueStatusCard** — Inline status card in the review panel shows queue depth, snail-mode pause state, and time-to-next-batch.
+- **Service worker: Snail Mode state** — Persistent `snailMode` state (`lastBatch`, `consecutiveErrors`, `isPaused`, `pausedUntil`, `totalProcessed`, `totalErrors`) tracks AI review batch throttling across browser restarts.
+- **Popup: settingsTab deep-link** — `openLibrary()` accepts a `settingsTab` parameter to deep-link directly to a Settings sub-panel from the popup.
+- **DedupReviewQueue: "Let AI Decide" action** — Per-conflict button that requests an AI comparison and auto-resolves within 10 s timeout; default countdown reduced from 12 s to 5 s.
+
+### Fixed
+- **AI prompts: chatMode respected** — `buildConversationSystemPrompt()` now switches to the direct-answer prompt when `context.chatMode === "direct"`, preventing Socratic rules from leaking into Direct mode sessions.
+- **Floating AI: DOM line sort** — View-lines are now sorted by `style.top` before joining, fixing incorrect line ordering when code spans the visible scroll window.
+
 ## [1.4.1] — 2026-05-21
 
 ### Added

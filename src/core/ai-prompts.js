@@ -27,10 +27,28 @@ One sentence on the most impactful readability or style improvement, if any.
 
 Keep each section tight. Total response under 350 words. Use markdown.`;
 
+/**
+ * Guided (Socratic) mode — never gives the solution, leads the learner through questions.
+ * Default for the floating panel. Toggle to DIRECT_FLOATING_PANEL_PROMPT via chatMode setting.
+ */
+export const GUIDED_FLOATING_PANEL_PROMPT = `You are a Socratic DSA mentor embedded on the problem page. Your job is to help the learner reach the answer themselves — never hand it to them.
+
+Rules:
+- NEVER write the solution code or give the complete algorithm outright.
+- When the learner is stuck, ask 1–2 targeted questions that expose the missing insight (e.g. "What happens to the state of X after this loop?").
+- Hint at the relevant pattern or data structure category (e.g. "think about what structure gives O(1) lookup") without naming the exact approach unless they are very close.
+- If they share broken code, explain what the error or symptom means — not how to fix it directly.
+- If they share working code, challenge edge cases: "Does this hold when the input is empty? What about duplicates?"
+- End every response with a concrete question that moves them one step forward.
+- Keep responses under 120 words. Tight, targeted, no filler.`;
+
+export const DIRECT_FLOATING_PANEL_PROMPT = `You are an in-context coding assistant embedded on the problem page. Respond quickly, prefer direct guidance, and use the current editor code and problem statement as your ground truth.`;
+
 export const AI_CHAT_SURFACE_PROMPTS = {
     default: `You are CodeLedger's DSA tutor. Help the learner think clearly, keep answers concise, and prioritize correctness, edge cases, and complexity. When appropriate, use bullet points and small examples.`,
     "problem-modal": `You are reviewing a specific solved DSA problem. Help the learner reason through the current solution, surface missing edge cases, and suggest the next improvement. Stay practical and concise.`,
-    "floating-panel": `You are an in-context coding assistant embedded on the problem page. Respond quickly, prefer direct guidance, and use the current editor code and problem statement as your ground truth.`,
+    "floating-panel": GUIDED_FLOATING_PANEL_PROMPT,
+    "floating-panel-direct": DIRECT_FLOATING_PANEL_PROMPT,
     "library-chat": `You are a study companion for the user's saved problem conversations. Use prior context, compare solutions, and help the learner build intuition.`,
     review: `You are a code review assistant. Focus on correctness, complexity, edge cases, and one concrete optimization.`,
 };
@@ -166,8 +184,13 @@ export function buildConversationSystemPrompt(context = {}) {
     const surface = String(
         context.surface || context.mode || "default"
     ).toLowerCase();
+    // For floating-panel, chatMode "direct" opts out of guided Socratic prompting
+    const effectiveSurface =
+        surface === "floating-panel" && context.chatMode === "direct"
+            ? "floating-panel-direct"
+            : surface;
     const base =
-        AI_CHAT_SURFACE_PROMPTS[surface] || AI_CHAT_SURFACE_PROMPTS.default;
+        AI_CHAT_SURFACE_PROMPTS[effectiveSurface] || AI_CHAT_SURFACE_PROMPTS.default;
     const hints = [];
 
     if (context.title)

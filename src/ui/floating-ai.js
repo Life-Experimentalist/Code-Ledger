@@ -11,6 +11,7 @@ import {
     getChatsByProblem,
     saveAIChat,
     updateAIChat,
+    deleteChat,
 } from "../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../lib/ai-chat-context.js";
 import { parseMarkdown } from "./components/AIMarkdownRenderer.js";
@@ -38,23 +39,25 @@ const DEFAULT_PLATFORM = {
 
 function readMonacoEditorCode() {
     try {
-        if (window.monaco?.editor) {
-            const models = window.monaco.editor.getModels();
-            if (models?.length) {
-                const code = models[0].getValue();
-                if (code && code.trim()) return code;
+        const active = window.monaco?.editor?.getActiveCodeEditor?.()?.getModel?.()?.getValue?.();
+        if (active && active.trim()) return active;
+        const editors = window.monaco?.editor?.getEditors?.();
+        if (editors?.length) {
+            for (const ed of editors) {
+                const val = ed.getModel?.()?.getValue?.();
+                if (val && val.trim()) return val;
             }
+        }
+        const models = window.monaco?.editor?.getModels?.();
+        if (models?.length) {
+            const val = models[0].getValue?.();
+            if (val && val.trim()) return val;
         }
     } catch {}
     try {
-        const lines = document.querySelectorAll(
-            ".monaco-editor .view-lines .view-line"
-        );
-        if (lines.length > 0) {
-            return Array.from(lines)
-                .map((l) => l.textContent)
-                .join("\n");
-        }
+        const lineEls = [...document.querySelectorAll(".monaco-editor .view-lines .view-line")];
+        lineEls.sort((a, b) => (parseInt(a.style.top, 10) || 0) - (parseInt(b.style.top, 10) || 0));
+        if (lineEls.length > 0) return lineEls.map((l) => l.textContent).join("\n");
     } catch {}
     return "";
 }
@@ -129,6 +132,9 @@ const PANEL_STYLE = `
   #cl-ai-open:hover { color: #67e8f9; border-color: rgba(6,182,212,0.35); }
   #cl-ai-close-confirm { display: none; }
   #cl-ai-close-confirm.visible { display: block; }
+  .cl-ai-apply-btn { display:inline-block;margin-top:5px;font-size:10px;padding:2px 8px;background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.28);border-radius:6px;color:#67e8f9;cursor:pointer;font-family:inherit;transition:background 0.15s; }
+  .cl-ai-apply-btn:hover { background:rgba(6,182,212,0.22); }
+  .cl-ai-kbd-hint { font-size:9px;color:#334155;margin-left:4px;letter-spacing:0.02em; }
 `;
 
 const TEMP_CHAT_KEY = (slug) =>
@@ -143,6 +149,27 @@ export function createFloatingAI(slug = "", opts = {}) {
     let expanded = false;
     let chatId = null;
     let copyableEnabled = false;
+    let chatMode = "guided"; // "guided" (Socratic default) or "direct"
+
+    // Load persisted mode
+    chrome.storage.local.get("cl_chat_mode", (res) => {
+        const v = res?.cl_chat_mode;
+        if (v === "direct" || v === "guided") chatMode = v;
+        if (modeBtnEl) updateModeBtnLabel();
+    });
+
+    let modeBtnEl = null;
+    function updateModeBtnLabel() {
+        if (!modeBtnEl) return;
+        modeBtnEl.textContent = chatMode === "guided" ? "Guided" : "Direct";
+        modeBtnEl.title = chatMode === "guided"
+            ? "Socratic mode: AI asks questions instead of giving answers. Click to switch to Direct."
+            : "Direct mode: AI answers directly. Click to switch to Guided (Socratic).";
+        modeBtnEl.style.color = chatMode === "guided" ? "#67e8f9" : "#94a3b8";
+        modeBtnEl.style.borderColor = chatMode === "guided"
+            ? "rgba(6,182,212,0.35)"
+            : "rgba(255,255,255,0.12)";
+    }
     let copyPrompt = null;
     let copyPromptTimer = null;
 
@@ -225,9 +252,10 @@ export function createFloatingAI(slug = "", opts = {}) {
     });
     header.innerHTML = `
     <span style="font-size:12px;font-weight:600;color:#94a3b8;letter-spacing:0.04em;display:flex;align-items:center;gap:6px;">
-      <span style="font-size:14px;">✦</span> AI Assistant
+      <span style="font-size:14px;">✦</span> AI Assistant<span class="cl-ai-kbd-hint">Alt+\`</span>
     </span>
     <div style="display:flex;align-items:center;gap:6px;">
+      <button id="cl-ai-mode" title="Toggle guided/direct mode" style="background:none;border:1px solid rgba(255,255,255,0.12);cursor:pointer;color:#94a3b8;font-size:10px;padding:2px 6px;border-radius:999px;transition:color 0.15s,border-color 0.15s;">Guided</button>
       <button id="cl-ai-open" title="Open AI Chats" style="background:none;border:1px solid rgba(255,255,255,0.12);cursor:pointer;color:#94a3b8;font-size:10px;padding:2px 6px;border-radius:999px;transition:color 0.15s,border-color 0.15s;">Chats</button>
       <button id="cl-ai-clear" title="Clear chat" style="background:none;border:none;cursor:pointer;color:#475569;font-size:11px;padding:2px 4px;border-radius:4px;transition:color 0.15s;">Clear</button>
       <button id="cl-ai-close" title="Close panel" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:14px;line-height:1;padding:2px 4px;border-radius:4px;transition:color 0.15s;">×</button>
@@ -471,7 +499,35 @@ export function createFloatingAI(slug = "", opts = {}) {
 
     // ── Render ──────────────────────────────────────────────────────────────────
 
-    function renderMessages() {
+    function applyCodeToEditor(code) {
+        try {
+            const activeEd = window.monaco?.editor?.getActiveCodeEditor?.();
+            if (activeEd) { activeEd.getModel()?.setValue?.(code); return true; }
+            const eds = window.monaco?.editor?.getEditors?.();
+            if (eds?.length) { eds[0].getModel()?.setValue?.(code); return true; }
+        } catch (_) {}
+        return false;
+    }
+
+    function addApplyButtons(bubble) {
+        bubble.querySelectorAll("pre").forEach((pre) => {
+            const codeEl = pre.querySelector("code");
+            const codeText = (codeEl ? codeEl.textContent : pre.textContent) || "";
+            if (codeText.trim().length < 8) return;
+            const btn = document.createElement("button");
+            btn.className = "cl-ai-apply-btn";
+            btn.textContent = "Apply to editor";
+            btn.title = "Replace editor content with this code block";
+            btn.addEventListener("click", () => {
+                const ok = applyCodeToEditor(codeText);
+                btn.textContent = ok ? "✓ Applied!" : "✗ Editor not found";
+                setTimeout(() => { btn.textContent = "Apply to editor"; }, 2000);
+            });
+            pre.after(btn);
+        });
+    }
+
+    function renderMessages(scrollToNew = false) {
         msgList.innerHTML = "";
         if (messages.length === 0) {
             const empty = document.createElement("div");
@@ -487,6 +543,7 @@ export function createFloatingAI(slug = "", opts = {}) {
             msgList.appendChild(empty);
             return;
         }
+        let lastAiBubble = null;
         for (const msg of messages) {
             const bubble = document.createElement("div");
             bubble.className = `cl-ai-msg-base ${msg.role === "user" ? "cl-ai-msg-user" : "cl-ai-msg-ai"}`;
@@ -495,10 +552,19 @@ export function createFloatingAI(slug = "", opts = {}) {
                 bubble.textContent = msg.content;
             } else {
                 bubble.innerHTML = parseMarkdown(msg.content || "");
+                addApplyButtons(bubble);
+                lastAiBubble = bubble;
             }
             msgList.appendChild(bubble);
         }
-        msgList.scrollTop = msgList.scrollHeight;
+        if (scrollToNew && lastAiBubble) {
+            // Scroll so the top of the new AI message is visible
+            requestAnimationFrame(() => {
+                lastAiBubble.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        } else {
+            msgList.scrollTop = msgList.scrollHeight;
+        }
     }
 
     function persistTempChat() {
@@ -599,6 +665,13 @@ export function createFloatingAI(slug = "", opts = {}) {
         };
     }
 
+    function collapsePanel() {
+        expanded = false;
+        panel.style.display = "none";
+        toggle.style.borderColor = "rgba(6,182,212,0.3)";
+        toggle.style.color = "#94a3b8";
+    }
+
     function showCloseConfirm() {
         closeConfirmEl.classList.add("visible");
     }
@@ -634,15 +707,17 @@ export function createFloatingAI(slug = "", opts = {}) {
                 .catch(() => {});
         } catch (_) {}
         openAIChatsPage();
-        destroy({ force: true });
+        hideCloseConfirm();
+        collapsePanel();
     }
 
+    // × just collapses the panel; destroy() is only for SPA navigation teardown.
     function requestClose() {
         if (hasUnsavedConversation()) {
             showCloseConfirm();
             return;
         }
-        destroy({ force: true });
+        collapsePanel();
     }
 
     function hideCopyPrompt() {
@@ -761,15 +836,20 @@ export function createFloatingAI(slug = "", opts = {}) {
     const clearBtn = header.querySelector("#cl-ai-clear");
     const openBtn = header.querySelector("#cl-ai-open");
     const closeBtn = header.querySelector("#cl-ai-close");
+    modeBtnEl = header.querySelector("#cl-ai-mode");
+    updateModeBtnLabel();
+    modeBtnEl.addEventListener("click", async () => {
+        chatMode = chatMode === "guided" ? "direct" : "guided";
+        updateModeBtnLabel();
+        chrome.storage.local.set({ cl_chat_mode: chatMode });
+    });
     openBtn.addEventListener("click", openAIChatsPage);
     closeBtn.addEventListener("click", requestClose);
     clearBtn.addEventListener("click", () => {
         messages = [];
         if (chatId) {
-            updateAIChat(chatId, [], {
-                surface: "floating-panel",
-                attachedProblemSlugs: slug ? [slug] : [],
-            }).catch(() => {});
+            deleteChat(chatId).catch(() => {});
+            chatId = null;
         }
         clearTempChat();
         renderMessages();
@@ -801,6 +881,7 @@ export function createFloatingAI(slug = "", opts = {}) {
                 : readGenericTestFailures()) || "";
         const baseContext = buildAIChatContext({
             surface: "floating-panel",
+            chatMode,
             text,
             title: pageMeta.title || platform.titleFallback || slug,
             difficulty: pageMeta.difficulty || "",
@@ -954,7 +1035,7 @@ export function createFloatingAI(slug = "", opts = {}) {
             pending = false;
             sendBtn.disabled = false;
             setThinking(false);
-            renderMessages();
+            renderMessages(true);
         }
     }
 
@@ -973,9 +1054,14 @@ export function createFloatingAI(slug = "", opts = {}) {
     closeConfirmEl
         .querySelector("#cl-ai-close-discard")
         ?.addEventListener("click", () => {
+            if (chatId) {
+                deleteChat(chatId).catch(() => {});
+                chatId = null;
+            }
+            messages = [];
             clearTempChat();
             hideCloseConfirm();
-            destroy({ force: true });
+            collapsePanel();
         });
     closeConfirmEl
         .querySelector("#cl-ai-close-save")
@@ -1069,6 +1155,15 @@ export function createFloatingAI(slug = "", opts = {}) {
     }
 
     startPersistenceMonitor();
+    // Keyboard shortcut: Alt+` toggles the panel
+    const _kbHandler = (e) => {
+        if (e.altKey && e.key === "`") {
+            e.preventDefault();
+            toggle.click();
+        }
+    };
+    document.addEventListener("keydown", _kbHandler);
+
     return {
         destroy(options = {}) {
             const force = options?.force === true;
@@ -1077,16 +1172,32 @@ export function createFloatingAI(slug = "", opts = {}) {
                 return false;
             }
             persistTempChat();
+            // Disconnect observer BEFORE DOM removal to prevent ensurePanelAttached
+            // from firing on the mutation caused by root.remove().
+            if (persistenceObserver) {
+                persistenceObserver.disconnect();
+                persistenceObserver = null;
+            }
+            document.removeEventListener("keydown", _kbHandler);
             root.remove();
             copyPromptEl.remove();
             closeConfirmEl.remove();
             const styleEl = document.getElementById("cl-ai-styles");
             if (styleEl) styleEl.remove();
-            if (persistenceObserver) {
-                persistenceObserver.disconnect();
-                persistenceObserver = null;
-            }
             return true;
+        },
+        /** Programmatically expand the panel (e.g., from toolbar button). */
+        expand() {
+            if (!expanded) toggle.click();
+        },
+        /** Expand and pre-fill the input (e.g., /review for selected code). */
+        preFill(text) {
+            this.expand();
+            setTimeout(() => {
+                input.value = text || "";
+                autoGrow();
+                input.focus();
+            }, 60);
         },
     };
 }

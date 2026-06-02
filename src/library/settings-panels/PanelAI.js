@@ -15,6 +15,7 @@ import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { ModelSelector } from "../../ui/components/ModelSelector.js";
 import { testAIKey } from "../../core/model-fetch.js";
+import { QueueModal } from "../../ui/components/QueueModal.js";
 import {
     getMCPConfig,
     updateMCPConfig,
@@ -58,6 +59,10 @@ export function PanelAI({ settings, onSettingsChange }) {
     const [mcpConfig, setMcpConfig] = useState(null);
     const [mcpEnabledIds, setMcpEnabledIds] = useState(new Set());
     const [mcpOpen, setMcpOpen] = useState(false);
+    const [queueStats, setQueueStats] = useState({ pending: 0, processing: 0, done: 0, failed: 0, total: 0 });
+    const [queueBusy, setQueueBusy] = useState(false);
+    const [queueMsg, setQueueMsg] = useState("");
+    const [showQueueModal, setShowQueueModal] = useState(false);
 
     useEffect(() => {
         Storage.getAIKeys()
@@ -77,6 +82,25 @@ export function PanelAI({ settings, onSettingsChange }) {
                 setMcpEnabledIds(new Set(enabled));
             })
             .catch(() => {});
+        // Poll queue stats
+        const pollStats = () => {
+            if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+                chrome.runtime.sendMessage({ type: "GET_QUEUE_STATS" }, (resp) => {
+                    if (!chrome.runtime.lastError && resp?.ok) {
+                        setQueueStats({
+                            pending: resp.pending || 0,
+                            processing: resp.processing || 0,
+                            done: resp.done || 0,
+                            failed: resp.failed || 0,
+                            total: (resp.pending || 0) + (resp.processing || 0) + (resp.done || 0) + (resp.failed || 0),
+                        });
+                    }
+                });
+            }
+        };
+        pollStats();
+        const statsTimer = setInterval(pollStats, 3000);
+        return () => clearInterval(statsTimer);
     }, []);
 
     const primaryProvider =
@@ -171,8 +195,68 @@ export function PanelAI({ settings, onSettingsChange }) {
         );
     };
 
+    const _sendQueueMsg = (type) =>
+        new Promise((resolve, reject) => {
+            if (typeof chrome === "undefined" || !chrome.runtime?.id)
+                return reject(new Error("Extension not available"));
+            chrome.runtime.sendMessage({ type }, (resp) => {
+                if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+                if (resp?.ok) return resolve(resp);
+                reject(new Error(resp?.error || "Failed"));
+            });
+        });
+
+    const handleQueueMissing = async () => {
+        if (queueBusy) return;
+        setQueueBusy(true);
+        setQueueMsg("Queuing missing reviews…");
+        try {
+            const res = await _sendQueueMsg("QUEUE_MISSING_AI_REVIEWS");
+            setQueueMsg(`Queued ${res.queued || 0} problem(s).`);
+            setTimeout(() => setQueueMsg(""), 5000);
+        } catch (e) { setQueueMsg(`Failed: ${e.message}`); }
+        finally { setQueueBusy(false); }
+    };
+
+    const handleRequeueAll = async () => {
+        if (queueBusy) return;
+        setQueueBusy(true);
+        setQueueMsg("Queuing all reviews…");
+        try {
+            const res = await _sendQueueMsg("QUEUE_ALL_AI_REVIEWS");
+            setQueueMsg(`Queued ${res.queued || 0} problem(s).`);
+            setTimeout(() => setQueueMsg(""), 5000);
+        } catch (e) { setQueueMsg(`Failed: ${e.message}`); }
+        finally { setQueueBusy(false); }
+    };
+
+    const handleCancelQueue = async () => {
+        if (!confirm("Cancel pending reviews? The current one will finish first.")) return;
+        try {
+            const res = await _sendQueueMsg("CANCEL_AI_REVIEW_QUEUE");
+            setQueueMsg(`Cancelled ${res.cancelled || 0} pending review(s).`);
+            setTimeout(() => setQueueMsg(""), 4000);
+        } catch (e) { setQueueMsg(`Failed: ${e.message}`); }
+    };
+
+    const handleRunQueueNow = async () => {
+        if (queueBusy) return;
+        setQueueBusy(true);
+        setQueueMsg("Running queue now…");
+        try {
+            await _sendQueueMsg("PROCESS_REVIEW_QUEUE_NOW");
+            setQueueMsg("Queue run triggered.");
+            setTimeout(() => setQueueMsg(""), 4000);
+        } catch (e) { setQueueMsg(`Failed: ${e.message}`); }
+        finally { setQueueBusy(false); }
+    };
+
     return html`
         <div class="space-y-6 w-full">
+            ${showQueueModal && html`<${QueueModal}
+                onClose=${() => setShowQueueModal(false)}
+                onOpenProblem=${() => setShowQueueModal(false)}
+            />`}
             <div>
                 <h2 class="text-base font-semibold text-white mb-1">
                     AI Providers
@@ -212,6 +296,99 @@ export function PanelAI({ settings, onSettingsChange }) {
                         </span>
                     </button>
                 </div>
+                <!-- Queue action buttons — beside the auto-review toggle -->
+                <div class="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                        onClick=${handleQueueMissing}
+                        disabled=${queueBusy}
+                        class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+                        title="Add only problems without an AI review"
+                    >
+                        ${queueBusy ? "Queuing…" : "Queue Missing"}
+                    </button>
+                    <button
+                        onClick=${handleRequeueAll}
+                        disabled=${queueBusy}
+                        class="px-3 py-1.5 bg-purple-600/10 hover:bg-purple-600/30 border border-purple-500/20 text-purple-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+                        title="Re-queue all problems including those already reviewed"
+                    >
+                        Requeue All
+                    </button>
+                    <button
+                        onClick=${() => setShowQueueModal(true)}
+                        class="px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/40 border border-violet-500/30 text-violet-200 text-xs rounded-lg transition-colors"
+                    >
+                        View Queue
+                        ${queueStats.total > 0
+                            ? html`<span class="ml-1 text-[10px] opacity-70">(${queueStats.pending}p ${queueStats.done}d${queueStats.failed > 0 ? ` ${queueStats.failed}!` : ""})</span>`
+                            : ""}
+                    </button>
+                    ${(queueStats.pending > 0 || queueStats.processing > 0) && html`
+                        <button
+                            onClick=${handleRunQueueNow}
+                            disabled=${queueBusy}
+                            class="px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+                            title="Skip wait and run next batch now"
+                        >
+                            Run Now
+                        </button>
+                        <button
+                            onClick=${handleCancelQueue}
+                            class="px-3 py-1.5 bg-rose-600/15 hover:bg-rose-600/30 border border-rose-500/25 text-rose-300 text-xs rounded-lg transition-colors"
+                            title="Stop after current item — removes remaining pending reviews"
+                        >
+                            Cancel Queue
+                        </button>
+                    `}
+                </div>
+                ${queueMsg && html`<p class="text-xs ${queueMsg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">${queueMsg}</p>`}
+                ${queueStats.total > 0 && html`
+                    <div class="flex flex-wrap gap-2 text-[11px] text-slate-400 pt-1">
+                        ${queueStats.pending > 0 && html`<span class="text-amber-300">${queueStats.pending} pending</span>`}
+                        ${queueStats.processing > 0 && html`<span class="text-cyan-300">${queueStats.processing} processing</span>`}
+                        ${queueStats.done > 0 && html`<span class="text-emerald-400">${queueStats.done} done</span>`}
+                        ${queueStats.failed > 0 && html`<span class="text-rose-400">${queueStats.failed} failed</span>`}
+                    </div>
+                `}
+            </div>
+
+            <!-- Snail Mode (background AI review rate limiting) -->
+            <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
+                <div>
+                    <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
+                        Snail Mode
+                    </h3>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Background AI review processes in small batches to avoid API rate limits.
+                        Reviews run automatically — no user action needed.
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[11px] text-slate-400">Batch size (problems per run)</span>
+                        <input
+                            type="number"
+                            min="1" max="20"
+                            value=${settings?.snailMode_batchSize ?? CONSTANTS.SNAIL_MODE.BATCH_SIZE}
+                            onInput=${(e) => onSettingsChange("snailMode_batchSize", Math.max(1, Math.min(20, Number(e.target.value) || CONSTANTS.SNAIL_MODE.BATCH_SIZE)))}
+                            class="w-20 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-cyan-500/50"
+                        />
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[11px] text-slate-400">Interval between batches (hours)</span>
+                        <input
+                            type="number"
+                            min="0.25" max="24" step="0.25"
+                            value=${settings?.snailMode_batchIntervalHours ?? (CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS / 3600000)}
+                            onInput=${(e) => onSettingsChange("snailMode_batchIntervalHours", Math.max(0.25, Math.min(24, Number(e.target.value) || 1)))}
+                            class="w-24 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-cyan-500/50"
+                        />
+                    </label>
+                </div>
+                <p class="text-[11px] text-slate-600">
+                    Default: ${CONSTANTS.SNAIL_MODE.BATCH_SIZE} problems every ${CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS / 3600000}h.
+                    Pauses automatically after ${CONSTANTS.SNAIL_MODE.ERROR_THRESHOLD} consecutive errors.
+                </p>
             </div>
 
             <!-- Primary + Fallback selectors -->

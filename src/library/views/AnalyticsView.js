@@ -440,15 +440,20 @@ export function AnalyticsView({ problems, onNavigate }) {
             platforms: {},
             langs: {},
             weeks: {},
+            months: {},
+            dayOfWeek: [0, 0, 0, 0, 0, 0, 0],
+            bestDay: { name: "—", count: 0 },
             currentStreak: 0,
             longestStreak: 0,
-            thisWeek: 0,
-            thisMonth: 0,
+            last7Days: 0,
+            last30Days: 0,
             avgSolveSeconds: 0,
             multiLangProblems: {}, // Map of problem ID → { langs: Set, count: N }
             uniqueProblems: 0, // Count of unique problems solved
             multiLangCount: 0, // Count of problems solved in 2+ languages
         };
+
+        const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
         // Pre-build last 12 weeks slots
         const dNow = new Date();
@@ -456,6 +461,13 @@ export function AnalyticsView({ problems, onNavigate }) {
             const d = new Date(dNow.getTime() - i * 7 * 86400000);
             const wStr = `${d.getFullYear()}-W${String(Math.ceil((d.getDate() - d.getDay() + 1) / 7)).padStart(2, "0")}`;
             s.weeks[wStr] = 0;
+        }
+
+        // Pre-build last 12 months slots
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(dNow.getFullYear(), dNow.getMonth() - i, 1);
+            const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+            s.months[mStr] = 0;
         }
 
         // Build day map for streak calculation
@@ -507,16 +519,22 @@ export function AnalyticsView({ problems, onNavigate }) {
             const wStr = `${solvedDate.getFullYear()}-W${String(Math.ceil((solvedDate.getDate() - solvedDate.getDay() + 1) / 7)).padStart(2, "0")}`;
             if (s.weeks[wStr] !== undefined) s.weeks[wStr]++;
 
+            // Monthly activity
+            const mStr = `${solvedDate.getFullYear()}-${String(solvedDate.getMonth() + 1).padStart(2, "0")}`;
+            if (s.months[mStr] !== undefined) s.months[mStr]++;
+
+            // Day of week activity
+            s.dayOfWeek[solvedDate.getDay()]++;
+
             const ds = dateStr(solvedDate);
             dayMap[ds] = (dayMap[ds] || 0) + 1;
 
-            // This week / this month
+            // Last 7 / last 30 rolling days
             const now = new Date();
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - now.getDay());
-            if (solvedDate >= weekStart) s.thisWeek++;
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            if (solvedDate >= monthStart) s.thisMonth++;
+            const ago7 = new Date(now.getTime() - 7 * 86400000);
+            const ago30 = new Date(now.getTime() - 30 * 86400000);
+            if (solvedDate >= ago7) s.last7Days++;
+            if (solvedDate >= ago30) s.last30Days++;
         });
 
         // Compute current streak and longest streak
@@ -543,6 +561,15 @@ export function AnalyticsView({ problems, onNavigate }) {
         }
         s.currentStreak = streak;
         s.longestStreak = Math.max(maxStreak, tempStreak);
+
+        // Best day of week
+        if (s.total > 0) {
+            const maxDow = s.dayOfWeek.reduce(
+                (best, cnt, i) => (cnt > s.dayOfWeek[best] ? i : best),
+                0
+            );
+            s.bestDay = { name: DOW_NAMES[maxDow], count: s.dayOfWeek[maxDow] };
+        }
 
         // Average solve time (only problems that have elapsedSeconds)
         const timed = problems.filter((p) => p.elapsedSeconds > 0);
@@ -766,6 +793,38 @@ export function AnalyticsView({ problems, onNavigate }) {
                     },
                 ],
             },
+            monthlyBar: {
+                labels: Object.keys(stats.months).map((m) => {
+                    const [yr, mo] = m.split("-");
+                    const d = new Date(parseInt(yr), parseInt(mo) - 1, 1);
+                    return d.toLocaleString("default", { month: "short" }) + " '" + yr.slice(2);
+                }),
+                datasets: [
+                    {
+                        label: "Solved",
+                        data: Object.values(stats.months),
+                        backgroundColor: "rgba(6, 182, 212, 0.65)",
+                        borderColor: "#06b6d4",
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    },
+                ],
+            },
+            dayOfWeekBar: {
+                labels: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+                datasets: [
+                    {
+                        label: "Solves",
+                        data: stats.dayOfWeek,
+                        backgroundColor: stats.dayOfWeek.map((cnt) =>
+                            cnt === Math.max(...stats.dayOfWeek) && cnt > 0
+                                ? "#06b6d4"
+                                : "rgba(6,182,212,0.3)"
+                        ),
+                        borderRadius: 4,
+                    },
+                ],
+            },
         };
     }, [stats]);
 
@@ -837,9 +896,9 @@ export function AnalyticsView({ problems, onNavigate }) {
                         color: "#10b981",
                     },
                     {
-                        label: "This Week",
-                        value: stats.thisWeek,
-                        sub: `${stats.thisMonth} this month`,
+                        label: "Last 7 Days",
+                        value: stats.last7Days,
+                        sub: `${stats.last30Days} last 30 days`,
                         color: "#f59e0b",
                     },
                     stats.avgSolveSeconds > 0
@@ -1137,6 +1196,77 @@ export function AnalyticsView({ problems, onNavigate }) {
                                         },
                                     },
                                 },
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Activity + Day of Week -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div
+                    class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col lg:col-span-2 h-72"
+                >
+                    <h3
+                        class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2"
+                    >
+                        Monthly Activity (12 Months)
+                    </h3>
+                    <div class="flex-1 min-h-0">
+                        <${ChartWrapper}
+                            type="bar"
+                            data=${chartData.monthlyBar}
+                            options=${{
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: "rgba(255,255,255,0.05)" },
+                                        ticks: { color: "#64748b", precision: 0 },
+                                    },
+                                    x: {
+                                        grid: { display: false },
+                                        ticks: { color: "#64748b" },
+                                    },
+                                },
+                                plugins: { legend: { display: false } },
+                            }}
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72"
+                >
+                    <div class="flex items-center justify-between mb-2">
+                        <h3
+                            class="text-xs font-bold text-slate-400 uppercase tracking-widest"
+                        >
+                            Activity by Day
+                        </h3>
+                        ${stats.bestDay.count > 0
+                            ? html`<span class="text-[10px] text-cyan-400"
+                                  >Peak: ${stats.bestDay.name}</span
+                              >`
+                            : ""}
+                    </div>
+                    <div class="flex-1 min-h-0">
+                        <${ChartWrapper}
+                            type="bar"
+                            data=${chartData.dayOfWeekBar}
+                            options=${{
+                                indexAxis: "y",
+                                scales: {
+                                    x: {
+                                        beginAtZero: true,
+                                        grid: { color: "rgba(255,255,255,0.05)" },
+                                        ticks: { color: "#64748b", precision: 0 },
+                                    },
+                                    y: {
+                                        grid: { display: false },
+                                        ticks: { color: "#94a3b8" },
+                                    },
+                                },
+                                plugins: { legend: { display: false } },
                             }}
                         />
                     </div>
