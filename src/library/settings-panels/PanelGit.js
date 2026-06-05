@@ -1120,6 +1120,7 @@ export function PanelGit({
                 setSyncNeedsPush(false);
                 const s = await Storage.getSettings();
                 await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+                onSettingsChange?.("_pendingConflicts", 0);
                 setSyncBusy(true);
                 setImportMsg(
                   `Pushing ${resolved.length} resolved problem${resolved.length !== 1 ? "s" : ""} to repo…`,
@@ -1153,9 +1154,11 @@ export function PanelGit({
                   loadSyncCount();
                 }
               }}
-              onCancel=${() => {
+              onCancel=${(_resolvedSoFar, remaining) => {
                 setImportData(null);
                 setSyncNeedsPush(false);
+                const leftover = Array.isArray(remaining) ? remaining.length : importData?.conflicts?.length ?? 0;
+                onSettingsChange?.("_pendingConflicts", leftover);
               }}
             />
           `

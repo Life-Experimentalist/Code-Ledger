@@ -6,6 +6,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.3] — 2026-06-05
+
+### Fixed
+- **Conflict Resolution Modal: Banner persists after resolve** — After applying resolved conflicts, the amber "conflicts detected" banner now clears immediately. Previously `_pendingConflicts` was zeroed in storage but the React settings state was not updated, so the banner remained until the next full reload.
+
+---
+
 ## [1.4.2] — 2026-06-02
 
 ### Added
