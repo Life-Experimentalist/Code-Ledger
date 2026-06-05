@@ -7,12 +7,8 @@ const version = pkg.version;
 
 mkdirSync("releases", { recursive: true });
 
-// Firefox (Gecko) requires manifest_version 3 but with a few tweaks:
-// - Remove "side_panel" which is Chrome-only
-// - Keep browser_specific_settings.gecko for stable add-on ID
-const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
-const ffManifest = { ...manifest };
-delete ffManifest.side_panel;  // not supported in Firefox MV3
+const ffManifest = JSON.parse(readFileSync("src/manifest-firefox.json", "utf8"));
+ffManifest.version = version;
 
 // Write temp manifest outside src/ so Chrome never sees it when loading unpacked
 const tmpManifest = resolve("releases/_manifest_ff_tmp.json");

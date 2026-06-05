@@ -1,7 +1,5 @@
 /**
- * Syncs version across package.json, manifest-chromium.json, manifest-firefox.json,
- * and manifest.json (the dev-unpacked copy of the chromium manifest).
- *
+ * Syncs version across package.json, manifest-chromium.json, and manifest-firefox.json.
  * Source of truth: package.json version.
  *
  * Usage:
@@ -31,24 +29,17 @@ if (!targetVersion || !/^\d+\.\d+\.\d+$/.test(targetVersion)) {
   process.exit(1);
 }
 
-// Update package.json
 if (pkg.version !== targetVersion) {
   pkg.version = targetVersion;
   writeFileSync(resolve(root, "package.json"), JSON.stringify(pkg, null, 2) + "\n", "utf8");
-  console.log(`  package.json          → ${targetVersion}`);
+  console.log(`  package.json               → ${targetVersion}`);
 }
 
-// Update both source manifests
 for (const rel of ["src/manifest-chromium.json", "src/manifest-firefox.json"]) {
   const m = readJson(rel);
   m.version = targetVersion;
   writeJson(rel, m);
   console.log(`  ${rel}  → ${targetVersion}`);
 }
-
-// Sync manifest.json from manifest-chromium.json (dev unpacked copy)
-const chromium = readJson("src/manifest-chromium.json");
-writeJson("src/manifest.json", chromium);
-console.log(`  src/manifest.json     → synced from manifest-chromium.json`);
 
 console.log(`\nAll manifests at ${targetVersion}`);

@@ -17,13 +17,13 @@ import { createGzip } from "zlib";
 import { pipeline } from "stream/promises";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-const manifest = JSON.parse(readFileSync(join("src", "manifest.json"), "utf8"));
+const manifest = JSON.parse(readFileSync(join("src", "manifest-chromium.json"), "utf8"));
 const version = pkg.version;
 
 if (manifest.version !== version) {
   console.error(
-    `Version mismatch: package.json has ${version} but src/manifest.json has ${manifest.version}.\n` +
-    `Update both to the same version before publishing.`
+    `Version mismatch: package.json has ${version} but src/manifest-chromium.json has ${manifest.version}.\n` +
+    `Run: node dev/sync-manifests.js --set ${version}`
   );
   process.exit(1);
 }

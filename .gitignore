@@ -9,6 +9,7 @@ coverage/
 .vscode/settings.json
 worker/wrangler.toml
 docs/superpowers
+desktop.ini
 
 # IDE & build
 .claude/
@@ -21,6 +22,7 @@ settings.local.json
 # Build artifacts
 src/ui/styles/compiled.css
 src/_manifest_ff_tmp.json
+src/manifest.json
 
 # Ignore local env file with secrets
 .env

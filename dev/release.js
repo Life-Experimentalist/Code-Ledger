@@ -19,7 +19,7 @@ const isDryRun = args.includes("--dry-run");
 const isRetry = args.includes("--retry");
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-const manifest = JSON.parse(readFileSync(join("src", "manifest.json"), "utf8"));
+const manifest = JSON.parse(readFileSync(join("src", "manifest-chromium.json"), "utf8"));
 const changelog = readFileSync("docs/CHANGELOG.md", "utf8");
 
 const version = pkg.version;
@@ -35,10 +35,10 @@ console.log("→ Validating...");
 if (manifest.version !== version) {
   console.error(`❌ Version mismatch:`);
   console.error(`   package.json: ${version}`);
-  console.error(`   src/manifest.json: ${manifest.version}`);
+  console.error(`   src/manifest-chromium.json: ${manifest.version}`);
   process.exit(1);
 }
-console.log(`   ✓ package.json and manifest.json both at ${version}`);
+console.log(`   ✓ package.json and manifests both at ${version}`);
 
 if (!changelog.includes(`## [${version}]`)) {
   console.error(`❌ docs/CHANGELOG.md missing entry for [${version}]`);
