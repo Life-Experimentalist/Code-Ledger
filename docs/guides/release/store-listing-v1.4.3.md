@@ -27,7 +27,7 @@ CodeLedger automatically commits every accepted DSA problem you solve — from L
 Solved a problem? CodeLedger detects the accepted submission, captures your code, and commits it to GitHub in a single atomic operation. Works across LeetCode, GFG (alpha), and Codeforces (alpha).
 
 ✦ AI CODE REVIEW
-Optional AI review (Gemini, GPT-4, Claude, DeepSeek, or Ollama) runs after every accepted solve. Reviews appear in the library panel and are committed alongside your solution. A floating AI chat panel on each problem page lets you ask follow-up questions.
+Optional AI review (Gemini, ChatGPT, Claude, DeepSeek, or Ollama) runs after every accepted solve. Reviews appear in the library panel and are committed alongside your solution. A floating AI chat panel on each problem page lets you ask follow-up questions.
 
 ✦ LIBRARY & ANALYTICS
 Browse all your saved solutions in the built-in Library side panel. Filter by platform, difficulty, language, or tag. View rolling 7/30-day solve counts, a monthly activity chart, a day-of-week heatmap, and a per-language breakdown.
@@ -39,7 +39,7 @@ Visualise connections between problems by topic, difficulty, and tag clusters in
 Solutions sync between devices via your GitHub repo. Conflict resolution is handled by a step-by-step modal that classifies same-code vs. different-approach conflicts and lets you keep either version — or both.
 
 ✦ PROFILE IMPORT
-Bulk-import your entire LeetCode or GFG solution history in one click. Existing problems merge intelligently.
+Bulk-import your entire LeetCode solution history in one click. Existing problems merge intelligently.
 
 ✦ YOUR DATA, YOUR REPO
 CodeLedger writes to a repository you own. No proprietary servers store your code. Authentication uses GitHub OAuth — no tokens stored in unsafe locations.
@@ -60,7 +60,7 @@ PERMISSIONS USED
 • webRequest — detect accepted submissions
 • Host permissions — limited to supported coding platforms and their APIs
 
-Open-source · MIT License · https://codeledger.vkrishna04.me
+Open-source · Apache 2.0 License · https://codeledger.vkrishna04.me
 ```
 
 ### Category
@@ -71,18 +71,18 @@ Open-source · MIT License · https://codeledger.vkrishna04.me
 
 ### Screenshots — order and captions
 
-| # | File | Caption |
-|---|------|---------|
-| 1 | `popup.png` | One-click access: live sync status and quick actions from the popup |
-| 2 | `Solutions Library Tab.png` | Browse every solved problem — filter by platform, difficulty, or language |
-| 3 | `Analytics Library Tab.png` | Rolling stats, monthly activity chart, day-of-week heatmap |
-| 4 | `AI Chat Leetcode.png` | Floating AI panel: get guided hints or a direct review on any problem |
-| 5 | `Graph Library Tab.png` | Knowledge graph: visualise topic clusters and connections |
-| 6 | `User Report.png` | Per-language and per-difficulty breakdown across your full history |
-| 7 | `User Repo auto Maintained.png` | Your GitHub repo — kept in sync automatically |
-| 8 | `conflict ui.png` | Step-by-step conflict resolution when merging from multiple devices |
-| 9 | `Portfolio Integration.png` | Portfolio integration: your solve history embeddable anywhere |
-| 10 | `Problems Modal.png` | Rich problem detail: code, AI review, tags, and edit in place |
+| #   | File                            | Caption                                                                   |
+| --- | ------------------------------- | ------------------------------------------------------------------------- |
+| 1   | `popup.png`                     | One-click access: live sync status and quick actions from the popup       |
+| 2   | `Solutions Library Tab.png`     | Browse every solved problem — filter by platform, difficulty, or language |
+| 3   | `Analytics Library Tab.png`     | Rolling stats, monthly activity chart, day-of-week heatmap                |
+| 4   | `AI Chat Leetcode.png`          | Floating AI panel: get guided hints or a direct review on any problem     |
+| 5   | `Graph Library Tab.png`         | Knowledge graph: visualise topic clusters and connections                 |
+| 6   | `User Report.png`               | Per-language and per-difficulty breakdown across your full history        |
+| 7   | `User Repo auto Maintained.png` | Your GitHub repo — kept in sync automatically                             |
+| 8   | `conflict ui.png`               | Step-by-step conflict resolution when merging from multiple devices       |
+| 9   | `Portfolio Integration.png`     | Portfolio integration: your solve history embeddable anywhere             |
+| 10  | `Problems Modal.png`            | Rich problem detail: code, AI review, tags, and edit in place             |
 
 ### Promotional images (if required)
 - **Small tile (440×280):** use `social preview.png` cropped or `icon-dark-bg.png` centered on dark bg
@@ -216,18 +216,18 @@ This extension uses no bundler or transpiler — all JS is plain ES6 modules loa
 
 All screenshots are in `src/assets/images/`. Minimum Chrome/Edge upload size is 1280×800. Firefox minimum is 400×300 (recommended 1280×800).
 
-| File | What it shows |
-|------|--------------|
-| `popup.png` | Extension popup with sync status |
-| `Solutions Library Tab.png` | Problems list with filters |
-| `Analytics Library Tab.png` | Analytics dashboard |
-| `AI Chat Leetcode.png` | Floating AI chat on LeetCode |
-| `Graph Library Tab.png` | Knowledge graph view |
-| `Current Graphify Graph.png` | Alternative graph view (use if higher resolution) |
-| `User Report.png` | Stats report card |
+| File                            | What it shows                                      |
+| ------------------------------- | -------------------------------------------------- |
+| `popup.png`                     | Extension popup with sync status                   |
+| `Solutions Library Tab.png`     | Problems list with filters                         |
+| `Analytics Library Tab.png`     | Analytics dashboard                                |
+| `AI Chat Leetcode.png`          | Floating AI chat on LeetCode                       |
+| `Graph Library Tab.png`         | Knowledge graph view                               |
+| `Current Graphify Graph.png`    | Alternative graph view (use if higher resolution)  |
+| `User Report.png`               | Stats report card                                  |
 | `User Repo auto Maintained.png` | GitHub repo structure auto-maintained by extension |
-| `conflict ui.png` | Conflict resolution wizard |
-| `Portfolio Integration.png` | Portfolio / external embed view |
-| `Problems Modal.png` | Problem detail modal with AI review |
+| `conflict ui.png`               | Conflict resolution wizard                         |
+| `Portfolio Integration.png`     | Portfolio / external embed view                    |
+| `Problems Modal.png`            | Problem detail modal with AI review                |
 
 > Note: Screenshots must be 1280×800 or 640×400 for Chrome. If any image is a different size, resize before uploading — do not stretch.
