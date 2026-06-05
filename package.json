@@ -54,6 +54,8 @@
     "release": "node dev/v2/cli.js release",
     "test:sync-regression": "node dev/test-sync-regression.js",
     "lint": "tsc --noEmit",
+    "sync:manifests": "node dev/sync-manifests.js",
+    "domains:update": "node dev/generate-manifest-domains.js",
     "validate:openapi": "node dev/validate-openapi.js",
     "deploy:worker": "cd worker && npx wrangler pages deploy public"
   },

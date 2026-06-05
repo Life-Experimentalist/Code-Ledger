@@ -7,7 +7,7 @@ export async function taskPublish(ctx, logger, options = {}) {
 
   // Validate versions first
   logger.section("Validate");
-  if (!validateVersions(ctx.pkg, ctx.manifest, logger)) {
+  if (!validateVersions(ctx.pkg, ctx.manifest, logger, ctx.manifestFirefox)) {
     process.exit(1);
   }
 

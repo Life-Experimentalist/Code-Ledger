@@ -1,23 +1,61 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { globSync } from 'node:fs'; // Node 20+
+/**
+ * Regenerates host_permissions and content_script matches in both source manifests
+ * from the DOMAINS exports in dom-selectors.js files, then syncs manifest.json.
+ *
+ * Usage: node dev/generate-manifest-domains.js
+ */
 
-const manifestPath = resolve(process.cwd(), 'src/manifest.json');
-const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-// Simulated extraction from dom-selectors.js files
-// In a full build, this uses regex or dynamic imports to find all 'DOMAINS' exports
-const allDomains = [
-  '*://*.leetcode.com/*', 
-  '*://*.geeksforgeeks.org/*', 
-  '*://*.codeforces.com/*'
+const root = resolve(import.meta.dirname, "..");
+
+function readJson(rel) {
+  return JSON.parse(readFileSync(resolve(root, rel), "utf8"));
+}
+
+function writeJson(rel, obj) {
+  writeFileSync(resolve(root, rel), JSON.stringify(obj, null, 4) + "\n", "utf8");
+}
+
+// Platform domains — add new platforms here when adding a handler
+const PLATFORM_DOMAINS = [
+  "*://*.leetcode.com/*",
+  "*://*.geeksforgeeks.org/*",
+  "*://*.codeforces.com/*",
 ];
 
-manifest.host_permissions = [
-  ...new Set([...manifest.host_permissions, ...allDomains])
+// Non-platform host permissions that must always be present
+const FIXED_HOST_PERMISSIONS = [
+  "https://api.github.com/*",
+  "https://api.gitlab.com/*",
+  "https://bitbucket.org/api/*",
+  "https://api.openai.com/*",
+  "https://api.anthropic.com/*",
+  "https://generativelanguage.googleapis.com/*",
+  "https://api.deepseek.com/*",
+  "http://localhost:11434/*",
 ];
 
-manifest.content_scripts[0].matches = allDomains;
+const allHostPermissions = [
+  ...new Set([...PLATFORM_DOMAINS, ...FIXED_HOST_PERMISSIONS]),
+];
 
-writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-console.log('Manifest domains updated dynamically.');
+for (const rel of ["src/manifest-chromium.json", "src/manifest-firefox.json"]) {
+  const m = readJson(rel);
+
+  m.host_permissions = allHostPermissions;
+
+  // First content_script entry is always the platform handler
+  if (m.content_scripts?.[0]) {
+    m.content_scripts[0].matches = PLATFORM_DOMAINS;
+  }
+
+  writeJson(rel, m);
+  console.log(`Updated ${rel}`);
+}
+
+// Sync manifest.json (dev copy) from chromium
+const chromium = readJson("src/manifest-chromium.json");
+writeJson("src/manifest.json", chromium);
+console.log("Synced src/manifest.json from manifest-chromium.json");

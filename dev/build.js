@@ -1,148 +1,58 @@
+/**
+ * Builds dist/chromium and dist/firefox from src/ using the source manifests.
+ * These dist directories are for local unpacked testing — packaging uses src/ directly.
+ *
+ * Usage: node dev/build.js [--skip-css]
+ */
+
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
+import { fileURLToPath } from "url";
 
-const SRC_DIR = "./src";
-const DIST_DIR = "./dist";
-const RELEASES_DIR = "./releases";
-const SKIP_CSS = process.argv.includes("--skip-css"); // Check for --skip-css argument
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, "..");
+const SRC_DIR = path.join(ROOT, "src");
+const DIST_DIR = path.join(ROOT, "dist");
+const SKIP_CSS = process.argv.includes("--skip-css");
 
-// Function to read version from manifest.json (single source of truth)
-function getVersion() {
-  try {
-    const manifestPath = path.join(SRC_DIR, "manifest.json");
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-    return manifest.version || "1.0.0";
-  } catch (e) {
-    console.warn("Could not read manifest.json:", e.message);
-    return "1.0.0";
-  }
+function readJson(rel) {
+  return JSON.parse(fs.readFileSync(path.join(ROOT, rel), "utf8"));
 }
 
-const VERSION = getVersion();
+const pkg = readJson("package.json");
+const VERSION = pkg.version;
 
-// Sync package.json version from manifest.json (source of truth)
-try {
-  const pkgPath = path.join(process.cwd(), "package.json");
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-  if (pkg.version !== VERSION) {
-    pkg.version = VERSION;
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-    console.log(
-      `✓ Synced package.json version to ${VERSION} (from manifest.json)`,
-    );
-  }
-} catch (e) {
-  console.warn("Could not sync package.json version:", e.message);
-}
-
-// Ensure CSS is built first (unless explicitly skipped)
 if (!SKIP_CSS) {
-  try {
-    console.log("Building CSS...");
-    execSync("npm run build:css", { stdio: "inherit" });
-  } catch (err) {
-    console.warn("CSS build failed:", err.message);
-  }
+  console.log("Building CSS...");
+  execSync("npm run build:css", { stdio: "inherit", cwd: ROOT });
 }
 
-if (fs.existsSync(DIST_DIR))
-  fs.rmSync(DIST_DIR, { recursive: true, force: true });
-if (!fs.existsSync(RELEASES_DIR))
-  fs.mkdirSync(RELEASES_DIR, { recursive: true });
+if (fs.existsSync(DIST_DIR)) fs.rmSync(DIST_DIR, { recursive: true, force: true });
 
 function copyRecursive(src, dest) {
   if (fs.statSync(src).isDirectory()) {
     fs.mkdirSync(dest, { recursive: true });
-    fs.readdirSync(src).forEach((item) => {
-      copyRecursive(path.join(src, item), path.join(dest, item));
-    });
+    fs.readdirSync(src).forEach((item) => copyRecursive(path.join(src, item), path.join(dest, item)));
   } else {
     fs.copyFileSync(src, dest);
   }
 }
 
-const baseManifest = {
-  manifest_version: 3,
-  name: "CodeLedger",
-  version: VERSION,
-  description:
-    "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
-  icons: {
-    16: "assets/images/icon-transparent.png",
-    48: "assets/images/icon-transparent.png",
-    128: "assets/images/icon-transparent.png",
-  },
-  permissions: ["storage", "alarms", "identity"],
-  host_permissions: [
-    "*://*.leetcode.com/*",
-    "*://*.geeksforgeeks.org/*",
-    "*://*.codeforces.com/*",
-    "*://api.github.com/*",
-    "*://generativelanguage.googleapis.com/*",
-  ],
-  action: {
-    default_popup: "popup/popup.html",
-  },
-  content_scripts: [
-    {
-      matches: ["*://*.leetcode.com/*"],
-      js: ["content/handler-loader.js"],
-    },
-  ],
-  web_accessible_resources: [
-    {
-      resources: ["*"],
-      matches: [
-        "*://*.leetcode.com/*",
-        "*://*.geeksforgeeks.org/*",
-        "*://*.codeforces.com/*",
-      ],
-    },
-  ],
-};
-
+// Build Chromium dist
 console.log("Building Chromium extension...");
 const chromeDir = path.join(DIST_DIR, "chromium");
 copyRecursive(SRC_DIR, chromeDir);
+const chromeManifest = readJson("src/manifest-chromium.json");
+chromeManifest.version = VERSION;
+fs.writeFileSync(path.join(chromeDir, "manifest.json"), JSON.stringify(chromeManifest, null, 4) + "\n");
 
-const chromeManifest = JSON.parse(JSON.stringify(baseManifest));
-chromeManifest.permissions.push("sidePanel");
-chromeManifest.side_panel = {
-  default_path: "sidebar/sidebar.html",
-};
-chromeManifest.background = {
-  service_worker: "background/service-worker.js",
-  type: "module",
-};
-fs.writeFileSync(
-  path.join(chromeDir, "manifest.json"),
-  JSON.stringify(chromeManifest, null, 2),
-);
-
+// Build Firefox dist
 console.log("Building Firefox extension...");
 const firefoxDir = path.join(DIST_DIR, "firefox");
 copyRecursive(SRC_DIR, firefoxDir);
+const ffManifest = readJson("src/manifest-firefox.json");
+ffManifest.version = VERSION;
+fs.writeFileSync(path.join(firefoxDir, "manifest.json"), JSON.stringify(ffManifest, null, 4) + "\n");
 
-const firefoxManifest = JSON.parse(JSON.stringify(baseManifest));
-firefoxManifest.sidebar_action = {
-  default_panel: "sidebar/sidebar.html",
-};
-firefoxManifest.background = {
-  scripts: ["background/service-worker.js"],
-  type: "module",
-};
-firefoxManifest.browser_specific_settings = {
-  gecko: {
-    id: "codeledger@vkrishna04.me",
-    strict_min_version: "109.0",
-  },
-};
-fs.writeFileSync(
-  path.join(firefoxDir, "manifest.json"),
-  JSON.stringify(firefoxManifest, null, 2),
-);
-
-console.log(
-  "Dist build complete. Run `node dev/package.js` to create release zips.",
-);
+console.log("Dist build complete. Run `node dev/package.js` to create release zips.");

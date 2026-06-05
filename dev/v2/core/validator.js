@@ -1,12 +1,24 @@
 import { readFileSync } from "fs";
 
-export function validateVersions(pkg, manifest, logger) {
+export function validateVersions(pkg, manifest, logger, manifestFirefox) {
+  let ok = true;
+
   if (pkg.version !== manifest.version) {
     logger.error(`Version mismatch:`);
-    logger.error(`   package.json: ${pkg.version}`);
-    logger.error(`   src/manifest.json: ${manifest.version}`);
-    return false;
+    logger.error(`   package.json:              ${pkg.version}`);
+    logger.error(`   src/manifest-chromium.json: ${manifest.version}`);
+    ok = false;
   }
+
+  if (manifestFirefox && pkg.version !== manifestFirefox.version) {
+    logger.error(`Version mismatch:`);
+    logger.error(`   package.json:             ${pkg.version}`);
+    logger.error(`   src/manifest-firefox.json: ${manifestFirefox.version}`);
+    ok = false;
+  }
+
+  if (!ok) return false;
+
   logger.ok(`package.json and manifest.json both at ${pkg.version}`);
   return true;
 }

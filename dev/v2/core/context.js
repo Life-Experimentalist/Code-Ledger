@@ -11,10 +11,12 @@ export function createContext() {
   const rootDir = resolve(dirname(__filename), "../../..");
 
   const packageJsonPath = join(rootDir, "package.json");
-  const manifestPath = join(rootDir, "src", "manifest.json");
+  const manifestChromiumPath = join(rootDir, "src", "manifest-chromium.json");
+  const manifestFirefoxPath = join(rootDir, "src", "manifest-firefox.json");
 
   const pkg = readJson(packageJsonPath);
-  const manifest = readJson(manifestPath);
+  const manifest = readJson(manifestChromiumPath);
+  const manifestFirefox = readJson(manifestFirefoxPath);
 
   const version = pkg.version;
   const tag = `v${version}`;
@@ -31,9 +33,13 @@ export function createContext() {
   return {
     rootDir,
     packageJsonPath,
-    manifestPath,
+    manifestChromiumPath,
+    manifestFirefoxPath,
+    // Keep manifestPath as alias for chromium (backwards compat with release.js/validator)
+    manifestPath: manifestChromiumPath,
     pkg,
     manifest,
+    manifestFirefox,
     version,
     tag,
     releasesDir,

@@ -10,38 +10,43 @@ export class Packager {
 
   packageChromium() {
     this.logger.step("Package Chromium extension");
+
+    const manifest = JSON.parse(
+      readFileSync(resolve(this.ctx.rootDir, "src", "manifest-chromium.json"), "utf8"),
+    );
+    manifest.version = this.ctx.version;
+
+    const tmpManifest = resolve(this.ctx.releaseVersionDir, "_manifest_chromium_tmp.json");
+    writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
+
     const zip = new AdmZip();
-    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "");
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", (name) => name !== "manifest.json");
+    zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(
       this.ctx.releaseVersionDir,
       `codeledger-chromium-v${this.ctx.version}.zip`,
     );
     zip.writeZip(outPath);
+
+    try { unlinkSync(tmpManifest); } catch (_) {}
     this.logger.ok(`Chromium packaged: ${outPath}`);
     return outPath;
   }
 
   packageFirefox() {
     this.logger.step("Package Firefox extension");
-    const manifest = JSON.parse(
-      readFileSync(resolve(this.ctx.rootDir, "src", "manifest.json"), "utf8"),
-    );
-    const ffManifest = { ...manifest };
-    delete ffManifest.side_panel; // Firefox MV3 doesn't support side_panel
 
-    const tmpManifest = resolve(
-      this.ctx.releaseVersionDir,
-      "_manifest_ff_tmp.json",
+    const manifest = JSON.parse(
+      readFileSync(resolve(this.ctx.rootDir, "src", "manifest-firefox.json"), "utf8"),
     );
-    writeFileSync(tmpManifest, JSON.stringify(ffManifest, null, 2), "utf8");
+    manifest.version = this.ctx.version;
+
+    const tmpManifest = resolve(this.ctx.releaseVersionDir, "_manifest_ff_tmp.json");
+    writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
 
     const zip = new AdmZip();
-    zip.addLocalFolder(
-      resolve(this.ctx.rootDir, "src"),
-      "",
-      (name) => name !== "manifest.json",
-    );
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", (name) => name !== "manifest.json");
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(
@@ -50,9 +55,7 @@ export class Packager {
     );
     zip.writeZip(outPath);
 
-    try {
-      unlinkSync(tmpManifest);
-    } catch (_) {}
+    try { unlinkSync(tmpManifest); } catch (_) {}
     this.logger.ok(`Firefox packaged: ${outPath}`);
     return outPath;
   }
@@ -69,7 +72,6 @@ export class Packager {
       ".prettierrc",
     ];
 
-    // Exclude generated directories that can be reproduced with npm install / build
     const EXCLUDE_SEGMENTS = new Set(["node_modules", "dist"]);
     const shouldInclude = (filePath) =>
       !filePath.split(/[\\/]/).some((seg) => EXCLUDE_SEGMENTS.has(seg));
