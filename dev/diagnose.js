@@ -61,7 +61,7 @@ async function checkHandler(handlerPath) {
 async function checkAllHandlers() {
   console.log(
     "\n📋 CodeLedger Handler Diagnostic Report\n" +
-      "========================================\n"
+      "========================================\n",
   );
 
   const categories = {
@@ -115,7 +115,7 @@ async function checkAllHandlers() {
     "..",
     "worker",
     "public",
-    "config.json"
+    "config.json",
   );
   if (fs.existsSync(workerConfig)) {
     const config = JSON.parse(fs.readFileSync(workerConfig, "utf-8"));
@@ -133,7 +133,7 @@ async function checkAllHandlers() {
     "..",
     "src",
     "core",
-    "constants.js"
+    "constants.js",
   );
   if (fs.existsSync(constantsPath)) {
     const content = fs.readFileSync(constantsPath, "utf-8");

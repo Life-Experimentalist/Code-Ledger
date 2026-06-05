@@ -7,7 +7,9 @@ const version = pkg.version;
 
 mkdirSync("releases", { recursive: true });
 
-const ffManifest = JSON.parse(readFileSync("src/manifest-firefox.json", "utf8"));
+const ffManifest = JSON.parse(
+  readFileSync("src/manifest-firefox.json", "utf8"),
+);
 ffManifest.version = version;
 
 // Write temp manifest outside src/ so Chrome never sees it when loading unpacked
@@ -23,6 +25,8 @@ zip.addLocalFile(tmpManifest, "", "manifest.json");
 zip.writeZip(outPath);
 
 // Clean up temp manifest
-try { unlinkSync(tmpManifest); } catch (_) { }
+try {
+  unlinkSync(tmpManifest);
+} catch (_) {}
 
 console.log(`Firefox extension packaged: ${outPath}`);

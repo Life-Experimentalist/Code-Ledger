@@ -21,6 +21,7 @@ When an AI provider generates a review or chat response:
    - Fetches enabled tools from `getMCPConfig()`
 
 2. **Context Building**: Prepends available tools to the prompt
+
    ```
    [AVAILABLE_MCP_TOOLS]
    - Query Problems: Search for problems by platform/difficulty/topic/time
@@ -57,15 +58,18 @@ Users control which tools are available in **Settings → MCP Tools**:
 ### Tool Categories
 
 **Context Tools** (default enabled):
+
 - `query-problems` — Search problems
 - `get-problem-stats` — Problem analytics
 - `find-similar-problems` — Similar problem suggestions
 - `get-user-profile` — User context
 
 **Suggestions** (default enabled):
+
 - `get-next-suggestion` — Smart difficulty progression
 
 **Analysis** (default enabled):
+
 - `analyze-code-quality` — Code complexity & patterns
 - `get-trend-analysis` — 30-day trends
 
@@ -88,6 +92,7 @@ On next problem commit:
 ### Portable Settings (Auto-Committed)
 
 Settings automatically committed to GitHub repo:
+
 - Theme configuration (preset, mode, accent)
 - Behavior bank settings (enabled, telemetry, debug)
 - AI settings (copyable, auto-review)
@@ -95,6 +100,7 @@ Settings automatically committed to GitHub repo:
 - MCP configuration (which tools enabled)
 
 **NOT committed** (security):
+
 - OAuth tokens
 - API keys
 - Personal access tokens
@@ -103,6 +109,7 @@ Settings automatically committed to GitHub repo:
 ### Cross-Device Sync
 
 After push to GitHub:
+
 1. On another device, user syncs settings
 2. Pulls `.codeledger/config.json` from repo
 3. Merges remote settings (remote wins except critical keys)
@@ -115,12 +122,14 @@ After push to GitHub:
 Instead of monolithic `index.js`, split into focused modules:
 
 **[src/handlers/git/github/api-client.js]**
+
 - Pure GitHub API wrapper functions
 - Handles auth, error handling, retries
 - Functions: `apiFetch`, `getCurrentUser`, `getRepoRef`, `createTree`, `createCommit`, etc.
 - Single responsibility: API communication
 
 **[src/handlers/git/github/infra-builder.js]**
+
 - Builds infrastructure files (README, LICENSE, .github/workflows, Pages)
 - Generates GitHub Pages HTML with optional verification
 - Normalizes repo topics
@@ -128,11 +137,13 @@ Instead of monolithic `index.js`, split into focused modules:
 - Single responsibility: File generation
 
 **[src/handlers/git/github/pages-template.js]** (existing)
+
 - GitHub Pages HTML/CSS template
 - Actions workflow template
 - README template
 
 **[src/handlers/git/github/index.js]** (refactored - now ~200 lines)
+
 - Main GitHubHandler class
 - Orchestrates API calls using modules
 - Implements BaseGitHandler interface
@@ -188,6 +199,7 @@ Action: Generates or validates `index.html`
 Schedule: Optional daily runs for off-peak re-generation
 
 Features:
+
 - Auto-run on every commit
 - No user action required
 - Regenerates Pages dashboard
@@ -265,6 +277,7 @@ On next commit:
 ## User Control
 
 Users can:
+
 - ✅ Enable/disable individual MCP tools
 - ✅ Toggle global MCP usage (chat/review)
 - ✅ Override AI model per provider
@@ -274,6 +287,7 @@ Users can:
 - ✅ Configure sync intervals
 
 Users don't need to:
+
 - ❌ Manually commit settings
 - ❌ Invoke MCP tools manually (AI does it)
 - ❌ Regenerate Pages dashboard
@@ -283,11 +297,13 @@ Users don't need to:
 ## Testing
 
 All autonomous systems type-checked via:
+
 ```bash
 npm run lint
 ```
 
 Manual testing checklist:
+
 - [ ] Change setting → verify next commit includes config.json
 - [ ] Enable/disable MCP tool → verify setting persisted
 - [ ] AI generates review → verify MCP tools in prompt if enabled

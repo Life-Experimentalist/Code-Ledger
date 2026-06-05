@@ -82,7 +82,9 @@ if (process.stdin.isTTY) {
   process.stdin.setEncoding("utf8");
   process.stdin.resume();
   process.stdin.on("data", (chunk) => {
-    const input = String(chunk || "").replace(/\r?\n/g, "").trim();
+    const input = String(chunk || "")
+      .replace(/\r?\n/g, "")
+      .trim();
     if (input === "") {
       triggerManualBuild();
     }

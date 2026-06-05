@@ -3,6 +3,7 @@
 Canonical project reference material that is not part of the main walkthrough docs.
 
 ## Files
+
 - [OpenAPI Contract](../OPENAPI.yaml)
 - [Changelog](../archive/changelog.md)
 - [Feature Requests](backlog.md)

@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 <div align="center">
 
 <img src="./src/assets/images/icon-transparent.png" width="88px" height="88px" alt="CodeLedger" />
@@ -6,7 +11,7 @@
 
 **Your DSA grind, on your GitHub. Automatically.**
 
-*Zero-click commits · AI code review · Live analytics · Knowledge graph · Bulk LeetCode import*
+_Zero-click commits · AI code review · Live analytics · Knowledge graph · Bulk LeetCode import_
 
 <br/>
 
@@ -255,6 +260,7 @@ Read [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) before opening a PR.
 **GFG and Codeforces platform handlers are actively wanted** — see [docs/reference/backlog.md](docs/reference/backlog.md) for the open tickets. The platform handler contract is fully documented; LeetCode's handler is the reference implementation.
 
 Quick rules:
+
 - All extension API calls go through `src/lib/browser-compat.js` — never touch `chrome.*` or `browser.*` elsewhere.
 - Use `createDebugger()` from `src/lib/debug.js` instead of `console.log`.
 - Run `npm run lint` before pushing.
@@ -278,6 +284,6 @@ Quick rules:
 
 **[codeledger.vkrishna04.me](https://codeledger.vkrishna04.me)** · [Apache 2.0](LICENSE.md)
 
-*Fork it. Self-host it. Own your data.*
+_Fork it. Self-host it. Own your data._
 
 </div>

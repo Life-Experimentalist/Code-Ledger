@@ -15,10 +15,10 @@ const dbg = createDebugger("GFGAceExtractor");
  * @returns {Promise<string>} Editor content, or "" if unavailable.
  */
 export async function extractAceCode() {
-    const metaId = `cl-ace-${Date.now()}`;
+  const metaId = `cl-ace-${Date.now()}`;
 
-    const script = document.createElement("script");
-    script.textContent = `(function(){
+  const script = document.createElement("script");
+  script.textContent = `(function(){
         try {
             var ed = ace.edit("ace-editor");
             var val = ed.getValue();
@@ -34,24 +34,24 @@ export async function extractAceCode() {
         }
     })();`;
 
-    document.head.appendChild(script);
+  document.head.appendChild(script);
 
-    // Give the synchronous injected script a tick to execute
-    await new Promise((r) => setTimeout(r, 50));
+  // Give the synchronous injected script a tick to execute
+  await new Promise((r) => setTimeout(r, 50));
 
-    const meta = document.head.querySelector(`meta[name="${metaId}"]`);
-    const raw = meta ? (meta.getAttribute("content") || "") : "";
-    meta?.remove();
-    script.remove();
+  const meta = document.head.querySelector(`meta[name="${metaId}"]`);
+  const raw = meta ? meta.getAttribute("content") || "" : "";
+  meta?.remove();
+  script.remove();
 
-    try {
-        const code = raw ? decodeURIComponent(raw) : "";
-        dbg.log(`extractAceCode(): ${code.length} chars`);
-        return code;
-    } catch (e) {
-        dbg.warn("extractAceCode(): decode failed", e.message);
-        return "";
-    }
+  try {
+    const code = raw ? decodeURIComponent(raw) : "";
+    dbg.log(`extractAceCode(): ${code.length} chars`);
+    return code;
+  } catch (e) {
+    dbg.warn("extractAceCode(): decode failed", e.message);
+    return "";
+  }
 }
 
 /**
@@ -59,13 +59,13 @@ export async function extractAceCode() {
  * @returns {string}
  */
 export function extractCodeMirrorCode() {
-    const cm = document.querySelector(".CodeMirror-code");
-    if (cm) {
-        return [...cm.querySelectorAll(".CodeMirror-line")]
-            .map((l) => l.textContent)
-            .join("\n");
-    }
-    return "";
+  const cm = document.querySelector(".CodeMirror-code");
+  if (cm) {
+    return [...cm.querySelectorAll(".CodeMirror-line")]
+      .map((l) => l.textContent)
+      .join("\n");
+  }
+  return "";
 }
 
 /**
@@ -73,12 +73,12 @@ export function extractCodeMirrorCode() {
  * @returns {Promise<string>}
  */
 export async function extractEditorCode() {
-    const aceCode = await extractAceCode();
-    if (aceCode.trim()) return aceCode;
+  const aceCode = await extractAceCode();
+  if (aceCode.trim()) return aceCode;
 
-    const cmCode = extractCodeMirrorCode();
-    if (cmCode.trim()) return cmCode;
+  const cmCode = extractCodeMirrorCode();
+  if (cmCode.trim()) return cmCode;
 
-    dbg.warn("extractEditorCode(): no code found in Ace or CodeMirror");
-    return "";
+  dbg.warn("extractEditorCode(): no code found in Ace or CodeMirror");
+  return "";
 }

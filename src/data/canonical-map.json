@@ -8,10 +8,7 @@
       "topic": "arrays",
       "difficulty": "easy",
       "pattern": "hash-map",
-      "tags": [
-        "array",
-        "hash-table"
-      ],
+      "tags": ["array", "hash-table"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -33,10 +30,7 @@
       "topic": "arrays",
       "difficulty": "easy",
       "pattern": "hash-set",
-      "tags": [
-        "array",
-        "hash-table"
-      ],
+      "tags": ["array", "hash-table"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -54,10 +48,7 @@
       "topic": "arrays",
       "difficulty": "easy",
       "pattern": "counting",
-      "tags": [
-        "string",
-        "hash-table"
-      ],
+      "tags": ["string", "hash-table"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -75,10 +66,7 @@
       "topic": "arrays",
       "difficulty": "medium",
       "pattern": "hash-map",
-      "tags": [
-        "array",
-        "string"
-      ],
+      "tags": ["array", "string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -96,10 +84,7 @@
       "topic": "heap",
       "difficulty": "medium",
       "pattern": "heap",
-      "tags": [
-        "array",
-        "heap"
-      ],
+      "tags": ["array", "heap"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -117,9 +102,7 @@
       "topic": "arrays",
       "difficulty": "medium",
       "pattern": "prefix-suffix",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -137,9 +120,7 @@
       "topic": "arrays",
       "difficulty": "medium",
       "pattern": "simulation",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -157,9 +138,7 @@
       "topic": "arrays",
       "difficulty": "medium",
       "pattern": "design",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -176,9 +155,7 @@
       "topic": "arrays",
       "difficulty": "medium",
       "pattern": "hash-set",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -196,9 +173,7 @@
       "topic": "two-pointers",
       "difficulty": "easy",
       "pattern": "two-pointer",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -216,9 +191,7 @@
       "topic": "two-pointers",
       "difficulty": "medium",
       "pattern": "two-pointer",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -236,9 +209,7 @@
       "topic": "two-pointers",
       "difficulty": "medium",
       "pattern": "two-pointer",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -256,9 +227,7 @@
       "topic": "two-pointers",
       "difficulty": "medium",
       "pattern": "greedy",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -276,9 +245,7 @@
       "topic": "two-pointers",
       "difficulty": "hard",
       "pattern": "two-pointer",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -296,9 +263,7 @@
       "topic": "sliding-window",
       "difficulty": "easy",
       "pattern": "two-pointer",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -316,10 +281,7 @@
       "topic": "sliding-window",
       "difficulty": "medium",
       "pattern": "sliding-window",
-      "tags": [
-        "string",
-        "hash-table"
-      ],
+      "tags": ["string", "hash-table"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -337,9 +299,7 @@
       "topic": "sliding-window",
       "difficulty": "medium",
       "pattern": "sliding-window",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -357,10 +317,7 @@
       "topic": "sliding-window",
       "difficulty": "hard",
       "pattern": "sliding-window",
-      "tags": [
-        "string",
-        "hash-table"
-      ],
+      "tags": ["string", "hash-table"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -378,9 +335,7 @@
       "topic": "sliding-window",
       "difficulty": "medium",
       "pattern": "sliding-window",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -398,9 +353,7 @@
       "topic": "stack",
       "difficulty": "easy",
       "pattern": "stack",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -418,9 +371,7 @@
       "topic": "stack",
       "difficulty": "medium",
       "pattern": "design",
-      "tags": [
-        "stack"
-      ],
+      "tags": ["stack"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -438,9 +389,7 @@
       "topic": "stack",
       "difficulty": "medium",
       "pattern": "stack",
-      "tags": [
-        "stack"
-      ],
+      "tags": ["stack"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -458,9 +407,7 @@
       "topic": "backtracking",
       "difficulty": "medium",
       "pattern": "backtracking",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -478,9 +425,7 @@
       "topic": "stack",
       "difficulty": "medium",
       "pattern": "monotonic-stack",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -498,9 +443,7 @@
       "topic": "binary-search",
       "difficulty": "easy",
       "pattern": "binary-search",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -518,9 +461,7 @@
       "topic": "binary-search",
       "difficulty": "medium",
       "pattern": "binary-search",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -538,9 +479,7 @@
       "topic": "binary-search",
       "difficulty": "medium",
       "pattern": "binary-search",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -558,9 +497,7 @@
       "topic": "binary-search",
       "difficulty": "medium",
       "pattern": "binary-search",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -578,9 +515,7 @@
       "topic": "binary-search",
       "difficulty": "medium",
       "pattern": "binary-search",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -598,9 +533,7 @@
       "topic": "linked-list",
       "difficulty": "easy",
       "pattern": "iteration",
-      "tags": [
-        "linked-list"
-      ],
+      "tags": ["linked-list"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -618,9 +551,7 @@
       "topic": "linked-list",
       "difficulty": "easy",
       "pattern": "merge",
-      "tags": [
-        "linked-list"
-      ],
+      "tags": ["linked-list"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -638,9 +569,7 @@
       "topic": "linked-list",
       "difficulty": "easy",
       "pattern": "fast-slow",
-      "tags": [
-        "linked-list"
-      ],
+      "tags": ["linked-list"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -658,9 +587,7 @@
       "topic": "linked-list",
       "difficulty": "medium",
       "pattern": "fast-slow",
-      "tags": [
-        "linked-list"
-      ],
+      "tags": ["linked-list"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -678,9 +605,7 @@
       "topic": "linked-list",
       "difficulty": "medium",
       "pattern": "two-pointer",
-      "tags": [
-        "linked-list"
-      ],
+      "tags": ["linked-list"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -698,9 +623,7 @@
       "topic": "linked-list",
       "difficulty": "medium",
       "pattern": "hash-map",
-      "tags": [
-        "linked-list"
-      ],
+      "tags": ["linked-list"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -718,9 +641,7 @@
       "topic": "linked-list",
       "difficulty": "medium",
       "pattern": "simulation",
-      "tags": [
-        "linked-list"
-      ],
+      "tags": ["linked-list"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -738,9 +659,7 @@
       "topic": "two-pointers",
       "difficulty": "medium",
       "pattern": "fast-slow",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -758,9 +677,7 @@
       "topic": "trees",
       "difficulty": "easy",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -778,9 +695,7 @@
       "topic": "trees",
       "difficulty": "easy",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -798,9 +713,7 @@
       "topic": "trees",
       "difficulty": "easy",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -818,9 +731,7 @@
       "topic": "trees",
       "difficulty": "easy",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -838,9 +749,7 @@
       "topic": "trees",
       "difficulty": "easy",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -858,9 +767,7 @@
       "topic": "trees",
       "difficulty": "easy",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -878,9 +785,7 @@
       "topic": "trees",
       "difficulty": "medium",
       "pattern": "bst",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -898,9 +803,7 @@
       "topic": "trees",
       "difficulty": "medium",
       "pattern": "bfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -918,9 +821,7 @@
       "topic": "trees",
       "difficulty": "medium",
       "pattern": "bfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -938,9 +839,7 @@
       "topic": "trees",
       "difficulty": "medium",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -958,9 +857,7 @@
       "topic": "trees",
       "difficulty": "medium",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -978,9 +875,7 @@
       "topic": "trees",
       "difficulty": "medium",
       "pattern": "inorder",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -998,9 +893,7 @@
       "topic": "trees",
       "difficulty": "medium",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1018,9 +911,7 @@
       "topic": "trees",
       "difficulty": "hard",
       "pattern": "dfs",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1038,9 +929,7 @@
       "topic": "trees",
       "difficulty": "hard",
       "pattern": "design",
-      "tags": [
-        "tree"
-      ],
+      "tags": ["tree"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1058,9 +947,7 @@
       "topic": "tries",
       "difficulty": "medium",
       "pattern": "design",
-      "tags": [
-        "trie"
-      ],
+      "tags": ["trie"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1078,9 +965,7 @@
       "topic": "tries",
       "difficulty": "medium",
       "pattern": "backtracking",
-      "tags": [
-        "trie"
-      ],
+      "tags": ["trie"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1098,9 +983,7 @@
       "topic": "tries",
       "difficulty": "hard",
       "pattern": "backtracking",
-      "tags": [
-        "trie"
-      ],
+      "tags": ["trie"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1118,9 +1001,7 @@
       "topic": "heap",
       "difficulty": "hard",
       "pattern": "two-heaps",
-      "tags": [
-        "heap"
-      ],
+      "tags": ["heap"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1138,9 +1019,7 @@
       "topic": "heap",
       "difficulty": "easy",
       "pattern": "heap",
-      "tags": [
-        "heap"
-      ],
+      "tags": ["heap"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1158,9 +1037,7 @@
       "topic": "dynamic-programming",
       "difficulty": "easy",
       "pattern": "dp",
-      "tags": [
-        "dp"
-      ],
+      "tags": ["dp"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1178,9 +1055,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "dp",
-      "tags": [
-        "dp"
-      ],
+      "tags": ["dp"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1198,9 +1073,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "dp",
-      "tags": [
-        "dp"
-      ],
+      "tags": ["dp"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1218,9 +1091,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "expand-around-center",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1238,9 +1109,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "expand-around-center",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1258,9 +1127,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "dp",
-      "tags": [
-        "dp"
-      ],
+      "tags": ["dp"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1278,9 +1145,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "unbounded-knapsack",
-      "tags": [
-        "dp"
-      ],
+      "tags": ["dp"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1298,9 +1163,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "kadane-variant",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1318,9 +1181,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "dp",
-      "tags": [
-        "string"
-      ],
+      "tags": ["string"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1338,9 +1199,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "dp-binary-search",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1358,9 +1217,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "grid-dp",
-      "tags": [
-        "dp"
-      ],
+      "tags": ["dp"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1378,9 +1235,7 @@
       "topic": "dynamic-programming",
       "difficulty": "medium",
       "pattern": "dp",
-      "tags": [
-        "dp"
-      ],
+      "tags": ["dp"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1398,9 +1253,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "dfs",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1418,9 +1271,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "dfs",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1438,9 +1289,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "dfs",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1458,9 +1307,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "dfs",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1478,9 +1325,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "topological-sort",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1498,9 +1343,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "topological-sort",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1518,9 +1361,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "union-find",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1538,9 +1379,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "union-find",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1558,9 +1397,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "union-find",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1578,9 +1415,7 @@
       "topic": "graphs",
       "difficulty": "hard",
       "pattern": "topological-sort",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1597,9 +1432,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "shortest-path",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1617,9 +1450,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "dijkstra",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1637,9 +1468,7 @@
       "topic": "graphs",
       "difficulty": "hard",
       "pattern": "dijkstra",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1657,9 +1486,7 @@
       "topic": "graphs",
       "difficulty": "hard",
       "pattern": "eulerian-path",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1677,9 +1504,7 @@
       "topic": "graphs",
       "difficulty": "medium",
       "pattern": "mst",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1697,9 +1522,7 @@
       "topic": "graphs",
       "difficulty": "hard",
       "pattern": "bfs",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1717,9 +1540,7 @@
       "topic": "graphs",
       "difficulty": "hard",
       "pattern": "bfs",
-      "tags": [
-        "graph"
-      ],
+      "tags": ["graph"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1737,9 +1558,7 @@
       "topic": "backtracking",
       "difficulty": "medium",
       "pattern": "backtracking",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1757,9 +1576,7 @@
       "topic": "backtracking",
       "difficulty": "medium",
       "pattern": "backtracking",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1777,9 +1594,7 @@
       "topic": "backtracking",
       "difficulty": "medium",
       "pattern": "backtracking",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1797,9 +1612,7 @@
       "topic": "backtracking",
       "difficulty": "medium",
       "pattern": "backtracking",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1817,9 +1630,7 @@
       "topic": "backtracking",
       "difficulty": "medium",
       "pattern": "backtracking",
-      "tags": [
-        "grid"
-      ],
+      "tags": ["grid"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1837,9 +1648,7 @@
       "topic": "intervals",
       "difficulty": "medium",
       "pattern": "sorting",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1857,9 +1666,7 @@
       "topic": "intervals",
       "difficulty": "medium",
       "pattern": "simulation",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1877,9 +1684,7 @@
       "topic": "intervals",
       "difficulty": "medium",
       "pattern": "greedy",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1897,9 +1702,7 @@
       "topic": "intervals",
       "difficulty": "easy",
       "pattern": "sorting",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1917,9 +1720,7 @@
       "topic": "intervals",
       "difficulty": "medium",
       "pattern": "heap",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1937,9 +1738,7 @@
       "topic": "math",
       "difficulty": "medium",
       "pattern": "matrix",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1957,9 +1756,7 @@
       "topic": "math",
       "difficulty": "medium",
       "pattern": "simulation",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1977,9 +1774,7 @@
       "topic": "math",
       "difficulty": "medium",
       "pattern": "matrix",
-      "tags": [
-        "array"
-      ],
+      "tags": ["array"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -1997,9 +1792,7 @@
       "topic": "bit-manipulation",
       "difficulty": "easy",
       "pattern": "bit",
-      "tags": [
-        "bit"
-      ],
+      "tags": ["bit"],
       "aliases": [
         {
           "platform": "leetcode",
@@ -2017,9 +1810,7 @@
       "topic": "bit-manipulation",
       "difficulty": "easy",
       "pattern": "dp",
-      "tags": [
-        "bit"
-      ],
+      "tags": ["bit"],
       "aliases": [
         {
           "platform": "leetcode",

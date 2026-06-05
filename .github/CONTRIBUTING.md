@@ -62,14 +62,14 @@ npx wrangler dev    # local dev — requires wrangler.toml with secrets (see doc
 
 ### Core rules — never violate these
 
-| Rule | Why |
-|------|-----|
-| No `chrome.*` or `browser.*` outside `src/lib/browser-compat.js` | Single cross-browser shim |
-| No `console.log` — use `createDebugger()` from `src/lib/debug.js` | Preserves source location in DevTools |
-| No storage key strings — use `CONSTANTS.SK.*` | Prevents key drift between reads and writes |
-| OAuth tokens go through `Storage.setAuthToken()` only | Tokens must never land in settings |
-| All UI uses Preact + htm — no JSX, no bundler | Extension CSP forbids eval/dynamic scripts |
-| Only `src/lib/browser-compat.js` touches extension APIs | All other files import from this shim |
+| Rule                                                              | Why                                         |
+| ----------------------------------------------------------------- | ------------------------------------------- |
+| No `chrome.*` or `browser.*` outside `src/lib/browser-compat.js`  | Single cross-browser shim                   |
+| No `console.log` — use `createDebugger()` from `src/lib/debug.js` | Preserves source location in DevTools       |
+| No storage key strings — use `CONSTANTS.SK.*`                     | Prevents key drift between reads and writes |
+| OAuth tokens go through `Storage.setAuthToken()` only             | Tokens must never land in settings          |
+| All UI uses Preact + htm — no JSX, no bundler                     | Extension CSP forbids eval/dynamic scripts  |
+| Only `src/lib/browser-compat.js` touches extension APIs           | All other files import from this shim       |
 
 ### Style
 
@@ -121,6 +121,7 @@ If your change affects canonical mapping:
 CodeLedger follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`) and [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Version is stored in two canonical places — both must be kept in sync:**
+
 - `src/manifest.json` → `"version"` field
 - `package.json` → `"version"` field
 
@@ -169,18 +170,19 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) style:
 [optional body]
 ```
 
-| Type | When to use |
-|------|-------------|
-| `feat` | New user-facing feature |
-| `fix` | Bug fix |
-| `chore` | Build, tooling, dependency updates |
-| `docs` | Documentation only |
+| Type       | When to use                              |
+| ---------- | ---------------------------------------- |
+| `feat`     | New user-facing feature                  |
+| `fix`      | Bug fix                                  |
+| `chore`    | Build, tooling, dependency updates       |
+| `docs`     | Documentation only                       |
 | `refactor` | Code restructuring (no behaviour change) |
-| `perf` | Performance improvement |
-| `test` | Test additions or fixes |
-| `ci` | CI/CD changes |
+| `perf`     | Performance improvement                  |
+| `test`     | Test additions or fixes                  |
+| `ci`       | CI/CD changes                            |
 
 Examples:
+
 ```
 feat: add OpenRouter AI provider
 fix: strip Monaco whitespace chars from copied code

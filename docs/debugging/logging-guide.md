@@ -8,7 +8,7 @@
 
 ```javascript
 // In browser console (any page):
-import { setDebug } from '/lib/debug.js';
+import { setDebug } from "/lib/debug.js";
 setDebug(true);
 
 // Now ALL logs will appear in DevTools Console with format:
@@ -302,6 +302,7 @@ dbg.log(`handleSolved(): ✓ complete - duration=${duration.toFixed(0)}ms`);
 ```
 
 **Expected Timings:**
+
 - Validation & normalization: 10-50ms
 - Duplicate detection: 20-100ms
 - Git commit (Trees API): 500-1500ms
@@ -313,7 +314,9 @@ dbg.log(`handleSolved(): ✓ complete - duration=${duration.toFixed(0)}ms`);
 ```javascript
 // In processAIReviewQueue():
 const stats = await getQueueStats();
-dbg.log(`Queue stats: pending=${stats.pending}, processing=${stats.processing}, done=${stats.done}, failed=${stats.failed}`);
+dbg.log(
+  `Queue stats: pending=${stats.pending}, processing=${stats.processing}, done=${stats.done}, failed=${stats.failed}`,
+);
 
 // Measure AI generation time:
 const aiStart = performance.now();
@@ -330,41 +333,40 @@ dbg.log(`AI generation: ${aiDuration.toFixed(0)}ms`);
 ```javascript
 // Create real-time dashboard
 async function showDashboard() {
-    setInterval(async () => {
-        console.clear();
-        console.log("╔════════════════════════════════════╗");
-        console.log("║   CodeLedger Queue Health Check    ║");
-        console.log("╚════════════════════════════════════╝");
+  setInterval(async () => {
+    console.clear();
+    console.log("╔════════════════════════════════════╗");
+    console.log("║   CodeLedger Queue Health Check    ║");
+    console.log("╚════════════════════════════════════╝");
 
-        const stats = await getQueueStats();
-        console.table({
-            "Pending": `${stats.pending} items`,
-            "Processing": `${stats.processing} items`,
-            "Done": `${stats.done} items`,
-            "Failed": `${stats.failed} items`,
-            "Total": `${stats.total} items`
-        });
+    const stats = await getQueueStats();
+    console.table({
+      Pending: `${stats.pending} items`,
+      Processing: `${stats.processing} items`,
+      Done: `${stats.done} items`,
+      Failed: `${stats.failed} items`,
+      Total: `${stats.total} items`,
+    });
 
-        // Show failed items
-        const items = await getAllQueueItems();
-        const failed = items.filter(i => i.status === "failed");
-        if (failed.length > 0) {
-            console.warn(`⚠️ ${failed.length} FAILED ITEMS:`);
-            failed.forEach(i => {
-                console.log(`   ${i.problemId}: ${i.error}`);
-            });
-        }
+    // Show failed items
+    const items = await getAllQueueItems();
+    const failed = items.filter((i) => i.status === "failed");
+    if (failed.length > 0) {
+      console.warn(`⚠️ ${failed.length} FAILED ITEMS:`);
+      failed.forEach((i) => {
+        console.log(`   ${i.problemId}: ${i.error}`);
+      });
+    }
 
-        // Check alarms
-        chrome.alarms.getAll((alarms) => {
-            console.log("🔔 Active Alarms:");
-            alarms.forEach(a => {
-                const inMs = a.scheduledTime - Date.now();
-                console.log(`   ${a.name}: in ${(inMs/1000).toFixed(1)}s`);
-            });
-        });
-
-    }, 5000); // Update every 5 seconds
+    // Check alarms
+    chrome.alarms.getAll((alarms) => {
+      console.log("🔔 Active Alarms:");
+      alarms.forEach((a) => {
+        const inMs = a.scheduledTime - Date.now();
+        console.log(`   ${a.name}: in ${(inMs / 1000).toFixed(1)}s`);
+      });
+    });
+  }, 5000); // Update every 5 seconds
 }
 
 // Start dashboard
@@ -417,7 +419,7 @@ dbg.error(`functionName(): ✗ failed`, error?.message);
 ```javascript
 // Get all console messages (if supported)
 chrome.tabs.executeScript({
-    code: `
+  code: `
         window.codeLedgerLogs = [];
         const originalLog = console.log;
         console.log = function(...args) {
@@ -428,18 +430,20 @@ chrome.tabs.executeScript({
             });
             originalLog.apply(console, args);
         };
-    `
+    `,
 });
 
 // Export logs
 const logs = await chrome.tabs.executeScript({
-    code: 'window.codeLedgerLogs'
+  code: "window.codeLedgerLogs",
 });
 
 // Save to file
-const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+const blob = new Blob([JSON.stringify(logs, null, 2)], {
+  type: "application/json",
+});
 const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
+const a = document.createElement("a");
 a.href = url;
 a.download = `codeledger-logs-${Date.now()}.json`;
 a.click();

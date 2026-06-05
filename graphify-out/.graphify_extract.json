@@ -73734,11 +73734,7 @@
     {
       "id": "leetcode-suite",
       "label": "LeetCode Integration Suite",
-      "members": [
-        "leetcode-platform",
-        "leetcode-handler",
-        "content-script"
-      ],
+      "members": ["leetcode-platform", "leetcode-handler", "content-script"],
       "description": "Complete LeetCode platform integration: DOM observation, problem detection, and event emission"
     },
     {

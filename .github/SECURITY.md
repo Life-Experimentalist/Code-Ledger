@@ -2,8 +2,8 @@
 
 ## Supported Versions
 
-| Version         | Supported             |
-| --------------- | --------------------- |
+| Version         | Supported              |
+| --------------- | ---------------------- |
 | Latest (`main`) | ✅ Actively supported  |
 | Previous minor  | ⚠️ Critical fixes only |
 | Older releases  | ❌ No longer supported |
@@ -24,7 +24,7 @@ Use the subject line: `[CodeLedger Security] <brief description>`
 - **Reproduction steps**: minimal, step-by-step instructions to trigger the issue
 - **Impact**: what an attacker could achieve (data exfiltration, token theft, commit injection, etc.)
 - **Affected version**: extension version from `src/manifest.json`
-- **Suggested fix** *(optional)*: if you have a patch or a mitigation in mind
+- **Suggested fix** _(optional)_: if you have a patch or a mitigation in mind
 
 ### What to expect
 

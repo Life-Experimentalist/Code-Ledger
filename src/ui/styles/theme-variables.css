@@ -1,4 +1,8 @@
-/* CodeLedger CSS custom property fallbacks.
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * CodeLedger CSS custom property fallbacks.
  * These defaults match the current material-dark palette.
  * Overridden at runtime by theme-engine.js setThemeVariables().
  * Referenced by: floating-ai, floating-timer, injected content-script buttons.

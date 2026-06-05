@@ -49,11 +49,7 @@
       {
         "id": "mcp_autonomous_system_triad",
         "label": "Autonomous MCP System: Tools + Executor + BaseAIHandler",
-        "nodes": [
-          "mcp_tools_js",
-          "mcp_executor",
-          "base_ai_handler_mcp"
-        ],
+        "nodes": ["mcp_tools_js", "mcp_executor", "base_ai_handler_mcp"],
         "relation": "implement",
         "confidence": "EXTRACTED",
         "confidence_score": 1.0,
@@ -75,11 +71,7 @@
       {
         "id": "store_listing_triad",
         "label": "Multi-Store Listing Strategy: Chrome + Firefox + Edge",
-        "nodes": [
-          "store_chrome",
-          "store_firefox",
-          "store_edge"
-        ],
+        "nodes": ["store_chrome", "store_firefox", "store_edge"],
         "relation": "form",
         "confidence": "EXTRACTED",
         "confidence_score": 1.0,
@@ -80866,11 +80858,7 @@
     {
       "id": "mcp_autonomous_system_triad",
       "label": "Autonomous MCP System: Tools + Executor + BaseAIHandler",
-      "nodes": [
-        "mcp_tools_js",
-        "mcp_executor",
-        "base_ai_handler_mcp"
-      ],
+      "nodes": ["mcp_tools_js", "mcp_executor", "base_ai_handler_mcp"],
       "relation": "implement",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
@@ -80892,11 +80880,7 @@
     {
       "id": "store_listing_triad",
       "label": "Multi-Store Listing Strategy: Chrome + Firefox + Edge",
-      "nodes": [
-        "store_chrome",
-        "store_firefox",
-        "store_edge"
-      ],
+      "nodes": ["store_chrome", "store_firefox", "store_edge"],
       "relation": "form",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,

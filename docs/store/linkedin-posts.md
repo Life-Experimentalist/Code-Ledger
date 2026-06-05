@@ -5,6 +5,7 @@ Schedule: one post per day. Mix recruiter-facing and user-facing content.
 ---
 
 ## Post 1 — The Hook / STAR Story
+
 **Audience:** Both | **Tone:** Personal, honest
 
 ---
@@ -34,6 +35,7 @@ If you're grinding DSA and your GitHub looks empty, this is for you.
 ---
 
 ## Post 2 — Zero-click Commits (Feature Focus)
+
 **Audience:** Users | **Tone:** Demo, practical
 
 ---
@@ -50,6 +52,7 @@ Total time: under 3 seconds.
 The commit message looks like: `[solved] Two Sum`
 
 Your repo gets:
+
 ```
 problems/lc-two-sum/
 ├── lc-two-sum.py     ← your actual code
@@ -67,6 +70,7 @@ CodeLedger is free and open-source → codeledger.vkrishna04.me
 ---
 
 ## Post 3 — Technical Architecture (Recruiter / Developer credibility)
+
 **Audience:** Recruiters + senior developers | **Tone:** Technical, confident
 
 ---
@@ -92,6 +96,7 @@ Fully open-source → github.com/Life-Experimentalist/Code-Ledger
 ---
 
 ## Post 4 — Bulk LeetCode Import (Feature Focus)
+
 **Audience:** Users | **Tone:** Practical, exciting
 
 ---
@@ -124,6 +129,7 @@ Free at codeledger.vkrishna04.me
 ---
 
 ## Post 5 — AI Code Review (Feature Focus)
+
 **Audience:** Both | **Tone:** Impressive, accessible
 
 ---
@@ -156,6 +162,7 @@ Connect your key under Settings → AI, and every future solve gets reviewed.
 ---
 
 ## Post 6 — The Viral Hook (Profile / contribution graph)
+
 **Audience:** Both | **Tone:** Bold, provocative
 
 ---
@@ -183,6 +190,7 @@ Share this with someone whose GitHub looks emptier than it should.
 ---
 
 ## Post 7 — Google XYZ Portfolio Framing (Recruiter targeted)
+
 **Audience:** Recruiters | **Tone:** Professional, quantified
 
 ---
@@ -208,6 +216,7 @@ The project: github.com/Life-Experimentalist/Code-Ledger
 ---
 
 ## Post 8 — Knowledge Graph + Analytics (Feature Focus)
+
 **Audience:** Users | **Tone:** Visual, compelling
 
 ---
@@ -238,6 +247,7 @@ The dashboard updates automatically on every commit. Your stats are always curre
 ---
 
 ## Post 9 — Open Source + Contributing (Community CTA)
+
 **Audience:** Developers | **Tone:** Inviting, direct
 
 ---
@@ -271,6 +281,7 @@ github.com/Life-Experimentalist/Code-Ledger
 ---
 
 ## Post 10 — v1.2 Release Announcement
+
 **Audience:** Both | **Tone:** Launch energy, comprehensive
 
 ---

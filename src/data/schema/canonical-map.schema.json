@@ -3,10 +3,7 @@
   "$id": "https://codeledger.vkrishna04.me/data/schema/canonical-map.schema.json",
   "$comment": "Schema for the canonical map of coding problems",
   "type": "object",
-  "required": [
-    "version",
-    "entries"
-  ],
+  "required": ["version", "entries"],
   "properties": {
     "version": {
       "type": "integer"
@@ -27,11 +24,7 @@
           },
           "difficulty": {
             "type": "string",
-            "enum": [
-              "Easy",
-              "Medium",
-              "Hard"
-            ]
+            "enum": ["Easy", "Medium", "Hard"]
           },
           "pattern": {
             "type": "string"
@@ -54,16 +47,10 @@
                   "type": "string"
                 },
                 "id": {
-                  "type": [
-                    "integer",
-                    "string"
-                  ]
+                  "type": ["integer", "string"]
                 }
               },
-              "required": [
-                "platform",
-                "slug"
-              ]
+              "required": ["platform", "slug"]
             }
           },
           "voteCount": {
@@ -76,12 +63,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "canonicalId",
-          "canonicalTitle",
-          "topic",
-          "difficulty"
-        ]
+        "required": ["canonicalId", "canonicalTitle", "topic", "difficulty"]
       }
     }
   }

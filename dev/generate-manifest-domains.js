@@ -15,7 +15,11 @@ function readJson(rel) {
 }
 
 function writeJson(rel, obj) {
-  writeFileSync(resolve(root, rel), JSON.stringify(obj, null, 4) + "\n", "utf8");
+  writeFileSync(
+    resolve(root, rel),
+    JSON.stringify(obj, null, 4) + "\n",
+    "utf8",
+  );
 }
 
 // Platform domains — add new platforms here when adding a handler

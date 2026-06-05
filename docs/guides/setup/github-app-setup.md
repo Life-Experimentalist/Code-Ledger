@@ -21,6 +21,7 @@ Recommended choices in the App creation UI:
 - Redirect on update: Enable + use the same Setup URL
 
 Installation target:
+
 - If you want the App to be installable only on your organization, choose **Only on this account** and select `Life-Experimentalist`.
 - If you intend to make CodeLedger available publicly, choose **Any account**.
 
@@ -49,7 +50,9 @@ Example GitHub App manifest (use via GitHub App creation flow):
 {
   "name": "Code Ledger",
   "url": "https://codeledger.vkrishna04.me",
-  "hook_attributes": { "url": "https://codeledger.vkrishna04.me/api/webhook/github" },
+  "hook_attributes": {
+    "url": "https://codeledger.vkrishna04.me/api/webhook/github"
+  },
   "redirect_url": "https://codeledger.vkrishna04.me/api/auth/github/callback",
   "public": false,
   "default_permissions": {
@@ -94,7 +97,6 @@ Notes on the two auth modes:
 - GitHub App (recommended for server-side automated commits): Worker exchanges an App JWT for installation tokens and acts on installed repositories. Requires the App private key and App ID.
 - OAuth App (simpler user-level flow): Worker redirects users through `https://github.com/login/oauth/authorize` and exchanges the `code` for a `access_token`. This is supported by the existing `worker/src/index.js` but does not grant repository-level automation via App installations.
 
-
 Deploying the worker from this repository (recommended GitHub Actions flow):
 
 - Repository secrets required by CI (use these exact names):
@@ -126,6 +128,7 @@ npx wrangler dev --local
 ```
 
 Notes:
+
 - If you prefer CI-based deployment, ensure `CF_API_TOKEN` and all required secrets are set in the repository before triggering the workflow — otherwise the workflow will fail early during validation.
 - If you want me to trigger the workflow now, I can do that (I will check whether `CF_API_TOKEN` exists in repo secrets first). Alternatively I can run `wrangler dev` locally for a smoke test instead.
 
@@ -148,8 +151,8 @@ If you want, I can:
 - Prepare or run the GitHub Actions workflow that deploys the worker using `CF_API_TOKEN`.
 
 ---
+
 File references:
 
 - Worker auth entry: [worker/src/index.js](../../worker/src/index.js)
 - Cloudflare config: [worker/wrangler.toml](../../worker/wrangler.toml)
-

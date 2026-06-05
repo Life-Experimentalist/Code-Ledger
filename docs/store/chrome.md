@@ -57,11 +57,11 @@ Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our se
 **REPOSITORY LAYOUT (v3)**
 
 problems/
-  lc-two-sum/
-    lc-two-sum.py     ← your code
-    lc-two-sum.md     ← description + AI review + stats
-index.json            ← machine-readable index
-index.html            ← live GitHub Pages dashboard
+lc-two-sum/
+lc-two-sum.py ← your code
+lc-two-sum.md ← description + AI review + stats
+index.json ← machine-readable index
+index.html ← live GitHub Pages dashboard
 
 ---
 

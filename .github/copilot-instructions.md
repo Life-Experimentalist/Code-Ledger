@@ -191,40 +191,40 @@ Consistent naming across the codebase reduces cognitive load and makes intent im
 All handlers live in `src/handlers/` and follow a strict structure:
 
 - **Platform handlers**: `src/handlers/platforms/{name}/`
-    - `index.js` — the platform handler class extending `BasePlatformHandler`
-    - `dom-selectors.js` — DOM selectors, legacy selectors, and DOMAINS export (for manifest)
-    - `page-detector.js` — exports `detectPage()` and `isSolveCapablePage()`
-    - Optional: `enhanced-selectors.js` for version-specific overrides (e.g., LeetCode)
-    - Examples: `leetcode/`, `geeksforgeeks/`, `codeforces/`
+  - `index.js` — the platform handler class extending `BasePlatformHandler`
+  - `dom-selectors.js` — DOM selectors, legacy selectors, and DOMAINS export (for manifest)
+  - `page-detector.js` — exports `detectPage()` and `isSolveCapablePage()`
+  - Optional: `enhanced-selectors.js` for version-specific overrides (e.g., LeetCode)
+  - Examples: `leetcode/`, `geeksforgeeks/`, `codeforces/`
 
 - **AI provider handlers**: `src/handlers/ai/{name}/`
-    - `index.js` — AI handler class extending `BaseAIHandler`
-    - `model-fetcher.js` — fetch live models or static list
-    - Examples: `gemini/`, `openai/`, `claude/`, `deepseek/`, `ollama/`, `openrouter/`
+  - `index.js` — AI handler class extending `BaseAIHandler`
+  - `model-fetcher.js` — fetch live models or static list
+  - Examples: `gemini/`, `openai/`, `claude/`, `deepseek/`, `ollama/`, `openrouter/`
 
 - **Git repository handlers**: `src/handlers/git/{name}/`
-    - `index.js` — Git handler class extending `BaseGitHandler`
-    - Examples: `github/`, `gitlab/`, `bitbucket/`
+  - `index.js` — Git handler class extending `BaseGitHandler`
+  - Examples: `github/`, `gitlab/`, `bitbucket/`
 
 ### UI Components & Views
 
 - **Reusable components**: `src/ui/components/{PascalCase}.js`
-    - One component per file; file name matches exported class/function name
-    - Examples: `SettingsSchema.js`, `GitHubOnboardingModal.js`, `DedupReviewQueue.js`, `AIReviewPanel.js`
-    - These are shared between extension sidebar and web app
+  - One component per file; file name matches exported class/function name
+  - Examples: `SettingsSchema.js`, `GitHubOnboardingModal.js`, `DedupReviewQueue.js`, `AIReviewPanel.js`
+  - These are shared between extension sidebar and web app
 
 - **Library views**: `src/library/views/{PascalCase}View.js`
-    - Always end with `View` suffix to distinguish from generic components
-    - Examples: `ProblemsView.js`, `AnalyticsView.js`, `SettingsView.js`, `AIChatsView.js`, `GraphView.js`
+  - Always end with `View` suffix to distinguish from generic components
+  - Examples: `ProblemsView.js`, `AnalyticsView.js`, `SettingsView.js`, `AIChatsView.js`, `GraphView.js`
 
 ### Core Utilities & Modules
 
 - **Core modules**: `src/core/{hyphen-case}.js`
-    - Examples: `constants.js`, `storage.js`, `event-bus.js`, `ai-deduplication.js`, `canonical-mapper.js`, `ai-prompts.js`, `duplicate-detector.js`
-    - Each core module handles one responsibility
+  - Examples: `constants.js`, `storage.js`, `event-bus.js`, `ai-deduplication.js`, `canonical-mapper.js`, `ai-prompts.js`, `duplicate-detector.js`
+  - Each core module handles one responsibility
 
 - **Library utilities**: `src/lib/{hyphen-case}.js`
-    - Examples: `debug.js`, `browser-compat.js`
+  - Examples: `debug.js`, `browser-compat.js`
 
 ### Naming Style Summary
 
@@ -247,8 +247,8 @@ All handlers live in `src/handlers/` and follow a strict structure:
 ```js
 // ✅ Correct
 const repo =
-    settings[CONSTANTS.SK.GITHUB_REPO] ||
-    settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
+  settings[CONSTANTS.SK.GITHUB_REPO] ||
+  settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
 
 // ❌ Wrong
 const repo = settings["github_repo"];
@@ -266,22 +266,22 @@ const repo = settings.github_repo;
 
 - **From extension root**: Use relative paths with no `src/` prefix
 
-    ```js
-    import { createDebugger } from "../../lib/debug.js";
-    import { BasePlatformHandler } from "../_base/BasePlatformHandler.js";
-    ```
+  ```js
+  import { createDebugger } from "../../lib/debug.js";
+  import { BasePlatformHandler } from "../_base/BasePlatformHandler.js";
+  ```
 
 - **In manifest.json paths**: Use paths relative to `src/`, without `src/` prefix
 
-    ```json
-    "background": { "service_worker": "background/service-worker.js" }
-    "content_scripts": [{ "js": ["content/handler-loader.js"] }]
-    ```
+  ```json
+  "background": { "service_worker": "background/service-worker.js" }
+  "content_scripts": [{ "js": ["content/handler-loader.js"] }]
+  ```
 
 - **In chrome.runtime.getURL()**: Same as manifest paths — no `src/` prefix
-    ```js
-    const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
-    ```
+  ```js
+  const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
+  ```
 
 ### Version-Specific Selectors
 
@@ -296,10 +296,10 @@ Example pattern in `dom-selectors.js`:
 
 ```js
 export const SELECTORS = {
-    /* current */
+  /* current */
 };
 export const LEGACY_SELECTORS = {
-    /* old versions */
+  /* old versions */
 };
 export const DOMAINS = ["leetcode.com", "www.leetcode.com"];
 ```
@@ -339,12 +339,12 @@ return true;
 ```js
 import { BasePlatformHandler } from "../../_base/BasePlatformHandler.js";
 export class MyHandler extends BasePlatformHandler {
-    constructor() {
-        super("myplatform", "MyPlatform", {});
-    }
-    async init() {
-        /* setup MutationObserver, inject QoL */
-    }
+  constructor() {
+    super("myplatform", "MyPlatform", {});
+  }
+  async init() {
+    /* setup MutationObserver, inject QoL */
+  }
 }
 ```
 

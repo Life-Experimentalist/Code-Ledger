@@ -42,8 +42,7 @@ export function extractChangelogSection(changelogPath, version) {
 // CLI: node dev/v2/tasks/extract-changelog.js <version>
 const isMain =
   process.argv[1] &&
-  resolve(process.argv[1]) ===
-    resolve(fileURLToPath(import.meta.url));
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 
 if (isMain) {
   const version = process.argv[2];

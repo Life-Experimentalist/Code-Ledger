@@ -17,6 +17,7 @@
  *
  * KV binding: CANONICAL_MAP
  */
+
 import { Hono } from "hono";
 
 const app = new Hono();
@@ -29,17 +30,26 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-app.options("*", (c) => new Response(null, { status: 204, headers: CORS_HEADERS }));
+app.options(
+  "*",
+  (c) => new Response(null, { status: 204, headers: CORS_HEADERS }),
+);
 
 /* ── Env helper ───────────────────────────────────────────────────── */
 
 function env(c, key) {
   const aliases = {
     GH_CLIENT_ID: ["CODELEDGER_GH_APP_CLIENT_ID", "GITHUB_CLIENT_ID"],
-    GH_CLIENT_SECRET: ["CODELEDGER_GH_APP_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"],
+    GH_CLIENT_SECRET: [
+      "CODELEDGER_GH_APP_CLIENT_SECRET",
+      "GITHUB_CLIENT_SECRET",
+    ],
     GH_APP_KEY: ["CODELEDGER_GH_APP_PRIVATE_KEY", "GITHUB_APP_PRIVATE_KEY"],
     GH_APP_ID: ["CODELEDGER_GH_APP_ID", "GITHUB_APP_ID"],
-    GH_WEBHOOK_SECRET: ["CODELEDGER_GH_APP_WEBHOOK_SECRET", "GITHUB_APP_WEBHOOK_SECRET"],
+    GH_WEBHOOK_SECRET: [
+      "CODELEDGER_GH_APP_WEBHOOK_SECRET",
+      "GITHUB_APP_WEBHOOK_SECRET",
+    ],
   };
   const names = aliases[key] || [key];
   for (const name of names) {
@@ -57,9 +67,7 @@ function base64UrlEncode(bytes) {
 }
 
 function jsonBase64(obj) {
-  return base64UrlEncode(
-    new TextEncoder().encode(JSON.stringify(obj))
-  );
+  return base64UrlEncode(new TextEncoder().encode(JSON.stringify(obj)));
 }
 
 /**
@@ -80,18 +88,22 @@ function pemToArrayBuffer(pem) {
 
   // Wrap PKCS#1 in a PKCS#8 ASN.1 envelope
   const rsaOid = new Uint8Array([
-    0x30, 0x0d, 0x06, 0x09,
-    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
-    0x05, 0x00,
+    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01,
+    0x01, 0x05, 0x00,
   ]);
   const encLen = (n) =>
-    n < 128 ? new Uint8Array([n])
-      : n < 256 ? new Uint8Array([0x81, n])
+    n < 128
+      ? new Uint8Array([n])
+      : n < 256
+        ? new Uint8Array([0x81, n])
         : new Uint8Array([0x82, (n >> 8) & 0xff, n & 0xff]);
   const concat = (...arrs) => {
     const out = new Uint8Array(arrs.reduce((s, a) => s + a.length, 0));
     let off = 0;
-    for (const a of arrs) { out.set(a, off); off += a.length; }
+    for (const a of arrs) {
+      out.set(a, off);
+      off += a.length;
+    }
     return out;
   };
   const octet = concat(new Uint8Array([0x04]), encLen(pkcs1.length), pkcs1);
@@ -123,10 +135,14 @@ async function createAppJWT(c) {
 
   const now = Math.floor(Date.now() / 1000);
   const payload = `${jsonBase64({ alg: "RS256", typ: "JWT" })}.${jsonBase64({
-    iat: now - 60, exp: now + 600, iss: Number(appId),
+    iat: now - 60,
+    exp: now + 600,
+    iss: Number(appId),
   })}`;
   const sig = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(payload)
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(payload),
   );
   return `${payload}.${base64UrlEncode(new Uint8Array(sig))}`;
 }
@@ -138,7 +154,12 @@ async function createAppJWT(c) {
  * The extension's handleOAuth listens for exactly type === 'CODELEDGER_AUTH'.
  */
 function authCallbackHtml(provider, token, error = "") {
-  const msg = JSON.stringify({ type: "CODELEDGER_AUTH", provider, token, error });
+  const msg = JSON.stringify({
+    type: "CODELEDGER_AUTH",
+    provider,
+    token,
+    error,
+  });
   const status = token
     ? "Authentication successful. Closing…"
     : `Authentication failed: ${error || "unknown error"}`;
@@ -161,7 +182,7 @@ function authCallbackHtml(provider, token, error = "") {
 
 // Health — used for smoke testing + uptime monitoring
 app.get("/api/health", (c) =>
-  c.json({ ok: true, version: "1.0.0", ts: Date.now() }, 200, CORS_HEADERS)
+  c.json({ ok: true, version: "1.0.0", ts: Date.now() }, 200, CORS_HEADERS),
 );
 
 // GitHub App: list installations (requires App key configured)
@@ -169,7 +190,10 @@ app.get("/api/app/installations", async (c) => {
   try {
     const jwt = await createAppJWT(c);
     const res = await fetch("https://api.github.com/app/installations", {
-      headers: { Authorization: `Bearer ${jwt}`, Accept: "application/vnd.github+json" },
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: "application/vnd.github+json",
+      },
     });
     return c.json(await res.json(), res.status, CORS_HEADERS);
   } catch (e) {
@@ -182,10 +206,16 @@ app.post("/api/app/installations/:id/access_tokens", async (c) => {
   const id = c.req.param("id");
   try {
     const jwt = await createAppJWT(c);
-    const res = await fetch(`https://api.github.com/app/installations/${id}/access_tokens`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${jwt}`, Accept: "application/vnd.github+json" },
-    });
+    const res = await fetch(
+      `https://api.github.com/app/installations/${id}/access_tokens`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          Accept: "application/vnd.github+json",
+        },
+      },
+    );
     return c.json(await res.json(), res.status, CORS_HEADERS);
   } catch (e) {
     return c.json({ error: e.message }, 500, CORS_HEADERS);
@@ -199,7 +229,11 @@ app.get("/api/auth/:provider", (c) => {
 
   if (provider === "github") {
     const clientId = env(c, "GH_CLIENT_ID");
-    if (!clientId) return c.text("GitHub OAuth not configured — set CODELEDGER_GH_APP_CLIENT_ID", 400);
+    if (!clientId)
+      return c.text(
+        "GitHub OAuth not configured — set CODELEDGER_GH_APP_CLIENT_ID",
+        400,
+      );
     const redirectUri = `${origin}/api/auth/github/callback`;
     // Scopes needed:
     // - repo: Create repos, push commits, manage Pages
@@ -209,7 +243,11 @@ app.get("/api/auth/:provider", (c) => {
     return c.redirect(url);
   }
 
-  return c.json({ error: `Unsupported provider: ${provider}` }, 404, CORS_HEADERS);
+  return c.json(
+    { error: `Unsupported provider: ${provider}` },
+    404,
+    CORS_HEADERS,
+  );
 });
 
 // GitHub OAuth callback
@@ -223,20 +261,31 @@ app.get("/api/auth/github/callback", async (c) => {
   }
 
   if (!code) {
-    return c.html(authCallbackHtml("github", "", "No code received from GitHub"));
+    return c.html(
+      authCallbackHtml("github", "", "No code received from GitHub"),
+    );
   }
 
   const clientId = env(c, "GH_CLIENT_ID");
   const clientSecret = env(c, "GH_CLIENT_SECRET");
   if (!clientId || !clientSecret) {
-    return c.html(authCallbackHtml("github", "", "OAuth not configured on server"));
+    return c.html(
+      authCallbackHtml("github", "", "OAuth not configured on server"),
+    );
   }
 
   try {
     const res = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+      }),
     });
     const data = await res.json();
     const token = data.access_token || "";
@@ -256,10 +305,16 @@ app.post("/api/webhook/github", async (c) => {
   if (secret) {
     const enc = new TextEncoder();
     const key = await crypto.subtle.importKey(
-      "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
     );
     const sig = await crypto.subtle.sign("HMAC", key, enc.encode(bodyText));
-    const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const hex = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
     if (`sha256=${hex}` !== sigHeader) {
       return c.text("Invalid signature", 401);
     }
@@ -270,17 +325,21 @@ app.post("/api/webhook/github", async (c) => {
 
 // Canonical map: read from KV or GitHub raw fallback
 app.get("/api/data/canonical-map.json", async (c) => {
-  const headers = { ...CORS_HEADERS, "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" };
+  const headers = {
+    ...CORS_HEADERS,
+    "Content-Type": "application/json",
+    "Cache-Control": "public, max-age=3600",
+  };
   try {
     const kv = c.env?.CANONICAL_MAP;
     if (kv) {
       const v = await kv.get("canonical-map");
       if (v) return new Response(v, { status: 200, headers });
     }
-  } catch (_) { }
+  } catch (_) {}
   try {
     const res = await fetch(
-      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/data/canonical-map.json"
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/data/canonical-map.json",
     );
     return new Response(await res.text(), { status: 200, headers });
   } catch (e) {
@@ -316,7 +375,7 @@ app.get("/favicon.ico", (c) =>
   c.redirect(
     "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png",
     301,
-  )
+  ),
 );
 
 // Static assets via ASSETS binding — must be last
@@ -325,7 +384,7 @@ app.get("/*", async (c) => {
     try {
       const res = await c.env.ASSETS.fetch(c.req.raw);
       if (res.status !== 404) return res;
-    } catch (_) { }
+    } catch (_) {}
   }
   return c.notFound();
 });

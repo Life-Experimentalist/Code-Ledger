@@ -44,6 +44,7 @@ node dev/v2/cli.js publish
 ```
 
 Produces:
+
 - `codeledger-chromium-v1.3.0.zip`
 - `codeledger-firefox-v1.3.0.zip`
 - `codeledger-source-v1.3.0.zip`
@@ -105,6 +106,7 @@ Older releases are preserved; new releases are added in separate folders.
 ### Centralized Context
 
 `dev/v2/core/context.js` provides:
+
 - `rootDir` — project root
 - `version` — from package.json
 - `tag` — e.g., "v1.3.0"
@@ -117,6 +119,7 @@ All tasks use the same context to ensure consistency.
 ### Modular Logger
 
 `dev/v2/core/logger.js` provides:
+
 - `step(msg)` — cyan step indicator
 - `ok(msg)` — green success checkmark
 - `error(msg)` — red error prefix
@@ -139,6 +142,7 @@ Old scripts in `dev/` (e.g., `dev/run-dev.js`, `dev/clean.js`) are **untouched**
 - `npm run validate:openapi` → still uses `dev/validate-openapi.js`
 
 Only these scripts now use v2:
+
 - `npm run build` → `dev/v2/cli.js build`
 - `npm run package` → `dev/v2/cli.js publish`
 - `npm run package:chrome` → `dev/v2/cli.js publish`
@@ -151,6 +155,7 @@ Only these scripts now use v2:
 To add a new task:
 
 1. Create `dev/v2/tasks/my-task.js`:
+
    ```js
    export async function taskMyTask(ctx, logger, options = {}) {
      logger.section("My Task");
@@ -161,13 +166,14 @@ To add a new task:
    ```
 
 2. Register in `dev/v2/cli.js`:
+
    ```js
    import { taskMyTask } from "./tasks/my-task.js";
    const TASKS = {
      build: taskBuild,
      publish: taskPublish,
      release: taskRelease,
-     myTask: taskMyTask,  // ← add here
+     myTask: taskMyTask, // ← add here
    };
    ```
 

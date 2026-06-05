@@ -1,4 +1,5 @@
 // src/vendor/preact-entry.js
+
 import * as preact from "preact";
 import * as hooks from "preact/hooks";
 import htm from "htm";

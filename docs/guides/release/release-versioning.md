@@ -3,6 +3,7 @@
 This document defines version semantics and release policy.
 
 For the procedural release steps, always use:
+
 - [guides/release/release-guide.md](guides/release/release-guide.md)
 
 ## Semantic Versioning

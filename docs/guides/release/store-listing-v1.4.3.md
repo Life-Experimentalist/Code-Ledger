@@ -10,16 +10,19 @@ Screenshots are in `src/assets/images/`.
 **Dashboard URL:** https://chrome.google.com/webstore/devconsole
 
 ### Extension name
+
 ```
 CodeLedger
 ```
 
 ### Short description (132 chars max)
+
 ```
 Auto-commit every DSA solve from LeetCode, GFG & Codeforces to your GitHub repo. AI review, analytics, and conflict sync included.
 ```
 
 ### Detailed description
+
 ```
 CodeLedger automatically commits every accepted DSA problem you solve — from LeetCode, GeeksForGeeks, and Codeforces — to a GitHub repository you own. No copy-paste, no manual uploads. Just solve, and the commit appears.
 
@@ -64,9 +67,11 @@ Open-source · Apache 2.0 License · https://codeledger.vkrishna04.me
 ```
 
 ### Category
+
 `Developer Tools`
 
 ### Language
+
 `English (United States)`
 
 ### Screenshots — order and captions
@@ -85,20 +90,24 @@ Open-source · Apache 2.0 License · https://codeledger.vkrishna04.me
 | 10  | `Problems Modal.png`            | Rich problem detail: code, AI review, tags, and edit in place             |
 
 ### Promotional images (if required)
+
 - **Small tile (440×280):** use `social preview.png` cropped or `icon-dark-bg.png` centered on dark bg
 - **Marquee (1400×560):** use `social preview.png`
 
 ### Privacy policy URL
+
 ```
 https://codeledger.vkrishna04.me/privacy
 ```
 
 ### Homepage URL
+
 ```
 https://codeledger.vkrishna04.me
 ```
 
 ### Upload
+
 - **File:** `releases/1.4.3/codeledger-chromium-v1.4.3.zip`
 
 ---
@@ -110,6 +119,7 @@ https://codeledger.vkrishna04.me
 Edge uses the same Chromium zip. All text fields below are identical to Chrome Web Store — copy from Section 1. Differences noted.
 
 ### Upload
+
 - **File:** `releases/1.4.3/codeledger-chromium-v1.4.3.zip` (same zip as Chrome)
 
 ### Edge-specific fields
@@ -119,6 +129,7 @@ Edge uses the same Chromium zip. All text fields below are identical to Chrome W
 **Extension name:** `CodeLedger`
 
 **Short description (300 chars max — more room than Chrome):**
+
 ```
 Auto-commit every solved DSA problem from LeetCode, GeeksForGeeks, and Codeforces to your own GitHub repository. Built-in AI code review, knowledge graph, rolling analytics, and cross-device conflict sync.
 ```
@@ -140,22 +151,26 @@ Auto-commit every solved DSA problem from LeetCode, GeeksForGeeks, and Codeforce
 **Dashboard URL:** https://addons.mozilla.org/en-US/developers/
 
 ### Upload
+
 - **Extension file:** `releases/1.4.3/codeledger-firefox-v1.4.3.zip`
 - **Source code (required if minified/bundled — check "yes, submit source"):** `releases/1.4.3/codeledger-source-v1.4.3.zip`
 
 > AMO requires source upload when your extension contains code that is "not human-readable". CodeLedger has no bundler/transpiler, so source may not be required — but upload the source zip anyway to avoid review delays.
 
 ### Name
+
 ```
 CodeLedger
 ```
 
 ### Summary (250 chars max)
+
 ```
 Auto-commit every accepted DSA solve from LeetCode, GFG & Codeforces to your own GitHub repo. Includes AI review, analytics, knowledge graph, and cross-device sync.
 ```
 
 ### Description
+
 ```
 CodeLedger automatically commits every accepted DSA problem you solve to a GitHub repository you own — no copy-paste, no manual uploads.
 
@@ -181,14 +196,17 @@ Your data lives in your own GitHub repo. No third-party servers store your code.
 ```
 
 ### Categories
+
 - `Developer Tools`
 
 ### Add-on homepage
+
 ```
 https://codeledger.vkrishna04.me
 ```
 
 ### Support site
+
 ```
 https://github.com/VKrishna04/codeledger/issues
 ```
@@ -196,16 +214,19 @@ https://github.com/VKrishna04/codeledger/issues
 ### Screenshots — same files as Chrome, same order
 
 ### Gecko ID (already in manifest)
+
 ```
 codeledger@vkrishna04.me
 ```
 
 ### Firefox minimum version (already in manifest)
+
 ```
 109.0
 ```
 
 ### Source code note for reviewers
+
 ```
 This extension uses no bundler or transpiler — all JS is plain ES6 modules loaded directly by the browser. The source zip is identical to the extension zip but includes dev tooling (node_modules excluded). Entry points: src/background/service-worker.js, src/content/handler-loader.js, src/popup/popup.js, src/library/library.js.
 ```

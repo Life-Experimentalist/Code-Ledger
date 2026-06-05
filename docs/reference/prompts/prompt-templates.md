@@ -1,5 +1,7 @@
 # CodeLedger — AI Studio Generation Prompt v2
+
 # Paste into Google AI Studio with Gemini 2.5 Pro, 1M token context window.
+
 # Generate one top-level directory at a time if context is tight.
 
 ---
@@ -37,13 +39,19 @@ React + Vite + Tailwind, driven entirely by a `settings.json` in the repo. Dynam
 ## TECHNOLOGY STACK — STRICT RULES
 
 ### UI: Preact + htm (no build step required)
+
 All UI is component-based using **Preact** loaded from CDN (`https://esm.sh/preact`) and **htm** for tagged template literals. No JSX, no transpilation, no webpack. Pure ES6 modules that work directly in the browser.
 
 ```js
 // Every UI file starts with:
-import { h, render, Component } from 'https://esm.sh/preact';
-import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact/hooks';
-import htm from 'https://esm.sh/htm';
+import { h, render, Component } from "https://esm.sh/preact";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "https://esm.sh/preact/hooks";
+import htm from "https://esm.sh/htm";
 const html = htm.bind(h);
 ```
 
@@ -62,68 +70,76 @@ These notes describe the active UI changes applied to the CodeLedger repository 
 - Feature toggles: the settings UI (`SettingsView` + `SettingsSchema`) already exposes toggle fields; handlers (platform, git, AI) can be enabled/disabled via settings. Ensure registry-provided schemas are used for these toggles.
 
 Actionable notes for generator runs:
+
 - Preserve `src/lib/browser-compat.js` as the ONLY file that touches `chrome.*` or `browser.*` directly. When modifying UI code that opens new tabs or uses runtime APIs, import `tabs` and `runtime` from the compat shim.
 - Keep the PWA `start_url` pointed at `/library` so installed webapps open the Library directly.
 - When adding new UI components, prefer small modules under `src/library/components/` and wire them into `src/library/library.js` to keep the app modular and testable.
 
-
 ### Charts: Chart.js (CDN, loaded in library/analytics pages only)
+
 ```js
-import Chart from 'https://esm.sh/chart.js/auto';
+import Chart from "https://esm.sh/chart.js/auto";
 ```
 
 ### Graph: vis.js (CDN, loaded in library graph view only)
+
 ```js
 // Via script tag in HTML, not ES module import:
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
 ```
 
 ### Browser compatibility: NO webextension-polyfill library
+
 Instead, use a **self-contained compatibility shim** (`src/lib/browser-compat.js`) that normalises `browser` vs `chrome` namespace at runtime:
 
 ```js
 // src/lib/browser-compat.js
 // This file is the ONLY place that touches chrome.* or browser.* directly.
 // Everything else in the codebase imports from this file.
-export const ext = (typeof browser !== 'undefined' && browser.runtime)
-  ? browser
-  : chrome;
+export const ext =
+  typeof browser !== "undefined" && browser.runtime ? browser : chrome;
 
 // Promisify callback-based chrome APIs for Firefox compatibility
 export const storage = {
   local: {
-    get: (keys) => new Promise((resolve, reject) => {
-      ext.storage.local.get(keys, (result) => {
-        if (ext.runtime.lastError) reject(ext.runtime.lastError);
-        else resolve(result);
-      });
-    }),
-    set: (items) => new Promise((resolve, reject) => {
-      ext.storage.local.set(items, () => {
-        if (ext.runtime.lastError) reject(ext.runtime.lastError);
-        else resolve();
-      });
-    }),
-    remove: (keys) => new Promise((resolve, reject) => {
-      ext.storage.local.remove(keys, () => {
-        if (ext.runtime.lastError) reject(ext.runtime.lastError);
-        else resolve();
-      });
-    }),
+    get: (keys) =>
+      new Promise((resolve, reject) => {
+        ext.storage.local.get(keys, (result) => {
+          if (ext.runtime.lastError) reject(ext.runtime.lastError);
+          else resolve(result);
+        });
+      }),
+    set: (items) =>
+      new Promise((resolve, reject) => {
+        ext.storage.local.set(items, () => {
+          if (ext.runtime.lastError) reject(ext.runtime.lastError);
+          else resolve();
+        });
+      }),
+    remove: (keys) =>
+      new Promise((resolve, reject) => {
+        ext.storage.local.remove(keys, () => {
+          if (ext.runtime.lastError) reject(ext.runtime.lastError);
+          else resolve();
+        });
+      }),
   },
-  session: { /* same pattern */ },
+  session: {
+    /* same pattern */
+  },
 };
 export const runtime = ext.runtime;
 export const tabs = ext.tabs;
 export const alarms = ext.alarms;
 export const action = ext.action || ext.browserAction; // MV3 vs MV2 compat
-export const sidePanel = ext.sidePanel;    // Chrome only — guard with if(sidePanel)
+export const sidePanel = ext.sidePanel; // Chrome only — guard with if(sidePanel)
 export const sidebar = ext.sidebarAction; // Firefox only — guard with if(sidebar)
 ```
 
 Every file imports from `../../lib/browser-compat.js`. Never `chrome.*` or `browser.*` directly anywhere else.
 
 ### No bundler, no transpiler, no minification
+
 Pure ES6+ modules. `type="module"` on all script tags. The extension ships as readable source for AMO review compliance.
 
 ---
@@ -135,7 +151,7 @@ This is critical. The debug system must preserve caller file+line context in con
 ```js
 // src/lib/debug.js
 
-const DEBUG_KEY = 'codeledger.debug';
+const DEBUG_KEY = "codeledger.debug";
 
 // Read debug state synchronously from storage (best-effort; defaults false)
 let _debugEnabled = false;
@@ -143,8 +159,9 @@ let _debugEnabled = false;
 // Called once at extension startup from service-worker.js
 export async function initDebug() {
   try {
-    const { [DEBUG_KEY]: val } = await import('./browser-compat.js')
-      .then(m => m.storage.local.get(DEBUG_KEY));
+    const { [DEBUG_KEY]: val } = await import("./browser-compat.js").then((m) =>
+      m.storage.local.get(DEBUG_KEY),
+    );
     _debugEnabled = val === true;
   } catch (_) {
     _debugEnabled = false;
@@ -186,30 +203,45 @@ export function createDebugger(namespace) {
   // Return a proxy-like object that re-evaluates _debugEnabled on each call.
   // This means toggling debug at runtime takes effect immediately.
   return {
-    get log()   { return _debugEnabled ? console.log.bind(console, prefix)   : noop; },
-    get warn()  { return _debugEnabled ? console.warn.bind(console, prefix)  : noop; },
-    get error() { return _debugEnabled ? console.error.bind(console, prefix) : noop; },
-    get info()  { return _debugEnabled ? console.info.bind(console, prefix)  : noop; },
-    get table() { return _debugEnabled ? console.table.bind(console, prefix) : noop; },
-    get group() { return _debugEnabled ? console.group.bind(console, prefix) : noop; },
-    get groupEnd() { return _debugEnabled ? console.groupEnd.bind(console)   : noop; },
+    get log() {
+      return _debugEnabled ? console.log.bind(console, prefix) : noop;
+    },
+    get warn() {
+      return _debugEnabled ? console.warn.bind(console, prefix) : noop;
+    },
+    get error() {
+      return _debugEnabled ? console.error.bind(console, prefix) : noop;
+    },
+    get info() {
+      return _debugEnabled ? console.info.bind(console, prefix) : noop;
+    },
+    get table() {
+      return _debugEnabled ? console.table.bind(console, prefix) : noop;
+    },
+    get group() {
+      return _debugEnabled ? console.group.bind(console, prefix) : noop;
+    },
+    get groupEnd() {
+      return _debugEnabled ? console.groupEnd.bind(console) : noop;
+    },
   };
 }
 
 // Convenience: module-level debugger for core files
-export const coreDebug = createDebugger('Core');
+export const coreDebug = createDebugger("Core");
 ```
 
 **Usage pattern in every file:**
+
 ```js
 // src/handlers/platforms/leetcode/index.js
-import { createDebugger } from '../../../lib/debug.js';
-const dbg = createDebugger('LeetCodeHandler');
+import { createDebugger } from "../../../lib/debug.js";
+const dbg = createDebugger("LeetCodeHandler");
 
 // In code:
-dbg.log('Submission detected', { problemSlug, language }); // Shows at leetcode/index.js:XX
-dbg.warn('Selector stale, trying legacy fallback');
-dbg.error('GraphQL fetch failed', err);
+dbg.log("Submission detected", { problemSlug, language }); // Shows at leetcode/index.js:XX
+dbg.warn("Selector stale, trying legacy fallback");
+dbg.error("GraphQL fetch failed", err);
 ```
 
 The Settings page has a **Debug Mode toggle** that calls `setDebug(true/false)` and saves to storage. When toggled on, all `dbg.*` calls immediately start logging with correct file+line context in DevTools.
@@ -402,181 +434,202 @@ Generate completely. This is the single source of truth for every URL, key, thre
 ```js
 // src/core/constants.js
 export const CONSTANTS = Object.freeze({
-
-  VERSION: '1.0.0',
-  EXTENSION_NAME: 'CodeLedger',
+  VERSION: "1.0.0",
+  EXTENSION_NAME: "CodeLedger",
   DEBUG_DEFAULT: false,
 
   // Extension store IDs (fill after publishing)
-  EXTENSION_ID_CHROME: '',
-  EXTENSION_ID_FIREFOX: '',
+  EXTENSION_ID_CHROME: "",
+  EXTENSION_ID_FIREFOX: "",
 
   // ── External URLs (all user-overridable via Settings > Advanced) ──
   URLS: {
-    LANDING:            'https://codeledger.vkrishna04.me',
-    AUTH_WORKER:        'https://codeledger.vkrishna04.me/api',
-    TELEMETRY:          'https://counter.vkrishna04.me',
-    CANONICAL_MAP_RAW:  'https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/canonical-map.json',
-    CANONICAL_MAP_SCHEMA: 'https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/schema/canonical-map.schema.json',
-    GITHUB_OAUTH_BASE:  'https://github.com/login/oauth',
-    GITLAB_OAUTH_BASE:  'https://gitlab.com/oauth',
-    BITBUCKET_OAUTH_BASE: 'https://bitbucket.org/site/oauth2',
+    LANDING: "https://codeledger.vkrishna04.me",
+    AUTH_WORKER: "https://codeledger.vkrishna04.me/api",
+    TELEMETRY: "https://counter.vkrishna04.me",
+    CANONICAL_MAP_RAW:
+      "https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/canonical-map.json",
+    CANONICAL_MAP_SCHEMA:
+      "https://raw.githubusercontent.com/vkrishna04/codeledger/main/data/schema/canonical-map.schema.json",
+    GITHUB_OAUTH_BASE: "https://github.com/login/oauth",
+    GITLAB_OAUTH_BASE: "https://gitlab.com/oauth",
+    BITBUCKET_OAUTH_BASE: "https://bitbucket.org/site/oauth2",
   },
 
   // ── AI Providers (endpoint user-overridable for self-hosted/proxies) ──
   AI_PROVIDERS: {
     gemini: {
-      id: 'gemini',
-      name: 'Google Gemini',
-      endpoint: 'https://generativelanguage.googleapis.com/v1beta',
-      modelsEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
-      defaultModel: 'gemini-2.0-flash',
-      supportsLiveFetch: true,    // can fetch available models at runtime
+      id: "gemini",
+      name: "Google Gemini",
+      endpoint: "https://generativelanguage.googleapis.com/v1beta",
+      modelsEndpoint: "https://generativelanguage.googleapis.com/v1beta/models",
+      defaultModel: "gemini-2.0-flash",
+      supportsLiveFetch: true, // can fetch available models at runtime
       keyRequired: true,
     },
     openai: {
-      id: 'openai',
-      name: 'OpenAI',
-      endpoint: 'https://api.openai.com/v1',
-      modelsEndpoint: 'https://api.openai.com/v1/models',
-      defaultModel: 'gpt-4o-mini',
-      supportsLiveFetch: true,    // GET /v1/models works for any OAI-compatible
+      id: "openai",
+      name: "OpenAI",
+      endpoint: "https://api.openai.com/v1",
+      modelsEndpoint: "https://api.openai.com/v1/models",
+      defaultModel: "gpt-4o-mini",
+      supportsLiveFetch: true, // GET /v1/models works for any OAI-compatible
       keyRequired: true,
     },
     claude: {
-      id: 'claude',
-      name: 'Anthropic Claude',
-      endpoint: 'https://api.anthropic.com/v1',
-      modelsEndpoint: 'https://api.anthropic.com/v1/models',
-      defaultModel: 'claude-haiku-4-5-20251001',
+      id: "claude",
+      name: "Anthropic Claude",
+      endpoint: "https://api.anthropic.com/v1",
+      modelsEndpoint: "https://api.anthropic.com/v1/models",
+      defaultModel: "claude-haiku-4-5-20251001",
       supportsLiveFetch: true,
       keyRequired: true,
     },
     deepseek: {
-      id: 'deepseek',
-      name: 'DeepSeek',
-      endpoint: 'https://api.deepseek.com/v1',
-      modelsEndpoint: null,       // no models endpoint; use static list
-      staticModels: ['deepseek-chat', 'deepseek-reasoner'],
-      defaultModel: 'deepseek-chat',
+      id: "deepseek",
+      name: "DeepSeek",
+      endpoint: "https://api.deepseek.com/v1",
+      modelsEndpoint: null, // no models endpoint; use static list
+      staticModels: ["deepseek-chat", "deepseek-reasoner"],
+      defaultModel: "deepseek-chat",
       supportsLiveFetch: false,
       keyRequired: true,
     },
     ollama: {
-      id: 'ollama',
-      name: 'Ollama (local)',
-      endpoint: 'http://localhost:11434/api',
-      modelsEndpoint: 'http://localhost:11434/api/tags',
-      defaultModel: 'llama3.2',
-      supportsLiveFetch: true,    // fetches installed models from local Ollama
+      id: "ollama",
+      name: "Ollama (local)",
+      endpoint: "http://localhost:11434/api",
+      modelsEndpoint: "http://localhost:11434/api/tags",
+      defaultModel: "llama3.2",
+      supportsLiveFetch: true, // fetches installed models from local Ollama
       keyRequired: false,
     },
   },
 
   // Primary AI → fallback chain. User-configurable in Settings.
-  AI_DEFAULT_PRIMARY: 'gemini',
-  AI_FALLBACK_CHAIN: ['ollama'],  // tried in order if primary fails
+  AI_DEFAULT_PRIMARY: "gemini",
+  AI_FALLBACK_CHAIN: ["ollama"], // tried in order if primary fails
 
   // ── Git Providers ──
   GIT_PROVIDERS: {
     github: {
-      id: 'github',
-      name: 'GitHub',
-      apiBase: 'https://api.github.com',
-      oauthBase: 'https://github.com/login/oauth',
-      clientId: '',  // injected at build time via .env; safe to store here (public)
+      id: "github",
+      name: "GitHub",
+      apiBase: "https://api.github.com",
+      oauthBase: "https://github.com/login/oauth",
+      clientId: "", // injected at build time via .env; safe to store here (public)
     },
     gitlab: {
-      id: 'gitlab',
-      name: 'GitLab',
-      apiBase: 'https://gitlab.com/api/v4',
-      oauthBase: 'https://gitlab.com/oauth',
-      clientId: '',
+      id: "gitlab",
+      name: "GitLab",
+      apiBase: "https://gitlab.com/api/v4",
+      oauthBase: "https://gitlab.com/oauth",
+      clientId: "",
     },
     bitbucket: {
-      id: 'bitbucket',
-      name: 'Bitbucket',
-      apiBase: 'https://api.bitbucket.org/2.0',
-      oauthBase: 'https://bitbucket.org/site/oauth2',
-      clientId: '',
+      id: "bitbucket",
+      name: "Bitbucket",
+      apiBase: "https://api.bitbucket.org/2.0",
+      oauthBase: "https://bitbucket.org/site/oauth2",
+      clientId: "",
     },
   },
 
   // ── Platforms ──
   PLATFORMS: {
-    leetcode:      { id: 'leetcode',      name: 'LeetCode',      color: '#FFA116', domains: ['leetcode.com'] },
-    geeksforgeeks: { id: 'geeksforgeeks', name: 'GeeksForGeeks', color: '#2F8D46', domains: ['geeksforgeeks.org', 'practice.geeksforgeeks.org'] },
-    codeforces:    { id: 'codeforces',    name: 'Codeforces',    color: '#1F8ACB', domains: ['codeforces.com'] },
+    leetcode: {
+      id: "leetcode",
+      name: "LeetCode",
+      color: "#FFA116",
+      domains: ["leetcode.com"],
+    },
+    geeksforgeeks: {
+      id: "geeksforgeeks",
+      name: "GeeksForGeeks",
+      color: "#2F8D46",
+      domains: ["geeksforgeeks.org", "practice.geeksforgeeks.org"],
+    },
+    codeforces: {
+      id: "codeforces",
+      name: "Codeforces",
+      color: "#1F8ACB",
+      domains: ["codeforces.com"],
+    },
   },
 
   // ── Canonical map ──
   CANONICAL_VOTES_REQUIRED: 5,
-  CANONICAL_AI_CONFIDENCE_AUTO: 0.90,
-  CANONICAL_AI_CONFIDENCE_REVIEW: 0.70,
+  CANONICAL_AI_CONFIDENCE_AUTO: 0.9,
+  CANONICAL_AI_CONFIDENCE_REVIEW: 0.7,
   CANONICAL_CACHE_TTL_MS: 86_400_000,
 
   // ── API Key Pool ──
   KEY_POOL_RETRY_AFTER_MS: 60_000,
 
   // ── Git repo ──
-  DEFAULT_REPO_NAME: 'CodeLedger-Sync',
-  REPO_BRANCH: 'main',
-  COMMIT_MESSAGE_TEMPLATE: '[{topic}] {title} — {difficulty} | {language}',
-  IMPORT_COMMIT_MESSAGE: 'chore: import {count} solutions from {platform} profile',
-  INDEX_JSON_PATH: 'index.json',
+  DEFAULT_REPO_NAME: "CodeLedger-Sync",
+  REPO_BRANCH: "main",
+  COMMIT_MESSAGE_TEMPLATE: "[{topic}] {title} — {difficulty} | {language}",
+  IMPORT_COMMIT_MESSAGE:
+    "chore: import {count} solutions from {platform} profile",
+  INDEX_JSON_PATH: "index.json",
 
   // ── Heartbeat ──
-  HEARTBEAT_PORT_NAME: 'heartbeat',
+  HEARTBEAT_PORT_NAME: "heartbeat",
   HEARTBEAT_INTERVAL_MS: 20_000,
 
   // ── Storage keys ──
   SK: {
-    SETTINGS:           'settings',
-    DEBUG:              'codeledger.debug',
-    AUTH_TOKENS:        'auth.tokens',
-    AI_KEYS:            'ai.keys',
-    AI_KEY_INDICES:     'ai.key.indices',
-    AI_ENDPOINT_OVERRIDES: 'ai.endpoint.overrides',
-    TELEMETRY_OPT_IN:   'telemetry.optIn',
-    INCOGNITO_MODE:     'incognito.mode',
-    DISABLED_PLATFORMS: 'platforms.disabled',
-    CANONICAL_MAP_CACHE:'canonical.map.cache',
-    CANONICAL_MAP_ETAG: 'canonical.map.etag',
-    AI_PROMPTS:         'ai.prompts',
-    SYNC_STATE:         'sync.state',
-    THEME:              'ui.theme',
+    SETTINGS: "settings",
+    DEBUG: "codeledger.debug",
+    AUTH_TOKENS: "auth.tokens",
+    AI_KEYS: "ai.keys",
+    AI_KEY_INDICES: "ai.key.indices",
+    AI_ENDPOINT_OVERRIDES: "ai.endpoint.overrides",
+    TELEMETRY_OPT_IN: "telemetry.optIn",
+    INCOGNITO_MODE: "incognito.mode",
+    DISABLED_PLATFORMS: "platforms.disabled",
+    CANONICAL_MAP_CACHE: "canonical.map.cache",
+    CANONICAL_MAP_ETAG: "canonical.map.etag",
+    AI_PROMPTS: "ai.prompts",
+    SYNC_STATE: "sync.state",
+    THEME: "ui.theme",
   },
 
   // ── IndexedDB ──
-  IDB_NAME: 'codeledger',
+  IDB_NAME: "codeledger",
   IDB_VERSION: 1,
-  IDB_STORES: { PROBLEMS: 'problems', REVIEWS: 'reviews', GRAPH_CACHE: 'graph_cache' },
+  IDB_STORES: {
+    PROBLEMS: "problems",
+    REVIEWS: "reviews",
+    GRAPH_CACHE: "graph_cache",
+  },
 
   // ── Telemetry events ──
   TEL: {
-    INSTALL:    'codeledger-install',
-    UPDATE:     'codeledger-update',
-    SOLVE:      'codeledger-solve',
-    AI_REVIEW:  'codeledger-ai-review',
-    COMMIT:     'codeledger-commit',
-    IMPORT:     'codeledger-import',
-    OPT_IN:     'codeledger-opt-in',
-    OPT_OUT:    'codeledger-opt-out',
+    INSTALL: "codeledger-install",
+    UPDATE: "codeledger-update",
+    SOLVE: "codeledger-solve",
+    AI_REVIEW: "codeledger-ai-review",
+    COMMIT: "codeledger-commit",
+    IMPORT: "codeledger-import",
+    OPT_IN: "codeledger-opt-in",
+    OPT_OUT: "codeledger-opt-out",
   },
 
   // ── UI ──
-  LIBRARY_SIDEBAR_PARAM: 'sidebar',
-  LIBRARY_PANEL_PARAM: 'panel',
+  LIBRARY_SIDEBAR_PARAM: "sidebar",
+  LIBRARY_PANEL_PARAM: "panel",
   SYNC_ALARM_PERIOD_MIN: 30,
   ALARM_NAMES: {
-    DAILY_REMINDER: 'reminder.daily',
-    STREAK_CHECK:   'reminder.streak',
-    SYNC:           'sync.periodic',
+    DAILY_REMINDER: "reminder.daily",
+    STREAK_CHECK: "reminder.streak",
+    SYNC: "sync.periodic",
   },
 
   // ── Portfolio integration ──
-  PORTFOLIO_DSA_SECTION_ID: 'dsa-stats', // ID in portfolio settings.json
-  PORTFOLIO_INDEX_JSON_FIELD: 'dsaIndexUrl', // field name in portfolio settings
+  PORTFOLIO_DSA_SECTION_ID: "dsa-stats", // ID in portfolio settings.json
+  PORTFOLIO_INDEX_JSON_FIELD: "dsaIndexUrl", // field name in portfolio settings
 });
 ```
 
@@ -589,8 +642,8 @@ This is a core requirement. Models must be fetched live from each provider's API
 ### `src/handlers/ai/gemini/model-fetcher.js`
 
 ```js
-import { createDebugger } from '../../../lib/debug.js';
-const dbg = createDebugger('GeminiModelFetcher');
+import { createDebugger } from "../../../lib/debug.js";
+const dbg = createDebugger("GeminiModelFetcher");
 
 // Fetches all available Gemini models that support generateContent.
 // Result is cached in memory for the session.
@@ -598,11 +651,11 @@ let _cache = null;
 
 export async function fetchGeminiModels(apiKey) {
   if (_cache) return _cache;
-  dbg.log('Fetching Gemini models from API');
+  dbg.log("Fetching Gemini models from API");
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-    { headers: { 'Content-Type': 'application/json' } }
+    { headers: { "Content-Type": "application/json" } },
   );
   if (!res.ok) throw new Error(`Gemini models fetch failed: ${res.status}`);
 
@@ -610,9 +663,9 @@ export async function fetchGeminiModels(apiKey) {
 
   // Filter to only models that support text generation
   const textModels = (models || [])
-    .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
-    .map(m => ({
-      id: m.name.replace('models/', ''),  // e.g. "gemini-2.0-flash"
+    .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+    .map((m) => ({
+      id: m.name.replace("models/", ""), // e.g. "gemini-2.0-flash"
       displayName: m.displayName,
       description: m.description,
       inputTokenLimit: m.inputTokenLimit,
@@ -625,22 +678,27 @@ export async function fetchGeminiModels(apiKey) {
   return textModels;
 }
 
-export function clearModelCache() { _cache = null; }
+export function clearModelCache() {
+  _cache = null;
+}
 ```
 
 ### `src/handlers/ai/openai/model-fetcher.js`
 
 ```js
 // Works for OpenAI AND any OpenAI-compatible endpoint (Groq, Together, etc.)
-export async function fetchOpenAIModels(apiKey, endpoint = 'https://api.openai.com/v1') {
+export async function fetchOpenAIModels(
+  apiKey,
+  endpoint = "https://api.openai.com/v1",
+) {
   const res = await fetch(`${endpoint}/models`, {
-    headers: { 'Authorization': `Bearer ${apiKey}` },
+    headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) throw new Error(`OpenAI models fetch failed: ${res.status}`);
   const { data } = await res.json();
   return (data || [])
-    .filter(m => m.id.includes('gpt') || m.id.includes('chat'))
-    .map(m => ({ id: m.id, displayName: m.id }))
+    .filter((m) => m.id.includes("gpt") || m.id.includes("chat"))
+    .map((m) => ({ id: m.id, displayName: m.id }))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 ```
@@ -649,12 +707,14 @@ export async function fetchOpenAIModels(apiKey, endpoint = 'https://api.openai.c
 
 ```js
 // Fetches locally installed Ollama models
-export async function fetchOllamaModels(endpoint = 'http://localhost:11434') {
+export async function fetchOllamaModels(endpoint = "http://localhost:11434") {
   try {
-    const res = await fetch(`${endpoint}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${endpoint}/api/tags`, {
+      signal: AbortSignal.timeout(3000),
+    });
     if (!res.ok) return [];
     const { models } = await res.json();
-    return (models || []).map(m => ({
+    return (models || []).map((m) => ({
       id: m.name,
       displayName: m.name,
       size: m.size,
@@ -669,75 +729,93 @@ export async function fetchOllamaModels(endpoint = 'http://localhost:11434') {
 ### `src/ui/components/ModelSelector.js`
 
 ```js
-import { h } from 'https://esm.sh/preact';
-import { useState, useEffect } from 'https://esm.sh/preact/hooks';
-import htm from 'https://esm.sh/htm';
+import { h } from "https://esm.sh/preact";
+import { useState, useEffect } from "https://esm.sh/preact/hooks";
+import htm from "https://esm.sh/htm";
 const html = htm.bind(h);
 
 /**
  * @param {{ providerId: string, apiKey: string, selectedModel: string,
  *           onSelect: (modelId: string) => void, endpoint?: string }} props
  */
-export function ModelSelector({ providerId, apiKey, selectedModel, onSelect, endpoint }) {
+export function ModelSelector({
+  providerId,
+  apiKey,
+  selectedModel,
+  onSelect,
+  endpoint,
+}) {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!providerId) return;
-    if (providerId !== 'ollama' && !apiKey) return;
+    if (providerId !== "ollama" && !apiKey) return;
 
     setLoading(true);
     setError(null);
 
     loadModels(providerId, apiKey, endpoint)
       .then(setModels)
-      .catch(err => setError(err.message))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [providerId, apiKey, endpoint]);
 
-  if (loading) return html`<span class="model-selector-loading">Loading models…</span>`;
-  if (error)   return html`<span class="model-selector-error">⚠ ${error}</span>`;
-  if (!models.length) return html`<span class="model-selector-empty">No models found</span>`;
+  if (loading)
+    return html`<span class="model-selector-loading">Loading models…</span>`;
+  if (error) return html`<span class="model-selector-error">⚠ ${error}</span>`;
+  if (!models.length)
+    return html`<span class="model-selector-empty">No models found</span>`;
 
   return html`
     <select
       class="model-selector"
       value=${selectedModel}
-      onChange=${e => onSelect(e.target.value)}
+      onChange=${(e) => onSelect(e.target.value)}
     >
-      ${models.map(m => html`
-        <option key=${m.id} value=${m.id} selected=${m.id === selectedModel}>
-          ${m.displayName || m.id}
-        </option>
-      `)}
+      ${models.map(
+        (m) => html`
+          <option key=${m.id} value=${m.id} selected=${m.id === selectedModel}>
+            ${m.displayName || m.id}
+          </option>
+        `,
+      )}
     </select>
   `;
 }
 
 async function loadModels(providerId, apiKey, endpoint) {
   switch (providerId) {
-    case 'gemini': {
-      const { fetchGeminiModels } = await import('../../handlers/ai/gemini/model-fetcher.js');
+    case "gemini": {
+      const { fetchGeminiModels } =
+        await import("../../handlers/ai/gemini/model-fetcher.js");
       return fetchGeminiModels(apiKey);
     }
-    case 'openai': {
-      const { fetchOpenAIModels } = await import('../../handlers/ai/openai/model-fetcher.js');
+    case "openai": {
+      const { fetchOpenAIModels } =
+        await import("../../handlers/ai/openai/model-fetcher.js");
       return fetchOpenAIModels(apiKey, endpoint);
     }
-    case 'claude': {
-      const { fetchClaudeModels } = await import('../../handlers/ai/claude/model-fetcher.js');
+    case "claude": {
+      const { fetchClaudeModels } =
+        await import("../../handlers/ai/claude/model-fetcher.js");
       return fetchClaudeModels(apiKey);
     }
-    case 'ollama': {
-      const { fetchOllamaModels } = await import('../../handlers/ai/ollama/model-fetcher.js');
+    case "ollama": {
+      const { fetchOllamaModels } =
+        await import("../../handlers/ai/ollama/model-fetcher.js");
       return fetchOllamaModels(endpoint);
     }
-    case 'deepseek': {
-      const { CONSTANTS } = await import('../../core/constants.js');
-      return CONSTANTS.AI_PROVIDERS.deepseek.staticModels.map(id => ({ id, displayName: id }));
+    case "deepseek": {
+      const { CONSTANTS } = await import("../../core/constants.js");
+      return CONSTANTS.AI_PROVIDERS.deepseek.staticModels.map((id) => ({
+        id,
+        displayName: id,
+      }));
     }
-    default: return [];
+    default:
+      return [];
   }
 }
 ```
@@ -751,18 +829,18 @@ Every platform handler must export a `PageDetector` that identifies what kind of
 ### `src/handlers/platforms/leetcode/page-detector.js`
 
 ```js
-import { createDebugger } from '../../../lib/debug.js';
-const dbg = createDebugger('LeetCodePageDetector');
+import { createDebugger } from "../../../lib/debug.js";
+const dbg = createDebugger("LeetCodePageDetector");
 
 export const PAGE_TYPES = {
-  PROBLEM:     'problem',      // /problems/{slug}/
-  SUBMISSION:  'submission',   // /submissions/detail/{id}/
-  CONTEST:     'contest',      // /contest/
-  EXPLORE:     'explore',      // /explore/
-  DISCUSS:     'discuss',      // /discuss/
-  PROFILE:     'profile',      // /u/{username}/  or /{username}/
-  HOME:        'home',         // leetcode.com/
-  UNKNOWN:     'unknown',
+  PROBLEM: "problem", // /problems/{slug}/
+  SUBMISSION: "submission", // /submissions/detail/{id}/
+  CONTEST: "contest", // /contest/
+  EXPLORE: "explore", // /explore/
+  DISCUSS: "discuss", // /discuss/
+  PROFILE: "profile", // /u/{username}/  or /{username}/
+  HOME: "home", // leetcode.com/
+  UNKNOWN: "unknown",
 };
 
 /**
@@ -771,13 +849,13 @@ export const PAGE_TYPES = {
  * @returns {{ type: string, slug?: string, submissionId?: string }}
  */
 export function detectPage(pathname) {
-  const clean = pathname.replace(/\/$/, ''); // strip trailing slash
+  const clean = pathname.replace(/\/$/, ""); // strip trailing slash
 
   // /problems/{slug} or /problems/{slug}/description or /problems/{slug}/submissions
   const problemMatch = clean.match(/^\/problems\/([^/]+)/);
   if (problemMatch) {
     const slug = problemMatch[1];
-    const isSubmissionTab = clean.includes('/submissions');
+    const isSubmissionTab = clean.includes("/submissions");
     dbg.log(`Problem page detected: ${slug}`, { isSubmissionTab });
     return { type: PAGE_TYPES.PROBLEM, slug };
   }
@@ -788,14 +866,15 @@ export function detectPage(pathname) {
     return { type: PAGE_TYPES.SUBMISSION, submissionId: submissionMatch[1] };
   }
 
-  if (clean.startsWith('/contest'))   return { type: PAGE_TYPES.CONTEST };
-  if (clean.startsWith('/explore'))   return { type: PAGE_TYPES.EXPLORE };
-  if (clean.startsWith('/discuss'))   return { type: PAGE_TYPES.DISCUSS };
-  if (clean === '' || clean === '/') return { type: PAGE_TYPES.HOME };
+  if (clean.startsWith("/contest")) return { type: PAGE_TYPES.CONTEST };
+  if (clean.startsWith("/explore")) return { type: PAGE_TYPES.EXPLORE };
+  if (clean.startsWith("/discuss")) return { type: PAGE_TYPES.DISCUSS };
+  if (clean === "" || clean === "/") return { type: PAGE_TYPES.HOME };
 
   // Profile: /u/{username} or /{username}
   const profileMatch = clean.match(/^\/(u\/)?([^/]+)\/?$/);
-  if (profileMatch) return { type: PAGE_TYPES.PROFILE, username: profileMatch[2] };
+  if (profileMatch)
+    return { type: PAGE_TYPES.PROFILE, username: profileMatch[2] };
 
   return { type: PAGE_TYPES.UNKNOWN };
 }
@@ -820,6 +899,7 @@ This is a **standalone Node.js script** (not part of the extension) that a user 
 ### `dev/import-profile/leetcode-importer.js`
 
 The importer:
+
 1. Opens LeetCode in a Puppeteer browser (the user logs in manually or via saved cookies)
 2. Fetches the user's full submission list via the GraphQL endpoint
 3. For each accepted submission (deduplicated per problem — takes the latest per language):
@@ -836,12 +916,12 @@ The importer:
 // Usage: node leetcode-importer.js --github-token=TOKEN --repo=owner/repo --cookie=SESSION_COOKIE
 // Or: node leetcode-importer.js --github-token=TOKEN --repo=owner/repo  (will open browser for login)
 
-import puppeteer from 'puppeteer';
-import { Octokit } from 'octokit';
-import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { CONSTANTS } from '../../src/core/constants.js';
+import puppeteer from "puppeteer";
+import { Octokit } from "octokit";
+import { parseArgs } from "node:util";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { CONSTANTS } from "../../src/core/constants.js";
 
 // [Full implementation: GraphQL queries, tree building, atomic commit]
 // The script must:
@@ -871,52 +951,66 @@ Every `dom-selectors.js` must follow this exact pattern. This is the contract fo
 // src/handlers/platforms/geeksforgeeks/dom-selectors.js
 
 export const SELECTORS = {
-  version: '2025-04-24',
-  lastVerified: '2025-04-24',
+  version: "2025-04-24",
+  lastVerified: "2025-04-24",
 
   // Page classification selectors
   page: {
-    isProblemPage: '.problems-header, .problem-statement-container',
-    isEditorPage: '#editor, .ace_editor',
+    isProblemPage: ".problems-header, .problem-statement-container",
+    isEditorPage: "#editor, .ace_editor",
   },
 
   // Problem metadata extraction
   problem: {
-    title:       '.problems-header h3, .problem-title h3',
-    difficulty:  '.difficulty-block .difficulty-tag, .problems-header .tag-item:first-child',
-    tags:        '.tags-section .tag-item, .topic-tag',
-    description: '.problem-statement, .problem-description',
-    platformId:  null, // extracted from URL
+    title: ".problems-header h3, .problem-title h3",
+    difficulty:
+      ".difficulty-block .difficulty-tag, .problems-header .tag-item:first-child",
+    tags: ".tags-section .tag-item, .topic-tag",
+    description: ".problem-statement, .problem-description",
+    platformId: null, // extracted from URL
   },
 
   // Submission success detection
   submission: {
     // The element that appears ONLY on successful submission
-    successIndicator: '.problems-submission-result.accepted, .success-container.accepted, [class*="accepted"][class*="submission"]',
-    code:     '.ace_content .ace_text-layer, #editor .CodeMirror-code',
+    successIndicator:
+      '.problems-submission-result.accepted, .success-container.accepted, [class*="accepted"][class*="submission"]',
+    code: ".ace_content .ace_text-layer, #editor .CodeMirror-code",
     language: '.language-dropdown .selected-option, select[name="language"]',
-    runtime:  '.result-table tr:nth-child(2) td:last-child',
-    memory:   '.result-table tr:nth-child(3) td:last-child',
+    runtime: ".result-table tr:nth-child(2) td:last-child",
+    memory: ".result-table tr:nth-child(3) td:last-child",
   },
 
   // QoL augmentation targets
   qol: {
-    editorContainer:  '#editor, .ace_editor',
-    editorToolbar:    '.editor-toolbar, .editor-header',
-    submitButton:     '.problems-submit-btn, button[type="submit"]',
-    resultContainer:  '.result-container, .submission-result',
+    editorContainer: "#editor, .ace_editor",
+    editorToolbar: ".editor-toolbar, .editor-header",
+    submitButton: '.problems-submit-btn, button[type="submit"]',
+    resultContainer: ".result-container, .submission-result",
   },
 };
 
 // Legacy fallbacks for each key — tried in order when primary fails
 export const LEGACY_SELECTORS = {
-  'problem.title':                ['.problem-title', '.question-title', 'h1.header-title'],
-  'submission.successIndicator':  ['.accepted-banner', '#result-accepted', '.submission-success'],
-  'submission.code':              ['.CodeMirror-code', '.ace_text-layer', '#code-editor pre'],
+  "problem.title": [".problem-title", ".question-title", "h1.header-title"],
+  "submission.successIndicator": [
+    ".accepted-banner",
+    "#result-accepted",
+    ".submission-success",
+  ],
+  "submission.code": [
+    ".CodeMirror-code",
+    ".ace_text-layer",
+    "#code-editor pre",
+  ],
 };
 
 // Domain list for manifest.json generation (dev/generate-manifest-domains.js reads this)
-export const DOMAINS = ['geeksforgeeks.org', 'practice.geeksforgeeks.org', 'www.geeksforgeeks.org'];
+export const DOMAINS = [
+  "geeksforgeeks.org",
+  "practice.geeksforgeeks.org",
+  "www.geeksforgeeks.org",
+];
 ```
 
 The `BasePlatformHandler.safeQuery(key, scope)` uses the `LEGACY_SELECTORS` map automatically when the primary selector fails.
@@ -976,38 +1070,74 @@ Every handler registers its settings schema on startup. The SettingsView renders
 
 ```js
 // How a handler registers settings:
-registry.registerSettings('leetcode', {
-  section: 'Platforms',
-  label: 'LeetCode',
-  icon: '🟠',
+registry.registerSettings("leetcode", {
+  section: "Platforms",
+  label: "LeetCode",
+  icon: "🟠",
   order: 10,
   fields: [
-    { key: 'enabled',         type: 'toggle', label: 'Enable tracking',        default: true },
-    { key: 'autoReview',      type: 'toggle', label: 'Auto AI review on solve', default: false },
-    { key: 'copyCodeButton',  type: 'toggle', label: 'Copy-code button',        default: true },
-    { key: 'showTimer',       type: 'toggle', label: 'Show solve timer',        default: true },
-    { key: 'graphqlEndpoint', type: 'url',    label: 'GraphQL endpoint (advanced)',
-      default: 'https://leetcode.com/graphql',
-      description: 'Override if you use a proxy. Default: official endpoint.' },
+    { key: "enabled", type: "toggle", label: "Enable tracking", default: true },
+    {
+      key: "autoReview",
+      type: "toggle",
+      label: "Auto AI review on solve",
+      default: false,
+    },
+    {
+      key: "copyCodeButton",
+      type: "toggle",
+      label: "Copy-code button",
+      default: true,
+    },
+    {
+      key: "showTimer",
+      type: "toggle",
+      label: "Show solve timer",
+      default: true,
+    },
+    {
+      key: "graphqlEndpoint",
+      type: "url",
+      label: "GraphQL endpoint (advanced)",
+      default: "https://leetcode.com/graphql",
+      description: "Override if you use a proxy. Default: official endpoint.",
+    },
   ],
 });
 
 // AI handler registers:
-registry.registerSettings('ai-gemini', {
-  section: 'AI Providers',
-  label: 'Google Gemini',
-  icon: '✨',
+registry.registerSettings("ai-gemini", {
+  section: "AI Providers",
+  label: "Google Gemini",
+  icon: "✨",
   order: 20,
   fields: [
-    { key: 'keys',        type: 'key-list', label: 'API Keys (round-robin)',
-      description: 'Add multiple keys for automatic rotation.' },
-    { key: 'model',       type: 'model-picker', label: 'Model',
-      providerRef: 'gemini',   // used by ModelSelector component
-      default: 'gemini-2.0-flash' },
-    { key: 'endpoint',    type: 'url',  label: 'API Endpoint',
-      default: 'https://generativelanguage.googleapis.com/v1beta' },
-    { key: 'enabled',     type: 'toggle', label: 'Enable', default: true },
-    { key: 'isPrimary',   type: 'radio', label: 'Set as primary', group: 'ai-primary' },
+    {
+      key: "keys",
+      type: "key-list",
+      label: "API Keys (round-robin)",
+      description: "Add multiple keys for automatic rotation.",
+    },
+    {
+      key: "model",
+      type: "model-picker",
+      label: "Model",
+      providerRef: "gemini", // used by ModelSelector component
+      default: "gemini-2.0-flash",
+    },
+    {
+      key: "endpoint",
+      type: "url",
+      label: "API Endpoint",
+      default: "https://generativelanguage.googleapis.com/v1beta",
+    },
+    { key: "enabled", type: "toggle", label: "Enable", default: true },
+    {
+      key: "isPrimary",
+      type: "radio",
+      label: "Set as primary",
+      group: "ai-primary",
+    },
   ],
 });
 ```
@@ -1033,13 +1163,14 @@ The `SettingsSchema.js` component renders `type: 'key-list'` as an add/remove li
 The `src/lib/browser-compat.js` file handles everything. Additional compatibility notes:
 
 **Firefox sidebar vs Chrome Side Panel:**
+
 ```js
 // In service-worker.js:
-import { ext, sidebar, sidePanel } from '../lib/browser-compat.js';
+import { ext, sidebar, sidePanel } from "../lib/browser-compat.js";
 
 // Firefox uses sidebarAction, Chrome uses sidePanel
-const hasSidebar = typeof sidebar !== 'undefined' && sidebar;
-const hasSidePanel = typeof sidePanel !== 'undefined' && sidePanel;
+const hasSidebar = typeof sidebar !== "undefined" && sidebar;
+const hasSidePanel = typeof sidePanel !== "undefined" && sidePanel;
 
 // Open library in appropriate sidebar:
 export async function openSidebar() {
@@ -1053,8 +1184,10 @@ export async function openSidebar() {
   } else {
     // Fallback: open as popup window
     await ext.windows.create({
-      url: ext.runtime.getURL('library/library.html?sidebar=true'),
-      type: 'popup', width: 400, height: 700,
+      url: ext.runtime.getURL("library/library.html?sidebar=true"),
+      type: "popup",
+      width: 400,
+      height: 700,
     });
   }
 }
@@ -1075,16 +1208,29 @@ CodeLedger exports a read-only data bridge for the portfolio.
 // Exposes DSA stats for the portfolio to consume via postMessage or direct API read.
 // The portfolio at VKrishna04.github.io reads the DSA repo's index.json from GitHub API.
 
-export async function getDSAStatsForPortfolio(githubToken, repoOwner, repoName) {
+export async function getDSAStatsForPortfolio(
+  githubToken,
+  repoOwner,
+  repoName,
+) {
   const raw = await fetch(
     `https://api.github.com/repos/${repoOwner}/${repoName}/contents/index.json`,
-    { headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github.raw' } }
+    {
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: "application/vnd.github.raw",
+      },
+    },
   );
   const index = await raw.json();
 
   return {
     totalSolved: index.stats.total,
-    byDifficulty: { easy: index.stats.easy, medium: index.stats.medium, hard: index.stats.hard },
+    byDifficulty: {
+      easy: index.stats.easy,
+      medium: index.stats.medium,
+      hard: index.stats.hard,
+    },
     byTopic: index.stats.byTopic,
     languages: extractLanguages(index.problems),
     recentSolves: index.problems.slice(-5).reverse(),
@@ -1114,6 +1260,7 @@ export async function getDSAStatsForPortfolio(githubToken, repoOwner, repoName) 
 The portfolio (React+Vite) reads this config and calls the GitHub API directly to fetch `index.json` from the DSA repo. The CodeLedger integration provides the exact schema of `index.json` so the portfolio knows what fields to expect.
 
 Generate `docs/reference/strategy/portfolio-integration.md` with:
+
 - Complete setup guide
 - Example `settings.json` snippet
 - The `index.json` schema reference
@@ -1137,21 +1284,22 @@ The web app shares components by importing from relative paths. It uses ES modul
 
 ```html
 <script type="importmap">
-{
-  "imports": {
-    "preact":        "https://esm.sh/preact",
-    "preact/hooks":  "https://esm.sh/preact/hooks",
-    "htm":           "https://esm.sh/htm",
-    "chart.js/auto": "https://esm.sh/chart.js/auto"
+  {
+    "imports": {
+      "preact": "https://esm.sh/preact",
+      "preact/hooks": "https://esm.sh/preact/hooks",
+      "htm": "https://esm.sh/htm",
+      "chart.js/auto": "https://esm.sh/chart.js/auto"
+    }
   }
-}
 </script>
 ```
 
 The library page auto-detects its context:
+
 ```js
 // src/library/library.js
-const IS_EXTENSION = typeof chrome !== 'undefined' && chrome.runtime?.id;
+const IS_EXTENSION = typeof chrome !== "undefined" && chrome.runtime?.id;
 const IS_WEB_APP = !IS_EXTENSION;
 
 // In extension mode: reads from IndexedDB + git sync
@@ -1165,6 +1313,7 @@ const IS_WEB_APP = !IS_EXTENSION;
 Generate with:
 
 ### Header badges:
+
 ```markdown
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/)
@@ -1176,6 +1325,7 @@ Generate with:
 ```
 
 ### STAR section (exact format, prominent placement):
+
 ```markdown
 ## Why CodeLedger exists
 
@@ -1215,6 +1365,7 @@ profile. Owned entirely by you. Shareable on your portfolio. No servers.
 Generate all 7 Mermaid diagrams completely. They must be syntactically valid Mermaid.
 
 Also include in `docs/DEBUG_SYSTEM.md`:
+
 - Explanation of the `console.bind()` trick that preserves caller context
 - How to enable debug mode (Settings toggle, or `chrome.storage.local.set({'codeledger.debug': true})` in DevTools)
 - How to create a debugger in a new file
@@ -1231,6 +1382,7 @@ Triggered when an issue has label `canonical-mapping` and has ≥ 5 `+1` comment
 ### `.github/workflows/release.yml`
 
 Triggered on `git tag v*`. Runs:
+
 1. `node dev/generate-manifest-domains.js`
 2. `node dev/package-chrome.js` → `releases/codeledger-chrome-vX.X.X.zip`
 3. `node dev/package-firefox.js` → `releases/codeledger-firefox-vX.X.X.zip`
@@ -1247,6 +1399,7 @@ Triggered on push to `main` affecting `worker/**`. Uses `CLOUDFLARE_API_TOKEN` s
 ## §INITIAL CANONICAL MAP — `data/canonical-map.json`
 
 Generate **all 150 entries** from the NeetCode 150 list. For each entry provide:
+
 - `canonicalId` (slug form)
 - `canonicalTitle`
 - `topic` (from NeetCode categories: arrays, two-pointers, sliding-window, stack, binary-search, linked-list, trees, tries, heap, backtracking, graphs, dynamic-programming, greedy, intervals, math, bit-manipulation)
@@ -1281,22 +1434,22 @@ Reads every `dom-selectors.js` `DOMAINS` export from handlers. Writes `host_perm
 ```json
 {
   "scripts": {
-    "update-domains":   "node dev/generate-manifest-domains.js",
-    "build:chrome":     "npm run update-domains && node dev/package-chrome.js",
-    "build:firefox":    "npm run update-domains && node dev/package-firefox.js",
-    "build":            "npm run build:chrome && npm run build:firefox",
-    "deploy:worker":    "cd worker && wrangler deploy",
-    "deploy:landing":   "cd worker && wrangler pages deploy public",
-    "validate:map":     "node dev/build-canonical-map.js",
-    "import:leetcode":  "node dev/import-profile/leetcode-importer.js",
-    "import:gfg":       "node dev/import-profile/gfg-importer.js",
-    "lint":             "eslint src/ --ext .js"
+    "update-domains": "node dev/generate-manifest-domains.js",
+    "build:chrome": "npm run update-domains && node dev/package-chrome.js",
+    "build:firefox": "npm run update-domains && node dev/package-firefox.js",
+    "build": "npm run build:chrome && npm run build:firefox",
+    "deploy:worker": "cd worker && wrangler deploy",
+    "deploy:landing": "cd worker && wrangler pages deploy public",
+    "validate:map": "node dev/build-canonical-map.js",
+    "import:leetcode": "node dev/import-profile/leetcode-importer.js",
+    "import:gfg": "node dev/import-profile/gfg-importer.js",
+    "lint": "eslint src/ --ext .js"
   },
   "devDependencies": {
     "puppeteer": "^22.0.0",
-    "octokit":   "^4.0.0",
-    "eslint":    "^9.0.0",
-    "web-ext":   "^8.0.0"
+    "octokit": "^4.0.0",
+    "eslint": "^9.0.0",
+    "web-ext": "^8.0.0"
   }
 }
 ```
@@ -1356,6 +1509,7 @@ The items below are planned enhancements. When generating or extending CodeLedge
 ### R1 — Gamification Layer (opt-in toggle)
 
 Users can toggle a "Gamified Mode" in General settings (`gamificationEnabled`). When on:
+
 - Award XP for each solve: Easy = 10 XP, Medium = 25 XP, Hard = 50 XP. Bonus multipliers for streaks (1.2×) and first-time topic solves (1.5×).
 - Display a level badge in the library header (Level 1–50 based on total XP, with tier names: Apprentice → Coder → Engineer → Expert → Legend).
 - Weekly challenges: seeded from the canonical map, randomised per week, shown as a sidebar card in Analytics. Completing all 3 earns a bonus XP badge.
@@ -1368,6 +1522,7 @@ Users can toggle a "Gamified Mode" in General settings (`gamificationEnabled`). 
 Two modes, both accessible from the ProblemCard detail view and the Library sidebar:
 
 **Mode A – Post-Submit Evaluator (default)**
+
 - Triggered automatically after a solve event is captured (already hooked in `service-worker.js`).
 - Sends code + problem title + difficulty + topic to the active AI provider.
 - Returns a structured review (already implemented as `ai.review()`). Render it inside `ProblemCard` as a collapsible "AI Review" panel with sections: Complexity, Correctness, Improvement, Pattern.
@@ -1375,6 +1530,7 @@ Two modes, both accessible from the ProblemCard detail view and the Library side
 - Prompt key: `ai_guide_prompt` (separate from `ai_review_prompt`). Default: `"Given that this {difficulty} {language} solution for '{title}' was incorrect, identify the most likely logical error without revealing the correct solution. Point to the specific case that would fail."`
 
 **Mode B – Contextual Chatbot (opt-in: `aiChatEnabled` toggle)**
+
 - A floating chat panel injected by the content script on LeetCode/GFG/CF problem pages.
 - The chatbot has context of: the current problem (title, difficulty, constraints, examples — from the DOM or cached metadata), the user's current code (read from the editor), and all previous solves of problems in the same topic (fetched from IndexedDB via a `chrome.runtime.sendMessage` round-trip).
 - It never auto-sends code; the user must click "Share my code" to attach it to a message.
@@ -1397,6 +1553,7 @@ Additions to `src/library/views/AnalyticsView.js`:
 ### R4 — Per-Platform Deep Stats
 
 Extend platform tracking in `AnalyticsView`:
+
 - Codeforces: parse contest rating if available (store in problem object when GFG/CF handlers capture it).
 - GeeksForGeeks: track problem difficulty using the canonical map (GFG uses School/Basic/Easy/Medium/Hard).
 - Cross-platform deduplication view: show problems solved on multiple platforms linked via canonical ID.
@@ -1411,9 +1568,10 @@ Extend platform tracking in `AnalyticsView`:
 ### R6 — Portfolio Integration Automation
 
 `src/library/views/PortfolioView.js` (new):
+
 - Fetches the user's GitHub repo `index.json` via GitHub API (using the stored OAuth token).
 - Renders a preview of what their portfolio would show.
 - Provides a one-click "Update portfolio settings.json" that PATCHes `src/settings.json` in their portfolio repo to add/update the `dsaStats` data source pointing at their CodeLedger repo's `index.json`.
 - The data source schema in the portfolio's `settings.json`: `{ "type": "codeledger", "repo": "owner/repo", "label": "DSA Progress" }`.
 
-*End of prompt. Begin generation.*
+_End of prompt. Begin generation._

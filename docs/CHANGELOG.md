@@ -9,6 +9,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.4.3] — 2026-06-05
 
 ### Fixed
+
 - **Conflict Resolution Modal: Banner persists after resolve** — After applying resolved conflicts, the amber "conflicts detected" banner now clears immediately. Previously `_pendingConflicts` was zeroed in storage but the React settings state was not updated, so the banner remained until the next full reload.
 
 ---
@@ -16,6 +17,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.4.2] — 2026-06-02
 
 ### Added
+
 - **Analytics: Monthly activity chart** — AnalyticsView now shows a rolling 12-month bar chart of solve activity alongside the existing weekly chart.
 - **Analytics: Day-of-week heatmap** — New bar chart showing which day of the week you solve most; peak day is highlighted and surfaced as a "Best Day" stat.
 - **Analytics: Rolling 7/30-day counts** — `last7Days` and `last30Days` replace the previous calendar-week/month counters so the numbers always reflect a true rolling window.
@@ -32,12 +34,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **DedupReviewQueue: "Let AI Decide" action** — Per-conflict button that requests an AI comparison and auto-resolves within 10 s timeout; default countdown reduced from 12 s to 5 s.
 
 ### Fixed
+
 - **AI prompts: chatMode respected** — `buildConversationSystemPrompt()` now switches to the direct-answer prompt when `context.chatMode === "direct"`, preventing Socratic rules from leaking into Direct mode sessions.
 - **Floating AI: DOM line sort** — View-lines are now sorted by `style.top` before joining, fixing incorrect line ordering when code spans the visible scroll window.
 
 ## [1.4.1] — 2026-05-21
 
 ### Added
+
 - **Codeforces: Full platform handler (alpha)** — complete submission detection, code capture, language resolution, and GitHub commit for all CF problem types (`/contest`, `/gym`, `/problemset`). Uses sessionStorage to preserve code across CF's full-page reloads.
 - **Codeforces: Floating AI panel** — AI chat injected on CF problem pages; reads editor code (`<textarea id="editor">`), language, problem statement, and test failure verdicts.
 - **Codeforces: QoL buttons** — "Copy Code" and "AI Review" buttons injected above the CF editor.
@@ -49,12 +53,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Docs: Testing guide** — `docs/TESTING_GUIDE.md` with per-platform test steps and common issue resolutions.
 
 ### Fixed
+
 - **Codeforces: Title prefix stripped** — CF problem titles like "A. Theatre Square" are stored as "Theatre Square" (letter prefix removed).
 - **Codeforces: Language prefix matching** — verbose CF lang strings ("GNU G++17 7.3.0") resolved by keyword prefix so future compiler bumps don't break detection.
 
 ## [1.4.0] — 2026-05-21
 
 ### Added
+
 - **GFG: Floating AI chat panel** — AI review/chat panel injected on GeeksForGeeks problem pages, matching LeetCode parity.
 - **GFG: Copy code button** — copy-to-clipboard button injected into the GFG editor toolbar alongside the existing QoL buttons.
 - **GFG: Bulk profile import** — import all accepted submissions from a GFG user profile page in one click (same flow as LeetCode profile import).
@@ -65,6 +71,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **LeetCode: Handler split into focused modules** — `index.js` reduced from ~2 000 to ~740 lines by extracting `file-builder.js`, `lang-utils.js`, `profile-import.js`, `submission-detector.js`, and `ui-injection.js`.
 
 ### Fixed
+
 - **AI: Stale default model names** — updated to `gemini-2.0-flash`, `gpt-4o-mini`, and the current OpenRouter free-tier model slug.
 - **AI: Ollama model listing** — was parsing `data.tags` (wrong key); now correctly reads `data.models`.
 - **AI: Claude model fetch** — added missing `anthropic-version` header to model-fetch and key-test requests.
@@ -80,6 +87,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.3.1] — 2026-05-19
 
 ### Fixed
+
 - **Auto AI review not triggering** — `_requestAIReview` flag was set on the local submission object but never included in the `emitSolved()` payload; the service worker always saw `undefined` and skipped the review. Flag is now forwarded correctly.
 - **"Sync to Ledger" false positive** — clicking the button while auto-sync was in progress caused `_processSubmission` to exit early due to `_processingLock`, but `_manualSync` still showed "✓ Synced". The button now waits up to 8 s for the in-progress sync to finish before reporting "✓ Auto-synced", and only shows "✓ Synced" when `_processSubmission` actually emitted a solve event.
 - **Floating AI panel position** — panel was anchored at `bottom: 110px`, sitting high above the window bottom. Moved to `bottom: 20px` to sit at the bottom edge.
@@ -87,6 +95,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **QoL copy/paste buttons lost on React re-render** — LeetCode's React occasionally re-mounts the editor toolbar, silently removing injected buttons. A `_maybeReinjectQoL()` check is now wired to the existing MutationObserver so buttons are restored within ~600 ms of being removed.
 
 ### Added
+
 - **Monaco language detection in AI panel** — `_getEditorLanguage()` reads the language from `monaco.editor.getModels()[0].getLanguageId()` and maps it to a human-readable name (e.g. `python3` → `Python3`). Language is now passed to the floating AI context so code blocks include the correct syntax identifier.
 - **Problem statement auto-injected into AI panel context** — `_readProblemStatement()` reads the problem description from the DOM (`[data-track-load="description_content"]`) and passes it as `problemStatement` in the AI chat context, giving the AI full problem context without the user needing `/problem`.
 
@@ -95,6 +104,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.3.0] — 2026-05-17
 
 ### Added
+
 - **Per-method AI review** — each code approach in a multi-method problem gets its own AI review. `MethodCard` renders per-method code + AI review inline in the Methods tab of ProblemModal. Clicking "Generate Review" triggers an immediate on-demand review for that method alone.
 - **Per-method AI review queue** — `handleQueueAllAIReviews` now enqueues `${problemId}::method::${index}` entries for methods without a review. `processAIReviewQueue` detects the `::method::` pattern and processes them separately from problem-level reviews.
 - **MAINTENANCE_COMMIT alarm** — every 10 minutes the service worker batches all pending AI reviews, metadata edits, and notes updates into a single atomic chore commit instead of one commit per edit.
@@ -111,6 +121,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Landing page platform icons** — LeetCode, GeeksForGeeks, and Codeforces chips now use actual favicons instead of emoji.
 
 ### Changed
+
 - **Problem description file renamed to README.md** — `descriptionPath()` now returns `{dir}/README.md` instead of `{dir}/{platformId}.md`. GitHub automatically renders this when browsing the problem directory.
 - **Infra bundled into the last meaningful commit** — `index.json`, `README.md`, `index.html`, and `.codeledger/*` are included in whichever commit is already happening (last problem commit in individual mode, the bulk commit, the maintenance commit). No separate trailing infra commit is issued when problem commits are made. An infra-only commit is still issued when all problems are already up-to-date.
 - **GitHub Pages "src" link uses v3 path** — `repoFileUrl()` now reconstructs the correct v3 path (`problems/{canonicalId}/{platform}/README.md` or `problems/{platformId}/README.md`) instead of the old v1 slug-based format.
@@ -120,6 +131,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Welcome page** — removed the Diagnostics & Migration tab and `DiagnosticsPanel` component. Path fixes and the two-phase resync make manual layout repair tools unnecessary.
 
 ### Fixed
+
 - **`::submissionId` suffix in problem paths** — `platformId()` now strips the `::number` suffix that the LeetCode bulk importer appended (e.g. `lc-best-time-to-buy-and-sell-stock::1427680302` → `lc-best-time-to-buy-and-sell-stock`). Affected paths are corrected on the next resync via the maintenance commit.
 - **Stale README stats (one-commit-lag)** — `buildInfraFiles` now accepts an `indexMetaOverride` parameter. Callers pass the freshly-built `index.json` data so README stats reflect the new problem count in the same commit rather than the previous state.
 - **Stale paths not deleted on layout change** — old problem files (`{slug}.md`, `::submissionId` dirs, pre-canonical paths) are now explicitly deleted in the maintenance commit via `opts.deletes`, eliminating orphaned files that accumulated across layout versions.
@@ -133,6 +145,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.2.0] — 2026-05-13
 
 ### Added
+
 - **AI Review Queue ΓÇö Queue Missing button** ΓÇö dedicated button that queues only problems with no AI review yet, separate from the full re-queue action.
 - **AI Review Queue ΓÇö Requeue All button** ΓÇö queues every problem for re-review (including those already reviewed); asks for confirmation before submitting.
 - **AI Review Queue ΓÇö Cancel Queue button** ΓÇö gracefully cancels all pending reviews: any review currently processing finishes naturally, then the rest are removed. Button appears only when there are pending or processing items.
@@ -175,6 +188,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Graph: zoom buttons** ΓÇö `+` and `ΓêÆ` buttons in the toolbar for click-to-zoom (centered on canvas), grouped with the existing Fit view (Γûú) button.
 
 ### Fixed
+
 - **`import()` banned in MV3 service workers** ΓÇö all dynamic `await import(...)` calls inside `service-worker.js` removed and replaced with top-level static imports. Affected modules: `ai-review-queue.js`, `ai-deduplication.js`, `backup-manager.js`, `migration-manager.js`, `api-client.js`, and `path-builder.js`. Fixes "Queue AI Reviews" and "Backup" features that were silently failing in production.
 - **AI Review Queue ΓÇö IndexedDB version conflict** ΓÇö `ai-review-queue.js` was opening a `"CodeLedger"` database at version 1 while the browser had an existing version 2, causing a hard error on every queue operation. Database renamed to `"codeledger-queue"` to open fresh at version 1.
 - **`git.apiFetch` not a function in PanelGit.js** ΓÇö two call sites replaced with a direct call to `ghGetCurrentUser(token)` from the statically imported `api-client.js`. Fixed the manual import preview and individual-sync path when `github_owner` was unset.
@@ -191,6 +205,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`providerId` could be undefined in the AI review loop** ΓÇö the provider id is now scoped before use and falls back safely.
 
 ### Changed
+
 - **AI Review Queue stats display** ΓÇö replaced verbose paragraph list with a compact inline pill row that only shows non-zero counts; processing count highlighted in cyan.
 - **`handleQueueAllAIReviews` now accepts a `missingOnly` flag** ΓÇö single function drives both "Queue Missing" and "Requeue All" to avoid duplicating logic.
 - **`Shift+Enter` inserts newline** in AI assistant input (previously single-line `<input>` ΓÇö replaced with auto-growing `<textarea>`).
@@ -201,6 +216,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **AI review tags are ordered by importance** ΓÇö tag presentation is now priority-based instead of alphabetical.
 
 ### Removed
+
 - Old `topics/{topic}/{slug}/` path pattern ΓÇö migrated by `MIGRATE_REPO`.
 
 ---
@@ -208,6 +224,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.1.0] ΓÇö 2026-05-07
 
 ### Added
+
 - **Syntax highlighting** in the Code tab of ProblemModal ΓÇö regex-based tokenizer for Python, JavaScript, TypeScript, Java, C++, C, Go, Rust, Kotlin, Swift; keywords in blue, strings in green, comments in gray, numbers in amber, types in purple.
 - **`src/lib/syntax-highlight.js`** ΓÇö new module with `highlightCode(code, lang)` and `cleanCode(code)` helpers; no external dependencies, works inside the extension's strict CSP.
 - **Mermaid diagram rendering** via [mermaid.ink](https://mermaid.ink) ΓÇö renders diagrams as images without loading external scripts (previously blocked by extension CSP). Includes a "View in Mermaid Live" fallback link.
@@ -227,12 +244,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - OpenRouter added to BYOK pills
 
 ### Fixed
+
 - **Copy issue with whitespace visualization characters** ΓÇö Monaco editor (LeetCode) injects U+00B7 (middle dot) and U+200C (zero-width non-joiner) as visible space indicators. `cleanCode()` strips these before display and before writing to clipboard, so copied code is clean.
 - **Mermaid showed only raw code** ΓÇö CDN script injection was blocked by extension CSP; replaced with `mermaid.ink` image approach; code-block fallback now also provides an external link.
 - **Double-escaping in markdown tables** ΓÇö fixed in previous sprint; tables now render properly.
 - **KaTeX CSP violation** ΓÇö fixed in previous sprint; math blocks render as styled code spans.
 
 ### Changed
+
 - Extension version bumped to **1.1.0** in `manifest.json` and `package.json`.
 - `mermaid-stub.js` ΓÇö completely rewritten; no longer attempts CDN script injection.
 - `presence-marker.js` ΓÇö now dispatches both DOM marker and CustomEvent for maximum reliability.
@@ -244,6 +263,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.0.0] ΓÇö 2026-04 (Initial Release)
 
 ### Added
+
 - Core extension: LeetCode, GeeksForGeeks, and Codeforces platform handlers
 - GitHub integration via OAuth + Trees API (atomic multi-file commits)
 - AI code review (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter)
@@ -264,6 +284,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 <!-- Add new releases above this line -->
+
 [Unreleased]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.3.0...HEAD
 [1.3.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.1.0...v1.2.0

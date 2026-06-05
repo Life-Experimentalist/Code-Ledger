@@ -1,8 +1,9 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * @ts-check
  */
-// @ts-nocheck
 
 import { Storage } from "./storage.js";
 import { CONSTANTS } from "./constants.js";
@@ -25,30 +26,30 @@ const LAST_COMMITTED_HASH = "settings._last_committed_hash";
  * Mark settings as pending commit (called when settings change).
  */
 export async function markSettingsPendingCommit() {
-    try {
-        const settings = await Storage.getSettings();
-        const hash = _hashPortableSettings(settings);
-        settings[SETTINGS_COMMIT_KEY] = true;
-        settings[LAST_COMMITTED_HASH] = hash;
-        await Storage.setSettings(settings);
-        dbg.log("Settings marked for auto-commit");
-    } catch (e) {
-        dbg.warn("Failed to mark settings pending:", e);
-    }
+  try {
+    const settings = await Storage.getSettings();
+    const hash = _hashPortableSettings(settings);
+    settings[SETTINGS_COMMIT_KEY] = true;
+    settings[LAST_COMMITTED_HASH] = hash;
+    await Storage.setSettings(settings);
+    dbg.log("Settings marked for auto-commit");
+  } catch (e) {
+    dbg.warn("Failed to mark settings pending:", e);
+  }
 }
 
 /**
  * Check if settings need committing.
  */
 export async function needsSettingsCommit() {
-    try {
-        const settings = await Storage.getSettings();
-        const needs = settings[SETTINGS_COMMIT_KEY] === true;
-        dbg.log(`needsSettingsCommit(): ${needs ? "yes" : "no"}`);
-        return needs;
-    } catch (e) {
-        return false;
-    }
+  try {
+    const settings = await Storage.getSettings();
+    const needs = settings[SETTINGS_COMMIT_KEY] === true;
+    dbg.log(`needsSettingsCommit(): ${needs ? "yes" : "no"}`);
+    return needs;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -56,37 +57,37 @@ export async function needsSettingsCommit() {
  * Returns: { path: ".codeledger/config.json", content: "..." } or null
  */
 export async function getConfigFileForCommit() {
-    dbg.log(`getConfigFileForCommit(): building config file`);
-    try {
-        const needs = await needsSettingsCommit();
-        if (!needs) return null;
+  dbg.log(`getConfigFileForCommit(): building config file`);
+  try {
+    const needs = await needsSettingsCommit();
+    if (!needs) return null;
 
-        const settings = await Storage.getSettings();
-        const portable = _extractPortableSettings(settings);
+    const settings = await Storage.getSettings();
+    const portable = _extractPortableSettings(settings);
 
-        return {
-            path: ".codeledger/config.json",
-            content: JSON.stringify(portable, null, 2),
-        };
-    } catch (e) {
-        dbg.warn("Failed to prepare config file:", e);
-        return null;
-    }
+    return {
+      path: ".codeledger/config.json",
+      content: JSON.stringify(portable, null, 2),
+    };
+  } catch (e) {
+    dbg.warn("Failed to prepare config file:", e);
+    return null;
+  }
 }
 
 /**
  * Clear pending commit flag after successful commit.
  */
 export async function clearSettingsCommitFlag() {
-    dbg.log(`clearSettingsCommitFlag(): clearing auto-commit flag`);
-    try {
-        const settings = await Storage.getSettings();
-        settings[SETTINGS_COMMIT_KEY] = false;
-        await Storage.setSettings(settings);
-        dbg.log("Settings commit flag cleared");
-    } catch (e) {
-        dbg.warn("Failed to clear commit flag:", e);
-    }
+  dbg.log(`clearSettingsCommitFlag(): clearing auto-commit flag`);
+  try {
+    const settings = await Storage.getSettings();
+    settings[SETTINGS_COMMIT_KEY] = false;
+    await Storage.setSettings(settings);
+    dbg.log("Settings commit flag cleared");
+  } catch (e) {
+    dbg.warn("Failed to clear commit flag:", e);
+  }
 }
 
 /**
@@ -95,41 +96,41 @@ export async function clearSettingsCommitFlag() {
  * Returns { committed: boolean, message }
  */
 export async function forceCommitSettingsNow() {
-    dbg.log(`forceCommitSettingsNow(): forcing immediate settings commit`);
-    try {
-        const settings = await Storage.getSettings();
-        const git = registry.getGitProvider(settings.gitProvider || "github");
-        if (!git) throw new Error("No git provider configured");
+  dbg.log(`forceCommitSettingsNow(): forcing immediate settings commit`);
+  try {
+    const settings = await Storage.getSettings();
+    const git = registry.getGitProvider(settings.gitProvider || "github");
+    if (!git) throw new Error("No git provider configured");
 
-        const cfg = await getConfigFileForCommit();
-        if (!cfg)
-            return {
-                committed: false,
-                message: "No pending settings to commit",
-            };
+    const cfg = await getConfigFileForCommit();
+    if (!cfg)
+      return {
+        committed: false,
+        message: "No pending settings to commit",
+      };
 
-        const repo = (
-            settings.github_repo ||
-            settings.gitRepo ||
-            CONSTANTS.DEFAULT_REPO_NAME
-        ).replace(/\s+/g, "-");
+    const repo = (
+      settings.github_repo ||
+      settings.gitRepo ||
+      CONSTANTS.DEFAULT_REPO_NAME
+    ).replace(/\s+/g, "-");
 
-        await git.commit(
-            [cfg],
-            buildCommitMessage(COMMIT_TYPES.MAINTENANCE, {
-                detail: "settings: force commit",
-                count: 1,
-            }),
-            repo
-        );
+    await git.commit(
+      [cfg],
+      buildCommitMessage(COMMIT_TYPES.MAINTENANCE, {
+        detail: "settings: force commit",
+        count: 1,
+      }),
+      repo,
+    );
 
-        await clearSettingsCommitFlag();
-        dbg.log("Force committed settings to repo", repo);
-        return { committed: true, message: "Settings committed" };
-    } catch (e) {
-        dbg.warn("Force commit settings failed:", e?.message || e);
-        throw e;
-    }
+    await clearSettingsCommitFlag();
+    dbg.log("Force committed settings to repo", repo);
+    return { committed: true, message: "Settings committed" };
+  } catch (e) {
+    dbg.warn("Force commit settings failed:", e?.message || e);
+    throw e;
+  }
 }
 
 /**
@@ -137,52 +138,52 @@ export async function forceCommitSettingsNow() {
  * Must match settings-sync.js PORTABLE_SETTINGS.
  */
 function _extractPortableSettings(settings) {
-    const PORTABLE_SETTINGS = [
-        "theme_preset",
-        "theme_mode",
-        "theme_accent",
-        "darkMode",
-        "behaviorBankEnabled",
-        "telemetryEnabled",
-        "debugMode",
-        "aiCopyable",
-        "deduplicationThreshold",
-        "autoReview",
-        "autoCommit",
-        "autoSync",
-        "syncInterval",
-        "commitMessageStyle",
-        "showNotifications",
-        "hideCompleted",
-        "hideIgnored",
-        "pages_show_verification",
-        "github_pages",
-        "github_repo_topics_extra",
-        "github_coauthor_enabled",
-        "github_coauthor_trailer",
-        "mcp.config",
-    ];
+  const PORTABLE_SETTINGS = [
+    "theme_preset",
+    "theme_mode",
+    "theme_accent",
+    "darkMode",
+    "behaviorBankEnabled",
+    "telemetryEnabled",
+    "debugMode",
+    "aiCopyable",
+    "deduplicationThreshold",
+    "autoReview",
+    "autoCommit",
+    "autoSync",
+    "syncInterval",
+    "commitMessageStyle",
+    "showNotifications",
+    "hideCompleted",
+    "hideIgnored",
+    "pages_show_verification",
+    "github_pages",
+    "github_repo_topics_extra",
+    "github_coauthor_enabled",
+    "github_coauthor_trailer",
+    "mcp.config",
+  ];
 
-    const portable = {};
-    PORTABLE_SETTINGS.forEach((key) => {
-        if (key in settings) {
-            portable[key] = settings[key];
-        }
-    });
+  const portable = {};
+  PORTABLE_SETTINGS.forEach((key) => {
+    if (key in settings) {
+      portable[key] = settings[key];
+    }
+  });
 
-    return portable;
+  return portable;
 }
 
 /**
  * Simple hash of portable settings for change detection.
  */
 function _hashPortableSettings(settings) {
-    const portable = _extractPortableSettings(settings);
-    const str = JSON.stringify(portable);
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = (hash << 5) - hash + str.charCodeAt(i);
-        hash |= 0;
-    }
-    return Math.abs(hash).toString(36);
+  const portable = _extractPortableSettings(settings);
+  const str = JSON.stringify(portable);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
 }

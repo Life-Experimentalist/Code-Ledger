@@ -13,6 +13,7 @@ CodeLedger does not collect, store, or transmit any personal data to CodeLedger 
 ### What CodeLedger Stores (Locally)
 
 **In your browser** (IndexedDB + Chrome storage):
+
 - Problem history (title, code, language, difficulty, tags, metrics)
 - GitHub repository settings (owner, repo name)
 - GitHub OAuth access token (or manual PAT if you provide one)
@@ -20,6 +21,7 @@ CodeLedger does not collect, store, or transmit any personal data to CodeLedger 
 - Sync metadata (last sync time, sync count)
 
 **None of this data leaves your browser except to:**
+
 1. Your GitHub repository (you own it)
 2. Optional AI providers (only if you enable AI review and provide an API key)
 
@@ -63,6 +65,7 @@ CodeLedger supports six AI providers for code review. **You choose which one to 
 | **OpenRouter**       | Problem code               | [OpenRouter Privacy](https://openrouter.ai/privacy)    | Disable AI review anytime |
 
 **You are responsible for**:
+
 - Providing your own API keys (never shared with CodeLedger)
 - Understanding each provider's data retention policy
 - Agreeing to each provider's terms of service
@@ -74,6 +77,7 @@ CodeLedger supports six AI providers for code review. **You choose which one to 
 **Where it goes**: https://codeledger.vkrishna04.me (Cloudflare Worker)
 
 **What happens**:
+
 1. You click "Connect GitHub"
 2. GitHub authorization window opens
 3. You approve CodeLedger access
@@ -83,6 +87,7 @@ CodeLedger supports six AI providers for code review. **You choose which one to 
 7. **Token never stored on our worker** — returned immediately to your browser
 
 **Worker does NOT**:
+
 - Store your token
 - Store your code
 - Log your activity
@@ -116,6 +121,7 @@ CodeLedger supports six AI providers for code review. **You choose which one to 
 ### Access
 
 You can view all data CodeLedger stores:
+
 - **Problem history**: Right-click extension → "Open extension options" → "Sync" tab
 - **GitHub settings**: Same → "GitHub" tab
 - **AI keys**: Same → "Settings" → "AI provider"
@@ -123,10 +129,12 @@ You can view all data CodeLedger stores:
 ### Delete
 
 You can delete all data:
+
 - **Uninstall extension**: Clears all IndexedDB + chrome.storage data
 - **Clear data button**: Settings → "Clear all data" → confirms deletion
 
 You can also:
+
 - Delete specific problems from "Sync" tab
 - Delete your GitHub repository (removes commits)
 - Revoke GitHub OAuth access (GitHub → Settings → Applications)
@@ -142,6 +150,7 @@ You can also:
 ## Children & COPPA
 
 CodeLedger is designed for developers solving DSA problems. **If you are under 13**, you may need parental consent to:
+
 - Create a GitHub account
 - Use optional AI providers
 
@@ -152,6 +161,7 @@ See GitHub's [Terms of Service](https://docs.github.com/en/site-policy/github-te
 ## Changes to This Policy
 
 We may update this privacy policy to reflect changes in our service. If we make material changes, we will:
+
 - Update the date at the top of this document
 - Notify you via GitHub release notes or email (if we contact you)
 

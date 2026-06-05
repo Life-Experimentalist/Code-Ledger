@@ -65,14 +65,31 @@ const QUESTION_QUERY = `
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
 const LANG_EXT = {
-  python: "py", python3: "py", cpp: "cpp", "c++": "cpp",
-  c: "c", java: "java", javascript: "js", typescript: "ts",
-  ruby: "rb", golang: "go", go: "go", swift: "swift",
-  kotlin: "kt", scala: "scala", rust: "rs", php: "php",
-  csharp: "cs", "c#": "cs", dart: "dart",
-  mysql: "sql", postgresql: "sql", bash: "sh",
+  python: "py",
+  python3: "py",
+  cpp: "cpp",
+  "c++": "cpp",
+  c: "c",
+  java: "java",
+  javascript: "js",
+  typescript: "ts",
+  ruby: "rb",
+  golang: "go",
+  go: "go",
+  swift: "swift",
+  kotlin: "kt",
+  scala: "scala",
+  rust: "rs",
+  php: "php",
+  csharp: "cs",
+  "c#": "cs",
+  dart: "dart",
+  mysql: "sql",
+  postgresql: "sql",
+  bash: "sh",
   // LeetCode uses "pythondata" as the internal lang slug for Pandas submissions
-  pythondata: "py", pandas: "py",
+  pythondata: "py",
+  pandas: "py",
 };
 
 function langExt(name = "") {
@@ -125,7 +142,8 @@ async function fetchAllSubmissions(page) {
       return r.ok ? r.json() : null;
     });
     const list = res?.data?.recentAcSubmissionList;
-    if (list?.length) return list.map((s) => ({ ...s, status_display: "Accepted" }));
+    if (list?.length)
+      return list.map((s) => ({ ...s, status_display: "Accepted" }));
   } catch (_) {}
 
   throw new Error(
@@ -183,17 +201,28 @@ async function getHeadSha(octokit, owner, repoName, branch) {
     return { commitSha: ref.data.object.sha, isNew: false };
   } catch {
     // Empty repo — no branch yet. Create an initial empty commit.
-    const blob = await octokit.request(
-      "POST /repos/{owner}/{repo}/git/blobs",
-      { owner, repo: repoName, content: "", encoding: "utf-8" },
-    );
-    const tree = await octokit.request(
-      "POST /repos/{owner}/{repo}/git/trees",
-      { owner, repo: repoName, tree: [{ path: ".gitkeep", mode: "100644", type: "blob", sha: blob.data.sha }] },
-    );
+    const blob = await octokit.request("POST /repos/{owner}/{repo}/git/blobs", {
+      owner,
+      repo: repoName,
+      content: "",
+      encoding: "utf-8",
+    });
+    const tree = await octokit.request("POST /repos/{owner}/{repo}/git/trees", {
+      owner,
+      repo: repoName,
+      tree: [
+        { path: ".gitkeep", mode: "100644", type: "blob", sha: blob.data.sha },
+      ],
+    });
     const commit = await octokit.request(
       "POST /repos/{owner}/{repo}/git/commits",
-      { owner, repo: repoName, message: "chore: initial commit", tree: tree.data.sha, parents: [] },
+      {
+        owner,
+        repo: repoName,
+        message: "chore: initial commit",
+        tree: tree.data.sha,
+        parents: [],
+      },
     );
     await octokit.request("POST /repos/{owner}/{repo}/git/refs", {
       owner,
@@ -205,7 +234,15 @@ async function getHeadSha(octokit, owner, repoName, branch) {
   }
 }
 
-async function atomicCommit(octokit, owner, repoName, branch, files, message, parentSha) {
+async function atomicCommit(
+  octokit,
+  owner,
+  repoName,
+  branch,
+  files,
+  message,
+  parentSha,
+) {
   // Get current tree SHA from the parent commit
   const parentCommit = await octokit.request(
     "GET /repos/{owner}/{repo}/git/commits/{commit_sha}",
@@ -227,13 +264,21 @@ async function atomicCommit(octokit, owner, repoName, branch, files, message, pa
 
   const commitRes = await octokit.request(
     "POST /repos/{owner}/{repo}/git/commits",
-    { owner, repo: repoName, message, tree: treeRes.data.sha, parents: [parentSha] },
+    {
+      owner,
+      repo: repoName,
+      message,
+      tree: treeRes.data.sha,
+      parents: [parentSha],
+    },
   );
 
-  await octokit.request(
-    "PATCH /repos/{owner}/{repo}/git/refs/heads/{branch}",
-    { owner, repo: repoName, branch, sha: commitRes.data.sha },
-  );
+  await octokit.request("PATCH /repos/{owner}/{repo}/git/refs/heads/{branch}", {
+    owner,
+    repo: repoName,
+    branch,
+    sha: commitRes.data.sha,
+  });
 
   return commitRes.data.sha;
 }
@@ -244,16 +289,16 @@ async function run() {
   const { values } = parseArgs({
     options: {
       "github-token": { type: "string" },
-      repo:           { type: "string" },
-      cookie:         { type: "string" },
-      headless:       { type: "boolean", short: "H", default: true },
+      repo: { type: "string" },
+      cookie: { type: "string" },
+      headless: { type: "boolean", short: "H", default: true },
     },
   });
 
   const githubToken = values["github-token"] || process.env.GITHUB_TOKEN;
-  const repo        = values.repo || process.env.LEETCODE_REPO;
-  const cookie      = values.cookie;
-  const headless    = values.headless;
+  const repo = values.repo || process.env.LEETCODE_REPO;
+  const cookie = values.cookie;
+  const headless = values.headless;
 
   if (!githubToken || !repo) {
     console.error(
@@ -270,13 +315,13 @@ async function run() {
 
   // ── Puppeteer ────────────────────────────────────────────────────────────
   const browser = await puppeteer.launch({ headless });
-  const page    = await browser.newPage();
+  const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
 
   if (cookie) {
     const [nameValue] = cookie.split(";");
     const eqIdx = nameValue.indexOf("=");
-    const name  = nameValue.slice(0, eqIdx).trim();
+    const name = nameValue.slice(0, eqIdx).trim();
     const value = nameValue.slice(eqIdx + 1).trim();
     await page.setCookie({ name, value, domain: ".leetcode.com", path: "/" });
   }
@@ -291,7 +336,9 @@ async function run() {
   );
 
   if (!loggedIn) {
-    await page.goto("https://leetcode.com/accounts/login", { waitUntil: "networkidle2" });
+    await page.goto("https://leetcode.com/accounts/login", {
+      waitUntil: "networkidle2",
+    });
     await waitForEnter();
     await page.goto("https://leetcode.com", { waitUntil: "networkidle2" });
   }
@@ -300,13 +347,15 @@ async function run() {
   console.log("Fetching submission list (this may take a moment)...");
   const raw = await fetchAllSubmissions(page);
 
-  const normalized = raw.map((s) => ({
-    id:        s.id || s.submission_id,
-    titleSlug: s.title_slug || s.titleSlug,
-    status:    s.status_display || s.statusDisplay || s.status || "",
-    lang:      s.lang || s.langName || "",
-    timestamp: Number(s.timestamp || 0),
-  })).filter((s) => s.id && s.titleSlug);
+  const normalized = raw
+    .map((s) => ({
+      id: s.id || s.submission_id,
+      titleSlug: s.title_slug || s.titleSlug,
+      status: s.status_display || s.statusDisplay || s.status || "",
+      lang: s.lang || s.langName || "",
+      timestamp: Number(s.timestamp || 0),
+    }))
+    .filter((s) => s.id && s.titleSlug);
 
   const accepted = normalized.filter((s) => /accepted/i.test(s.status));
 
@@ -333,28 +382,35 @@ async function run() {
     process.stdout.write(`[${i + 1}/${picks.length}] ${p.titleSlug}... `);
 
     try {
-      const detailRes = await gql(page, SUBMISSION_DETAIL_QUERY, { submissionId: Number(p.id) });
-      const detail    = detailRes?.data?.submissionDetails;
-      if (!detail?.code) { console.log("no code, skipping"); continue; }
+      const detailRes = await gql(page, SUBMISSION_DETAIL_QUERY, {
+        submissionId: Number(p.id),
+      });
+      const detail = detailRes?.data?.submissionDetails;
+      if (!detail?.code) {
+        console.log("no code, skipping");
+        continue;
+      }
 
-      const questionRes = await gql(page, QUESTION_QUERY, { titleSlug: p.titleSlug });
-      const question    = questionRes?.data?.question;
+      const questionRes = await gql(page, QUESTION_QUERY, {
+        titleSlug: p.titleSlug,
+      });
+      const question = questionRes?.data?.question;
 
-      const langName    = detail.lang?.name || p.lang || "";
-      const ext         = langExt(langName);
-      const title       = question?.title || p.titleSlug;
-      const pid         = `lc-${p.titleSlug}`;
-      const base        = `problems/${pid}/`;
+      const langName = detail.lang?.name || p.lang || "";
+      const ext = langExt(langName);
+      const title = question?.title || p.titleSlug;
+      const pid = `lc-${p.titleSlug}`;
+      const base = `problems/${pid}/`;
 
       files.push({
-        path:    `${base}${pid}.${ext}`,
+        path: `${base}${pid}.${ext}`,
         content: detail.code,
       });
 
       // Always write a description file (even without question metadata)
       {
-        const tags    = (question?.topicTags || []).map((t) => t.name);
-        const rows    = [
+        const tags = (question?.topicTags || []).map((t) => t.name);
+        const rows = [
           `| Difficulty | ${question?.difficulty || "?"} |`,
           `| Platform   | LeetCode |`,
           `| Problem ID | \`${pid}\` |`,
@@ -378,8 +434,12 @@ async function run() {
               .replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, "\n```\n$1\n```\n")
               .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
               .replace(/<[^>]+>/g, "")
-              .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-              .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+              .replace(/&amp;/g, "&")
+              .replace(/&lt;/g, "<")
+              .replace(/&gt;/g, ">")
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+              .replace(/&nbsp;/g, " ")
               .replace(/\n{3,}/g, "\n\n")
               .trim()
           : null;
@@ -387,7 +447,10 @@ async function run() {
         const similar = (question?.similarQuestionList || [])
           .filter((q) => !q.isPaidOnly)
           .slice(0, 5)
-          .map((q) => `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`)
+          .map(
+            (q) =>
+              `- [${q.title}](https://leetcode.com/problems/${q.titleSlug}/) — ${q.difficulty}`,
+          )
           .join("\n");
 
         files.push({
@@ -401,7 +464,9 @@ async function run() {
             "",
             stmtRaw ? `## Problem Statement\n\n${stmtRaw}\n` : "",
             similar ? `## Similar Problems\n\n${similar}\n` : "",
-          ].filter((l) => l !== null && l !== undefined).join("\n"),
+          ]
+            .filter((l) => l !== null && l !== undefined)
+            .join("\n"),
         });
       }
 
@@ -424,16 +489,25 @@ async function run() {
   const authedLogin = authUser.data.login;
 
   if (owner !== authedLogin) {
-    console.error(`Token owner is ${authedLogin} but --repo owner is ${owner}. Aborting.`);
+    console.error(
+      `Token owner is ${authedLogin} but --repo owner is ${owner}. Aborting.`,
+    );
     process.exit(1);
   }
 
   await ensureRepo(octokit, owner, repoName);
 
   const branch = "main";
-  const { commitSha: headSha } = await getHeadSha(octokit, owner, repoName, branch);
+  const { commitSha: headSha } = await getHeadSha(
+    octokit,
+    owner,
+    repoName,
+    branch,
+  );
 
-  console.log(`\nCommitting ${files.length} files to ${owner}/${repoName}@${branch}...`);
+  console.log(
+    `\nCommitting ${files.length} files to ${owner}/${repoName}@${branch}...`,
+  );
   const newSha = await atomicCommit(
     octokit,
     owner,
@@ -449,15 +523,15 @@ async function run() {
   try {
     const problemRecords = picks.map((p) => ({
       titleSlug: p.titleSlug,
-      lang:      { name: p.lang, slug: p.lang, ext: langExt(p.lang) },
-      platform:  "leetcode",
+      lang: { name: p.lang, slug: p.lang, ext: langExt(p.lang) },
+      platform: "leetcode",
     }));
     const indexContent = JSON.stringify(
       {
-        updatedAt:  new Date().toISOString(),
-        source:     "leetcode-cli-importer",
-        stats:      { total: problemRecords.length },
-        problems:   problemRecords,
+        updatedAt: new Date().toISOString(),
+        source: "leetcode-cli-importer",
+        stats: { total: problemRecords.length },
+        problems: problemRecords,
       },
       null,
       2,

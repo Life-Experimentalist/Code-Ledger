@@ -13,6 +13,7 @@
 ## To Test OAuth (After Worker Deploy)
 
 ### Step 1: Load Extension Locally
+
 ```bash
 npm run build:fast
 # Chrome → chrome://extensions → Load unpacked
@@ -20,25 +21,30 @@ npm run build:fast
 ```
 
 ### Step 2: Check Settings
+
 - Open CodeLedger Library view
 - Settings tab → should see Git providers listed
 - All three (GitHub, GitLab, Bitbucket) should be shown
 
 ### Step 3: Test Connect Button
+
 - Header top-right → "Connect" button
 - Should show GitHub label next to it
 - Click → Opens GitHub OAuth in new tab
 - Authenticate → should redirect back with token
 
 ### Step 4: Verify Token Saved
+
 **In Chrome DevTools (on library page):**
+
 ```javascript
 // DevTools Console
 const storage = await chrome.storage.local.get(null);
-console.log(storage['auth.tokens']); // Should show { github: 'ghu_...' }
+console.log(storage["auth.tokens"]); // Should show { github: 'ghu_...' }
 ```
 
 ### Step 5: Test LeetCode Integration
+
 - Go to LeetCode.com
 - Solve any problem
 - Submit solution
@@ -80,6 +86,7 @@ npm run build:fast
 The code is ready, but to test OAuth end-to-end you need:
 
 **Worker Secrets** (in `worker/wrangler.toml`):
+
 ```toml
 CODELEDGER_GH_APP_PRIVATE_KEY = "..."      # PKCS#8 format
 CODELEDGER_GH_APP_ID = "..."               # Numeric GitHub App ID
@@ -90,6 +97,7 @@ SESSION_SECRET = "..."                      # Random hex 32 bytes
 ```
 
 **Deploy Worker:**
+
 ```bash
 cd worker
 npx wrangler deploy
@@ -100,6 +108,7 @@ npx wrangler deploy
 ## Fallback Provider Logic
 
 If GitHub is disabled in settings:
+
 ```javascript
 // Settings has github_enabled = false
 // getActiveGitProvider() will return "gitlab"
@@ -107,6 +116,7 @@ If GitHub is disabled in settings:
 ```
 
 Test by:
+
 1. Settings → GitHub → toggle off
 2. Solve LeetCode problem
 3. Should attempt GitLab commit instead

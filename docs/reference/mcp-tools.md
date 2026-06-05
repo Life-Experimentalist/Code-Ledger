@@ -16,7 +16,7 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
    - Converts tool definitions to provider-specific formats (OpenAI, Claude, Gemini, DeepSeek)
    - Processes provider responses and formats results
 
-3. **[src/handlers/_base/BaseAIHandler.js](src/handlers/_base/BaseAIHandler.js)**
+3. **[src/handlers/\_base/BaseAIHandler.js](src/handlers/_base/BaseAIHandler.js)**
    - Added MCP support to all AI providers
    - `supportsMCPTools` flag: provider can enable/disable
    - `mcpToolFormat` property: provider specifies format (openai, claude, gemini, etc.)
@@ -34,6 +34,7 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
 ## Available MCP Tools
 
 ### 1. Query Problems
+
 - **ID**: `query-problems`
 - **Purpose**: Search for problems by platform, difficulty, topic, or time
 - **Parameters**:
@@ -46,6 +47,7 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
 - **Returns**: Array of problems matching filters
 
 ### 2. Get Problem Stats
+
 - **ID**: `get-problem-stats`
 - **Purpose**: Get detailed statistics for a single problem
 - **Parameters**:
@@ -53,12 +55,14 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
 - **Returns**: Problem metadata + runtime/memory stats + percentiles
 
 ### 3. Get Next Problem Suggestion
+
 - **ID**: `get-next-suggestion`
 - **Purpose**: Analyze weak topics and suggest next best problem
 - **Parameters**: None
 - **Returns**: Weak topics ranked by count + suggested problem with rationale
 
 ### 4. Analyze Code Quality
+
 - **ID**: `analyze-code-quality`
 - **Purpose**: Analyze code for complexity, edge cases, patterns
 - **Parameters**:
@@ -67,6 +71,7 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
 - **Returns**: Line count, comments, type annotations, estimated complexity, edge cases, suggestions
 
 ### 5. Get Trend Analysis
+
 - **ID**: `get-trend-analysis`
 - **Purpose**: Analyze solving trends, platform distribution, difficulty progression
 - **Parameters**:
@@ -74,6 +79,7 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
 - **Returns**: Daily breakdown, platform distribution, difficulty distribution
 
 ### 6. Find Similar Problems
+
 - **ID**: `find-similar-problems`
 - **Purpose**: Find problems similar to a given one
 - **Parameters**:
@@ -82,6 +88,7 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
 - **Returns**: Ranked similar problems with similarity scores
 
 ### 7. Get User Profile
+
 - **ID**: `get-user-profile`
 - **Purpose**: Comprehensive user context for AI
 - **Parameters**: None
@@ -127,6 +134,7 @@ export class MyAIHandler extends BaseAIHandler {
 ### Provider Tool Call Formats
 
 **OpenAI Format:**
+
 ```javascript
 {
   type: "function",
@@ -142,6 +150,7 @@ export class MyAIHandler extends BaseAIHandler {
 ```
 
 **Claude Format:**
+
 ```javascript
 {
   name: "query-problems",
@@ -154,6 +163,7 @@ export class MyAIHandler extends BaseAIHandler {
 ```
 
 **Gemini Format:**
+
 ```javascript
 {
   name: "query-problems",
@@ -209,6 +219,7 @@ export class MyAIHandler extends BaseAIHandler {
 ## Adding a New MCP Tool
 
 1. Create handler function in `src/core/mcp-tools.js`:
+
 ```javascript
 export async function myTool(arg1, arg2) {
   try {
@@ -221,6 +232,7 @@ export async function myTool(arg1, arg2) {
 ```
 
 2. Add to `MCP_TOOLS` array with schema:
+
 ```javascript
 {
   id: "my-tool",
@@ -239,6 +251,7 @@ export async function myTool(arg1, arg2) {
 ```
 
 3. Update `MCPToolsSidebar.js` to display results:
+
 ```javascript
 case "my-tool":
   return html`<div>/* render result */</div>`;
@@ -255,7 +268,7 @@ import { executeMCPTool } from "/core/mcp-executor.js";
 const result = await executeMCPTool("query-problems", {
   platform: "leetcode",
   difficulty: "Medium",
-  limit: 10
+  limit: 10,
 });
 ```
 

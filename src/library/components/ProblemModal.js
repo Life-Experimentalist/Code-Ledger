@@ -1839,7 +1839,15 @@ modalTabRegistry.register("*", [
     show: () => true,
     render(
       problem,
-      { html, AIReviewPanel, onGenerateAIReview, reviewBusy, reviewError, onRemoveFromQueue, removeFromQueueBusy },
+      {
+        html,
+        AIReviewPanel,
+        onGenerateAIReview,
+        reviewBusy,
+        reviewError,
+        onRemoveFromQueue,
+        removeFromQueueBusy,
+      },
     ) {
       return html`<${AIReviewPanel}
         review=${problem.aiReview || ""}

@@ -19,7 +19,9 @@ const isDryRun = args.includes("--dry-run");
 const isRetry = args.includes("--retry");
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-const manifest = JSON.parse(readFileSync(join("src", "manifest-chromium.json"), "utf8"));
+const manifest = JSON.parse(
+  readFileSync(join("src", "manifest-chromium.json"), "utf8"),
+);
 const changelog = readFileSync("docs/CHANGELOG.md", "utf8");
 
 const version = pkg.version;
@@ -171,7 +173,9 @@ console.log(`${"=".repeat(60)}`);
 if (!isDryRun) {
   console.log(`\nThis triggered .github/workflows/release.yml`);
   console.log(`GitHub will create a release and attach the zips.`);
-  console.log(`Check: https://github.com/Life-Experimentalist/Code-Ledger/releases/tag/${tag}`);
+  console.log(
+    `Check: https://github.com/Life-Experimentalist/Code-Ledger/releases/tag/${tag}`,
+  );
 } else {
   console.log(`\nDry-run complete. Run without --dry-run to actually release.`);
 }

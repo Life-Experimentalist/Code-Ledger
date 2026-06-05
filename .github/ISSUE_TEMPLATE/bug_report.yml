@@ -3,79 +3,79 @@ description: Something isn't working as expected
 title: "[Bug] "
 labels: ["bug"]
 body:
-    - type: dropdown
-      id: platform
-      attributes:
-          label: Platform
-          description: Which coding platform were you using when the bug occurred?
-          options:
-              - LeetCode
-              - GeeksForGeeks
-              - Codeforces
-              - Extension UI (Library / Settings)
-              - GitHub Pages dashboard
-              - Not platform-specific
-      validations:
-          required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Which coding platform were you using when the bug occurred?
+      options:
+        - LeetCode
+        - GeeksForGeeks
+        - Codeforces
+        - Extension UI (Library / Settings)
+        - GitHub Pages dashboard
+        - Not platform-specific
+    validations:
+      required: true
 
-    - type: dropdown
-      id: browser
-      attributes:
-          label: Browser
-          options:
-              - Chrome
-              - Edge
-              - Brave
-              - Firefox
-              - Other
-      validations:
-          required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Brave
+        - Firefox
+        - Other
+    validations:
+      required: true
 
-    - type: input
-      id: version
-      attributes:
-          label: Extension version
-          placeholder: "e.g. 1.2.0"
-      validations:
-          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Extension version
+      placeholder: "e.g. 1.2.0"
+    validations:
+      required: true
 
-    - type: textarea
-      id: description
-      attributes:
-          label: What happened?
-          description: A clear description of the bug.
-      validations:
-          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
 
-    - type: textarea
-      id: steps
-      attributes:
-          label: Steps to reproduce
-          placeholder: |
-              1. Go to ...
-              2. Submit a solution to ...
-              3. Expected: commit appears in GitHub
-              4. Actual: ...
-      validations:
-          required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Submit a solution to ...
+        3. Expected: commit appears in GitHub
+        4. Actual: ...
+    validations:
+      required: true
 
-    - type: textarea
-      id: expected
-      attributes:
-          label: Expected behavior
-          description: What should have happened?
-      validations:
-          required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
 
-    - type: textarea
-      id: logs
-      attributes:
-          label: Console errors / logs
-          description: Open DevTools → Console. Paste any errors from the background service worker or content script.
-          render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console errors / logs
+      description: Open DevTools → Console. Paste any errors from the background service worker or content script.
+      render: text
 
-    - type: textarea
-      id: context
-      attributes:
-          label: Additional context
-          description: Screenshots, network request details, or anything else that might help.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, network request details, or anything else that might help.

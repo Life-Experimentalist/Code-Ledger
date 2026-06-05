@@ -14,35 +14,35 @@ const dbg = createDebugger("DeepSeekModelFetcher");
  * @returns {Promise<Array<{id: string, name: string}>>}
  */
 export async function fetchAvailableModels(apiKey) {
-    try {
-        const res = await fetch(
-            `${CONSTANTS.AI_PROVIDERS.deepseek.endpoint}/models`,
-            {
-                method: "GET",
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
+  try {
+    const res = await fetch(
+      `${CONSTANTS.AI_PROVIDERS.deepseek.endpoint}/models`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-        if (!res.ok) {
-            throw new Error(`Failed to fetch DeepSeek models: ${res.status}`);
-        }
-
-        const data = await res.json();
-        return data.data.map((model) => ({
-            id: model.id,
-            name: model.id, // DeepSeek uses the id as the display name typically
-        }));
-    } catch (error) {
-        dbg.error("DeepSeek model fetch failed", error);
-        // Fallback to defaults
-        return [
-            {
-                id: CONSTANTS.AI_PROVIDERS.deepseek.defaultModel,
-                name: "DeepSeek Coder V2",
-            },
-        ];
+    if (!res.ok) {
+      throw new Error(`Failed to fetch DeepSeek models: ${res.status}`);
     }
+
+    const data = await res.json();
+    return data.data.map((model) => ({
+      id: model.id,
+      name: model.id, // DeepSeek uses the id as the display name typically
+    }));
+  } catch (error) {
+    dbg.error("DeepSeek model fetch failed", error);
+    // Fallback to defaults
+    return [
+      {
+        id: CONSTANTS.AI_PROVIDERS.deepseek.defaultModel,
+        name: "DeepSeek Coder V2",
+      },
+    ];
+  }
 }

@@ -23,11 +23,11 @@ Before uploading to any store, verify:
 ### Code & Build
 
 - [ ] All tests pass:
-pm run lint
-- [ ] No TypeScript errors: 	sc --noEmit
+      pm run lint
+- [ ] No TypeScript errors: sc --noEmit
 - [ ] Build succeeds:
-pm run build
-- [ ] Zips are valid: unzip -t releases/*.zip
+      pm run build
+- [ ] Zips are valid: unzip -t releases/\*.zip
 - [ ] Working directory clean: git status
 - [ ] Latest commit tagged and pushed: git log --oneline -1
 
@@ -74,17 +74,13 @@ pm run build
 
 #### Title
 
-`
-CodeLedger
-`
+`CodeLedger`
 
 Length: 45 characters (Chrome: max 50)
 
 #### Short Description
 
-`
-Track and commit all your solved DSA problems to GitHub automatically.
-`
+`Track and commit all your solved DSA problems to GitHub automatically.`
 
 Length: 70 characters (Chrome: max 132)
 
@@ -181,6 +177,7 @@ Length: ~1,400 characters (Chrome: max 4,000)
    - Show: Code, README, ai-review.md side-by-side
 
 **Best practices**:
+
 - Use real UI screenshots (not mockups)
 - Highlight key features
 - Use English text (add captions if needed)
@@ -195,12 +192,10 @@ Length: ~1,400 characters (Chrome: max 4,000)
 
 For each permission listed, provide brief explanation:
 
-`
-Storage: Saves problem history and GitHub settings to your browser
+`Storage: Saves problem history and GitHub settings to your browser
 Tabs: Checks which problem page you're viewing
 Scripting: Detects when you solve problems on supported platforms
-Alarms: Syncs with GitHub periodically (1-hour intervals)
-`
+Alarms: Syncs with GitHub periodically (1-hour intervals)`
 
 #### Official URL
 
@@ -259,15 +254,11 @@ Alarms: Syncs with GitHub periodically (1-hour intervals)
 
 #### Name
 
-`
-CodeLedger
-`
+`CodeLedger`
 
 #### Summary
 
-`
-Automatically commit solved DSA problems from LeetCode, GeeksForGeeks, and Codeforces to your GitHub repository.
-`
+`Automatically commit solved DSA problems from LeetCode, GeeksForGeeks, and Codeforces to your GitHub repository.`
 
 Length: max 250 characters
 
@@ -287,6 +278,7 @@ What You Get:
 🔒 100% yours — Your data, your repo, no tracking.
 
 Setup:
+
 1. Click the CodeLedger icon
 2. Connect GitHub (OAuth)
 3. Set a repo name
@@ -295,11 +287,13 @@ Setup:
 Optional: Add an AI API key in Settings → AI for code reviews.
 
 Supported Platforms:
+
 - LeetCode
 - GeeksForGeeks
 - Codeforces
 
 Supported AI Providers:
+
 - Google Gemini (default, free)
 - OpenAI
 - Anthropic Claude
@@ -339,21 +333,17 @@ Same as Chrome Web Store (see above). Firefox accepts:
 
 Firefox requires explicit user permission for each capability:
 
-`
-Access your data for sites in leetcode.com, geeksforgeeks.org, codeforces.com
+`Access your data for sites in leetcode.com, geeksforgeeks.org, codeforces.com
 Access your data for all websites  // only to check domain in popup
 Access your browser tabs
 Read and modify stored settings
-Read and modify data on your GitHub.com account  // explain clearly
-`
+Read and modify data on your GitHub.com account  // explain clearly`
 
 For each, provide justification:
 
-`
-"Tabs" permission: To detect which problem page you're viewing
+`"Tabs" permission: To detect which problem page you're viewing
 "Storage" permission: To save problem history and GitHub settings
-"GitHub access": To commit solved problems to your repository
-`
+"GitHub access": To commit solved problems to your repository`
 
 #### Submission Checklist
 
@@ -419,6 +409,7 @@ Target: **v1.3.0 or later** (after Chrome & Firefox launch success)
 ### Store Listing Requirements
 
 **Same as Chrome Web Store** — Edge uses identical:
+
 - Title format
 - Description
 - Screenshots
@@ -444,6 +435,7 @@ Target: **v1.3.0 or later** (after Chrome & Firefox launch success)
 Create PRIVACY.md at repository root:
 
 `markdown
+
 # Privacy Policy
 
 ## Data Collection
@@ -453,12 +445,14 @@ CodeLedger does not collect, store, or transmit any personal data to CodeLedger 
 ### What CodeLedger Stores
 
 **Locally (in your browser)**:
+
 - Problem history (IndexedDB)
 - GitHub settings (Chrome storage)
 - GitHub OAuth token (secure storage)
 - AI API keys (if you provide them)
 
 **On GitHub (you control)**:
+
 - Problem code
 - Problem statement
 - AI review (if enabled)
@@ -478,6 +472,7 @@ CodeLedger does not collect, store, or transmit any personal data to CodeLedger 
 **GitHub API** — If you use CodeLedger, your code is committed to GitHub, which you own and control. See [GitHub's Privacy Policy](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement).
 
 **AI Providers** (optional) — If you enable AI review and provide an API key:
+
 - **Google Gemini** — Your code is sent to Google. See [Google Privacy Policy](https://policies.google.com/privacy)
 - **OpenAI** — Your code is sent to OpenAI. See [OpenAI Privacy Policy](https://openai.com/privacy)
 - **Anthropic Claude** — Your code is sent to Anthropic. See [Anthropic Privacy Policy](https://www.anthropic.com/privacy)
@@ -488,6 +483,7 @@ Each AI provider has its own data retention and privacy terms. You can disable A
 ### Cloudflare Worker
 
 CodeLedger uses a Cloudflare Worker at codeledger.vkrishna04.me to handle GitHub OAuth. The worker:
+
 - Receives your GitHub authorization code
 - Exchanges it for a GitHub access token
 - Returns the token to your extension via postMessage
@@ -498,6 +494,7 @@ See [Cloudflare Privacy Policy](https://www.cloudflare.com/privacy/).
 ## Contacting Us
 
 For privacy concerns or questions:
+
 - **Email**: github@vkrishna04.me
 - **GitHub Issues**: https://github.com/Life-Experimentalist/Code-Ledger/issues
 
@@ -513,9 +510,9 @@ Last updated: 2026-05-07
 ### Code & Quality
 
 - [ ] Lint passes:
-pm run lint
+      pm run lint
 - [ ] Build succeeds:
-pm run build
+      pm run build
 - [ ] No console errors in DevTools (when extension runs)
 - [ ] Tested on Chrome 120+
 - [ ] Tested on Firefox 121+
@@ -548,6 +545,7 @@ pm run build
 ### Store-Specific
 
 **Chrome Web Store**:
+
 - [ ] Screenshots uploaded (5 minimum)
 - [ ] Icon provided (128×128)
 - [ ] Description proofread
@@ -556,6 +554,7 @@ pm run build
 - [ ] Support email visible
 
 **Firefox Add-ons**:
+
 - [ ] Screenshots uploaded (5 minimum)
 - [ ] Icons provided (48, 96, 128)
 - [ ] Description proofread

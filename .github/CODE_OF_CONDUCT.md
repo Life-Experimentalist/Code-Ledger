@@ -41,6 +41,7 @@ This Code of Conduct applies in all project spaces — GitHub issues, pull reque
 If you experience or witness behavior that violates this Code of Conduct, report it privately to the maintainers via email at **github@vkrishna04.me**.
 
 When reporting, please include:
+
 - Links or screenshots of the relevant content
 - Timestamps
 - A brief description of what happened and why it felt harmful

@@ -1,13 +1,15 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+/\*\*
+
+- @license
+- SPDX-License-Identifier: Apache-2.0
+  \*/
 
 # OAuth & Git Provider Testing Guide
 
 ## Setup Status
 
 ### ✅ Completed
+
 - [x] Git provider fallback system (GitHub → GitLab → Bitbucket)
 - [x] OAuth message listener in library.js
 - [x] SettingsView cleaned (removed duplicate navigation)
@@ -17,9 +19,11 @@
 - [x] Build passing without errors
 
 ### ⚠️ Prerequisites for OAuth to Work
+
 Before testing OAuth, you need:
 
 **Worker Secrets (in wrangler.toml):**
+
 ```
 CODELEDGER_GH_APP_PRIVATE_KEY=<PKCS#8 format private key>
 CODELEDGER_GH_APP_ID=<numeric GitHub App ID>
@@ -34,6 +38,7 @@ SESSION_SECRET=<random hex 32 bytes>
 ### Phase 1: Local Development (No OAuth yet)
 
 **Step 1a: Load extension in Chrome**
+
 ```bash
 npm run build:fast
 # Go to chrome://extensions
@@ -42,12 +47,14 @@ npm run build:fast
 ```
 
 **Step 1b: Check handler initialization**
+
 - Open DevTools Console
 - Go to extension popup or sidebar
 - Look for: "LeetCode handler active" or "GitHub Integration" in logs
 - Check Settings tab loads without errors
 
 **Step 1c: Verify git provider detection**
+
 - Settings → Git section
 - Should see "GitHub" as active provider by default
 - Can toggle enable/disable and see fallback work
@@ -55,6 +62,7 @@ npm run build:fast
 ### Phase 2: Manual PAT Testing (Before OAuth)
 
 **Step 2a: Test GitHub with Personal Access Token**
+
 ```bash
 # In GitHub: Settings → Developer settings → Personal access tokens
 # Create token with "repo" scope
@@ -62,11 +70,13 @@ npm run build:fast
 ```
 
 **Step 2b: Add token to settings**
+
 - In CodeLedger Settings
 - GitHub section → paste PAT into "GitHub Token" field
 - Save settings
 
 **Step 2c: Test commit**
+
 - Go to LeetCode, solve a problem
 - Should see commit attempt in console
 - Check if repository was created/updated on GitHub
@@ -74,12 +84,14 @@ npm run build:fast
 ### Phase 3: OAuth Testing (After Worker Deploy)
 
 **Step 3a: Deploy worker**
+
 ```bash
 cd worker
 npx wrangler deploy
 ```
 
 **Step 3b: Test OAuth flow**
+
 - In CodeLedger Library view
 - Header → "Connect" button
 - Should open OAuth window
@@ -88,17 +100,20 @@ npx wrangler deploy
 - Token appears in Storage
 
 **Step 3c: Verify token saved**
+
 - DevTools → Application → Storage → Extension
 - Should see `auth.tokens` containing `{ github: "ghu_..." }`
 
 ### Phase 4: LeetCode Integration Test
 
 **Step 4a: Enable LeetCode tracking**
+
 - Settings → LeetCode section
 - Toggle "Enable tracking"
 - Verify observer is active
 
 **Step 4b: Solve a LeetCode problem**
+
 - Go to LeetCode.com
 - Solve any problem (Python, JavaScript, etc.)
 - Submit solution
@@ -106,6 +121,7 @@ npx wrangler deploy
 - Should see commit log
 
 **Step 4c: Verify GitHub sync**
+
 ```bash
 # Check GitHub repo
 # Should see new directory: problems/leetcode/<problem-slug>/
@@ -115,12 +131,15 @@ npx wrangler deploy
 ## Diagnostic Commands
 
 ### Check handler status
+
 ```bash
 node dev/diagnose.js
 ```
+
 Expected: LeetCode ✅, GitHub ✅
 
 ### Verify build output
+
 ```bash
 # Check if dist files were created
 ls dist/chromium/handlers/platforms/leetcode/
@@ -128,19 +147,21 @@ ls dist/chromium/handlers/git/github/
 ```
 
 ### Check storage in DevTools
+
 ```javascript
 // Run in DevTools console of library page
 await chrome.storage.local.get(null, (items) => {
-  console.log('All storage:', items);
-  console.log('Git providers:', items['git.providers']);
-  console.log('Auth tokens:', items['auth.tokens']);
-  console.log('Settings:', items['settings']);
+  console.log("All storage:", items);
+  console.log("Git providers:", items["git.providers"]);
+  console.log("Auth tokens:", items["auth.tokens"]);
+  console.log("Settings:", items["settings"]);
 });
 ```
 
 ## Troubleshooting
 
 ### OAuth not working
+
 - [ ] Check worker secrets are set in wrangler.toml
 - [ ] Verify GitHub App is created at github.com/settings/apps
 - [ ] Check worker is deployed: `npx wrangler deploy`
@@ -148,18 +169,21 @@ await chrome.storage.local.get(null, (items) => {
 - [ ] Check browser DevTools for auth message
 
 ### LeetCode not detecting submissions
+
 - [ ] Open problem page and wait 5 seconds
 - [ ] Check DOM selectors haven't changed (run `node dev/generate-manifest-domains.js`)
 - [ ] Look for MutationObserver errors in console
 - [ ] Verify LeetCode is in enabled platforms list
 
 ### Git commit failing
+
 - [ ] Check if token is present: `Storage.getAuthToken('github')`
 - [ ] Verify token has "repo" scope
 - [ ] Check if repository exists or can be created
 - [ ] Look for GitHub API errors in console
 
 ### Git provider not switching
+
 - [ ] Check settings.js has github_enabled flag
 - [ ] Verify getActiveGitProvider() returning correct value
 - [ ] Test fallback by disabling GitHub in settings

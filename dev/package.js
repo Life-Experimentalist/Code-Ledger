@@ -11,19 +11,26 @@
  */
 
 import { execSync } from "child_process";
-import { createReadStream, createWriteStream, mkdirSync, readFileSync } from "fs";
+import {
+  createReadStream,
+  createWriteStream,
+  mkdirSync,
+  readFileSync,
+} from "fs";
 import { resolve, relative, join } from "path";
 import { createGzip } from "zlib";
 import { pipeline } from "stream/promises";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-const manifest = JSON.parse(readFileSync(join("src", "manifest-chromium.json"), "utf8"));
+const manifest = JSON.parse(
+  readFileSync(join("src", "manifest-chromium.json"), "utf8"),
+);
 const version = pkg.version;
 
 if (manifest.version !== version) {
   console.error(
     `Version mismatch: package.json has ${version} but src/manifest-chromium.json has ${manifest.version}.\n` +
-    `Run: node dev/sync-manifests.js --set ${version}`
+      `Run: node dev/sync-manifests.js --set ${version}`,
   );
   process.exit(1);
 }
@@ -46,22 +53,42 @@ function run(cmd, label) {
 run("npm run build:css", "Compile Tailwind CSS");
 
 // 2. Chromium package
-run("node dev/package-chrome.js", `Package Chromium → releases/codeledger-chromium-v${version}.zip`);
+run(
+  "node dev/package-chrome.js",
+  `Package Chromium → releases/codeledger-chromium-v${version}.zip`,
+);
 
 // 3. Firefox package
-run("node dev/package-firefox.js", `Package Firefox → releases/codeledger-firefox-v${version}.zip`);
+run(
+  "node dev/package-firefox.js",
+  `Package Firefox → releases/codeledger-firefox-v${version}.zip`,
+);
 
 // 4. Source zip
 import AdmZip from "adm-zip";
 const sourceZip = new AdmZip();
 const sourceDirs = ["src", "dev", "docs", "worker"];
-const sourceFiles = ["package.json", "package-lock.json", "tsconfig.json", "tailwind.config.js", ".prettierrc"];
+const sourceFiles = [
+  "package.json",
+  "package-lock.json",
+  "tsconfig.json",
+  "tailwind.config.js",
+  ".prettierrc",
+];
 
 for (const dir of sourceDirs) {
-  try { sourceZip.addLocalFolder(dir, dir); } catch (_) { /* skip missing dirs */ }
+  try {
+    sourceZip.addLocalFolder(dir, dir);
+  } catch (_) {
+    /* skip missing dirs */
+  }
 }
 for (const file of sourceFiles) {
-  try { sourceZip.addLocalFile(file); } catch (_) { /* skip missing files */ }
+  try {
+    sourceZip.addLocalFile(file);
+  } catch (_) {
+    /* skip missing files */
+  }
 }
 
 const sourcePath = resolve(`releases/codeledger-source-v${version}.zip`);
@@ -75,4 +102,6 @@ console.log(`  codeledger-source-v${version}.zip`);
 console.log(`\nNext steps:`);
 console.log(`  git commit -m "chore: release v${version}"`);
 console.log(`  git tag v${version}`);
-console.log(`  git push origin main v${version}   # triggers GitHub Actions release`);
+console.log(
+  `  git push origin main v${version}   # triggers GitHub Actions release`,
+);

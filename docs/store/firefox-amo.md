@@ -47,16 +47,16 @@ Thank you for reviewing CodeLedger. Please read these notes before testing.
 
 **Permissions justification:**
 
-| Permission | Why it is needed |
-|------------|-----------------|
-| `storage` | Stores user settings, OAuth token, and IndexedDB problem records locally. No data is sent to external servers. |
-| `tabs` | Reads the active tab URL to detect supported platforms (leetcode.com) and inject the correct content script. |
-| `scripting` | Injects content scripts into platform pages to detect accepted submissions via DOM observation. |
-| `alarms` | Schedules periodic background sync (cross-device) and reminder alarms via chrome.alarms. |
-| `identity` (not used) | Not requested — OAuth is handled via a web redirect to our Cloudflare Worker, not the identity API. |
-| Host permissions `*://leetcode.com/*` | Required to run content scripts on LeetCode pages to detect submission results. |
-| Host permissions `*://codeledger.vkrishna04.me/*` | Our Cloudflare Worker URL — handles GitHub OAuth callback. No user code is ever sent here. |
-| Host permissions `*://api.github.com/*` | Directly calls GitHub REST API (Trees API, Contents API) from the extension to commit files to the user's repo. |
+| Permission                                        | Why it is needed                                                                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `storage`                                         | Stores user settings, OAuth token, and IndexedDB problem records locally. No data is sent to external servers.  |
+| `tabs`                                            | Reads the active tab URL to detect supported platforms (leetcode.com) and inject the correct content script.    |
+| `scripting`                                       | Injects content scripts into platform pages to detect accepted submissions via DOM observation.                 |
+| `alarms`                                          | Schedules periodic background sync (cross-device) and reminder alarms via chrome.alarms.                        |
+| `identity` (not used)                             | Not requested — OAuth is handled via a web redirect to our Cloudflare Worker, not the identity API.             |
+| Host permissions `*://leetcode.com/*`             | Required to run content scripts on LeetCode pages to detect submission results.                                 |
+| Host permissions `*://codeledger.vkrishna04.me/*` | Our Cloudflare Worker URL — handles GitHub OAuth callback. No user code is ever sent here.                      |
+| Host permissions `*://api.github.com/*`           | Directly calls GitHub REST API (Trees API, Contents API) from the extension to commit files to the user's repo. |
 
 **No remote code execution.** The extension never uses `eval()`, `new Function()`, or loads scripts from remote URLs at runtime. All JavaScript is bundled statically. Preact and htm are loaded from a local vendor shim (`src/vendor/preact-bundle.js`), not from a CDN at runtime. This satisfies AMO's policy on no remote code execution.
 

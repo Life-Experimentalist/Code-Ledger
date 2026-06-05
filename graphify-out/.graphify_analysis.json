@@ -1155,11 +1155,7 @@
       "portfolio-integration-doc",
       "portfolio-repo"
     ],
-    "23": [
-      "build_copyrecursive",
-      "build_getversion",
-      "dev_build_js"
-    ],
+    "23": ["build_copyrecursive", "build_getversion", "dev_build_js"],
     "24": [
       "dev_fix_imports_js",
       "fix_imports_fixpath",
@@ -1185,26 +1181,11 @@
       "heatmap_heatmap",
       "src_ui_components_heatmap_js"
     ],
-    "29": [
-      "debug_imports_checkfiles",
-      "dev_debug_imports_js"
-    ],
-    "30": [
-      "dev_fix_htm_js",
-      "fix_htm_fixhtmimports"
-    ],
-    "31": [
-      "dev_package_js",
-      "package_getversion"
-    ],
-    "32": [
-      "dev_watch_js",
-      "watch_runbuild"
-    ],
-    "33": [
-      "dev_import_profile_gfg_importer_js",
-      "gfg_importer_main"
-    ],
+    "29": ["debug_imports_checkfiles", "dev_debug_imports_js"],
+    "30": ["dev_fix_htm_js", "fix_htm_fixhtmimports"],
+    "31": ["dev_package_js", "package_getversion"],
+    "32": ["dev_watch_js", "watch_runbuild"],
+    "33": ["dev_import_profile_gfg_importer_js", "gfg_importer_main"],
     "34": [
       "model_fetcher_fetchclaudemodels",
       "src_handlers_ai_claude_model_fetcher_js"
@@ -1221,150 +1202,55 @@
       "model_fetcher_fetchopenaimodels",
       "src_handlers_ai_openai_model_fetcher_js"
     ],
-    "38": [
-      "qol_injectqol",
-      "src_handlers_platforms_leetcode_qol_js"
-    ],
-    "39": [
-      "library_libraryapp",
-      "src_library_library_js"
-    ],
-    "40": [
-      "analyticsview_analyticsview",
-      "src_library_views_analyticsview_js"
-    ],
-    "41": [
-      "graphview_graphview",
-      "src_library_views_graphview_js"
-    ],
-    "42": [
-      "problemsview_problemsview",
-      "src_library_views_problemsview_js"
-    ],
-    "43": [
-      "popup_popupapp",
-      "src_popup_popup_js"
-    ],
-    "44": [
-      "aireviewpanel_aireviewpanel",
-      "src_ui_components_aireviewpanel_js"
-    ],
-    "45": [
-      "chartwrapper_chartwrapper",
-      "src_ui_components_chartwrapper_js"
-    ],
-    "46": [
-      "handlerstatus_handlerstatus",
-      "src_ui_components_handlerstatus_js"
-    ],
+    "38": ["qol_injectqol", "src_handlers_platforms_leetcode_qol_js"],
+    "39": ["library_libraryapp", "src_library_library_js"],
+    "40": ["analyticsview_analyticsview", "src_library_views_analyticsview_js"],
+    "41": ["graphview_graphview", "src_library_views_graphview_js"],
+    "42": ["problemsview_problemsview", "src_library_views_problemsview_js"],
+    "43": ["popup_popupapp", "src_popup_popup_js"],
+    "44": ["aireviewpanel_aireviewpanel", "src_ui_components_aireviewpanel_js"],
+    "45": ["chartwrapper_chartwrapper", "src_ui_components_chartwrapper_js"],
+    "46": ["handlerstatus_handlerstatus", "src_ui_components_handlerstatus_js"],
     "47": [
       "incognitobanner_incognitobanner",
       "src_ui_components_incognitobanner_js"
     ],
-    "48": [
-      "modelselector_modelselector",
-      "src_ui_components_modelselector_js"
-    ],
-    "49": [
-      "problemcard_problemcard",
-      "src_ui_components_problemcard_js"
-    ],
-    "50": [
-      "providerbadge_providerbadge",
-      "src_ui_components_providerbadge_js"
-    ],
-    "51": [
-      "src_ui_components_statsring_js",
-      "statsring_statsring"
-    ],
+    "48": ["modelselector_modelselector", "src_ui_components_modelselector_js"],
+    "49": ["problemcard_problemcard", "src_ui_components_problemcard_js"],
+    "50": ["providerbadge_providerbadge", "src_ui_components_providerbadge_js"],
+    "51": ["src_ui_components_statsring_js", "statsring_statsring"],
     "52": [
       "src_ui_components_telemetryprompt_js",
       "telemetryprompt_telemetryprompt"
     ],
-    "53": [
-      "dev_build_canonical_map_js"
-    ],
-    "54": [
-      "dev_clean_js"
-    ],
-    "55": [
-      "dev_generate_manifest_domains_js"
-    ],
-    "56": [
-      "dev_package_chrome_js"
-    ],
-    "57": [
-      "dev_package_firefox_js"
-    ],
-    "58": [
-      "src_background_alarm_manager_js"
-    ],
-    "59": [
-      "src_background_git_engine_js"
-    ],
-    "60": [
-      "src_background_sync_engine_js"
-    ],
-    "61": [
-      "src_content_presence_marker_js"
-    ],
-    "62": [
-      "src_core_constants_js"
-    ],
-    "63": [
-      "src_core_crypto_js"
-    ],
-    "64": [
-      "src_core_problem_graph_js"
-    ],
-    "65": [
-      "src_core_storage_js"
-    ],
-    "66": [
-      "src_core_telemetry_js"
-    ],
-    "67": [
-      "src_handlers_platforms_codeforces_dom_selectors_js"
-    ],
-    "68": [
-      "src_handlers_platforms_geeksforgeeks_dom_selectors_js"
-    ],
-    "69": [
-      "src_handlers_platforms_leetcode_dom_selectors_js"
-    ],
-    "70": [
-      "src_handlers_platforms_leetcode_graphql_queries_js"
-    ],
-    "71": [
-      "src_lib_browser_compat_js"
-    ],
-    "72": [
-      "src_vendor_chart_entry_js"
-    ],
-    "73": [
-      "src_vendor_chart_js"
-    ],
-    "74": [
-      "src_vendor_preact_hooks_js"
-    ],
-    "75": [
-      "worker_public_assets_landing_js"
-    ],
-    "76": [
-      "github-api"
-    ],
-    "77": [
-      "execution-guide"
-    ],
-    "78": [
-      "canonical-map-prompt"
-    ],
-    "79": [
-      "prompt"
-    ],
-    "80": [
-      "base-handler"
-    ]
+    "53": ["dev_build_canonical_map_js"],
+    "54": ["dev_clean_js"],
+    "55": ["dev_generate_manifest_domains_js"],
+    "56": ["dev_package_chrome_js"],
+    "57": ["dev_package_firefox_js"],
+    "58": ["src_background_alarm_manager_js"],
+    "59": ["src_background_git_engine_js"],
+    "60": ["src_background_sync_engine_js"],
+    "61": ["src_content_presence_marker_js"],
+    "62": ["src_core_constants_js"],
+    "63": ["src_core_crypto_js"],
+    "64": ["src_core_problem_graph_js"],
+    "65": ["src_core_storage_js"],
+    "66": ["src_core_telemetry_js"],
+    "67": ["src_handlers_platforms_codeforces_dom_selectors_js"],
+    "68": ["src_handlers_platforms_geeksforgeeks_dom_selectors_js"],
+    "69": ["src_handlers_platforms_leetcode_dom_selectors_js"],
+    "70": ["src_handlers_platforms_leetcode_graphql_queries_js"],
+    "71": ["src_lib_browser_compat_js"],
+    "72": ["src_vendor_chart_entry_js"],
+    "73": ["src_vendor_chart_js"],
+    "74": ["src_vendor_preact_hooks_js"],
+    "75": ["worker_public_assets_landing_js"],
+    "76": ["github-api"],
+    "77": ["execution-guide"],
+    "78": ["canonical-map-prompt"],
+    "79": ["prompt"],
+    "80": ["base-handler"]
   },
   "cohesion": {},
   "god_nodes": [
@@ -1423,10 +1309,7 @@
     {
       "source": "githubAsInstallation()",
       "target": "parse()",
-      "source_files": [
-        "worker\\src\\index.js",
-        "src\\vendor\\chart-bundle.js"
-      ],
+      "source_files": ["worker\\src\\index.js", "src\\vendor\\chart-bundle.js"],
       "confidence": "INFERRED",
       "relation": "calls",
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities; peripheral node `githubAsInstallation()` unexpectedly reaches hub `parse()`"

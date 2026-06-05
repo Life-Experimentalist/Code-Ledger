@@ -1,15 +1,18 @@
-# Graph Report - V:\Code\ProjectCode\CodeLedger  (2026-06-02)
+# Graph Report - V:\Code\ProjectCode\CodeLedger (2026-06-02)
 
 ## Corpus Check
+
 - 194 files · ~639,571 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
+
 - 2141 nodes · 5029 edges · 121 communities detected
 - Extraction: 79% EXTRACTED · 21% INFERRED · 0% AMBIGUOUS · INFERRED: 1055 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
+
 - [[_COMMUNITY_Community 0|Community 0]]
 - [[_COMMUNITY_Community 1|Community 1]]
 - [[_COMMUNITY_Community 2|Community 2]]
@@ -133,6 +136,7 @@
 - [[_COMMUNITY_Community 120|Community 120]]
 
 ## God Nodes (most connected - your core abstractions)
+
 1. `log()` - 160 edges
 2. `_update()` - 90 edges
 3. `isArray()` - 79 edges
@@ -145,18 +149,20 @@
 10. `CodeLedger Project Overview (CLAUDE.md)` - 41 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Rolling GitHub Backups` --semantically_similar_to--> `Cross-Device Sync via index.json`  [INFERRED] [semantically similar]
+
+- `Rolling GitHub Backups` --semantically_similar_to--> `Cross-Device Sync via index.json` [INFERRED] [semantically similar]
   docs/CHANGELOG.md → CLAUDE.md
-- `Cross-Device Sync via index.json` --semantically_similar_to--> `Cross-device AI Chat Sync`  [INFERRED] [semantically similar]
+- `Cross-Device Sync via index.json` --semantically_similar_to--> `Cross-device AI Chat Sync` [INFERRED] [semantically similar]
   CLAUDE.md → docs/CHANGELOG.md
-- `removeCFQoL()` --calls--> `remove()`  [INFERRED]
+- `removeCFQoL()` --calls--> `remove()` [INFERRED]
   V:\Code\ProjectCode\CodeLedger\src\handlers\platforms\codeforces\qol.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
-- `fmtDate()` --calls--> `number()`  [INFERRED]
+- `fmtDate()` --calls--> `number()` [INFERRED]
   V:\Code\ProjectCode\CodeLedger\src\library\components\ConflictResolutionModal.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
-- `toMs()` --calls--> `number()`  [INFERRED]
+- `toMs()` --calls--> `number()` [INFERRED]
   V:\Code\ProjectCode\CodeLedger\src\library\views\AnalyticsView.js → V:\Code\ProjectCode\CodeLedger\src\vendor\chart-bundle.js
 
 ## Hyperedges (group relationships)
+
 - **Solve Event Pipeline (detect â†’ emit â†’ commit â†’ AI review)** — concept_platform_handlers, concept_event_bus, concept_service_worker, concept_git_engine, concept_ai_review_queue [EXTRACTED 0.98]
 - **Atomic GitHub Commit Flow (Trees API)** — concept_git_engine, concept_trees_api, concept_path_builder, concept_commit_builder [EXTRACTED 0.95]
 - **OAuth Token Storage Flow (Worker â†’ Extension â†’ Storage)** — concept_cloudflare_worker, concept_github_oauth, concept_storage, concept_settings_schema [EXTRACTED 0.90]
@@ -173,490 +179,612 @@
 ## Communities
 
 ### Community 0 - "Community 0"
+
 Cohesion: 0.02
 Nodes (58): extractAceCode(), extractCodeMirrorCode(), extractEditorCode(), registerPlatformPrompt(), BasePlatformHandler, addEventListener(), number(), remove() (+50 more)
 
 ### Community 1 - "Community 1"
+
 Cohesion: 0.02
 Nodes (96): compareSolutions(), findDuplicatesForProblem(), mergeSolutions(), normalizeCode(), buildConversationSystemPrompt(), buildReviewPrompt(), fillPromptTemplate(), getDefaultAIPrompts() (+88 more)
 
 ### Community 2 - "Community 2"
+
 Cohesion: 0.02
-Nodes (93): afterDraw(), axisFromPosition(), beforeLayout(), _bezierInterpolation(), bindResponsiveEvents(), borderProps(), buildLayoutBoxes(), buildStacks() (+85 more)
+Nodes (93): afterDraw(), axisFromPosition(), beforeLayout(), \_bezierInterpolation(), bindResponsiveEvents(), borderProps(), buildLayoutBoxes(), buildStacks() (+85 more)
 
 ### Community 3 - "Community 3"
+
 Cohesion: 0.04
 Nodes (103): cancelPendingReviews(), clearCompletedReviews(), enqueueReview(), exportQueueState(), getAllQueueItems(), getNextPendingReview(), getPendingReviewsForProblem(), getQueueStats() (+95 more)
 
 ### Community 4 - "Community 4"
+
 Cohesion: 0.04
-Nodes (58): CanonicalMapper, normalizeAliases(), normalizeCanonicalEntries(), addBox(), applyAnimationsDefaults(), applyLayoutsDefaults(), applyScaleDefaults(), _cachedScopes() (+50 more)
+Nodes (58): CanonicalMapper, normalizeAliases(), normalizeCanonicalEntries(), addBox(), applyAnimationsDefaults(), applyLayoutsDefaults(), applyScaleDefaults(), \_cachedScopes() (+50 more)
 
 ### Community 5 - "Community 5"
+
 Cohesion: 0.05
 Nodes (93): clearBehaviorBank(), getAllEntries(), getChatStats(), getProblemStats(), isEnabled(), load(), recordAIInsights(), recordAIReview() (+85 more)
 
 ### Community 6 - "Community 6"
+
 Cohesion: 0.03
-Nodes (56): buildAIChatContext(), inferChatRequestType(), normalizeLang(), normalizeList(), normalizeProblem(), _addDeletedChatPath(), addMessageToChat(), clearDeletedChatPaths() (+48 more)
+Nodes (56): buildAIChatContext(), inferChatRequestType(), normalizeLang(), normalizeList(), normalizeProblem(), \_addDeletedChatPath(), addMessageToChat(), clearDeletedChatPaths() (+48 more)
 
 ### Community 7 - "Community 7"
+
 Cohesion: 0.05
 Nodes (87): Architecture Overview (docs/architecture/overview.md), Architecture README, System Architecture (docs/architecture/system-architecture.md), Archive Changelog, Pre-Launch Checklist (archived), CodeLedger Execution Guide (archived), Final Release Summary (archived), Comprehensive Fix Plan (archived) (+79 more)
 
 ### Community 8 - "Community 8"
+
 Cohesion: 0.04
-Nodes (83): addElements(), _addGrace(), afterBuildTicks(), afterCalculateLabelRotation(), afterDataLimits(), afterFit(), afterSetDimensions(), afterTickToLabelConversion() (+75 more)
+Nodes (83): addElements(), \_addGrace(), afterBuildTicks(), afterCalculateLabelRotation(), afterDataLimits(), afterFit(), afterSetDimensions(), afterTickToLabelConversion() (+75 more)
 
 ### Community 9 - "Community 9"
+
 Cohesion: 0.04
-Nodes (67): getVersion(), slugifyCanonicalId(), ThumbsBar(), applyStack(), _arrayUnique(), _boundSegment(), calculateDelta(), determineDataLimits() (+59 more)
+Nodes (67): getVersion(), slugifyCanonicalId(), ThumbsBar(), applyStack(), \_arrayUnique(), \_boundSegment(), calculateDelta(), determineDataLimits() (+59 more)
 
 ### Community 10 - "Community 10"
+
 Cohesion: 0.06
-Nodes (61): hsl2rgbn(), hsv2rgbn(), hwb2rgbn(), b(), A(), ae(), $(), _2() (+53 more)
+Nodes (61): hsl2rgbn(), hsv2rgbn(), hwb2rgbn(), b(), A(), ae(), $(), \_2() (+53 more)
 
 ### Community 11 - "Community 11"
+
 Cohesion: 0.05
-Nodes (64): _alignPixel(), barSign(), _calculateBarIndexPixels(), _calculateBarValuePixels(), calculateCircumference(), calculateLabelRotation(), _calculatePadding(), calculateTotal() (+56 more)
+Nodes (64): \_alignPixel(), barSign(), \_calculateBarIndexPixels(), \_calculateBarValuePixels(), calculateCircumference(), calculateLabelRotation(), \_calculatePadding(), calculateTotal() (+56 more)
 
 ### Community 12 - "Community 12"
+
 Cohesion: 0.07
 Nodes (41): apiFetch(), createBlob(), createCommit(), createRepository(), createTree(), enablePages(), getCommit(), getCommitHistory() (+33 more)
 
 ### Community 13 - "Community 13"
+
 Cohesion: 0.05
 Nodes (31): normalizeLang(), toMs(), classifyConflict(), DiffApproachStep(), fmtDate(), pickBetterVersion(), SameCodeStep(), ConflictItem() (+23 more)
 
 ### Community 14 - "Community 14"
+
 Cohesion: 0.05
 Nodes (49): AIChatsView (src/library/views/AIChatsView.js), Autonomous MCP System, AI Command Palette, Completed Features, Feature Requests & Backlog, Graph Community Detection, In-Progress Features, MCP Tools (Pending) (+41 more)
 
 ### Community 15 - "Community 15"
+
 Cohesion: 0.06
-Nodes (43): alpha(), b2n(), _boundSegments(), calln(), clone(), color(), _computeSegments(), darken() (+35 more)
+Nodes (43): alpha(), b2n(), \_boundSegments(), calln(), clone(), color(), \_computeSegments(), darken() (+35 more)
 
 ### Community 16 - "Community 16"
+
 Cohesion: 0.07
 Nodes (42): average(), binarySearch(), boundingRects(), capBezierPoints(), capControlPoint(), dataset(), distanceBetweenPoints(), evaluateInteractionItems() (+34 more)
 
 ### Community 17 - "Community 17"
+
 Cohesion: 0.07
-Nodes (40): active(), add(), addScopes(), addScopesFromKey(), allPlugins(), _animateOptions(), _attachContext(), awaitAll() (+32 more)
+Nodes (40): active(), add(), addScopes(), addScopesFromKey(), allPlugins(), \_animateOptions(), \_attachContext(), awaitAll() (+32 more)
 
 ### Community 18 - "Community 18"
+
 Cohesion: 0.07
-Nodes (37): addPointsBelow(), afterDatasetsUpdate(), _buildStackLine(), _createBoundaryLine(), determineLastEvent(), _elementsEqual(), findPoint(), getDatasetMeta() (+29 more)
+Nodes (37): addPointsBelow(), afterDatasetsUpdate(), \_buildStackLine(), \_createBoundaryLine(), determineLastEvent(), \_elementsEqual(), findPoint(), getDatasetMeta() (+29 more)
 
 ### Community 19 - "Community 19"
+
 Cohesion: 0.13
 Nodes (12): taskBuild(), resolve(), main(), createContext(), readJson(), createLogger(), Logger, Packager (+4 more)
 
 ### Community 20 - "Community 20"
+
 Cohesion: 0.08
-Nodes (32): afterAutoSkip(), almostEquals(), almostWhole(), aspectRatio(), autoSkip(), buildLookupTable(), computeFitCategoryTraits(), _computeLabelSizes() (+24 more)
+Nodes (32): afterAutoSkip(), almostEquals(), almostWhole(), aspectRatio(), autoSkip(), buildLookupTable(), computeFitCategoryTraits(), \_computeLabelSizes() (+24 more)
 
 ### Community 21 - "Community 21"
+
 Cohesion: 0.08
-Nodes (31): Bulk Import Commit-to-GitHub Button, Commit Message Taxonomy (commit-messages.js), Floating AI Textarea + Autocomplete, forceCommit Flag for Manual Sync, Always-Fresh Infra Files (_buildInfraFiles), LAYOUT_VERSION Constant (v2), Migration Manager (migration-manager.js), MigrationPanel UI Component (+23 more)
+Nodes (31): Bulk Import Commit-to-GitHub Button, Commit Message Taxonomy (commit-messages.js), Floating AI Textarea + Autocomplete, forceCommit Flag for Manual Sync, Always-Fresh Infra Files (\_buildInfraFiles), LAYOUT_VERSION Constant (v2), Migration Manager (migration-manager.js), MigrationPanel UI Component (+23 more)
 
 ### Community 22 - "Community 22"
+
 Cohesion: 0.12
 Nodes (26): abstract(), addTick(), buildTicks(), computeTickLimit(), determineMajorUnit(), determineUnitForAutoTicks(), determineUnitForFormatting(), diff() (+18 more)
 
 ### Community 23 - "Community 23"
+
 Cohesion: 0.12
-Nodes (19): apply(), chartOptionScopes(), constructor(), debounce(), _detectPlatform(), getCanvas(), hexParse(), _isDomSupported() (+11 more)
+Nodes (19): apply(), chartOptionScopes(), constructor(), debounce(), \_detectPlatform(), getCanvas(), hexParse(), \_isDomSupported() (+11 more)
 
 ### Community 24 - "Community 24"
+
 Cohesion: 0.12
-Nodes (24): clone2(), computeBoundary(), computeCircularBoundary(), computeLinearBoundary(), _decodeFill(), decodeTargetIndex(), formats(), getBasePixel() (+16 more)
+Nodes (24): clone2(), computeBoundary(), computeCircularBoundary(), computeLinearBoundary(), \_decodeFill(), decodeTargetIndex(), formats(), getBasePixel() (+16 more)
 
 ### Community 25 - "Community 25"
+
 Cohesion: 0.1
-Nodes (23): _angleBetween(), buildPointLabelItems(), clipArc(), clipSelf(), createPointLabelItem(), determineLimits(), drawBorder(), fitWithPointLabels() (+15 more)
+Nodes (23): \_angleBetween(), buildPointLabelItems(), clipArc(), clipSelf(), createPointLabelItem(), determineLimits(), drawBorder(), fitWithPointLabels() (+15 more)
 
 ### Community 26 - "Community 26"
+
 Cohesion: 0.17
-Nodes (16): cleanCode(), _cleanupGFGQoL(), copyToClipboard(), findEditorToolbar(), getEditorCode(), _inject(), injectCFQoL(), injectGFGQoL() (+8 more)
+Nodes (16): cleanCode(), \_cleanupGFGQoL(), copyToClipboard(), findEditorToolbar(), getEditorCode(), \_inject(), injectCFQoL(), injectGFGQoL() (+8 more)
 
 ### Community 27 - "Community 27"
+
 Cohesion: 0.16
 Nodes (21): Canonical Rename Pipeline, ConflictResolutionModal Component, Graph Filter Correctness Fix, importFromRepo() Function, makeProblemId() Helper, modal-tab-registry.js Module, OPENAPI.yaml Extension URL Scheme, PanelGit Manual Import Button (+13 more)
 
 ### Community 28 - "Community 28"
+
 Cohesion: 0.14
 Nodes (15): addListener(), releaseObserver(), removeEventListener(), removeListener(), unlistenDevicePixelRatioChanges(), connectHeartbeat(), adjustHexBrightness(), applyThemeFromStorage() (+7 more)
 
 ### Community 29 - "Community 29"
+
 Cohesion: 0.14
 Nodes (17): AI_COMPARE_SOLUTIONS SW Handler, Both as Methods Resolution Strategy, ConflictItem Component (per-item countdown + diff), DedupReviewQueue.js Redesign, handleBulkImport() Rewrite (auto-merge + conflict), CODELEDGER_IMPORT_COMPLETE Banner in library.js, Export normalizeCode() from duplicate-detector.js, Smart Deduplication on Import Implementation Plan (+9 more)
 
 ### Community 30 - "Community 30"
+
 Cohesion: 0.23
 Nodes (15): Browser Extension Badge â€” MV3, Plugin-Based, Cross-Browser, CodeLedger Brand Identity, CodeLedger Logo (CL monogram with code bracket icon), Solve. Commit. Own. Tagline, Core Value Proposition â€” Every problem you solve, atomically committed to GitHub, forever yours, CTA: One GitHub repo. Every problem. Your legacy., Feature: AI-Powered Reviews â€” Get intelligent feedback and level up faster, Feature: Community-Driven Mapping â€” Crowd-sourced canonical problem mapping (+7 more)
 
 ### Community 31 - "Community 31"
+
 Cohesion: 0.23
 Nodes (13): acquireContext(), createContext(), createDataContext(), createDatasetContext(), createScaleContext(), createTickContext(), createTooltipContext(), doSplitByStyles() (+5 more)
 
 ### Community 32 - "Community 32"
+
 Cohesion: 0.18
 Nodes (13): Background Tab Code Recovery Pattern, Code Recovery & Tag Inference Implementation Plan, handleCodeFetch() Method on LeetCodeHandler, codeledger_code_fetch URL Flag Detection, markFailedWithRetry() for Failed Recovery, TAGS Instruction in buildReviewPrompt(), AI-Inferred TAGS Parsing in generateAIReview(), triggerCodeRecovery() Function (+5 more)
 
 ### Community 33 - "Community 33"
+
 Cohesion: 0.36
-Nodes (10): _btnStyle(), createFloatingTimer(), fmt(), loadState(), saveState(), SESSION_KEY(), _setPlayIcon(), _svgPause() (+2 more)
+Nodes (10): \_btnStyle(), createFloatingTimer(), fmt(), loadState(), saveState(), SESSION_KEY(), \_setPlayIcon(), \_svgPause() (+2 more)
 
 ### Community 34 - "Community 34"
+
 Cohesion: 0.27
 Nodes (6): AIMarkdownRenderer(), escapeHtml(), parseMarkdown(), renderTable(), renderMath(), substituteLatex()
 
 ### Community 35 - "Community 35"
+
 Cohesion: 0.22
 Nodes (1): BitbucketHandler
 
 ### Community 36 - "Community 36"
+
 Cohesion: 0.43
 Nodes (8): getAfterBody(), getBeforeAfterBodyLines(), getBeforeBody(), getFooter(), getTitle(), invokeCallbackWithFallback(), pushOrConcat(), splitNewlines()
 
 ### Community 37 - "Community 37"
+
 Cohesion: 0.52
 Nodes (7): Cloudflare Worker OAuth Proxy, Chrome Web Store Listing, Edge Add-ons Listing, Firefox AMO Listing, Extension Privacy Policy, Store Notes README, Store Submission Checklist
 
 ### Community 38 - "Community 38"
+
 Cohesion: 0.33
-Nodes (6): Community 0: AI Dedup, Prompt Building, Code Analysis, Community 1: Behaviour Bank, Chat Stats, Problem Stats, Community 2: AI Review Queue Management, God Nodes: log(), _update(), isArray(), LeetCodeHandler, Graph Report (2026-05-20), Knowledge Gaps: Isolated and Thin Communities
+Nodes (6): Community 0: AI Dedup, Prompt Building, Code Analysis, Community 1: Behaviour Bank, Chat Stats, Problem Stats, Community 2: AI Review Queue Management, God Nodes: log(), \_update(), isArray(), LeetCodeHandler, Graph Report (2026-05-20), Knowledge Gaps: Isolated and Thin Communities
 
 ### Community 39 - "Community 39"
+
 Cohesion: 0.47
 Nodes (6): Assets Images README, CodeLedger Icon (Dark Background), CodeLedger Main Logo with Wordmark, Tagline: SOLVE. COMMIT. OWN., CodeLedger Icon (Transparent Background), Visual Identity: Cyan-blue C + green L letterforms, open book with code + grid
 
 ### Community 40 - "Community 40"
+
 Cohesion: 0.6
 Nodes (3): getSubmissionResultElement(), getSubmissionVerdict(), isSubmissionDetailsPanelVisible()
 
 ### Community 41 - "Community 41"
+
 Cohesion: 0.4
 Nodes (2): formatTime(), PanelBehaviorBank()
 
 ### Community 42 - "Community 42"
+
 Cohesion: 0.5
 Nodes (2): fmtDateLabel(), HeatMap()
 
 ### Community 43 - "Community 43"
+
 Cohesion: 0.4
 Nodes (5): makeProblemId() Helper Function, PLATFORM_CODE Map (lc, gfg, cf), Platform-Scoped Problem IDs (lc-two-sum, gfg-two-sum), Rationale: Platform-Scoped IDs Prevent Slug Collision, URL-ification of Library State (tab, problem, filters)
 
 ### Community 44 - "Community 44"
+
 Cohesion: 0.5
-Nodes (0): 
+Nodes (0):
 
 ### Community 45 - "Community 45"
+
 Cohesion: 0.5
-Nodes (0): 
+Nodes (0):
 
 ### Community 46 - "Community 46"
+
 Cohesion: 0.67
 Nodes (2): formatDuration(), QueueStatusCard()
 
 ### Community 47 - "Community 47"
+
 Cohesion: 0.83
 Nodes (3): preferVertical(), renderMermaid(), toBase64()
 
 ### Community 48 - "Community 48"
+
 Cohesion: 0.67
-Nodes (0): 
+Nodes (0):
 
 ### Community 49 - "Community 49"
+
 Cohesion: 0.67
-Nodes (0): 
+Nodes (0):
 
 ### Community 50 - "Community 50"
+
 Cohesion: 1.0
 Nodes (2): ModelStatusBar(), shortModel()
 
 ### Community 51 - "Community 51"
+
 Cohesion: 0.67
-Nodes (0): 
+Nodes (0):
 
 ### Community 52 - "Community 52"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 53 - "Community 53"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 54 - "Community 54"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 55 - "Community 55"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 56 - "Community 56"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 57 - "Community 57"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 58 - "Community 58"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 59 - "Community 59"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 60 - "Community 60"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 61 - "Community 61"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 62 - "Community 62"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 63 - "Community 63"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 64 - "Community 64"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 65 - "Community 65"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 66 - "Community 66"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 67 - "Community 67"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 68 - "Community 68"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 69 - "Community 69"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 70 - "Community 70"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 71 - "Community 71"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 72 - "Community 72"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 73 - "Community 73"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 74 - "Community 74"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 75 - "Community 75"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 76 - "Community 76"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 77 - "Community 77"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 78 - "Community 78"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 79 - "Community 79"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 80 - "Community 80"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 81 - "Community 81"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 82 - "Community 82"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 83 - "Community 83"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 84 - "Community 84"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 85 - "Community 85"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 86 - "Community 86"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 87 - "Community 87"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 88 - "Community 88"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 89 - "Community 89"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 90 - "Community 90"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 91 - "Community 91"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 92 - "Community 92"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 93 - "Community 93"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 94 - "Community 94"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 95 - "Community 95"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 96 - "Community 96"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 97 - "Community 97"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 98 - "Community 98"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 99 - "Community 99"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 100 - "Community 100"
+
 Cohesion: 1.0
-Nodes (0): 
+Nodes (0):
 
 ### Community 101 - "Community 101"
+
 Cohesion: 1.0
 Nodes (1): DSA (Data Structures & Algorithms)
 
 ### Community 102 - "Community 102"
+
 Cohesion: 1.0
 Nodes (1): README.md
 
 ### Community 103 - "Community 103"
+
 Cohesion: 1.0
 Nodes (1): ARCHITECTURE.md
 
 ### Community 104 - "Community 104"
+
 Cohesion: 1.0
 Nodes (1): DEPLOYMENT_GUIDE.md
 
 ### Community 105 - "Community 105"
+
 Cohesion: 1.0
 Nodes (1): CODELEDGER_EXECUTION_GUIDE.md
 
 ### Community 106 - "Community 106"
+
 Cohesion: 1.0
 Nodes (1): GITHUB_APP_SETUP.md
 
 ### Community 107 - "Community 107"
+
 Cohesion: 1.0
 Nodes (1): ADDING_PLATFORM_HANDLER.md
 
 ### Community 108 - "Community 108"
+
 Cohesion: 1.0
 Nodes (1): PORTFOLIO_INTEGRATION.md
 
 ### Community 109 - "Community 109"
+
 Cohesion: 1.0
 Nodes (1): generate-canonical-map-prompt.md
 
 ### Community 110 - "Community 110"
+
 Cohesion: 1.0
 Nodes (1): prompt.md
 
 ### Community 111 - "Community 111"
+
 Cohesion: 1.0
 Nodes (1): Apache 2.0 License
 
 ### Community 112 - "Community 112"
+
 Cohesion: 1.0
 Nodes (1): VKrishna04 (Author)
 
 ### Community 113 - "Community 113"
+
 Cohesion: 1.0
 Nodes (1): Life Experimentalist (Organization)
 
 ### Community 114 - "Community 114"
+
 Cohesion: 1.0
 Nodes (1): Manifest V3 Standard
 
 ### Community 115 - "Community 115"
+
 Cohesion: 1.0
 Nodes (1): Release Quick Start (archived)
 
 ### Community 116 - "Community 116"
+
 Cohesion: 1.0
 Nodes (1): Session Summary (archived)
 
 ### Community 117 - "Community 117"
+
 Cohesion: 1.0
 Nodes (1): Pre-Launch Checklist
 
 ### Community 118 - "Community 118"
+
 Cohesion: 1.0
 Nodes (1): GitHub Repository Metadata
 
 ### Community 119 - "Community 119"
+
 Cohesion: 1.0
 Nodes (1): Rationale: OAuth via Cloudflare Worker (client secret not in bundle)
 
 ### Community 120 - "Community 120"
+
 Cohesion: 1.0
 Nodes (1): Keyboard Navigation in ProblemModal (arrow keys)
 
 ## Knowledge Gaps
+
 - **90 isolated node(s):** `DSA (Data Structures & Algorithms)`, `Archive README`, `Comprehensive Fix Plan (archived)`, `Final Release Summary (archived)`, `Launch Complete Note (archived)` (+85 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `Community 52`** (2 nodes): `fixHtmImports()`, `fix-htm.js`
@@ -799,6 +927,7 @@ Nodes (1): Keyboard Navigation in ProblemModal (arrow keys)
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
+
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `isArray()` connect `Community 6` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 36`, `Community 5`, `Community 4`, `Community 8`, `Community 9`, `Community 11`, `Community 12`, `Community 13`, `Community 15`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 24`?**

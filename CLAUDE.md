@@ -18,6 +18,7 @@ A **Manifest V3 browser extension** (Chrome + Firefox) that automatically commit
 ## Quick Start
 
 ### Extension development
+
 ```bash
 npm install
 npm run build:css        # Tailwind → src/ui/styles/compiled.css (run after CSS changes)
@@ -29,6 +30,7 @@ npm run lint             # tsc --noEmit (type-check only, no transpile)
 Load the extension unpacked from `src/` in `chrome://extensions`.
 
 ### Worker (Cloudflare)
+
 ```bash
 cd worker && npm install
 npx wrangler dev         # local dev (requires wrangler.toml with secrets)
@@ -39,6 +41,7 @@ cd .. && npm run deploy:worker   # shorthand from root
 `worker/wrangler.toml` is git-ignored — create it from the template in `CODELEDGER_EXECUTION_GUIDE.md`.
 
 ### Dev utilities
+
 ```bash
 node dev/generate-manifest-domains.js   # regenerates host_permissions from dom-selectors DOMAINS exports
 node dev/build-canonical-map.js         # validate data/canonical-map.json against schema
@@ -49,12 +52,14 @@ node dev/import-profile/gfg-importer.js --github-token=TOKEN --repo=owner/repo
 ```
 
 ### Release (automated)
+
 ```bash
 npm run release             # validates, builds zips, commits, tags, pushes all in one command
 npm run release -- --dry-run   # preview what would happen (no git changes)
 ```
 
 Or manually:
+
 ```bash
 npm run publish             # clean → build:css → build:dist → zip Chrome + Firefox + source
 git commit -m "chore: release vX.Y.Z"
@@ -63,6 +68,7 @@ git push origin main vX.Y.Z   # triggers .github/workflows/release.yml
 ```
 
 ### Smoke test (post-deploy)
+
 ```bash
 curl -sf https://codeledger.vkrishna04.me/api/health
 ```
@@ -105,6 +111,7 @@ manifest.json
 ```
 
 ### Data flow for a solve event
+
 1. Content script (`handler-loader.js`) → imports platform handler → calls `handler.init()`
 2. Platform handler detects accepted submission (DOM / GraphQL / REST)
 3. Fires `eventBus.emit("problem:solved", data)` → caught by service-worker
@@ -112,12 +119,14 @@ manifest.json
 5. `git-engine.js` calls GitHub Tree API for a single atomic commit
 
 ### Cloudflare Worker (`worker/src/index.js`)
+
 - Built with **Hono** framework
 - Routes: `/api/health`, `/api/auth/github`, `/api/auth/github/callback`, `/api/webhook/github`, `/api/admin/canonical`, `/api/data/canonical-map.json`
 - Serves static landing page from `worker/public/`
 - OAuth callback posts `{ type: 'CODELEDGER_AUTH', provider, token }` — the extension listens for exactly this message type
 
 ### Library / Web App (`src/library/`)
+
 - Shared HTML + Preact components used both inside the extension sidebar and at `codeledger.vkrishna04.me/library`
 - Auto-detects context: `IS_EXTENSION = !!chrome.runtime?.id`
 - Extension mode: reads IndexedDB; Web app mode: reads GitHub API via OAuth token
@@ -127,35 +136,43 @@ manifest.json
 ## Critical Rules
 
 ### Never use `chrome.*` or `browser.*` directly
+
 All extension API calls must go through `src/lib/browser-compat.js`. This is the only file that touches those namespaces.
 
 ### Never use `console.log` directly
+
 Use `createDebugger('HandlerName')` from `src/lib/debug.js`. The `.bind()` trick preserves caller file+line in DevTools.
 
 ```js
-import { createDebugger } from '../../lib/debug.js';
-const dbg = createDebugger('MyHandler');
-dbg.log('message');  // shows at the correct source location in DevTools
+import { createDebugger } from "../../lib/debug.js";
+const dbg = createDebugger("MyHandler");
+dbg.log("message"); // shows at the correct source location in DevTools
 ```
 
 ### Import paths from extension pages
+
 The extension root is `src/`. `chrome.runtime.getURL('handlers/...')` — no `src/` prefix in the path. This is a common bug source.
 
 ### UI: Preact + htm, no build step
+
 All UI files import Preact and htm from `https://esm.sh`. No JSX. No webpack. No transpilation. Every UI file starts with:
+
 ```js
-import { h, render } from '../../vendor/preact-bundle.js';
-import { useState, useEffect } from '../../vendor/preact-bundle.js';
-import { htm } from '../../vendor/preact-bundle.js';
+import { h, render } from "../../vendor/preact-bundle.js";
+import { useState, useEffect } from "../../vendor/preact-bundle.js";
+import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 ```
+
 `src/vendor/preact-bundle.js` is a CDN re-export shim — all UI files import from this single path.
 
 ### OAuth message contract
+
 Worker posts: `{ type: 'CODELEDGER_AUTH', provider: 'github', token: '...' }`
 Extension listens for exactly `data.type === 'CODELEDGER_AUTH'`. Any mismatch silently drops the token.
 
 ### Token storage paths
+
 - OAuth tokens: `Storage.setAuthToken(provider, token)` → stored at `auth.tokens`
 - AI API keys: `Storage.setAIKeys(map)` → stored at `ai.keys`
 - Manual PAT: `settings['github_token']`
@@ -187,15 +204,18 @@ If commits fail, check in this order:
 If all checks pass but commit still fails, the issue is likely in the Trees API call itself (check OPENAPI.yaml for the exact endpoint contract).
 
 ### OpenAPI spec maintenance
+
 **Source of truth:** `docs/OPENAPI.yaml`
 
 **When to update the spec:**
+
 - Adding new Worker endpoints or routes
 - Changing request/response schemas, parameters, or status codes
 - Modifying authentication methods or security schemes
 - Updating server URLs (must match `CONSTANTS.URLS` in `src/core/constants.js`)
 
 **Spec compliance rules:**
+
 - Every Worker route must be documented in `docs/OPENAPI.yaml`
 - Code implementation must match the spec (path, method, parameters, response format)
 - If Worker behavior changes, update the spec **and** the code in the same commit
@@ -269,14 +289,17 @@ All handlers live in `src/handlers/` and follow a strict structure:
 
 ```js
 // ✅ Correct
-const repo = settings[CONSTANTS.SK.GITHUB_REPO] || settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
+const repo =
+  settings[CONSTANTS.SK.GITHUB_REPO] ||
+  settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
 
 // ❌ Wrong
-const repo = settings['github_repo'];
+const repo = settings["github_repo"];
 const repo = settings.github_repo;
 ```
 
 **Canonical storage paths** (must never vary across modules):
+
 - OAuth tokens: `auth.tokens[provider]` via `Storage.setAuthToken(provider, token)` — NOT settings
 - Settings: `chrome.storage.local` via `Storage.setSettings(map)`
 - AI keys: `ai.keys[provider]` via `Storage.setAIKeys(map)` — NOT settings
@@ -287,12 +310,14 @@ Before reading or writing a storage key, validate it exists in `CONSTANTS.SK`; i
 ### Import Path Conventions
 
 - **From extension root**: Use relative paths with no `src/` prefix
+
   ```js
   import { createDebugger } from "../../lib/debug.js";
   import { BasePlatformHandler } from "../_base/BasePlatformHandler.js";
   ```
 
 - **In manifest.json paths**: Use paths relative to `src/`, without `src/` prefix
+
   ```json
   "background": { "service_worker": "background/service-worker.js" }
   "content_scripts": [{ "js": ["content/handler-loader.js"] }]
@@ -313,9 +338,14 @@ When DOM selectors change between platform versions (e.g., LeetCode refactors):
 - If multiple major versions need different selectors, create `enhanced-selectors.js` and conditionally load
 
 Example pattern in `dom-selectors.js`:
+
 ```js
-export const SELECTORS = { /* current */ };
-export const LEGACY_SELECTORS = { /* old versions */ };
+export const SELECTORS = {
+  /* current */
+};
+export const LEGACY_SELECTORS = {
+  /* old versions */
+};
 export const DOMAINS = ["leetcode.com", "www.leetcode.com"];
 ```
 
@@ -333,6 +363,7 @@ These conventions apply across all files. Inconsistency here causes silent commi
 | OAuth token         | `auth.tokens` (via `Storage.setAuthToken`)         | accessed via `Storage.getAuthToken("github")` | Never save OAuth tokens to settings                                                                                                 |
 
 **When reading the repo name anywhere in the codebase, always use:**
+
 ```js
 const repo = settings.github_repo || settings.gitRepo;
 ```
@@ -410,12 +441,14 @@ The `files` array drives the git commit. If absent, SW builds a fallback single-
 ## Versioning & Changelog
 
 Version is canonical in **two places that must always match**:
+
 - `src/manifest.json` → `"version"`
 - `package.json` → `"version"`
 
 **Source of truth for releases:** `package.json`. The CI release pipeline validates they match before tagging.
 
 ### Release checklist
+
 1. Add a `## [x.y.z] — YYYY-MM-DD` section to `docs/CHANGELOG.md` (Added / Fixed / Changed / Removed / Security).
 2. Bump version in **both** `src/manifest.json` and `package.json` to the same version.
 3. Run `npm run release` (validates, builds, commits, tags, pushes all at once).
@@ -423,6 +456,7 @@ Version is canonical in **two places that must always match**:
 4. GitHub Actions (`.github/workflows/release.yml`) triggers automatically on tag push → creates GitHub Release with attached zips.
 
 ### CHANGELOG sections
+
 - **Added** — new features or capabilities
 - **Fixed** — bug fixes
 - **Changed** — behaviour changes in existing features

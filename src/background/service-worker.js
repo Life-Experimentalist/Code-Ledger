@@ -146,11 +146,11 @@ async function getAIReviewQueueStatus() {
   ]);
   const now = Date.now();
   const batchIntervalMs = snailSettings.snailMode_batchIntervalHours
-    ? Math.round(Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000)
+    ? Math.round(
+        Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000,
+      )
     : CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS;
-  const intervalAt = state.lastBatch
-    ? state.lastBatch + batchIntervalMs
-    : now;
+  const intervalAt = state.lastBatch ? state.lastBatch + batchIntervalMs : now;
   const pausedAt = state.isPaused && state.pausedUntil ? state.pausedUntil : 0;
   const nextRetryAt = pendingItems.reduce((min, item) => {
     const candidate = Number(item?.nextRetryAt || 0);
@@ -2600,13 +2600,18 @@ async function processAIReviewQueue(options = {}) {
       1,
       Math.min(
         20,
-        Number(snailSettings.snailMode_batchSize) || CONSTANTS.SNAIL_MODE.BATCH_SIZE,
+        Number(snailSettings.snailMode_batchSize) ||
+          CONSTANTS.SNAIL_MODE.BATCH_SIZE,
       ),
     );
-    const BATCH_INTERVAL_MS =
-      Math.max(1, Number(snailSettings.snailMode_batchIntervalHours) || 0)
-        ? Math.round(Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000)
-        : CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS;
+    const BATCH_INTERVAL_MS = Math.max(
+      1,
+      Number(snailSettings.snailMode_batchIntervalHours) || 0,
+    )
+      ? Math.round(
+          Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000,
+        )
+      : CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS;
 
     // Check if snail mode is paused
     if (
@@ -3062,18 +3067,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const problemId = msg.problemId;
-        if (!problemId) { sendResponse({ ok: false, error: "problemId required" }); return; }
+        if (!problemId) {
+          sendResponse({ ok: false, error: "problemId required" });
+          return;
+        }
         const items = await getAllQueueItems(null);
-        const matching = (items || []).filter((it) => it.problemId === problemId || it.problemId?.startsWith(problemId + "::"));
+        const matching = (items || []).filter(
+          (it) =>
+            it.problemId === problemId ||
+            it.problemId?.startsWith(problemId + "::"),
+        );
         let removed = 0;
         for (const it of matching) {
           await removeQueueItem(it.id).catch(() => {});
           removed++;
         }
-        dbg.log(`onMessage(REMOVE_QUEUE_ITEMS_BY_PROBLEM): removed ${removed} item(s) for ${problemId}`);
+        dbg.log(
+          `onMessage(REMOVE_QUEUE_ITEMS_BY_PROBLEM): removed ${removed} item(s) for ${problemId}`,
+        );
         sendResponse({ ok: true, removed });
       } catch (err) {
-        dbg.error(`onMessage(REMOVE_QUEUE_ITEMS_BY_PROBLEM): failed:`, err?.message || err);
+        dbg.error(
+          `onMessage(REMOVE_QUEUE_ITEMS_BY_PROBLEM): failed:`,
+          err?.message || err,
+        );
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();

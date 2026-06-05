@@ -28,12 +28,15 @@ if (!SKIP_CSS) {
   execSync("npm run build:css", { stdio: "inherit", cwd: ROOT });
 }
 
-if (fs.existsSync(DIST_DIR)) fs.rmSync(DIST_DIR, { recursive: true, force: true });
+if (fs.existsSync(DIST_DIR))
+  fs.rmSync(DIST_DIR, { recursive: true, force: true });
 
 function copyRecursive(src, dest) {
   if (fs.statSync(src).isDirectory()) {
     fs.mkdirSync(dest, { recursive: true });
-    fs.readdirSync(src).forEach((item) => copyRecursive(path.join(src, item), path.join(dest, item)));
+    fs.readdirSync(src).forEach((item) =>
+      copyRecursive(path.join(src, item), path.join(dest, item)),
+    );
   } else {
     fs.copyFileSync(src, dest);
   }
@@ -45,7 +48,10 @@ const chromeDir = path.join(DIST_DIR, "chromium");
 copyRecursive(SRC_DIR, chromeDir);
 const chromeManifest = readJson("src/manifest-chromium.json");
 chromeManifest.version = VERSION;
-fs.writeFileSync(path.join(chromeDir, "manifest.json"), JSON.stringify(chromeManifest, null, 4) + "\n");
+fs.writeFileSync(
+  path.join(chromeDir, "manifest.json"),
+  JSON.stringify(chromeManifest, null, 4) + "\n",
+);
 
 // Build Firefox dist
 console.log("Building Firefox extension...");
@@ -53,6 +59,11 @@ const firefoxDir = path.join(DIST_DIR, "firefox");
 copyRecursive(SRC_DIR, firefoxDir);
 const ffManifest = readJson("src/manifest-firefox.json");
 ffManifest.version = VERSION;
-fs.writeFileSync(path.join(firefoxDir, "manifest.json"), JSON.stringify(ffManifest, null, 4) + "\n");
+fs.writeFileSync(
+  path.join(firefoxDir, "manifest.json"),
+  JSON.stringify(ffManifest, null, 4) + "\n",
+);
 
-console.log("Dist build complete. Run `node dev/package.js` to create release zips.");
+console.log(
+  "Dist build complete. Run `node dev/package.js` to create release zips.",
+);

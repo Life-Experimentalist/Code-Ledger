@@ -10,34 +10,34 @@ import { CONSTANTS } from "../../../core/constants.js";
  * The page fetches ./index.json at runtime and renders a full dashboard.
  */
 export function getPagesHtml(opts = {}) {
-    const theme = opts.theme || {};
-    const settings = opts.settings || {};
-    const commitSummary = opts.commitSummary || null;
-    const reportImages = Array.isArray(opts.reportImages)
-        ? opts.reportImages
-        : [];
-    const commitList = Array.isArray(opts.commitList) ? opts.commitList : [];
-    // GitHub owner and repo embedded at generation time so custom domains work correctly
-    const repoOwner = opts.owner || "";
-    const repoName = opts.repo || "";
-    // Default raw image URLs (can be overridden via settings passed to generator)
-    const ASSETS = {
-        iconDark:
-            (settings?.assets && settings.assets.iconDark) ||
-            "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-dark-bg.png",
-        iconTransparent:
-            (settings?.assets && settings.assets.iconTransparent) ||
-            "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-transparent.png",
-        logo:
-            (settings?.assets && settings.assets.logo) ||
-            "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/logo.png",
-        social:
-            (settings?.assets && settings.assets.social) ||
-            "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/social%20preview.png",
-    };
-    // NOTE: No backtick template literals inside the returned string — this entire
-    // string is itself a template literal, so nested backticks would terminate it.
-    return `<!DOCTYPE html>
+  const theme = opts.theme || {};
+  const settings = opts.settings || {};
+  const commitSummary = opts.commitSummary || null;
+  const reportImages = Array.isArray(opts.reportImages)
+    ? opts.reportImages
+    : [];
+  const commitList = Array.isArray(opts.commitList) ? opts.commitList : [];
+  // GitHub owner and repo embedded at generation time so custom domains work correctly
+  const repoOwner = opts.owner || "";
+  const repoName = opts.repo || "";
+  // Default raw image URLs (can be overridden via settings passed to generator)
+  const ASSETS = {
+    iconDark:
+      (settings?.assets && settings.assets.iconDark) ||
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-dark-bg.png",
+    iconTransparent:
+      (settings?.assets && settings.assets.iconTransparent) ||
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-transparent.png",
+    logo:
+      (settings?.assets && settings.assets.logo) ||
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/logo.png",
+    social:
+      (settings?.assets && settings.assets.social) ||
+      "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/social%20preview.png",
+  };
+  // NOTE: No backtick template literals inside the returned string — this entire
+  // string is itself a template literal, so nested backticks would terminate it.
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -307,8 +307,8 @@ export function getPagesHtml(opts = {}) {
 
   <!-- Floating image/report panel -->
   ${
-      reportImages.length
-          ? `
+    reportImages.length
+      ? `
   <div id="float-panel" style="position:fixed;right:1rem;bottom:1rem;width:320px;max-width:40%;z-index:60">
     <div class="card" style="padding: .5rem;">
       <div class="card-label">Report Images</div>
@@ -318,7 +318,7 @@ export function getPagesHtml(opts = {}) {
     </div>
   </div>
   `
-          : ""
+      : ""
   }
 
   <script>
@@ -839,94 +839,94 @@ export function getPagesHtml(opts = {}) {
 }
 
 export function getActionsWorkflow() {
-    // Build with string concatenation so no nested backticks or tricky escapes are needed.
-    const nl = "\n";
-    const lines = [
-        "name: Update Stats README",
-        "",
-        "on:",
-        "  push:",
-        "    paths:",
-        "      - 'index.json'",
-        "  workflow_dispatch:",
-        "",
-        "permissions:",
-        "  contents: write",
-        "",
-        "jobs:",
-        "  update-readme:",
-        "    runs-on: ubuntu-latest",
-        "    steps:",
-        "      - name: Checkout",
-        "        uses: actions/checkout@v4",
-        "",
-        "      - name: Generate README",
-        "        uses: actions/github-script@v7",
-        "        with:",
-        "          script: |",
-        "            const fs = require('fs');",
-        "            const startMarker = '<!-- CODELEDGER_AUTO_GENERATED_START -->';",
-        "            const endMarker = '<!-- CODELEDGER_AUTO_GENERATED_END -->';",
-        "            const data = JSON.parse(fs.readFileSync('index.json', 'utf8'));",
-        "            const stats = data.stats || {};",
-        "            const problems = data.problems || [];",
-        "            const updated = data.updatedAt",
-        "              ? new Date(data.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })",
-        "              : '-';",
-        "            const recentRows = problems",
-        "              .filter(p => p.timestamp)",
-        "              .sort((a, b) => b.timestamp - a.timestamp)",
-        "              .slice(0, 5)",
-        "              .map(p => {",
-        "                const ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;",
-        "                const date = new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });",
-        "                const lang = (p.lang && (p.lang.name || p.lang)) || '?';",
-        "                return '| ' + [p.title || p.titleSlug, p.difficulty || '?', lang, date].join(' | ') + ' |';",
-        "              });",
-        "            const generatedBlock = [",
-        "              startMarker,",
-        "              '# DSA Solutions',",
-        "              '',",
-        "              '> Managed by [CodeLedger](https://github.com/Life-Experimentalist/Code-Ledger). Last updated: ' + updated,",
-        "              '',",
-        "              '## Stats',",
-        "              '',",
-        "              '| Total | Easy | Medium | Hard |',",
-        "              '|:-----:|:----:|:------:|:----:|',",
-        "              '| **' + (stats.total || 0) + '** | ' + (stats.easy || 0) + ' | ' + (stats.medium || 0) + ' | ' + (stats.hard || 0) + ' |',",
-        "              '',",
-        "              '## Recent Solves',",
-        "              '',",
-        "              '| Problem | Difficulty | Language | Date |',",
-        "              '|---------|-----------|----------|------|',",
-        "              ...(recentRows.length ? recentRows : ['| - | - | - | - |']),",
-        "              '',",
-        "              endMarker,",
-        "            ].join('\\n');",
-        "            const readmePath = 'README.md';",
-        "            if (fs.existsSync(readmePath)) {",
-        "              const existing = fs.readFileSync(readmePath, 'utf8');",
-        "              if (existing.includes(startMarker) && existing.includes(endMarker)) {",
-        "                const pattern = new RegExp(startMarker + '[\\\\s\\\\S]*?' + endMarker);",
-        "                const next = existing.replace(pattern, generatedBlock);",
-        "                fs.writeFileSync(readmePath, next);",
-        "              } else {",
-        "                console.log('README.md is manually maintained. Skipping auto-update.');",
-        "              }",
-        "            } else {",
-        "              fs.writeFileSync(readmePath, generatedBlock);",
-        "            }",
-        "            console.log('README updated with ' + problems.length + ' problems.');",
-        "",
-        "      - name: Commit README",
-        "        run: |",
-        '          git config user.name "github-actions[bot]"',
-        '          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
-        "          git add README.md",
-        '          git diff --staged --quiet && echo "No changes" || git commit -m "chore: update stats README [skip ci]"',
-        "          git push",
-    ];
-    return lines.join(nl);
+  // Build with string concatenation so no nested backticks or tricky escapes are needed.
+  const nl = "\n";
+  const lines = [
+    "name: Update Stats README",
+    "",
+    "on:",
+    "  push:",
+    "    paths:",
+    "      - 'index.json'",
+    "  workflow_dispatch:",
+    "",
+    "permissions:",
+    "  contents: write",
+    "",
+    "jobs:",
+    "  update-readme:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - name: Checkout",
+    "        uses: actions/checkout@v4",
+    "",
+    "      - name: Generate README",
+    "        uses: actions/github-script@v7",
+    "        with:",
+    "          script: |",
+    "            const fs = require('fs');",
+    "            const startMarker = '<!-- CODELEDGER_AUTO_GENERATED_START -->';",
+    "            const endMarker = '<!-- CODELEDGER_AUTO_GENERATED_END -->';",
+    "            const data = JSON.parse(fs.readFileSync('index.json', 'utf8'));",
+    "            const stats = data.stats || {};",
+    "            const problems = data.problems || [];",
+    "            const updated = data.updatedAt",
+    "              ? new Date(data.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })",
+    "              : '-';",
+    "            const recentRows = problems",
+    "              .filter(p => p.timestamp)",
+    "              .sort((a, b) => b.timestamp - a.timestamp)",
+    "              .slice(0, 5)",
+    "              .map(p => {",
+    "                const ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;",
+    "                const date = new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });",
+    "                const lang = (p.lang && (p.lang.name || p.lang)) || '?';",
+    "                return '| ' + [p.title || p.titleSlug, p.difficulty || '?', lang, date].join(' | ') + ' |';",
+    "              });",
+    "            const generatedBlock = [",
+    "              startMarker,",
+    "              '# DSA Solutions',",
+    "              '',",
+    "              '> Managed by [CodeLedger](https://github.com/Life-Experimentalist/Code-Ledger). Last updated: ' + updated,",
+    "              '',",
+    "              '## Stats',",
+    "              '',",
+    "              '| Total | Easy | Medium | Hard |',",
+    "              '|:-----:|:----:|:------:|:----:|',",
+    "              '| **' + (stats.total || 0) + '** | ' + (stats.easy || 0) + ' | ' + (stats.medium || 0) + ' | ' + (stats.hard || 0) + ' |',",
+    "              '',",
+    "              '## Recent Solves',",
+    "              '',",
+    "              '| Problem | Difficulty | Language | Date |',",
+    "              '|---------|-----------|----------|------|',",
+    "              ...(recentRows.length ? recentRows : ['| - | - | - | - |']),",
+    "              '',",
+    "              endMarker,",
+    "            ].join('\\n');",
+    "            const readmePath = 'README.md';",
+    "            if (fs.existsSync(readmePath)) {",
+    "              const existing = fs.readFileSync(readmePath, 'utf8');",
+    "              if (existing.includes(startMarker) && existing.includes(endMarker)) {",
+    "                const pattern = new RegExp(startMarker + '[\\\\s\\\\S]*?' + endMarker);",
+    "                const next = existing.replace(pattern, generatedBlock);",
+    "                fs.writeFileSync(readmePath, next);",
+    "              } else {",
+    "                console.log('README.md is manually maintained. Skipping auto-update.');",
+    "              }",
+    "            } else {",
+    "              fs.writeFileSync(readmePath, generatedBlock);",
+    "            }",
+    "            console.log('README updated with ' + problems.length + ' problems.');",
+    "",
+    "      - name: Commit README",
+    "        run: |",
+    '          git config user.name "github-actions[bot]"',
+    '          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
+    "          git add README.md",
+    '          git diff --staged --quiet && echo "No changes" || git commit -m "chore: update stats README [skip ci]"',
+    "          git push",
+  ];
+  return lines.join(nl);
 }
 
 /**
@@ -934,233 +934,235 @@ export function getActionsWorkflow() {
  * pagesUrl is the GitHub Pages URL (or custom domain if configured).
  */
 export function getRepoReadme(
-    owner,
-    repo,
-    pagesUrl,
-    _theme,
-    _settings,
-    indexMeta
+  owner,
+  repo,
+  pagesUrl,
+  _theme,
+  _settings,
+  indexMeta,
 ) {
-    const url = pagesUrl || "https://" + owner + ".github.io/" + repo + "/";
-    const stats = indexMeta?.stats || null;
+  const url = pagesUrl || "https://" + owner + ".github.io/" + repo + "/";
+  const stats = indexMeta?.stats || null;
 
-    const updatedAt = indexMeta?.updatedAt
-        ? new Date(indexMeta.updatedAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-          })
-        : null;
-    const recentProblems = (indexMeta?.problems || [])
-        .filter((p) => p.timestamp)
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-        .slice(0, 10);
+  const updatedAt = indexMeta?.updatedAt
+    ? new Date(indexMeta.updatedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+  const recentProblems = (indexMeta?.problems || [])
+    .filter((p) => p.timestamp)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .slice(0, 10);
 
-    const LOGO_URL =
-        "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/logo.png";
-    const ICON_URL =
-        "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-transparent.png";
-    const SOCIAL_URL =
-        "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/social%20preview.png";
-    const total = stats?.total || 0;
-    const easy = stats?.easy || 0;
-    const medium = stats?.medium || 0;
-    const hard = stats?.hard || 0;
+  const LOGO_URL =
+    "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/logo.png";
+  const ICON_URL =
+    "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/icon-transparent.png";
+  const SOCIAL_URL =
+    "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/assets/images/social%20preview.png";
+  const total = stats?.total || 0;
+  const easy = stats?.easy || 0;
+  const medium = stats?.medium || 0;
+  const hard = stats?.hard || 0;
 
-    const lines = [
-      "<!-- CODELEDGER_AUTO_GENERATED_START -->",
-      "",
-      '<div align="center">',
-      "",
-      '<img src="' + ICON_URL + '" alt="CodeLedger" width="72" height="72" />',
-      "",
-      "# " + owner + "'s DSA Solutions",
-      "",
-      "[![Solutions](https://img.shields.io/badge/Solutions-" +
-        total +
-        "-06b6d4?style=flat-square&logo=github)](" +
-        url +
-        ")" +
-        "  [![Easy](https://img.shields.io/badge/Easy-" +
-        easy +
-        "-22c55e?style=flat-square)](" +
-        url +
-        ")" +
-        "  [![Medium](https://img.shields.io/badge/Medium-" +
-        medium +
-        "-f59e0b?style=flat-square)](" +
-        url +
-        ")" +
-        "  [![Hard](https://img.shields.io/badge/Hard-" +
-        hard +
-        "-ef4444?style=flat-square)](" +
-        url +
-        ")",
-      "",
-      "> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — every problem solved, committed to Git.",
-      "",
-      "**[View Live Dashboard →](" + url + ")**",
-      updatedAt ? "*Last updated: " + updatedAt + "*" : "",
-      "",
-      "[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")",
-      "",
-      "</div>",
-      "",
-      "---",
-      "",
-    ];
+  const lines = [
+    "<!-- CODELEDGER_AUTO_GENERATED_START -->",
+    "",
+    '<div align="center">',
+    "",
+    '<img src="' + ICON_URL + '" alt="CodeLedger" width="72" height="72" />',
+    "",
+    "# " + owner + "'s DSA Solutions",
+    "",
+    "[![Solutions](https://img.shields.io/badge/Solutions-" +
+      total +
+      "-06b6d4?style=flat-square&logo=github)](" +
+      url +
+      ")" +
+      "  [![Easy](https://img.shields.io/badge/Easy-" +
+      easy +
+      "-22c55e?style=flat-square)](" +
+      url +
+      ")" +
+      "  [![Medium](https://img.shields.io/badge/Medium-" +
+      medium +
+      "-f59e0b?style=flat-square)](" +
+      url +
+      ")" +
+      "  [![Hard](https://img.shields.io/badge/Hard-" +
+      hard +
+      "-ef4444?style=flat-square)](" +
+      url +
+      ")",
+    "",
+    "> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — every problem solved, committed to Git.",
+    "",
+    "**[View Live Dashboard →](" + url + ")**",
+    updatedAt ? "*Last updated: " + updatedAt + "*" : "",
+    "",
+    "[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")",
+    "",
+    "</div>",
+    "",
+    "---",
+    "",
+  ];
 
-    // Stats table
-    if (stats) {
-        lines.push("## Stats", "");
-        lines.push("| Total | Easy | Medium | Hard |");
-        lines.push("|:-----:|:----:|:------:|:----:|");
-        lines.push(
-            "| **" +
-                (stats.total || 0) +
-                "** | " +
-                (stats.easy || 0) +
-                " | " +
-                (stats.medium || 0) +
-                " | " +
-                (stats.hard || 0) +
-                " |"
-        );
-        lines.push("");
-
-        // Platform breakdown
-        if (stats.byPlatform && Object.keys(stats.byPlatform).length) {
-            const platRows = Object.entries(stats.byPlatform).sort(
-                (a, b) => b[1] - a[1]
-            );
-            lines.push(
-                "**By Platform:** " +
-                    platRows.map(([p, n]) => p + " (" + n + ")").join(" · ")
-            );
-            lines.push("");
-        }
-
-        // Language breakdown
-        if (stats.byLang && Object.keys(stats.byLang).length) {
-            const langRows = Object.entries(stats.byLang)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 8);
-            lines.push(
-                "**Top Languages:** " +
-                    langRows.map(([l, n]) => l + " (" + n + ")").join(" · ")
-            );
-            lines.push("");
-        }
-
-        // Topic breakdown
-        if (stats.byTopic && Object.keys(stats.byTopic).length) {
-            const topicRows = Object.entries(stats.byTopic)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10);
-            lines.push(
-                "**Top Topics:** " +
-                    topicRows.map(([t, n]) => t + " (" + n + ")").join(" · ")
-            );
-            lines.push("");
-        }
-
-        lines.push("---", "");
-    }
-
-    // Recent solves
-    const LANG_DISPLAY = {
-        pythondata: "Python (Pandas)",
-        python3: "Python3",
-        python: "Python",
-        javascript: "JavaScript",
-        typescript: "TypeScript",
-        java: "Java",
-        cpp: "C++",
-        c: "C",
-        csharp: "C#",
-        kotlin: "Kotlin",
-        swift: "Swift",
-        go: "Go",
-        rust: "Rust",
-        scala: "Scala",
-        ruby: "Ruby",
-        php: "PHP",
-    };
-    if (recentProblems.length) {
-        lines.push("## Recent Solves", "");
-        lines.push("| Problem | Difficulty | Language | Platform | Date |");
-        lines.push("|---------|-----------|----------|----------|------|");
-        const thisYear = new Date().getFullYear();
-        recentProblems.forEach((p) => {
-            const ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
-            const d = new Date(ts);
-            const isSameYear = d.getFullYear() === thisYear;
-            const date = d.toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                ...(isSameYear ? {} : { year: "numeric" }),
-            });
-            const rawLang = (p.lang && (p.lang.name || p.lang)) || "?";
-            const lang = LANG_DISPLAY[rawLang.toLowerCase()] || rawLang;
-            const slug = p.titleSlug || "";
-            const titleText = p.title || slug || "?";
-            const titleCell = slug
-                ? "[" + titleText + "](" + CONSTANTS.makeProblemUrl(p.platform || "leetcode", slug) + ")"
-                : titleText;
-            const diff = p.difficulty || "?";
-            const plat = p.platform || "?";
-            lines.push(
-                "| " + [titleCell, diff, lang, plat, date].join(" | ") + " |"
-            );
-        });
-        lines.push("");
-        lines.push("---", "");
-    }
-
+  // Stats table
+  if (stats) {
+    lines.push("## Stats", "");
+    lines.push("| Total | Easy | Medium | Hard |");
+    lines.push("|:-----:|:----:|:------:|:----:|");
     lines.push(
-        "## Repository Structure",
-        "",
-        "```",
-        "problems/",
-        "  lc-{slug}/                  ← one directory per problem",
-        "    lc-{slug}.py              ← your solution (named after the slug)",
-        "    lc-{slug}.md              ← problem statement + runtime + memory + AI review",
-        "  {canonical-slug}/",
-        "    leetcode/                 ← platform subdir (when canonical ID is assigned)",
-        "      lc-{slug}.py",
-        "index.json                    ← machine-readable index (all problems + stats)",
-        "index.html                    ← live GitHub Pages dashboard",
-        "chats/                        ← saved AI conversations (YYYY-MM-DD-*.md)",
-        ".codeledger/                  ← extension config & knowledge bank",
-        "```",
-        "",
-        "---",
-        "",
-        "## About",
-        "",
-        "This repository is managed by [CodeLedger](https://codeledger.vkrishna04.me), a browser extension that automatically commits every accepted DSA solution to GitHub with AI-powered code reviews.",
-        "",
-        "- Solutions committed automatically the instant they are accepted",
-        "- AI code reviews (complexity analysis, hints, optimizations) committed alongside code",
-        "- Live stats dashboard: " + url,
-        "- Cross-device sync — your history is always up to date on any machine",
-        "- Fully owned by you — plain files, no lock-in, no third-party servers",
-        "",
-        "---",
-        "",
-        '<div align="center">',
-        "",
-        '<img src="' + LOGO_URL + '" width="32" alt="CodeLedger" />',
-        "",
-        "Built with [CodeLedger](https://codeledger.vkrishna04.me) · " +
-            "[⭐ Star the extension](https://github.com/Life-Experimentalist/Code-Ledger) · " +
-            "[Apache 2.0](https://github.com/Life-Experimentalist/Code-Ledger/blob/main/LICENSE.md)",
-        "",
-        "</div>",
-        "",
-        "<!-- CODELEDGER_AUTO_GENERATED_END -->",
-        ""
+      "| **" +
+        (stats.total || 0) +
+        "** | " +
+        (stats.easy || 0) +
+        " | " +
+        (stats.medium || 0) +
+        " | " +
+        (stats.hard || 0) +
+        " |",
     );
+    lines.push("");
 
-    return lines.filter((l) => l !== null && l !== undefined).join("\n");
+    // Platform breakdown
+    if (stats.byPlatform && Object.keys(stats.byPlatform).length) {
+      const platRows = Object.entries(stats.byPlatform).sort(
+        (a, b) => b[1] - a[1],
+      );
+      lines.push(
+        "**By Platform:** " +
+          platRows.map(([p, n]) => p + " (" + n + ")").join(" · "),
+      );
+      lines.push("");
+    }
+
+    // Language breakdown
+    if (stats.byLang && Object.keys(stats.byLang).length) {
+      const langRows = Object.entries(stats.byLang)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+      lines.push(
+        "**Top Languages:** " +
+          langRows.map(([l, n]) => l + " (" + n + ")").join(" · "),
+      );
+      lines.push("");
+    }
+
+    // Topic breakdown
+    if (stats.byTopic && Object.keys(stats.byTopic).length) {
+      const topicRows = Object.entries(stats.byTopic)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      lines.push(
+        "**Top Topics:** " +
+          topicRows.map(([t, n]) => t + " (" + n + ")").join(" · "),
+      );
+      lines.push("");
+    }
+
+    lines.push("---", "");
+  }
+
+  // Recent solves
+  const LANG_DISPLAY = {
+    pythondata: "Python (Pandas)",
+    python3: "Python3",
+    python: "Python",
+    javascript: "JavaScript",
+    typescript: "TypeScript",
+    java: "Java",
+    cpp: "C++",
+    c: "C",
+    csharp: "C#",
+    kotlin: "Kotlin",
+    swift: "Swift",
+    go: "Go",
+    rust: "Rust",
+    scala: "Scala",
+    ruby: "Ruby",
+    php: "PHP",
+  };
+  if (recentProblems.length) {
+    lines.push("## Recent Solves", "");
+    lines.push("| Problem | Difficulty | Language | Platform | Date |");
+    lines.push("|---------|-----------|----------|----------|------|");
+    const thisYear = new Date().getFullYear();
+    recentProblems.forEach((p) => {
+      const ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
+      const d = new Date(ts);
+      const isSameYear = d.getFullYear() === thisYear;
+      const date = d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        ...(isSameYear ? {} : { year: "numeric" }),
+      });
+      const rawLang = (p.lang && (p.lang.name || p.lang)) || "?";
+      const lang = LANG_DISPLAY[rawLang.toLowerCase()] || rawLang;
+      const slug = p.titleSlug || "";
+      const titleText = p.title || slug || "?";
+      const titleCell = slug
+        ? "[" +
+          titleText +
+          "](" +
+          CONSTANTS.makeProblemUrl(p.platform || "leetcode", slug) +
+          ")"
+        : titleText;
+      const diff = p.difficulty || "?";
+      const plat = p.platform || "?";
+      lines.push("| " + [titleCell, diff, lang, plat, date].join(" | ") + " |");
+    });
+    lines.push("");
+    lines.push("---", "");
+  }
+
+  lines.push(
+    "## Repository Structure",
+    "",
+    "```",
+    "problems/",
+    "  lc-{slug}/                  ← one directory per problem",
+    "    lc-{slug}.py              ← your solution (named after the slug)",
+    "    lc-{slug}.md              ← problem statement + runtime + memory + AI review",
+    "  {canonical-slug}/",
+    "    leetcode/                 ← platform subdir (when canonical ID is assigned)",
+    "      lc-{slug}.py",
+    "index.json                    ← machine-readable index (all problems + stats)",
+    "index.html                    ← live GitHub Pages dashboard",
+    "chats/                        ← saved AI conversations (YYYY-MM-DD-*.md)",
+    ".codeledger/                  ← extension config & knowledge bank",
+    "```",
+    "",
+    "---",
+    "",
+    "## About",
+    "",
+    "This repository is managed by [CodeLedger](https://codeledger.vkrishna04.me), a browser extension that automatically commits every accepted DSA solution to GitHub with AI-powered code reviews.",
+    "",
+    "- Solutions committed automatically the instant they are accepted",
+    "- AI code reviews (complexity analysis, hints, optimizations) committed alongside code",
+    "- Live stats dashboard: " + url,
+    "- Cross-device sync — your history is always up to date on any machine",
+    "- Fully owned by you — plain files, no lock-in, no third-party servers",
+    "",
+    "---",
+    "",
+    '<div align="center">',
+    "",
+    '<img src="' + LOGO_URL + '" width="32" alt="CodeLedger" />',
+    "",
+    "Built with [CodeLedger](https://codeledger.vkrishna04.me) · " +
+      "[⭐ Star the extension](https://github.com/Life-Experimentalist/Code-Ledger) · " +
+      "[Apache 2.0](https://github.com/Life-Experimentalist/Code-Ledger/blob/main/LICENSE.md)",
+    "",
+    "</div>",
+    "",
+    "<!-- CODELEDGER_AUTO_GENERATED_END -->",
+    "",
+  );
+
+  return lines.filter((l) => l !== null && l !== undefined).join("\n");
 }

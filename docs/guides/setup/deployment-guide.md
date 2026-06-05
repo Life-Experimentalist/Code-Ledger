@@ -3,6 +3,7 @@
 ## Overview
 
 CodeLedger uses a unified Cloudflare Worker deployment serving:
+
 - **Landing page** (`https://codeledger.vkrishna04.me`)
 - **OAuth endpoints** (`https://codeledger.vkrishna04.me/api/auth/*`)
 - **Webhook receiver** (`https://codeledger.vkrishna04.me/api/webhook/github`)
@@ -51,16 +52,16 @@ All secrets are **already set** in your repository. Here's what they do:
 
 | Secret                             | Purpose                                               | Set? |
 | ---------------------------------- | ----------------------------------------------------- | ---- |
-| `CF_API_TOKEN`                     | Cloudflare API token for publishing Worker            | ✅    |
-| `CF_ZONE_ID`                       | DNS zone ID for codeledger.vkrishna04.me              | ✅    |
-| `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | ✅    |
-| `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | ✅    |
-| `SESSION_SECRET`                   | Secret for signing session tokens/JWTs                | ✅    |
-| `CODELEDGER_GH_APP_ID`             | GitHub App ID (numeric)                               | ✅    |
-| `CODELEDGER_GH_APP_PRIVATE_KEY`    | GitHub App private key (PEM format)                   | ✅    |
-| `CODELEDGER_GH_APP_CLIENT_ID`      | OAuth client ID from GitHub App                       | ✅    |
-| `CODELEDGER_GH_APP_CLIENT_SECRET`  | OAuth client secret                                   | ✅    |
-| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook secret for verifying GitHub events            | ✅    |
+| `CF_API_TOKEN`                     | Cloudflare API token for publishing Worker            | ✅   |
+| `CF_ZONE_ID`                       | DNS zone ID for codeledger.vkrishna04.me              | ✅   |
+| `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | ✅   |
+| `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | ✅   |
+| `SESSION_SECRET`                   | Secret for signing session tokens/JWTs                | ✅   |
+| `CODELEDGER_GH_APP_ID`             | GitHub App ID (numeric)                               | ✅   |
+| `CODELEDGER_GH_APP_PRIVATE_KEY`    | GitHub App private key (PEM format)                   | ✅   |
+| `CODELEDGER_GH_APP_CLIENT_ID`      | OAuth client ID from GitHub App                       | ✅   |
+| `CODELEDGER_GH_APP_CLIENT_SECRET`  | OAuth client secret                                   | ✅   |
+| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook secret for verifying GitHub events            | ✅   |
 
 > **Note:** These are named `CODELEDGER_GH_*` instead of `GITHUB_*` because GitHub Actions forbids repository secret names starting with `GITHUB_`.
 
@@ -78,6 +79,7 @@ Worker: codeledger
 ```
 
 **If not already created**, add it here:
+
 1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
 2. Select **codeledger.vkrishna04.me** zone
 3. Go to **Workers** → **Routes**
@@ -92,6 +94,7 @@ The CI workflow automatically uploads these at deployment time. To verify they'r
 ```
 
 Expected secrets in Cloudflare:
+
 - `CANONICAL_UPLOAD_TOKEN` (from GitHub repo secret)
 - `SESSION_SECRET` (from GitHub repo secret)
 - `CODELEDGER_GH_APP_PRIVATE_KEY` (from GitHub repo secret)
@@ -135,8 +138,8 @@ Expected output: all 11 secrets listed above should be present.
 ### 2. Verify Worker Route in Cloudflare
 
 Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → **codeledger.vkrishna04.me** → **Workers** → **Routes** and confirm:
-- Route `codeledger.vkrishna04.me/*` is bound to the `codeledger` Worker.
 
+- Route `codeledger.vkrishna04.me/*` is bound to the `codeledger` Worker.
 
 **Option A: Using GitHub Actions UI (recommended)**
 
@@ -172,7 +175,6 @@ gh run view --repo Life-Experimentalist/Code-Ledger --log | Select-Object -Last 
 ---
 
 ## Testing Deployed Endpoints
-
 
 ### 1. Landing Page
 
@@ -235,7 +237,7 @@ npm ci
 
 ### Run Locally
 
-```bash
+````bash
 npm run dev
 # or
 npx wrangler dev --local
@@ -253,7 +255,7 @@ curl -L http://localhost:8787/api/auth/github
 
 # Canonical map
 curl http://localhost:8787/api/data/canonical-map.json
-```
+````
 
 ---
 
@@ -263,6 +265,7 @@ curl http://localhost:8787/api/data/canonical-map.json
 
 **Cause:** API token lacks permissions to update Worker routes.
 **Solution:**
+
 - Regenerate API token with these permissions:
 - Update `CF_API_TOKEN` in GitHub repo secrets.
 - Re-run the workflow.
@@ -274,6 +277,7 @@ Alternatively, manually create/manage routes in the Cloudflare dashboard (as we 
 **Cause:** GitHub App callback URL or client ID/secret misconfigured.
 
 **Check:**
+
 1. GitHub App settings: callback URL is `https://codeledger.vkrishna04.me/api/auth/github/callback`
 2. Repo secrets: `CODELEDGER_GH_APP_CLIENT_ID` and `CODELEDGER_GH_APP_CLIENT_SECRET` are set
 3. Verify they're uploaded to Cloudflare: `npx wrangler secret list --env production`
@@ -296,7 +300,7 @@ Expected output: `✨ Success! Uploaded secret <NAME>` for each secret.
 
 ```javascript
 export default defineConfig({
-  plugins: [],  // ← This line was added
+  plugins: [], // ← This line was added
   // ... rest of config
 });
 ```
@@ -314,6 +318,7 @@ This is already fixed in the current code.
 ✅ **Worker route manually created** in Cloudflare dashboard
 
 **Next steps:**
+
 1. Trigger the deployment workflow (via GitHub Actions UI or CLI)
 2. Monitor logs to confirm all secrets upload successfully
 3. Test deployed endpoints to verify OAuth and API flows work
@@ -346,6 +351,7 @@ cd worker && npm ci && npm run dev
 ---
 
 For more details, see:
+
 - [GitHub App Setup](github-app-setup.md)
 - [OPENAPI.yaml](../OPENAPI.yaml)
 - [Architecture](../architecture/README.md)

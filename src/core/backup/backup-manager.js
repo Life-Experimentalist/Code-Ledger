@@ -27,30 +27,30 @@ const COMMIT_INTERVAL_KEY = "_backupCommitCount";
  * @returns {Promise<object>}
  */
 export async function buildSnapshot() {
-    const [problems, settings, knowledge] = await Promise.all([
-        Storage.getAllProblems().catch(() => []),
-        Storage.getSettings().catch(() => ({})),
-        getAllInsights().catch(() => []),
-    ]);
+  const [problems, settings, knowledge] = await Promise.all([
+    Storage.getAllProblems().catch(() => []),
+    Storage.getSettings().catch(() => ({})),
+    getAllInsights().catch(() => []),
+  ]);
 
-    // Strip transient/private keys from settings
-    const safeSettings = Object.fromEntries(
-        Object.entries(settings).filter(
-            ([k]) =>
-                !k.startsWith("_") &&
-                !k.includes("token") &&
-                !k.includes("key") &&
-                !k.includes("secret")
-        )
-    );
+  // Strip transient/private keys from settings
+  const safeSettings = Object.fromEntries(
+    Object.entries(settings).filter(
+      ([k]) =>
+        !k.startsWith("_") &&
+        !k.includes("token") &&
+        !k.includes("key") &&
+        !k.includes("secret"),
+    ),
+  );
 
-    return {
-        version: 1,
-        createdAt: new Date().toISOString(),
-        problems,
-        settings: safeSettings,
-        knowledge,
-    };
+  return {
+    version: 1,
+    createdAt: new Date().toISOString(),
+    problems,
+    settings: safeSettings,
+    knowledge,
+  };
 }
 
 /**
@@ -59,11 +59,11 @@ export async function buildSnapshot() {
  * @returns {string}
  */
 export function backupFilePath(ts = new Date()) {
-    const iso = (ts instanceof Date ? ts : new Date(ts))
-        .toISOString()
-        .replace(/[:.]/g, "-")
-        .slice(0, 19);
-    return `${BACKUP_DIR}/${iso}.json`;
+  const iso = (ts instanceof Date ? ts : new Date(ts))
+    .toISOString()
+    .replace(/[:.]/g, "-")
+    .slice(0, 19);
+  return `${BACKUP_DIR}/${iso}.json`;
 }
 
 // ── GitHub commit ─────────────────────────────────────────────────────────────
@@ -79,52 +79,52 @@ export function backupFilePath(ts = new Date()) {
  * @returns {Promise<void>}
  */
 export async function commitBackupToGitHub(
-    owner,
-    repo,
-    git,
-    keep = DEFAULT_KEEP
+  owner,
+  repo,
+  git,
+  keep = DEFAULT_KEEP,
 ) {
-    try {
-        const snapshot = await buildSnapshot();
-        const filePath = backupFilePath();
-        const content = JSON.stringify(snapshot, null, 2);
+  try {
+    const snapshot = await buildSnapshot();
+    const filePath = backupFilePath();
+    const content = JSON.stringify(snapshot, null, 2);
 
-        dbg.log(
-            `commitBackupToGitHub(): creating backup at ${filePath} (${snapshot.problems.length} problems)`
-        );
+    dbg.log(
+      `commitBackupToGitHub(): creating backup at ${filePath} (${snapshot.problems.length} problems)`,
+    );
 
-        // Find existing backups so we can prune
-        const toDelete = await _getOldBackupPaths(owner, repo, git, keep);
+    // Find existing backups so we can prune
+    const toDelete = await _getOldBackupPaths(owner, repo, git, keep);
 
-        await git.commit(
-            [{ path: filePath, content }],
-            `chore: rolling backup — ${snapshot.problems.length} problems`,
-            repo,
-            { ownerOverride: owner, deletes: toDelete }
-        );
+    await git.commit(
+      [{ path: filePath, content }],
+      `chore: rolling backup — ${snapshot.problems.length} problems`,
+      repo,
+      { ownerOverride: owner, deletes: toDelete },
+    );
 
-        dbg.log(
-            `commitBackupToGitHub(): ✓ committed ${filePath}, pruned ${toDelete.length} old backup(s)`
-        );
-    } catch (e) {
-        dbg.warn(`commitBackupToGitHub(): failed:`, e?.message || e);
-    }
+    dbg.log(
+      `commitBackupToGitHub(): ✓ committed ${filePath}, pruned ${toDelete.length} old backup(s)`,
+    );
+  } catch (e) {
+    dbg.warn(`commitBackupToGitHub(): failed:`, e?.message || e);
+  }
 }
 
 async function _getOldBackupPaths(owner, repo, git, keep) {
-    try {
-        const listing = await git.getContents(owner, repo, BACKUP_DIR);
-        if (!Array.isArray(listing)) return [];
-        const files = listing
-            .filter((f) => f.type === "file" && f.name.endsWith(".json"))
-            .sort((a, b) => b.name.localeCompare(a.name)); // newest first (ISO names sort lexicographically)
-        // After the new one is added there will be files.length + 1; prune the oldest
-        return files.slice(keep - 1).map((f) => f.path);
-    } catch (e) {
-        if (e?.status === 404) return []; // backups/ dir doesn't exist yet
-        dbg.warn(`_getOldBackupPaths(): failed to list:`, e?.message);
-        return [];
-    }
+  try {
+    const listing = await git.getContents(owner, repo, BACKUP_DIR);
+    if (!Array.isArray(listing)) return [];
+    const files = listing
+      .filter((f) => f.type === "file" && f.name.endsWith(".json"))
+      .sort((a, b) => b.name.localeCompare(a.name)); // newest first (ISO names sort lexicographically)
+    // After the new one is added there will be files.length + 1; prune the oldest
+    return files.slice(keep - 1).map((f) => f.path);
+  } catch (e) {
+    if (e?.status === 404) return []; // backups/ dir doesn't exist yet
+    dbg.warn(`_getOldBackupPaths(): failed to list:`, e?.message);
+    return [];
+  }
 }
 
 // ── Conditional trigger ───────────────────────────────────────────────────────
@@ -138,35 +138,32 @@ async function _getOldBackupPaths(owner, repo, git, keep) {
  * @param {object} git - GitHandler instance
  */
 export async function maybeCommitRollingBackup(owner, repo, git) {
-    try {
-        const settings = await Storage.getSettings();
-        const enabled = settings.githubRollingBackups !== false; // default on
-        if (!enabled) return;
+  try {
+    const settings = await Storage.getSettings();
+    const enabled = settings.githubRollingBackups !== false; // default on
+    if (!enabled) return;
 
-        const interval = Math.max(
-            1,
-            parseInt(settings.githubBackupInterval || "10", 10)
-        );
-        const keep = Math.max(
-            1,
-            parseInt(settings.githubBackupKeep || "10", 10)
-        );
-        const count = (settings[COMMIT_INTERVAL_KEY] || 0) + 1;
+    const interval = Math.max(
+      1,
+      parseInt(settings.githubBackupInterval || "10", 10),
+    );
+    const keep = Math.max(1, parseInt(settings.githubBackupKeep || "10", 10));
+    const count = (settings[COMMIT_INTERVAL_KEY] || 0) + 1;
 
-        await Storage.setSettings({
-            ...settings,
-            [COMMIT_INTERVAL_KEY]: count,
-        });
+    await Storage.setSettings({
+      ...settings,
+      [COMMIT_INTERVAL_KEY]: count,
+    });
 
-        if (count % interval === 0) {
-            dbg.log(
-                `maybeCommitRollingBackup(): triggering backup at commit #${count}`
-            );
-            await commitBackupToGitHub(owner, repo, git, keep);
-        }
-    } catch (e) {
-        dbg.warn(`maybeCommitRollingBackup(): failed:`, e?.message || e);
+    if (count % interval === 0) {
+      dbg.log(
+        `maybeCommitRollingBackup(): triggering backup at commit #${count}`,
+      );
+      await commitBackupToGitHub(owner, repo, git, keep);
     }
+  } catch (e) {
+    dbg.warn(`maybeCommitRollingBackup(): failed:`, e?.message || e);
+  }
 }
 
 // ── List and restore ──────────────────────────────────────────────────────────
@@ -179,23 +176,23 @@ export async function maybeCommitRollingBackup(owner, repo, git) {
  * @returns {Promise<Array<{name, path, sha, size}>>}
  */
 export async function listBackups(owner, repo, git) {
-    try {
-        const listing = await git.getContents(owner, repo, BACKUP_DIR);
-        if (!Array.isArray(listing)) return [];
-        return listing
-            .filter((f) => f.type === "file" && f.name.endsWith(".json"))
-            .sort((a, b) => b.name.localeCompare(a.name))
-            .map((f) => ({
-                name: f.name,
-                path: f.path,
-                sha: f.sha,
-                size: f.size,
-            }));
-    } catch (e) {
-        if (e?.status === 404) return [];
-        dbg.warn(`listBackups(): failed:`, e?.message);
-        return [];
-    }
+  try {
+    const listing = await git.getContents(owner, repo, BACKUP_DIR);
+    if (!Array.isArray(listing)) return [];
+    return listing
+      .filter((f) => f.type === "file" && f.name.endsWith(".json"))
+      .sort((a, b) => b.name.localeCompare(a.name))
+      .map((f) => ({
+        name: f.name,
+        path: f.path,
+        sha: f.sha,
+        size: f.size,
+      }));
+  } catch (e) {
+    if (e?.status === 404) return [];
+    dbg.warn(`listBackups(): failed:`, e?.message);
+    return [];
+  }
 }
 
 /**
@@ -207,13 +204,13 @@ export async function listBackups(owner, repo, git) {
  * @returns {Promise<object|null>}
  */
 export async function fetchBackupSnapshot(owner, repo, filePath, git) {
-    try {
-        const fileData = await git.getContents(owner, repo, filePath);
-        if (!fileData?.content) return null;
-        const raw = atob(fileData.content.replace(/\n/g, ""));
-        return JSON.parse(raw);
-    } catch (e) {
-        dbg.warn(`fetchBackupSnapshot(): failed for ${filePath}:`, e?.message);
-        return null;
-    }
+  try {
+    const fileData = await git.getContents(owner, repo, filePath);
+    if (!fileData?.content) return null;
+    const raw = atob(fileData.content.replace(/\n/g, ""));
+    return JSON.parse(raw);
+  } catch (e) {
+    dbg.warn(`fetchBackupSnapshot(): failed for ${filePath}:`, e?.message);
+    return null;
+  }
 }

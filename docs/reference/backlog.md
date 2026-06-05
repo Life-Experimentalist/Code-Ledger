@@ -3,6 +3,7 @@
 Tracked from user sessions. Status: `done` | `in-progress` | `pending` | `wont-do`
 
 ## How to add new feature requests
+
 Drop plain text at the bottom of this file (below the tables). Claude/GitHub Copilot will read it, convert it into a proper row in the right section, and delete the raw text.
 
 1.

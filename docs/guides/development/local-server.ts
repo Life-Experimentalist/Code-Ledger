@@ -24,7 +24,7 @@ async function startServer() {
       typeof rawCode === "string"
         ? rawCode
         : Array.isArray(rawCode)
-          ? rawCode[0] ?? ""
+          ? (rawCode[0] ?? "")
           : "";
     const safeCodeLiteral = JSON.stringify(code);
 

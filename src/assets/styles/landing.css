@@ -1,4 +1,10 @@
 /* Canonical landing page styles for CodeLedger (source) */
+
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 :root {
   --bg-color: #050508;
   --text-color: #e2e8f0;

@@ -24,7 +24,7 @@
 body {
   background-color: var(--cl-bg);
   color: var(--cl-text);
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   margin: 0;
   padding: 0;
 }
@@ -44,40 +44,78 @@ body {
 [data-theme="light"] .bg-white\/\[0\.02\],
 [data-theme="light"] .bg-white\/\[0\.03\],
 [data-theme="light"] .bg-white\/\[0\.04\],
-[data-theme="light"] .bg-white\/5 { background-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
 
 [data-theme="light"] .bg-black\/20,
 [data-theme="light"] .bg-black\/30,
-[data-theme="light"] .bg-black\/40 { background-color: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .bg-black\/40 {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
 
 /* Borders */
 [data-theme="light"] .border-white\/5,
 [data-theme="light"] .border-white\/8,
-[data-theme="light"] .border-white\/10 { border-color: rgba(0,0,0,0.12) !important; }
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
 
 /* Dividers */
-[data-theme="light"] .divide-white\/5 > * + * { border-color: rgba(0,0,0,0.10) !important; }
+[data-theme="light"] .divide-white\/5 > * + * {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
 
 /* Muted text — flip slate- grays */
 [data-theme="light"] .text-slate-400,
 [data-theme="light"] .text-slate-500,
-[data-theme="light"] .text-slate-600 { color: #374151 !important; }
-[data-theme="light"] .text-slate-300 { color: #1f2937 !important; }
-[data-theme="light"] .text-white { color: #0f172a !important; }
+[data-theme="light"] .text-slate-600 {
+  color: #374151 !important;
+}
+[data-theme="light"] .text-slate-300 {
+  color: #1f2937 !important;
+}
+[data-theme="light"] .text-white {
+  color: #0f172a !important;
+}
 
 /* Sidebar nav active / hover */
-[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.05) !important; }
-[data-theme="light"] .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.06) !important; }
-[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.08) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+[data-theme="light"] .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+[data-theme="light"] .hover\:bg-white\/10:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
 
 /* lc-content in light mode */
-[data-theme="light"] .lc-content p { color: #374151; }
-[data-theme="light"] .lc-content li { color: #4b5563; }
-[data-theme="light"] .lc-content pre { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); color: #1e293b; }
-[data-theme="light"] .lc-content code { background: rgba(0,0,0,0.07); color: #0891b2; }
-[data-theme="light"] .lc-content strong, [data-theme="light"] .lc-content b { color: #0f172a; }
-[data-theme="light"] .lc-content em { color: #4b5563; }
-[data-theme="light"] .lc-content a { color: #0284c7; }
+[data-theme="light"] .lc-content p {
+  color: #374151;
+}
+[data-theme="light"] .lc-content li {
+  color: #4b5563;
+}
+[data-theme="light"] .lc-content pre {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1e293b;
+}
+[data-theme="light"] .lc-content code {
+  background: rgba(0, 0, 0, 0.07);
+  color: #0891b2;
+}
+[data-theme="light"] .lc-content strong,
+[data-theme="light"] .lc-content b {
+  color: #0f172a;
+}
+[data-theme="light"] .lc-content em {
+  color: #4b5563;
+}
+[data-theme="light"] .lc-content a {
+  color: #0284c7;
+}
 
 .cl-qol-btn {
   font-size: 0.75rem;
@@ -100,7 +138,8 @@ body {
   z-index: 50;
 }
 
-.model-selector-loading, .model-selector-empty {
+.model-selector-loading,
+.model-selector-empty {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.2em;
@@ -110,23 +149,72 @@ body {
 }
 
 /* LeetCode HTML content styling (problem statements) */
-.lc-content p { margin-bottom: 0.75rem; color: #cbd5e1; line-height: 1.6; }
-.lc-content ul { margin: 0.5rem 0 0.75rem 1.25rem; list-style: disc; }
-.lc-content ol { margin: 0.5rem 0 0.75rem 1.25rem; list-style: decimal; }
-.lc-content li { margin-bottom: 0.25rem; color: #94a3b8; }
-.lc-content pre, .lc-content code { font-family: ui-monospace, monospace; }
-.lc-content pre { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.75rem 0; font-size: 0.8125rem; color: #e2e8f0; }
-.lc-content code { background: rgba(255,255,255,0.08); padding: 0.1em 0.35em; border-radius: 0.25rem; font-size: 0.85em; color: #67e8f9; }
-.lc-content pre code { background: none; padding: 0; color: inherit; }
-.lc-content strong, .lc-content b { color: #f1f5f9; font-weight: 600; }
-.lc-content em { color: #94a3b8; }
-.lc-content img { max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0; }
-.lc-content a { color: #22d3ee; text-decoration: underline; }
+.lc-content p {
+  margin-bottom: 0.75rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+.lc-content ul {
+  margin: 0.5rem 0 0.75rem 1.25rem;
+  list-style: disc;
+}
+.lc-content ol {
+  margin: 0.5rem 0 0.75rem 1.25rem;
+  list-style: decimal;
+}
+.lc-content li {
+  margin-bottom: 0.25rem;
+  color: #94a3b8;
+}
+.lc-content pre,
+.lc-content code {
+  font-family: ui-monospace, monospace;
+}
+.lc-content pre {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  font-size: 0.8125rem;
+  color: #e2e8f0;
+}
+.lc-content code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  color: #67e8f9;
+}
+.lc-content pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.lc-content strong,
+.lc-content b {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+.lc-content em {
+  color: #94a3b8;
+}
+.lc-content img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  margin: 0.5rem 0;
+}
+.lc-content a {
+  color: #22d3ee;
+  text-decoration: underline;
+}
 
 /* Native select dropdown — browser renders <option> with OS defaults, ignoring
    Tailwind's semi-transparent backgrounds. Force explicit colors so the popup
    isn't white-on-white in dark mode or black-on-black in light mode. */
-select option, select optgroup {
+select option,
+select optgroup {
   background-color: #111118;
   color: #cbd5e1;
 }

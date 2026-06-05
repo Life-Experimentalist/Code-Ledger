@@ -15,17 +15,18 @@
  * @returns {object[]} tree items ready for POST /git/trees
  */
 export function buildTreeItems(files, deletes = []) {
-    const items = (files || []).map((f) => {
-        const item = { path: f.path, mode: "100644", type: "blob" };
-        if (f.sha) item.sha = f.sha; else item.content = f.content;
-        return item;
-    });
+  const items = (files || []).map((f) => {
+    const item = { path: f.path, mode: "100644", type: "blob" };
+    if (f.sha) item.sha = f.sha;
+    else item.content = f.content;
+    return item;
+  });
 
-    for (const delPath of deletes || []) {
-        items.push({ path: delPath, mode: "100644", type: "blob", sha: null });
-    }
+  for (const delPath of deletes || []) {
+    items.push({ path: delPath, mode: "100644", type: "blob", sha: null });
+  }
 
-    return items;
+  return items;
 }
 
 /**
@@ -39,20 +40,27 @@ export function buildTreeItems(files, deletes = []) {
  * @param {object} [user]        { name, login, email } from getCurrentUser
  * @returns {object}             Payload for POST /git/commits
  */
-export function buildCommitPayload(message, treeSha, parentSha, opts = {}, user = {}) {
-    const payload = {
-        message,
-        tree: treeSha,
-        parents: [parentSha],
-    };
+export function buildCommitPayload(
+  message,
+  treeSha,
+  parentSha,
+  opts = {},
+  user = {},
+) {
+  const payload = {
+    message,
+    tree: treeSha,
+    parents: [parentSha],
+  };
 
-    if (opts.date) {
-        const iso = new Date(opts.date).toISOString();
-        const name = user.name || user.login || "CodeLedger";
-        const email = user.email || `${user.login || "codeledger"}@users.noreply.github.com`;
-        payload.author = { name, email, date: iso };
-        payload.committer = { ...payload.author };
-    }
+  if (opts.date) {
+    const iso = new Date(opts.date).toISOString();
+    const name = user.name || user.login || "CodeLedger";
+    const email =
+      user.email || `${user.login || "codeledger"}@users.noreply.github.com`;
+    payload.author = { name, email, date: iso };
+    payload.committer = { ...payload.author };
+  }
 
-    return payload;
+  return payload;
 }

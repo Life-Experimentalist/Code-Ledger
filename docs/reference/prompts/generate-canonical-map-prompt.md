@@ -35,6 +35,7 @@ Please output the result as a complete JSON structure matching the schema below.
 For each problem in the standard NeetCode 150 list, provide the exact `canonicalId` (use the LeetCode slug as the canonical ID), and fill out all fields.
 
 Topics must be chosen from the following list:
+
 - arrays
 - two-pointers
 - sliding-window

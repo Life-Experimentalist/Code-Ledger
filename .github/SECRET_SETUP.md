@@ -1,6 +1,6 @@
 # Setting up Gemini API keys and repository variables for canonical mapping
 
-Add these repository *Actions variables* or *secrets* to enable the canonical-map validator.
+Add these repository _Actions variables_ or _secrets_ to enable the canonical-map validator.
 
 Recommended repository variables (plain text, visible to repo managers):
 

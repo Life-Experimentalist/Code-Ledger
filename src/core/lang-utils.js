@@ -14,7 +14,7 @@ const dbg = createDebugger("LangUtils");
  * @returns {string} normalized language name (lowercase, trimmed)
  */
 export function normalizeLang(problem = {}) {
-    const lang =
-        problem?.lang?.name || problem?.lang?.slug || problem?.lang?.ext || "";
-    return String(lang).toLowerCase().trim();
+  const lang =
+    problem?.lang?.name || problem?.lang?.slug || problem?.lang?.ext || "";
+  return String(lang).toLowerCase().trim();
 }

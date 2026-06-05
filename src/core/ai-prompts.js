@@ -45,12 +45,12 @@ Rules:
 export const DIRECT_FLOATING_PANEL_PROMPT = `You are an in-context coding assistant embedded on the problem page. Respond quickly, prefer direct guidance, and use the current editor code and problem statement as your ground truth.`;
 
 export const AI_CHAT_SURFACE_PROMPTS = {
-    default: `You are CodeLedger's DSA tutor. Help the learner think clearly, keep answers concise, and prioritize correctness, edge cases, and complexity. When appropriate, use bullet points and small examples.`,
-    "problem-modal": `You are reviewing a specific solved DSA problem. Help the learner reason through the current solution, surface missing edge cases, and suggest the next improvement. Stay practical and concise.`,
-    "floating-panel": GUIDED_FLOATING_PANEL_PROMPT,
-    "floating-panel-direct": DIRECT_FLOATING_PANEL_PROMPT,
-    "library-chat": `You are a study companion for the user's saved problem conversations. Use prior context, compare solutions, and help the learner build intuition.`,
-    review: `You are a code review assistant. Focus on correctness, complexity, edge cases, and one concrete optimization.`,
+  default: `You are CodeLedger's DSA tutor. Help the learner think clearly, keep answers concise, and prioritize correctness, edge cases, and complexity. When appropriate, use bullet points and small examples.`,
+  "problem-modal": `You are reviewing a specific solved DSA problem. Help the learner reason through the current solution, surface missing edge cases, and suggest the next improvement. Stay practical and concise.`,
+  "floating-panel": GUIDED_FLOATING_PANEL_PROMPT,
+  "floating-panel-direct": DIRECT_FLOATING_PANEL_PROMPT,
+  "library-chat": `You are a study companion for the user's saved problem conversations. Use prior context, compare solutions, and help the learner build intuition.`,
+  review: `You are a code review assistant. Focus on correctness, complexity, edge cases, and one concrete optimization.`,
 };
 
 /**
@@ -58,7 +58,7 @@ export const AI_CHAT_SURFACE_PROMPTS = {
  * Populated by platform handlers calling registerPlatformPrompt().
  */
 const _platformPrompts = {
-    default: DEFAULT_PROMPT_TEMPLATE,
+  default: DEFAULT_PROMPT_TEMPLATE,
 };
 
 /**
@@ -68,10 +68,10 @@ const _platformPrompts = {
  * @param {string} template    Prompt string with {title}/{difficulty}/{language} tokens
  */
 export function registerPlatformPrompt(platformId, template) {
-    if (platformId && typeof template === "string" && template.trim()) {
-        dbg.log(`registerPlatformPrompt(${platformId}): registered`);
-        _platformPrompts[platformId] = template;
-    }
+  if (platformId && typeof template === "string" && template.trim()) {
+    dbg.log(`registerPlatformPrompt(${platformId}): registered`);
+    _platformPrompts[platformId] = template;
+  }
 }
 
 /**
@@ -80,7 +80,7 @@ export function registerPlatformPrompt(platformId, template) {
  * @returns {Record<string, string>}
  */
 export function getDefaultAIPrompts() {
-    return { ..._platformPrompts };
+  return { ..._platformPrompts };
 }
 
 /**
@@ -89,7 +89,7 @@ export function getDefaultAIPrompts() {
  * @returns {string[]}
  */
 export function getRegisteredPlatforms() {
-    return Object.keys(_platformPrompts).filter((k) => k !== "default");
+  return Object.keys(_platformPrompts).filter((k) => k !== "default");
 }
 
 /**
@@ -99,23 +99,23 @@ export function getRegisteredPlatforms() {
  * @returns {Record<string, string>}
  */
 export function normalizeAIPrompts(raw) {
-    const defaults = getDefaultAIPrompts();
-    if (!raw || typeof raw !== "object") {
-        dbg.log(
-            `normalizeAIPrompts(): no raw prompts, using defaults (${Object.keys(defaults).length} keys)`
-        );
-        return defaults;
-    }
-    const out = { ...defaults };
-    for (const key of Object.keys(defaults)) {
-        if (raw[key] && typeof raw[key] === "string" && raw[key].trim()) {
-            out[key] = raw[key];
-        }
-    }
+  const defaults = getDefaultAIPrompts();
+  if (!raw || typeof raw !== "object") {
     dbg.log(
-        `normalizeAIPrompts(): merged raw + defaults (${Object.keys(out).length} keys)`
+      `normalizeAIPrompts(): no raw prompts, using defaults (${Object.keys(defaults).length} keys)`,
     );
-    return out;
+    return defaults;
+  }
+  const out = { ...defaults };
+  for (const key of Object.keys(defaults)) {
+    if (raw[key] && typeof raw[key] === "string" && raw[key].trim()) {
+      out[key] = raw[key];
+    }
+  }
+  dbg.log(
+    `normalizeAIPrompts(): merged raw + defaults (${Object.keys(out).length} keys)`,
+  );
+  return out;
 }
 
 /**
@@ -125,12 +125,12 @@ export function normalizeAIPrompts(raw) {
  * @returns {string}
  */
 export function fillPromptTemplate(template, ctx = {}) {
-    return template
-        .replace(/\{title\}/g, ctx.title || "Unknown Problem")
-        .replace(/\{difficulty\}/g, ctx.difficulty || "Unknown")
-        .replace(/\{language\}/g, ctx.language || ctx.lang?.name || "Unknown")
-        .replace(/\{methodTitle\}/g, ctx.methodTitle || ctx.method || "")
-        .replace(/\{platform\}/g, ctx.platform || "Unknown");
+  return template
+    .replace(/\{title\}/g, ctx.title || "Unknown Problem")
+    .replace(/\{difficulty\}/g, ctx.difficulty || "Unknown")
+    .replace(/\{language\}/g, ctx.language || ctx.lang?.name || "Unknown")
+    .replace(/\{methodTitle\}/g, ctx.methodTitle || ctx.method || "")
+    .replace(/\{platform\}/g, ctx.platform || "Unknown");
 }
 
 /**
@@ -143,88 +143,86 @@ export function fillPromptTemplate(template, ctx = {}) {
  * @returns {string}               Complete prompt ready to send to an AI provider
  */
 export function buildReviewPrompt(
-    problemContext = {},
-    code = "",
-    prompts = {}
+  problemContext = {},
+  code = "",
+  prompts = {},
 ) {
-    // Raw mode: the caller has already built the full prompt — return it as-is.
-    if (problemContext._rawPrompt) {
-        dbg.log(`buildReviewPrompt(): raw mode (pre-built prompt)`);
-        return code;
-    }
+  // Raw mode: the caller has already built the full prompt — return it as-is.
+  if (problemContext._rawPrompt) {
+    dbg.log(`buildReviewPrompt(): raw mode (pre-built prompt)`);
+    return code;
+  }
 
-    const platform = (problemContext.platform || "").toLowerCase() || "default";
+  const platform = (problemContext.platform || "").toLowerCase() || "default";
 
-    // Preference order: user stored override → registered platform default → registered default fallback
-    const template =
-        (prompts[platform] && prompts[platform].trim()
-            ? prompts[platform]
-            : null) ||
-        _platformPrompts[platform] ||
-        (prompts["default"] && prompts["default"].trim()
-            ? prompts["default"]
-            : null) ||
-        _platformPrompts["default"] ||
-        DEFAULT_PROMPT_TEMPLATE;
+  // Preference order: user stored override → registered platform default → registered default fallback
+  const template =
+    (prompts[platform] && prompts[platform].trim()
+      ? prompts[platform]
+      : null) ||
+    _platformPrompts[platform] ||
+    (prompts["default"] && prompts["default"].trim()
+      ? prompts["default"]
+      : null) ||
+    _platformPrompts["default"] ||
+    DEFAULT_PROMPT_TEMPLATE;
 
-    const filledTemplate = fillPromptTemplate(template, problemContext);
-    const lang = problemContext.language || problemContext.lang?.name || "";
-    dbg.log(`buildReviewPrompt(): ${platform} (${lang})`);
-    const needsTags = !problemContext.tags?.length;
-    const tagInstruction = needsTags
-        ? `\n\nThis problem has no topic tags. On the very last line of your response, output 2–4 relevant algorithm/data structure tags in exactly this format (no other text on that line):\nTAGS: Tag One, Tag Two`
-        : "";
-    const behaviorSection = problemContext._behaviorContext
-        ? `\n\n## Learner History:\n${problemContext._behaviorContext}`
-        : "";
-    return `${filledTemplate}${behaviorSection}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\`${tagInstruction}`;
+  const filledTemplate = fillPromptTemplate(template, problemContext);
+  const lang = problemContext.language || problemContext.lang?.name || "";
+  dbg.log(`buildReviewPrompt(): ${platform} (${lang})`);
+  const needsTags = !problemContext.tags?.length;
+  const tagInstruction = needsTags
+    ? `\n\nThis problem has no topic tags. On the very last line of your response, output 2–4 relevant algorithm/data structure tags in exactly this format (no other text on that line):\nTAGS: Tag One, Tag Two`
+    : "";
+  const behaviorSection = problemContext._behaviorContext
+    ? `\n\n## Learner History:\n${problemContext._behaviorContext}`
+    : "";
+  return `${filledTemplate}${behaviorSection}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\`${tagInstruction}`;
 }
 
 export function buildConversationSystemPrompt(context = {}) {
-    const surface = String(
-        context.surface || context.mode || "default"
-    ).toLowerCase();
-    // For floating-panel, chatMode "direct" opts out of guided Socratic prompting
-    const effectiveSurface =
-        surface === "floating-panel" && context.chatMode === "direct"
-            ? "floating-panel-direct"
-            : surface;
-    const base =
-        AI_CHAT_SURFACE_PROMPTS[effectiveSurface] || AI_CHAT_SURFACE_PROMPTS.default;
-    const hints = [];
+  const surface = String(
+    context.surface || context.mode || "default",
+  ).toLowerCase();
+  // For floating-panel, chatMode "direct" opts out of guided Socratic prompting
+  const effectiveSurface =
+    surface === "floating-panel" && context.chatMode === "direct"
+      ? "floating-panel-direct"
+      : surface;
+  const base =
+    AI_CHAT_SURFACE_PROMPTS[effectiveSurface] ||
+    AI_CHAT_SURFACE_PROMPTS.default;
+  const hints = [];
 
-    if (context.title)
-        hints.push(
-            `Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`
-        );
-    if (context.platform) hints.push(`Platform: ${context.platform}`);
-    if (context.methodTitle) hints.push(`Method: ${context.methodTitle}`);
-    if (
-        Array.isArray(context.attachedProblemSlugs) &&
-        context.attachedProblemSlugs.length
-    ) {
-        hints.push(
-            `Related problems: ${context.attachedProblemSlugs.join(", ")}`
-        );
-    }
-    if (context.requestType) {
-        const type = String(context.requestType).toLowerCase();
-        const requestMap = {
-            explain: "Explain the idea step by step for a learner.",
-            optimize:
-                "Suggest a concrete improvement and explain the trade-off.",
-            complexity: "Give a precise time and space complexity analysis.",
-            test: "Return useful tests and edge cases.",
-            diagram:
-                "If helpful, use a Mermaid diagram or structured flow description.",
-            formula:
-                "Use math notation where appropriate and keep the output readable.",
-        };
-        if (requestMap[type]) hints.push(requestMap[type]);
-    }
-
-    dbg.log(
-        `buildConversationSystemPrompt(): surface=${surface} (${hints.length} hints)`
+  if (context.title)
+    hints.push(
+      `Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`,
     );
-    return hints.length ? `${base}\n\nContext:\n${hints.join("\n")}` : base;
+  if (context.platform) hints.push(`Platform: ${context.platform}`);
+  if (context.methodTitle) hints.push(`Method: ${context.methodTitle}`);
+  if (
+    Array.isArray(context.attachedProblemSlugs) &&
+    context.attachedProblemSlugs.length
+  ) {
+    hints.push(`Related problems: ${context.attachedProblemSlugs.join(", ")}`);
+  }
+  if (context.requestType) {
+    const type = String(context.requestType).toLowerCase();
+    const requestMap = {
+      explain: "Explain the idea step by step for a learner.",
+      optimize: "Suggest a concrete improvement and explain the trade-off.",
+      complexity: "Give a precise time and space complexity analysis.",
+      test: "Return useful tests and edge cases.",
+      diagram:
+        "If helpful, use a Mermaid diagram or structured flow description.",
+      formula:
+        "Use math notation where appropriate and keep the output readable.",
+    };
+    if (requestMap[type]) hints.push(requestMap[type]);
+  }
+
+  dbg.log(
+    `buildConversationSystemPrompt(): surface=${surface} (${hints.length} hints)`,
+  );
+  return hints.length ? `${base}\n\nContext:\n${hints.join("\n")}` : base;
 }

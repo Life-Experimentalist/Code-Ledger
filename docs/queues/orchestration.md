@@ -21,8 +21,8 @@
 
 CodeLedger uses a **multi-layered queue system** to manage problem-solving events, AI reviews, and GitHub commits asynchronously and reliably:
 
-| Component                  | Purpose                                                      | Storage              | Persistence          |
-| -------------------------- | ------------------------------------------------------------ | -------------------- | -------------------- |
+| Component                  | Purpose                                                      | Storage              | Persistence           |
+| -------------------------- | ------------------------------------------------------------ | -------------------- | --------------------- |
 | **AI Review Queue**        | Enqueue, prioritize, and process AI reviews with retry logic | IndexedDB            | ✅ Cross-session      |
 | **Commit Queue**           | Batched GitHub commits for solved problems                   | Memory + GitHub      | ✅ Resumed on restart |
 | **Sync Engine**            | Cross-device sync via GitHub repo index                      | GitHub + IndexedDB   | ✅ Webhook-triggered  |
@@ -30,6 +30,7 @@ CodeLedger uses a **multi-layered queue system** to manage problem-solving event
 | **Metadata Refresh Queue** | Background metadata refresh for problems                     | In-flight state      | ⚠️ Per-session        |
 
 **Key Properties:**
+
 - **Persistent**: Survives browser crashes, restarts, and closed tabs
 - **Prioritized**: Problems can be prioritized (lower = higher priority)
 - **Retry-aware**: Exponential backoff with max retries before manual intervention
@@ -89,6 +90,7 @@ graph TB
 ```
 
 **Legend:**
+
 - **Blue** = Content Script (HTML injection)
 - **Orange** = Event System
 - **Green** = Background Service Worker
@@ -133,6 +135,7 @@ stateDiagram-v2
 ```
 
 **Transitions:**
+
 - **PENDING → PROCESSING**: Next item pulled by review processor alarm
 - **PROCESSING → DONE**: AI review succeeds, problem updated
 - **PROCESSING → FAILED**: Network error, rate limit, or AI error
@@ -187,6 +190,7 @@ graph LR
 ```
 
 **Timing:**
+
 - Steps 1-3 happen within 1-2 seconds of solve
 - Step 2 (AI Review) happens on scheduled alarm (default: every 5-10 seconds)
 - Step 4 (Sync) triggered by webhook (GitHub → Cloudflare Worker → Extension)
@@ -309,18 +313,18 @@ await clearCompletedReviews();
 ```javascript
 // If AI review fails:
 try {
-    const review = await aiProvider.generateReview(problem);
+  const review = await aiProvider.generateReview(problem);
 } catch (error) {
-    await markFailedWithRetry(item.id, error.message);
-    // → Updates retryCount++, calculates nextRetryTime with backoff
-    // → If retryCount >= MAX_RETRIES, stays in "failed" status
-    // → Otherwise, item will be retried on next alarm
+  await markFailedWithRetry(item.id, error.message);
+  // → Updates retryCount++, calculates nextRetryTime with backoff
+  // → If retryCount >= MAX_RETRIES, stays in "failed" status
+  // → Otherwise, item will be retried on next alarm
 }
 
 // Backoff calculation:
 const backoffMs = Math.min(
-    RETRY_BASE_DELAY_MS * Math.pow(2, retryCount),
-    RETRY_MAX_DELAY_MS
+  RETRY_BASE_DELAY_MS * Math.pow(2, retryCount),
+  RETRY_MAX_DELAY_MS,
 );
 // 1st retry: 5000ms (5s)
 // 2nd retry: 10000ms (10s)
@@ -581,18 +585,18 @@ dbg.log(`handleSolved(): normalizing ID to platform format`);
 
 // Try commit
 try {
-    dbg.log(`handleSolved(): calling GitEngine.commit()...`);
-    await gitEngine.commit(problem);
-    dbg.log(`handleSolved(): ✓ commit succeeded`);
+  dbg.log(`handleSolved(): calling GitEngine.commit()...`);
+  await gitEngine.commit(problem);
+  dbg.log(`handleSolved(): ✓ commit succeeded`);
 } catch (error) {
-    dbg.error(`handleSolved(): commit failed - ${error.message}`);
+  dbg.error(`handleSolved(): commit failed - ${error.message}`);
 
-    if (error.status === 429) {
-        dbg.log(`handleSolved(): rate limit detected - will retry`);
-        await markFailedWithRetry(queueId, error.message);
-    } else if (error.status === 404) {
-        dbg.error(`handleSolved(): repo not found - abandoning`);
-    }
+  if (error.status === 429) {
+    dbg.log(`handleSolved(): rate limit detected - will retry`);
+    await markFailedWithRetry(queueId, error.message);
+  } else if (error.status === 404) {
+    dbg.error(`handleSolved(): repo not found - abandoning`);
+  }
 }
 
 // Enqueue review
@@ -683,23 +687,23 @@ sequenceDiagram
 
 ```javascript
 // AI Review Queue
-const REVIEW_RATE_LIMIT_MS = 2000;        // Min interval between reviews
-const RETRY_BASE_DELAY_MS = 5000;          // Start at 5 seconds
-const RETRY_MAX_DELAY_MS = 300000;         // Cap at 5 minutes
-const MAX_RETRIES = 5;                     // Max retry attempts
+const REVIEW_RATE_LIMIT_MS = 2000; // Min interval between reviews
+const RETRY_BASE_DELAY_MS = 5000; // Start at 5 seconds
+const RETRY_MAX_DELAY_MS = 300000; // Cap at 5 minutes
+const MAX_RETRIES = 5; // Max retry attempts
 
 // Alarms (periodic tasks)
 const ALARM_NAMES = {
-    SYNC: "codeledger-sync",                // Full sync every 4 hours
-    REVIEW: "codeledger-review-queue",      // Process reviews every 5-10s
-    SETTINGS_COMMIT: "codeledger-settings", // Commit settings every 30s
-    BACKUP: "codeledger-backup",            // Backup every 24 hours
+  SYNC: "codeledger-sync", // Full sync every 4 hours
+  REVIEW: "codeledger-review-queue", // Process reviews every 5-10s
+  SETTINGS_COMMIT: "codeledger-settings", // Commit settings every 30s
+  BACKUP: "codeledger-backup", // Backup every 24 hours
 };
 
 // Backoff strategy
 function calculateBackoff(retryCount) {
-    const exponential = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount);
-    return Math.min(exponential, RETRY_MAX_DELAY_MS);
+  const exponential = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount);
+  return Math.min(exponential, RETRY_MAX_DELAY_MS);
 }
 ```
 
@@ -709,7 +713,7 @@ function calculateBackoff(retryCount) {
 
 ```javascript
 // In browser console (library page):
-import { getQueueStats, getAllQueueItems } from '/core/ai-review-queue.js';
+import { getQueueStats, getAllQueueItems } from "/core/ai-review-queue.js";
 
 // Get stats
 const stats = await getQueueStats();
@@ -733,7 +737,7 @@ console.log("Queue Items:", items);
 
 ```javascript
 // In browser console:
-import { setDebug } from '/lib/debug.js';
+import { setDebug } from "/lib/debug.js";
 
 // Enable all debug logs
 setDebug(true);
@@ -750,13 +754,13 @@ setDebug(true);
 ```javascript
 // Check all active alarms:
 chrome.alarms.getAll((alarms) => {
-    console.log("Active Alarms:", alarms);
-    // Output:
-    // [
-    //     { name: 'codeledger-sync', scheduledTime: 1715603600000 },
-    //     { name: 'codeledger-review-queue', scheduledTime: 1715600005000 },
-    //     { name: 'codeledger-settings', scheduledTime: 1715600030000 }
-    // ]
+  console.log("Active Alarms:", alarms);
+  // Output:
+  // [
+  //     { name: 'codeledger-sync', scheduledTime: 1715603600000 },
+  //     { name: 'codeledger-review-queue', scheduledTime: 1715600005000 },
+  //     { name: 'codeledger-settings', scheduledTime: 1715600030000 }
+  // ]
 });
 ```
 
@@ -768,11 +772,13 @@ const state = await exportQueueState();
 console.log(JSON.stringify(state, null, 2));
 
 // Save to file for analysis
-const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+const blob = new Blob([JSON.stringify(state, null, 2)], {
+  type: "application/json",
+});
 const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
+const a = document.createElement("a");
 a.href = url;
-a.download = 'codeledger-queue-export.json';
+a.download = "codeledger-queue-export.json";
 a.click();
 ```
 

@@ -77,7 +77,9 @@ function QueueStatusCard({
         <div class="flex items-center gap-2 shrink-0">
           <button
             onClick=${onRunQueueNow}
-            disabled=${runQueueBusy || (pending === 0 && processing === 0) || !onRunQueueNow}
+            disabled=${runQueueBusy ||
+            (pending === 0 && processing === 0) ||
+            !onRunQueueNow}
             class="px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest border transition-colors ${runQueueBusy ||
             (pending === 0 && processing === 0) ||
             !onRunQueueNow
@@ -100,22 +102,30 @@ function QueueStatusCard({
       </div>
       <div class="flex flex-wrap gap-2 text-[11px] text-slate-400">
         ${pending > 0
-          ? html`<span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-amber-300">
+          ? html`<span
+              class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-amber-300"
+            >
               ${pending} pending
             </span>`
           : ""}
         ${processing > 0
-          ? html`<span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-cyan-300">
+          ? html`<span
+              class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-cyan-300"
+            >
               ${processing} processing
             </span>`
           : ""}
         ${done > 0
-          ? html`<span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-300">
+          ? html`<span
+              class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-300"
+            >
               ${done} done
             </span>`
           : ""}
         ${failed > 0
-          ? html`<span class="rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-300">
+          ? html`<span
+              class="rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-300"
+            >
               ${failed} failed
             </span>`
           : ""}

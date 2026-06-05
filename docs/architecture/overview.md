@@ -27,7 +27,7 @@ graph TD
 ```
 
 **Explanation:**
-When a user submits a passing solution on LeetCode or GeeksForGeeks, the specific *Platform Handler* detects this via DOM polling or intercepting `fetch` requests. It emits a universal `problem:solved` event. The Background Service Worker listens to this and acts as the orchestrator: it saves the file locally, sends the code for AI review if enabled, and ultimately performs an atomic commit to the user's Git repository.
+When a user submits a passing solution on LeetCode or GeeksForGeeks, the specific _Platform Handler_ detects this via DOM polling or intercepting `fetch` requests. It emits a universal `problem:solved` event. The Background Service Worker listens to this and acts as the orchestrator: it saves the file locally, sends the code for AI review if enabled, and ultimately performs an atomic commit to the user's Git repository.
 
 ## 2. Plugin Registration Sequence
 
@@ -101,4 +101,4 @@ Instead of mutating files sequentially (which ruins commit history), CodeLedger 
 
 ---
 
-*(Additional architecture diagrams regarding Cross Browser Sync, Canonical Maps, and Round-Robin API Fallbacks are defined in upcoming updates.)*
+_(Additional architecture diagrams regarding Cross Browser Sync, Canonical Maps, and Round-Robin API Fallbacks are defined in upcoming updates.)_

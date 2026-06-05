@@ -18,13 +18,16 @@ Add a new section at the top of `docs/CHANGELOG.md`:
 ## [X.Y.Z] — YYYY-MM-DD
 
 ### Added
+
 - Feature 1
 - Feature 2
 
 ### Fixed
+
 - Bug fix 1
 
 ### Changed
+
 - Behavior change 1
 ```
 
@@ -46,6 +49,7 @@ npm run release -- --dry-run
 ```
 
 This validates everything without making any git changes. You'll see:
+
 - Version check (manifest ↔ package.json)
 - Changelog entry validation
 - Sync regression check
@@ -60,6 +64,7 @@ npm run release
 ```
 
 This does **everything automatically**:
+
 1. ✅ Validates versions match (`package.json` ↔ `src/manifest.json`)
 2. ✅ Checks `docs/CHANGELOG.md` has an entry for the version
 3. ✅ Runs sync regression checks
@@ -87,19 +92,24 @@ Once the push completes:
 ## Troubleshooting
 
 ### "Working directory not clean"
+
 ```bash
 git status
 # Commit or stash any changes
 ```
 
 ### "Tag already exists"
+
 The version tag already exists. Check if you already released this version:
+
 ```bash
 git tag -l | grep vX.Y.Z
 ```
 
 ### "Commit failed"
+
 Most likely a pre-commit hook issue. Run:
+
 ```bash
 npm run lint
 ```
@@ -107,13 +117,16 @@ npm run lint
 to fix any type errors, then try again.
 
 ### "Push failed"
+
 Ensure you have push access and are on `main`:
+
 ```bash
 git branch
 git remote -v
 ```
 
 ### "Undo a release"
+
 If the push succeeds but something is wrong, you can undo locally (before CI completes):
 
 ```bash
