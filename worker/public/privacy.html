@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy — CodeLedger</title>
+    <meta name="description" content="CodeLedger privacy policy. Your data stays yours — no servers, no telemetry, no tracking." />
+    <link rel="canonical" href="https://codeledger.vkrishna04.me/privacy" />
+    <link rel="icon" href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" />
+    <link rel="stylesheet" href="/assets/landing.css" />
+    <style>
+      .page-content {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 48px 24px 80px;
+      }
+      .page-content h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #06b6d4, #a855f7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .page-content .updated {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 40px;
+      }
+      .page-content h2 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text);
+        margin: 36px 0 12px;
+      }
+      .page-content p, .page-content li {
+        color: var(--subtle);
+        line-height: 1.75;
+        margin-bottom: 12px;
+      }
+      .page-content ul {
+        padding-left: 20px;
+      }
+      .page-content li {
+        margin-bottom: 6px;
+      }
+      .page-content strong {
+        color: var(--text);
+      }
+      .page-content a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .page-content a:hover {
+        text-decoration: underline;
+      }
+      .highlight-box {
+        background: rgba(16, 185, 129, 0.08);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        border-radius: var(--radius);
+        padding: 20px 24px;
+        margin: 24px 0;
+      }
+      .highlight-box p {
+        color: #6ee7b7;
+        margin: 0;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a class="nav-brand" href="/">
+        <img src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" alt="CodeLedger logo" />
+        CodeLedger
+      </a>
+      <div class="nav-links">
+        <a href="/#features"><span>Features</span></a>
+        <a href="/library">📚 <span>Library</span></a>
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">⭐ <span>GitHub</span></a>
+      </div>
+    </nav>
+
+    <div class="page-content">
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: June 2026</p>
+
+      <div class="highlight-box">
+        <p>TL;DR — CodeLedger never sees your code, your AI keys, or your GitHub token. Everything lives in your browser and your own GitHub repo.</p>
+      </div>
+
+      <h2>1. What data we collect</h2>
+      <p><strong>We collect nothing.</strong> CodeLedger does not operate any analytics, telemetry, logging, or tracking infrastructure. The extension runs entirely inside your browser.</p>
+
+      <h2>2. Data stored locally (in your browser)</h2>
+      <p>The extension stores the following data <strong>only in your browser's local storage and IndexedDB</strong>:</p>
+      <ul>
+        <li>Your GitHub OAuth access token (used to push commits to your repo)</li>
+        <li>Your AI provider API keys (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter)</li>
+        <li>Extension settings (repository name, commit preferences, AI configuration)</li>
+        <li>Solved problem metadata and AI reviews (in IndexedDB)</li>
+        <li>AI chat history</li>
+      </ul>
+      <p>None of this data is transmitted to CodeLedger servers. Your browser storage is under your full control.</p>
+
+      <h2>3. Data sent to GitHub</h2>
+      <p>When you solve a problem, CodeLedger commits the following to <strong>your own GitHub repository</strong> using the GitHub API:</p>
+      <ul>
+        <li>Your solution code</li>
+        <li>Problem metadata (title, difficulty, tags, platform)</li>
+        <li>AI review text (if AI review is enabled)</li>
+        <li>An updated <code>index.json</code> tracking your solved problems</li>
+      </ul>
+      <p>This data goes directly from your browser to GitHub's API. CodeLedger infrastructure is not involved.</p>
+
+      <h2>4. Data sent to AI providers</h2>
+      <p>If you configure an AI provider, your solution code and problem metadata are sent to that provider using <strong>your own API key</strong>. Review each provider's privacy policy:</p>
+      <ul>
+        <li><a href="https://ai.google.dev/terms" target="_blank" rel="noopener">Google Gemini</a></li>
+        <li><a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">OpenAI</a></li>
+        <li><a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic Claude</a></li>
+        <li><a href="https://www.deepseek.com/privacy" target="_blank" rel="noopener">DeepSeek</a></li>
+        <li>Ollama: runs locally — no external requests</li>
+      </ul>
+      <p>AI review is optional and can be disabled in Settings → AI.</p>
+
+      <h2>5. The OAuth relay server</h2>
+      <p>CodeLedger operates one server at <code>codeledger.vkrishna04.me/api</code>. Its sole purpose is the GitHub OAuth code exchange:</p>
+      <ul>
+        <li>Your browser sends GitHub's temporary <code>code</code> parameter to this server</li>
+        <li>The server exchanges it for an access token via GitHub's API</li>
+        <li>The token is returned to your browser and stored locally</li>
+        <li><strong>The token is never logged, stored, or transmitted elsewhere</strong></li>
+      </ul>
+      <p>The server does not log IP addresses, request bodies, tokens, or any user-identifying information. Cloudflare Workers processes the request in-memory only.</p>
+
+      <h2>6. The Library web app</h2>
+      <p>The Library at <code>codeledger.vkrishna04.me/library</code> reads your problems directly from your GitHub repository via the GitHub API using your token. No data is cached or stored on our servers.</p>
+
+      <h2>7. Cookies and tracking</h2>
+      <p>We use no cookies, no third-party analytics (no Google Analytics, Mixpanel, etc.), no fingerprinting, and no advertising SDKs.</p>
+
+      <h2>8. Children's privacy</h2>
+      <p>CodeLedger is not directed at children under 13. We do not knowingly collect information from children.</p>
+
+      <h2>9. Changes to this policy</h2>
+      <p>If we make material changes, we will update the "Last updated" date above and note it in the <a href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG</a>.</p>
+
+      <h2>10. Contact</h2>
+      <p>Questions? Open an issue on <a href="https://github.com/Life-Experimentalist/Code-Ledger/issues" target="_blank" rel="noopener">GitHub</a> or email <a href="mailto:krishnalsh2004@gmail.com">krishnalsh2004@gmail.com</a>.</p>
+    </div>
+
+    <footer>
+      <span>CodeLedger — Apache 2.0 · Built by <a href="https://github.com/VKrishna04" style="color:var(--accent);text-decoration:none">VKrishna04</a></span>
+      <div class="footer-links">
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">GitHub</a>
+        <a href="/library">Library</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/support">Support</a>
+      </div>
+    </footer>
+  </body>
+</html>

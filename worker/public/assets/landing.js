@@ -127,6 +127,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       "#";
     installBtn.href = storeUrl;
   }
+  const chromeBtn = document.getElementById("install-btn-chrome");
+  if (chromeBtn) {
+    chromeBtn.href =
+      config.chrome_store ||
+      config.github_releases ||
+      config.github_repo ||
+      "#";
+  }
   const ffBtn = document.getElementById("install-btn-firefox");
   if (ffBtn) {
     ffBtn.href =
