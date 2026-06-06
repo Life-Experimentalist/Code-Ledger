@@ -1,0 +1,129 @@
+name: Publish to Microsoft Edge Add-ons
+
+# Runs after a GitHub Release is published — independent of build-and-release.
+# Only works for UPDATES after the first manual submission in Partner Center.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   EDGE_PRODUCT_ID        — Extension product ID from Partner Center dashboard
+#   EDGE_CLIENT_ID         — Azure AD app client ID (from Partner Center API access)
+#   EDGE_CLIENT_SECRET     — Azure AD app client secret
+#   EDGE_ACCESS_TOKEN_URL  — https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token
+#
+# How to get these: Partner Center → Edge extensions → {extension} → API access
+# How to activate: set all four secrets. Workflow is a no-op until they exist.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish-edge:
+    name: Upload & publish to Microsoft Edge Add-ons
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip pre-releases and skip if secrets are not configured
+    if: "!contains(github.ref_name, '-') && secrets.EDGE_CLIENT_ID != ''"
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download chromium zip from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p release-assets
+          # Edge uses the Chromium zip (same MV3 build)
+          gh release download "${{ steps.version.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "codeledger-chromium-*.zip" \
+            --dir release-assets/
+          ls -lh release-assets/
+
+      - name: Get Edge OAuth access token
+        id: edge_token
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ secrets.EDGE_ACCESS_TOKEN_URL }}" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "client_id=${{ secrets.EDGE_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.EDGE_CLIENT_SECRET }}" \
+            -d "scope=https://api.addons.microsoftedge.microsoft.com/.default" \
+            -d "grant_type=client_credentials")
+
+          TOKEN=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Failed to obtain Edge OAuth token"
+            echo "$RESPONSE"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "access_token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Upload package to Edge draft
+        id: upload
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP="release-assets/codeledger-chromium-v${VERSION}.zip"
+          PRODUCT_ID="${{ secrets.EDGE_PRODUCT_ID }}"
+          BASE="https://api.addons.microsoftedge.microsoft.com"
+
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer ${{ steps.edge_token.outputs.access_token }}" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@$ZIP" \
+            "$BASE/v1/products/$PRODUCT_ID/submissions/draft/package")
+
+          echo "Upload response: $RESPONSE"
+          OP_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+          echo "operation_id=$OP_ID" >> "$GITHUB_OUTPUT"
+
+      # Poll until the package upload is processed
+      - name: Wait for package processing
+        run: |
+          PRODUCT_ID="${{ secrets.EDGE_PRODUCT_ID }}"
+          OP_ID="${{ steps.upload.outputs.operation_id }}"
+          BASE="https://api.addons.microsoftedge.microsoft.com"
+
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s \
+              -H "Authorization: Bearer ${{ steps.edge_token.outputs.access_token }}" \
+              "$BASE/v1/products/$PRODUCT_ID/submissions/draft/package/operations/$OP_ID" \
+              | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','Unknown'))")
+            echo "Attempt $i: status=$STATUS"
+            if [ "$STATUS" = "Succeeded" ]; then break; fi
+            if [ "$STATUS" = "Failed" ]; then
+              echo "::error::Edge package processing failed"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Publish to Edge Add-ons
+        run: |
+          PRODUCT_ID="${{ secrets.EDGE_PRODUCT_ID }}"
+          BASE="https://api.addons.microsoftedge.microsoft.com"
+
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer ${{ steps.edge_token.outputs.access_token }}" \
+            -H "Content-Length: 0" \
+            "$BASE/v1/products/$PRODUCT_ID/submissions")
+
+          echo "Publish response: $RESPONSE"
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','Unknown'))" 2>/dev/null || echo "Unknown")
+          echo "Publish status: $STATUS"
+
+      - name: Summary
+        run: |
+          echo "### Edge Add-ons publish complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: ${{ steps.version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Status: submitted for review" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dashboard: https://partner.microsoft.com/dashboard/microsoftedge/overview" >> "$GITHUB_STEP_SUMMARY"

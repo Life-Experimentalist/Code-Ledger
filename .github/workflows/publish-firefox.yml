@@ -1,0 +1,133 @@
+name: Publish to Firefox AMO
+
+# Runs after a GitHub Release is published — independent of build-and-release.
+# Only works for UPDATES after the first manual submission on addons.mozilla.org.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   AMO_JWT_ISSUER   — API key from addons.mozilla.org/developers/addon/api/key/
+#   AMO_JWT_SECRET   — API secret from the same page
+#   AMO_ADDON_SLUG   — Your addon slug from AMO, e.g. "codeledger" (set when first submitted)
+#
+# How to activate: set the three secrets above. The workflow is a no-op until they exist.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish-firefox:
+    name: Upload & submit to Firefox AMO
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip pre-releases and skip if secrets are not configured
+    if: "!contains(github.ref_name, '-') && secrets.AMO_JWT_ISSUER != ''"
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download Firefox zip from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p release-assets
+          gh release download "${{ steps.version.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "codeledger-firefox-*.zip" \
+            --dir release-assets/
+          ls -lh release-assets/
+
+      - name: Generate AMO JWT
+        id: amo_jwt
+        run: |
+          JWT=$(python3 - <<'PYEOF'
+import base64, hashlib, hmac, json, time, uuid, os
+
+iss    = os.environ["AMO_JWT_ISSUER"]
+secret = os.environ["AMO_JWT_SECRET"]
+iat    = int(time.time())
+exp    = iat + 300
+
+def b64(data):
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+header  = b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+payload = b64(json.dumps({"iss": iss, "jti": str(uuid.uuid4()), "iat": iat, "exp": exp}).encode())
+msg     = f"{header}.{payload}"
+sig     = b64(hmac.new(secret.encode(), msg.encode(), hashlib.sha256).digest())
+print(f"{msg}.{sig}")
+PYEOF
+)
+          echo "::add-mask::$JWT"
+          echo "jwt=$JWT" >> "$GITHUB_OUTPUT"
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+
+      - name: Upload XPI to AMO
+        id: upload
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          XPI="release-assets/codeledger-firefox-v${VERSION}.zip"
+
+          RESPONSE=$(curl -s \
+            -H "Authorization: JWT ${{ steps.amo_jwt.outputs.jwt }}" \
+            -F "upload=@$XPI" \
+            "https://addons.mozilla.org/api/v5/addons/upload/")
+
+          echo "Upload response: $RESPONSE"
+          UUID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('uuid',''))")
+          if [ -z "$UUID" ]; then
+            echo "::error::AMO upload failed — no UUID returned"
+            exit 1
+          fi
+          echo "upload_uuid=$UUID" >> "$GITHUB_OUTPUT"
+
+      # AMO processes uploads asynchronously; poll until it's ready
+      - name: Wait for AMO upload processing
+        run: |
+          UUID="${{ steps.upload.outputs.upload_uuid }}"
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s \
+              -H "Authorization: JWT ${{ steps.amo_jwt.outputs.jwt }}" \
+              "https://addons.mozilla.org/api/v5/addons/upload/$UUID/" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('processed', False))")
+            echo "Attempt $i: processed=$STATUS"
+            if [ "$STATUS" = "True" ]; then break; fi
+            sleep 10
+          done
+
+      - name: Create new version on AMO
+        run: |
+          UUID="${{ steps.upload.outputs.upload_uuid }}"
+          SLUG="${{ secrets.AMO_ADDON_SLUG }}"
+
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: JWT ${{ steps.amo_jwt.outputs.jwt }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"upload\": \"$UUID\"}" \
+            "https://addons.mozilla.org/api/v5/addons/addon/$SLUG/versions/")
+
+          echo "Version response: $RESPONSE"
+          VERSION_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
+          if [ -z "$VERSION_ID" ]; then
+            echo "::error::AMO version creation failed"
+            exit 1
+          fi
+          echo "AMO version created: $VERSION_ID"
+
+      - name: Summary
+        run: |
+          echo "### Firefox AMO submission complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: ${{ steps.version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Status: submitted for review" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dashboard: https://addons.mozilla.org/developers/addons" >> "$GITHUB_STEP_SUMMARY"
