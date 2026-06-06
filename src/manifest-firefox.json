@@ -11,14 +11,13 @@
     "48": "assets/images/icon-48.png",
     "128": "assets/images/icon-128.png"
   },
-  "permissions": ["storage", "alarms", "tabs", "scripting", "webRequest"],
+  "permissions": ["storage", "alarms"],
   "host_permissions": [
     "*://*.leetcode.com/*",
     "*://*.geeksforgeeks.org/*",
     "*://*.codeforces.com/*",
     "https://api.github.com/*",
     "https://api.gitlab.com/*",
-    "https://bitbucket.org/api/*",
     "https://api.openai.com/*",
     "https://api.anthropic.com/*",
     "https://generativelanguage.googleapis.com/*",
@@ -78,15 +77,19 @@
         "lib/*",
         "vendor/*",
         "data/*",
-        "library/*",
-        "ui/*",
-        "popup/*",
-        "sidebar/*",
-        "welcome/*",
-        "assets/*",
         "content/*"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "*://*.leetcode.com/*",
+        "*://*.geeksforgeeks.org/*",
+        "*://*.codeforces.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "content/presence-marker.js"
+      ],
+      "matches": ["*://codeledger.vkrishna04.me/*"]
     }
   ],
   "browser_specific_settings": {
