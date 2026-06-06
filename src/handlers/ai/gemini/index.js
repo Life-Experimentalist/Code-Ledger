@@ -38,8 +38,7 @@ export class GeminiHandler extends BaseAIHandler {
           label: "API Keys",
           type: "text",
           default: "",
-          description:
-            "Comma separated list of API keys for rate-limit pooling.",
+          description: "Comma separated list of API keys for rate-limit pooling.",
         },
         {
           key: "gemini_endpoint",
@@ -56,9 +55,7 @@ export class GeminiHandler extends BaseAIHandler {
   }
 
   async review(code, problemContext) {
-    dbg.log(
-      `review(): starting Gemini review for ${problemContext?.titleSlug || "unknown"}`,
-    );
+    dbg.log(`review(): starting Gemini review for ${problemContext?.titleSlug || "unknown"}`);
     const settings = await Storage.getSettings();
     const model =
       problemContext?.aiModelOverride ||
@@ -66,9 +63,7 @@ export class GeminiHandler extends BaseAIHandler {
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.gemini.defaultModel;
     const endpoint =
-      settings.gemini_endpoint ||
-      settings.aiEndpoint ||
-      CONSTANTS.AI_PROVIDERS.gemini.endpoint;
+      settings.gemini_endpoint || settings.aiEndpoint || CONSTANTS.AI_PROVIDERS.gemini.endpoint;
     dbg.log(`review(): model=${model}, endpoint=${endpoint}`);
     const prompts = await Storage.getAIPrompts();
     const prompt = buildReviewPrompt(problemContext, code, prompts);
@@ -84,9 +79,7 @@ export class GeminiHandler extends BaseAIHandler {
       if (!key) break;
 
       try {
-        dbg.log(
-          `review(): attempt ${attempt + 1}/${keyCount}, calling Gemini API...`,
-        );
+        dbg.log(`review(): attempt ${attempt + 1}/${keyCount}, calling Gemini API...`);
         const url = `${endpoint}/models/${model}:generateContent?key=${key}`;
         const res = await fetch(url, {
           method: "POST",
@@ -101,9 +94,7 @@ export class GeminiHandler extends BaseAIHandler {
         const data = await res.json();
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
         if (!content) {
-          dbg.warn(
-            `review(): empty response at attempt ${attempt + 1}/${keyCount}`,
-          );
+          dbg.warn(`review(): empty response at attempt ${attempt + 1}/${keyCount}`);
           throw new Error("Empty Gemini response");
         }
         dbg.log(
@@ -119,10 +110,7 @@ export class GeminiHandler extends BaseAIHandler {
       }
     }
 
-    dbg.error(
-      `review(): ✗ all ${keyCount} key(s) exhausted:`,
-      lastErr?.message,
-    );
+    dbg.error(`review(): ✗ all ${keyCount} key(s) exhausted:`, lastErr?.message);
     throw lastErr || new Error("Gemini review failed with all available keys.");
   }
 }

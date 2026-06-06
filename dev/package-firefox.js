@@ -7,9 +7,7 @@ const version = pkg.version;
 
 mkdirSync("releases", { recursive: true });
 
-const ffManifest = JSON.parse(
-  readFileSync("src/manifest-firefox.json", "utf8"),
-);
+const ffManifest = JSON.parse(readFileSync("src/manifest-firefox.json", "utf8"));
 ffManifest.version = version;
 
 // Write temp manifest outside src/ so Chrome never sees it when loading unpacked

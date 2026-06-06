@@ -26,8 +26,7 @@ export function AICommandPalette({
   useEffect(() => {
     if (!listRef.current) return;
     const active = listRef.current.querySelector("[data-active='true']");
-    if (active)
-      active.scrollIntoView({ block: "nearest", behavior: "instant" });
+    if (active) active.scrollIntoView({ block: "nearest", behavior: "instant" });
   }, [activeIndex]);
 
   if (!visible) return null;
@@ -40,8 +39,7 @@ export function AICommandPalette({
       <div
         class="flex items-center justify-between px-3 py-2 border-b border-slate-800 bg-slate-900/80"
       >
-        <span
-          class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+        <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500"
           >${title}</span
         >
         <span class="text-[10px] text-slate-600"
@@ -50,9 +48,7 @@ export function AICommandPalette({
       </div>
       <div ref=${listRef} class="max-h-56 overflow-y-auto">
         ${items.length === 0
-          ? html`
-              <div class="px-3 py-3 text-sm text-slate-500">${emptyLabel}</div>
-            `
+          ? html` <div class="px-3 py-3 text-sm text-slate-500">${emptyLabel}</div> `
           : items.map(
               (item, index) => html`
                 <button
@@ -70,9 +66,7 @@ export function AICommandPalette({
                       <div class="text-sm font-medium truncate">
                         ${item.label || item.name || item.id}
                       </div>
-                      <div
-                        class="text-[11px] text-slate-500 leading-snug mt-0.5"
-                      >
+                      <div class="text-[11px] text-slate-500 leading-snug mt-0.5">
                         ${item.description || item.help || item.subtitle || ""}
                       </div>
                     </div>

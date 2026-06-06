@@ -47,9 +47,7 @@ export function hookSubmitButton(page) {
 
   const savePending = () => {
     const code = document.querySelector("#editor")?.value || "";
-    const langSel = document.querySelector(
-      '#programTypeForTesting, select[name="programTypeId"]',
-    );
+    const langSel = document.querySelector('#programTypeForTesting, select[name="programTypeId"]');
     const opt = langSel?.options?.[langSel.selectedIndex];
     const lang = (opt?.textContent || opt?.value || "").trim() || "C++";
 
@@ -109,8 +107,7 @@ export function watchForVerdict(onAccepted) {
       const submissionId = row?.getAttribute("data-submission-id");
       if (!submissionId || processedIds.has(submissionId)) continue;
 
-      const contestIdMatch =
-        window.location.pathname.match(/\/contest\/(\d+)\//);
+      const contestIdMatch = window.location.pathname.match(/\/contest\/(\d+)\//);
       const contestId = contestIdMatch?.[1] || null;
 
       dbg.log("Accepted verdict detected", { submissionId, contestId });
@@ -151,14 +148,12 @@ export function readCurrentTestOutput() {
     const lines = [];
 
     // Non-accepted verdict cells in submission table
-    document
-      .querySelectorAll(".status-verdict-cell span[submissionverdict]")
-      .forEach((el) => {
-        const verdict = el.getAttribute("submissionverdict") || "";
-        if (verdict === "OK") return;
-        const t = (el.textContent || "").trim();
-        if (t) lines.push(`Verdict: ${t}`);
-      });
+    document.querySelectorAll(".status-verdict-cell span[submissionverdict]").forEach((el) => {
+      const verdict = el.getAttribute("submissionverdict") || "";
+      if (verdict === "OK") return;
+      const t = (el.textContent || "").trim();
+      if (t) lines.push(`Verdict: ${t}`);
+    });
 
     // Error / wrong answer test output blocks
     document

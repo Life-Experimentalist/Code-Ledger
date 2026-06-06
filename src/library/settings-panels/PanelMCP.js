@@ -27,38 +27,32 @@ const MCP_TOOL_INFO = {
   },
   "get-problem-stats": {
     name: "Get Problem Stats",
-    description:
-      "Detailed statistics for a single problem (time, complexity, percentiles)",
+    description: "Detailed statistics for a single problem (time, complexity, percentiles)",
     category: "Context",
   },
   "get-next-suggestion": {
     name: "Get Next Suggestion",
-    description:
-      "Analyze weak topics and suggest the next best problem to practice",
+    description: "Analyze weak topics and suggest the next best problem to practice",
     category: "Suggestions",
   },
   "analyze-code-quality": {
     name: "Analyze Code Quality",
-    description:
-      "Analyze code for complexity, edge cases, and improvement opportunities",
+    description: "Analyze code for complexity, edge cases, and improvement opportunities",
     category: "Analysis",
   },
   "get-trend-analysis": {
     name: "Get Trend Analysis",
-    description:
-      "Analyze 30-day solving trends, platform distribution, difficulty progression",
+    description: "Analyze 30-day solving trends, platform distribution, difficulty progression",
     category: "Analysis",
   },
   "find-similar-problems": {
     name: "Find Similar Problems",
-    description:
-      "Find problems similar to a given one based on difficulty, platform, tags",
+    description: "Find problems similar to a given one based on difficulty, platform, tags",
     category: "Context",
   },
   "get-user-profile": {
     name: "Get User Profile",
-    description:
-      "Comprehensive user context: total problems, top platforms/languages/topics",
+    description: "Comprehensive user context: total problems, top platforms/languages/topics",
     category: "Context",
   },
 };
@@ -103,9 +97,7 @@ export function PanelMCP() {
 
   const categories = ["Context", "Suggestions", "Analysis"];
   const toolsByCategory = categories.reduce((acc, cat) => {
-    acc[cat] = Object.entries(MCP_TOOL_INFO).filter(
-      ([, info]) => info.category === cat,
-    );
+    acc[cat] = Object.entries(MCP_TOOL_INFO).filter(([, info]) => info.category === cat);
     return acc;
   }, {});
 
@@ -115,12 +107,10 @@ export function PanelMCP() {
       <div
         class="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-lg p-4 border border-blue-500/20"
       >
-        <h3 class="font-semibold text-white mb-2">
-          MCP (Model Context Protocol)
-        </h3>
+        <h3 class="font-semibold text-white mb-2">MCP (Model Context Protocol)</h3>
         <p class="text-sm text-slate-300 leading-relaxed">
-          AI providers can automatically invoke these tools to provide richer
-          analysis. Enable/disable individual tools based on your preferences.
+          AI providers can automatically invoke these tools to provide richer analysis.
+          Enable/disable individual tools based on your preferences.
         </p>
       </div>
 
@@ -134,15 +124,12 @@ export function PanelMCP() {
           <input
             type="checkbox"
             checked=${config.useInChat === true}
-            onChange=${(e) =>
-              handleToggleSetting("useInChat", e.target.checked)}
+            onChange=${(e) => handleToggleSetting("useInChat", e.target.checked)}
             class="w-4 h-4 rounded"
           />
           <div>
             <div class="text-sm font-medium text-white">Use MCP in Chat</div>
-            <div class="text-xs text-slate-400">
-              AI uses tools during chat conversations
-            </div>
+            <div class="text-xs text-slate-400">AI uses tools during chat conversations</div>
           </div>
         </label>
 
@@ -152,15 +139,12 @@ export function PanelMCP() {
           <input
             type="checkbox"
             checked=${config.useInReview === true}
-            onChange=${(e) =>
-              handleToggleSetting("useInReview", e.target.checked)}
+            onChange=${(e) => handleToggleSetting("useInReview", e.target.checked)}
             class="w-4 h-4 rounded"
           />
           <div>
             <div class="text-sm font-medium text-white">Use MCP in Review</div>
-            <div class="text-xs text-slate-400">
-              AI uses tools during code reviews
-            </div>
+            <div class="text-xs text-slate-400">AI uses tools during code reviews</div>
           </div>
         </label>
 
@@ -170,15 +154,12 @@ export function PanelMCP() {
           <input
             type="checkbox"
             checked=${config.cacheResults === true}
-            onChange=${(e) =>
-              handleToggleSetting("cacheResults", e.target.checked)}
+            onChange=${(e) => handleToggleSetting("cacheResults", e.target.checked)}
             class="w-4 h-4 rounded"
           />
           <div>
             <div class="text-sm font-medium text-white">Cache Tool Results</div>
-            <div class="text-xs text-slate-400">
-              Cache results for 5 minutes
-            </div>
+            <div class="text-xs text-slate-400">Cache results for 5 minutes</div>
           </div>
         </label>
       </div>
@@ -187,9 +168,7 @@ export function PanelMCP() {
       ${categories.map(
         (category) => html`
           <div>
-            <h4 class="text-sm font-semibold text-slate-200 mb-2">
-              ${category}
-            </h4>
+            <h4 class="text-sm font-semibold text-slate-200 mb-2">${category}</h4>
             <div class="space-y-2">
               ${toolsByCategory[category].map(
                 ([toolId, toolInfo]) => html`
@@ -203,12 +182,8 @@ export function PanelMCP() {
                       class="w-4 h-4 rounded mt-1 flex-shrink-0"
                     />
                     <div class="flex-1">
-                      <div class="text-sm font-medium text-white">
-                        ${toolInfo.name}
-                      </div>
-                      <div class="text-xs text-slate-400 mt-1">
-                        ${toolInfo.description}
-                      </div>
+                      <div class="text-sm font-medium text-white">${toolInfo.name}</div>
+                      <div class="text-xs text-slate-400 mt-1">${toolInfo.description}</div>
                     </div>
                   </label>
                 `,
@@ -239,10 +214,7 @@ export function PanelMCP() {
                   min="1"
                   max="10"
                   onChange=${(e) =>
-                    handleToggleSetting(
-                      "maxToolCallsPerRequest",
-                      parseInt(e.target.value),
-                    )}
+                    handleToggleSetting("maxToolCallsPerRequest", parseInt(e.target.value))}
                   class="w-12 bg-slate-700 text-white rounded px-2 py-1"
                 />
               </label>

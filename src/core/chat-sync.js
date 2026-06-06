@@ -35,9 +35,7 @@ export function buildChatMarkdown(chat) {
   const problems = Array.from(
     new Set([
       ...(chat.problemSlug ? [chat.problemSlug] : []),
-      ...(Array.isArray(chat.attachedProblemSlugs)
-        ? chat.attachedProblemSlugs
-        : []),
+      ...(Array.isArray(chat.attachedProblemSlugs) ? chat.attachedProblemSlugs : []),
     ]),
   ).filter(Boolean);
 
@@ -191,8 +189,7 @@ export function parseChatMarkdown(content, filePath = "") {
   for (const section of sections) {
     const userMatch = section.match(/^### User\n\n([\s\S]*)/);
     const assistantMatch = section.match(/^### Assistant\n\n([\s\S]*)/);
-    if (userMatch)
-      chat.messages.push({ role: "user", content: userMatch[1].trim() });
+    if (userMatch) chat.messages.push({ role: "user", content: userMatch[1].trim() });
     else if (assistantMatch)
       chat.messages.push({
         role: "assistant",
@@ -214,13 +211,7 @@ export function parseChatMarkdown(content, filePath = "") {
  * @param {Function} importFn - `(chats: object[]) => Promise<void>`
  * @returns {Promise<number>} count of imported chats
  */
-export async function importChatsFromRepo(
-  owner,
-  repo,
-  token,
-  getContentsFn,
-  importFn,
-) {
+export async function importChatsFromRepo(owner, repo, token, getContentsFn, importFn) {
   try {
     let dirListing;
     try {
@@ -232,16 +223,12 @@ export async function importChatsFromRepo(
 
     if (!Array.isArray(dirListing)) return 0;
 
-    const mdFiles = dirListing.filter(
-      (f) => f.type === "file" && f.name.endsWith(".md"),
-    );
+    const mdFiles = dirListing.filter((f) => f.type === "file" && f.name.endsWith(".md"));
     if (mdFiles.length === 0) return 0;
 
     // Get existing githubPaths to skip already-synced chats
     const localChats = await getAllChats();
-    const knownPaths = new Set(
-      localChats.map((c) => c._githubPath).filter(Boolean),
-    );
+    const knownPaths = new Set(localChats.map((c) => c._githubPath).filter(Boolean));
 
     const toImport = mdFiles.filter((f) => !knownPaths.has(f.path));
     if (toImport.length === 0) return 0;
@@ -252,9 +239,7 @@ export async function importChatsFromRepo(
     for (const file of toImport) {
       try {
         const fileData = await getContentsFn(owner, repo, file.path, token);
-        const raw = fileData?.content
-          ? atob(fileData.content.replace(/\n/g, ""))
-          : "";
+        const raw = fileData?.content ? atob(fileData.content.replace(/\n/g, "")) : "";
         if (!raw) continue;
         const parsed = parseChatMarkdown(raw, file.path);
         imported.push({
@@ -274,10 +259,7 @@ export async function importChatsFromRepo(
           updatedAt: Date.now(),
         });
       } catch (e) {
-        dbg.warn(
-          `importChatsFromRepo(): failed to import ${file.path}:`,
-          e?.message,
-        );
+        dbg.warn(`importChatsFromRepo(): failed to import ${file.path}:`, e?.message);
       }
     }
 

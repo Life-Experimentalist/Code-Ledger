@@ -8,10 +8,7 @@ import { CONSTANTS } from "../core/constants.js";
 import { registry } from "../core/handler-registry.js";
 import { createDebugger } from "../lib/debug.js";
 import { normalizeLang } from "../core/lang-utils.js";
-import {
-  flushPendingChatSync,
-  importChatsFromRepo,
-} from "../core/chat-sync.js";
+import { flushPendingChatSync, importChatsFromRepo } from "../core/chat-sync.js";
 import { importChatsLocal } from "../core/ai-chat-storage.js";
 
 const dbg = createDebugger("SyncEngine");
@@ -32,10 +29,7 @@ const COMPARE_FIELDS = [
 function _syncCommitKey(problem = {}) {
   const id = String(
     problem.id ||
-      CONSTANTS.makeProblemId(
-        problem.platform || "unknown",
-        problem.titleSlug || "unknown",
-      ),
+      CONSTANTS.makeProblemId(problem.platform || "unknown", problem.titleSlug || "unknown"),
   );
   const lang = normalizeLang(problem);
   if (!id || !lang) return "";
@@ -44,10 +38,8 @@ function _syncCommitKey(problem = {}) {
 
 function _fieldsEqual(a, b) {
   return COMPARE_FIELDS.every((k) => {
-    const av =
-      typeof a[k] === "object" ? JSON.stringify(a[k]) : String(a[k] ?? "");
-    const bv =
-      typeof b[k] === "object" ? JSON.stringify(b[k]) : String(b[k] ?? "");
+    const av = typeof a[k] === "object" ? JSON.stringify(a[k]) : String(a[k] ?? "");
+    const bv = typeof b[k] === "object" ? JSON.stringify(b[k]) : String(b[k] ?? "");
     return av === bv;
   });
 }
@@ -83,31 +75,21 @@ export async function importFromRepo(owner, repo, git) {
       const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/index.json`;
       const r = await fetch(rawUrl);
       if (r.ok) raw = await r.text();
-      dbg.log(
-        `importFromRepo(): ✓ loaded index.json from raw.githubusercontent`,
-      );
+      dbg.log(`importFromRepo(): ✓ loaded index.json from raw.githubusercontent`);
     } catch (e) {
-      dbg.warn(
-        "importFromRepo: raw.githubusercontent fallback failed",
-        e?.message || e,
-      );
+      dbg.warn("importFromRepo: raw.githubusercontent fallback failed", e?.message || e);
     }
   }
 
   if (!raw || !raw.trim()) {
-    dbg.log(
-      "importFromRepo(): no index.json content found; treating as empty remote",
-    );
+    dbg.log("importFromRepo(): no index.json content found; treating as empty remote");
     return { remoteOnly: [], conflicts: [] };
   }
   let index;
   try {
     index = JSON.parse(raw);
   } catch (e) {
-    dbg.warn(
-      "importFromRepo(): failed to parse index.json; treating as empty",
-      e?.message || e,
-    );
+    dbg.warn("importFromRepo(): failed to parse index.json; treating as empty", e?.message || e);
     index = { problems: [] };
   }
   const rawRemote = Array.isArray(index.problems) ? index.problems : [];
@@ -128,10 +110,7 @@ export async function importFromRepo(owner, repo, git) {
     if (!p.id || !/^(lc|gfg|cf)-/.test(p.id)) {
       return {
         ...p,
-        id: CONSTANTS.makeProblemId(
-          p.platform || "unknown",
-          p.titleSlug || "unknown",
-        ),
+        id: CONSTANTS.makeProblemId(p.platform || "unknown", p.titleSlug || "unknown"),
       };
     }
     return p;
@@ -139,13 +118,9 @@ export async function importFromRepo(owner, repo, git) {
 
   const localProblems = await Storage.getAllProblems();
   const localByCommitKey = new Map(
-    localProblems
-      .map((p) => [_syncCommitKey(p), p])
-      .filter(([key]) => Boolean(key)),
+    localProblems.map((p) => [_syncCommitKey(p), p]).filter(([key]) => Boolean(key)),
   );
-  dbg.log(
-    `importFromRepo(): mapped ${localByCommitKey.size} local problem(s) by commit key`,
-  );
+  dbg.log(`importFromRepo(): mapped ${localByCommitKey.size} local problem(s) by commit key`);
 
   const remoteOnly = [];
   const conflicts = [];
@@ -161,9 +136,7 @@ export async function importFromRepo(owner, repo, git) {
     }
   }
 
-  dbg.log(
-    `importFromRepo(): ✓ complete — ${remoteOnly.length} new, ${conflicts.length} conflicts`,
-  );
+  dbg.log(`importFromRepo(): ✓ complete — ${remoteOnly.length} new, ${conflicts.length} conflicts`);
   return { remoteOnly, conflicts };
 }
 
@@ -202,18 +175,14 @@ function _linkMultiLangSolutions(problems) {
  * @param {object[]} resolvedProblems
  */
 export async function applyImport(resolvedProblems) {
-  dbg.log(
-    `applyImport(): saving ${resolvedProblems.length} resolved problem(s)...`,
-  );
+  dbg.log(`applyImport(): saving ${resolvedProblems.length} resolved problem(s)...`);
 
   // Snapshot existing data before overwriting — rolling backup
   try {
     const existing = await Storage.getAllProblems();
     if (existing.length > 0) {
       await Storage.addScheduledBackup(existing, "pre-import");
-      dbg.log(
-        `applyImport(): ✓ pre-import backup created (${existing.length} problems)`,
-      );
+      dbg.log(`applyImport(): ✓ pre-import backup created (${existing.length} problems)`);
     }
   } catch (e) {
     dbg.warn("applyImport(): backup failed (non-blocking):", e?.message);
@@ -231,9 +200,7 @@ export async function applyImport(resolvedProblems) {
       dbg.warn(`applyImport(): failed to save ${p.id}:`, e?.message);
     }
   }
-  dbg.log(
-    `applyImport(): ✓ saved ${saved}/${resolvedProblems.length} problems`,
-  );
+  dbg.log(`applyImport(): ✓ saved ${saved}/${resolvedProblems.length} problems`);
 }
 
 export const SyncEngine = {
@@ -259,9 +226,7 @@ export const SyncEngine = {
     const owner = settings.github_owner || settings.github_username;
     const repo = settings.github_repo || settings.gitRepo;
     if (!owner || !repo) {
-      dbg.warn(
-        `performSync(): owner or repo not configured (owner=${owner}, repo=${repo})`,
-      );
+      dbg.warn(`performSync(): owner or repo not configured (owner=${owner}, repo=${repo})`);
       return;
     }
 
@@ -291,21 +256,13 @@ export const SyncEngine = {
           _pendingConflicts: 0,
         });
       }
-      dbg.log(
-        `performSync(): ✓ sync complete — imported ${remoteOnly.length} new problems`,
-      );
+      dbg.log(`performSync(): ✓ sync complete — imported ${remoteOnly.length} new problems`);
 
       // Sync AI chats: push pending local chats, pull new remote chats
       flushPendingChatSync(owner, repo, git).catch((e) =>
         dbg.warn("performSync(): chat flush failed:", e?.message),
       );
-      importChatsFromRepo(
-        owner,
-        repo,
-        token,
-        getContents,
-        importChatsLocal,
-      ).catch((e) =>
+      importChatsFromRepo(owner, repo, token, getContents, importChatsLocal).catch((e) =>
         dbg.warn("performSync(): chat import failed:", e?.message),
       );
     } catch (e) {

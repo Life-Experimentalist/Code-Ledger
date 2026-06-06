@@ -38,8 +38,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
   function getMissingReasons(p) {
     const reasons = [];
     const hasNoTags = !p.tags || p.tags.length === 0;
-    const hasNoDifficulty =
-      !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
+    const hasNoDifficulty = !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
 
     if (hasNoTags) reasons.push("Missing tags");
     if (hasNoDifficulty) reasons.push("Missing difficulty level");
@@ -50,8 +49,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
   const missing = (problems || [])
     .filter((p) => {
       const noTags = !p.tags || p.tags.length === 0;
-      const noDifficulty =
-        !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
+      const noDifficulty = !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
       return noTags || noDifficulty;
     })
     .filter((p) => !ignoredIds.has(p.id)); // Exclude ignored
@@ -63,15 +61,12 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
     try {
       if (typeof chrome !== "undefined" && chrome.runtime?.id) {
         await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage(
-            { type: "REFRESH_METADATA", problems: [p] },
-            (resp) => {
-              if (chrome.runtime.lastError)
-                return reject(new Error(chrome.runtime.lastError.message));
-              if (resp?.ok) return resolve(resp);
-              return reject(new Error(resp?.error || "refresh failed"));
-            },
-          );
+          chrome.runtime.sendMessage({ type: "REFRESH_METADATA", problems: [p] }, (resp) => {
+            if (chrome.runtime.lastError)
+              return reject(new Error(chrome.runtime.lastError.message));
+            if (resp?.ok) return resolve(resp);
+            return reject(new Error(resp?.error || "refresh failed"));
+          });
         });
       }
     } catch (e) {
@@ -163,22 +158,18 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
           <div>
             <h3 class="text-lg font-semibold">Missing Metadata</h3>
             <p class="text-xs text-slate-500 mt-1">
-              ${missing.length} problem${missing.length !== 1 ? "s" : ""} need
-              metadata
+              ${missing.length} problem${missing.length !== 1 ? "s" : ""} need metadata
               ${ignored.length > 0 ? ` • ${ignored.length} ignored` : ""}
             </p>
           </div>
-          <button
-            onClick=${onClose}
-            class="text-slate-400 hover:text-white text-2xl leading-none"
-          >
+          <button onClick=${onClose} class="text-slate-400 hover:text-white text-2xl leading-none">
             ×
           </button>
         </div>
 
         <p class="text-sm text-slate-400 mb-4">
-          The following problems have missing tags or difficulty levels. You can
-          refresh them individually or ignore them.
+          The following problems have missing tags or difficulty levels. You can refresh them
+          individually or ignore them.
         </p>
 
         ${missing.length > 0 &&
@@ -197,9 +188,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
               ${missing.map((p) => {
                 const reasons = getMissingReasons(p);
                 return html`
-                  <div
-                    class="p-3 bg-white/1 rounded border border-white/3 flex items-center gap-3"
-                  >
+                  <div class="p-3 bg-white/1 rounded border border-white/3 flex items-center gap-3">
                     <input
                       type="checkbox"
                       onChange=${(e) => toggleIgnore(p.id, e.target.checked)}
@@ -207,15 +196,11 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
                       title="Ignore this problem"
                     />
                     <div class="flex-1 min-w-0">
-                      <div class="text-sm font-medium truncate">
-                        ${p.title || p.id}
-                      </div>
+                      <div class="text-sm font-medium truncate">${p.title || p.id}</div>
                       <div class="text-xs text-slate-500 truncate">
                         ${p.platform} → ${p.titleSlug || p.id}
                       </div>
-                      <div class="text-xs text-amber-400/80 mt-1">
-                        ${reasons.join(", ")}
-                      </div>
+                      <div class="text-xs text-amber-400/80 mt-1">${reasons.join(", ")}</div>
                     </div>
                     <button
                       onClick=${() => queueRefreshOne(p)}
@@ -238,9 +223,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
         html`
           <div class="p-4 bg-white/2 rounded-lg border border-white/5">
             <div class="flex items-center justify-between gap-4 mb-3">
-              <h4 class="text-sm font-medium text-slate-400">
-                ${ignored.length} Ignored
-              </h4>
+              <h4 class="text-sm font-medium text-slate-400">${ignored.length} Ignored</h4>
               <button
                 onClick=${unignoreAll}
                 class="text-xs px-3 py-1 bg-slate-700/50 hover:bg-slate-600/50 rounded transition-colors"
@@ -277,9 +260,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
         ${missing.length === 0 &&
         ignored.length === 0 &&
         html`
-          <div
-            class="p-4 bg-white/2 rounded-lg text-center text-sm text-slate-400"
-          >
+          <div class="p-4 bg-white/2 rounded-lg text-center text-sm text-slate-400">
             All problems have complete metadata!
           </div>
         `}

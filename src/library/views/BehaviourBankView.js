@@ -11,11 +11,7 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { createDebugger } from "../../lib/debug.js";
-import {
-  getInsights,
-  saveInsight,
-  deleteInsight,
-} from "../../core/memory/knowledge-bank.js";
+import { getInsights, saveInsight, deleteInsight } from "../../core/memory/knowledge-bank.js";
 import {
   getAllSkills,
   saveUserSkill,
@@ -121,11 +117,7 @@ function InsightsSection() {
       </div>
 
       ${msg &&
-      html`<p
-        class="text-xs ${msg.startsWith("Failed")
-          ? "text-rose-400"
-          : "text-emerald-400"}"
-      >
+      html`<p class="text-xs ${msg.startsWith("Failed") ? "text-rose-400" : "text-emerald-400"}">
         ${msg}
       </p>`}
       ${addForm &&
@@ -182,9 +174,7 @@ function InsightsSection() {
             />
           </div>
           <div>
-            <label class="text-xs text-slate-400 mb-1 block"
-              >Tags (comma-separated)</label
-            >
+            <label class="text-xs text-slate-400 mb-1 block">Tags (comma-separated)</label>
             <input
               type="text"
               value=${form.tags}
@@ -209,18 +199,12 @@ function InsightsSection() {
         ? html`<p class="text-xs text-slate-500 py-4">Loading...</p>`
         : insights.length === 0
           ? html`<p class="text-xs text-slate-500 py-4">
-              No insights yet. The AI will add insights here as you chat and
-              solve problems.
+              No insights yet. The AI will add insights here as you chat and solve problems.
             </p>`
           : Object.entries(byTopic).map(
               ([topic, items]) => html`
-                <div
-                  key=${topic}
-                  class="p-4 bg-white/3 border border-white/8 rounded-xl"
-                >
-                  <h4
-                    class="text-xs font-medium text-cyan-400 uppercase tracking-widest mb-3"
-                  >
+                <div key=${topic} class="p-4 bg-white/3 border border-white/8 rounded-xl">
+                  <h4 class="text-xs font-medium text-cyan-400 uppercase tracking-widest mb-3">
                     ${topic}
                   </h4>
                   <div class="flex flex-col gap-2">
@@ -231,9 +215,7 @@ function InsightsSection() {
                           class="flex items-start gap-3 p-3 bg-white/5 border border-white/8 rounded-lg group"
                         >
                           <div class="flex-1 min-w-0">
-                            <p class="text-xs text-slate-300 leading-relaxed">
-                              ${item.content}
-                            </p>
+                            <p class="text-xs text-slate-300 leading-relaxed">${item.content}</p>
                             ${item.tags?.length > 0 &&
                             html`
                               <div class="flex flex-wrap gap-1 mt-1.5">
@@ -294,14 +276,11 @@ function MilestoneCard({ milestone, problems, onNavigate }) {
   const target = milestone.targetCount || 5;
   const pct = Math.min(100, Math.round((solved / target) * 100));
   const done = solved >= target;
-  const diffClass =
-    DIFFICULTY_COLORS[milestone.difficulty] || DIFFICULTY_COLORS.Medium;
+  const diffClass = DIFFICULTY_COLORS[milestone.difficulty] || DIFFICULTY_COLORS.Medium;
 
   return html`
     <div
-      class="p-4 bg-white/3 border ${done
-        ? "border-emerald-500/30"
-        : "border-white/8"} rounded-xl"
+      class="p-4 bg-white/3 border ${done ? "border-emerald-500/30" : "border-white/8"} rounded-xl"
     >
       <div class="flex items-start justify-between gap-3 mb-2">
         <div class="flex-1 min-w-0">
@@ -311,27 +290,19 @@ function MilestoneCard({ milestone, problems, onNavigate }) {
               : html`<span
                   class="w-4 h-4 rounded-full border border-white/20 inline-block flex-shrink-0"
                 ></span>`}
-            <span class="text-sm font-medium text-slate-200"
-              >${milestone.topic}</span
-            >
+            <span class="text-sm font-medium text-slate-200">${milestone.topic}</span>
             <span class="text-[10px] px-1.5 py-0.5 rounded border ${diffClass}"
               >${milestone.difficulty || "Medium"}</span
             >
             ${milestone.week
-              ? html`<span class="text-[10px] text-slate-600"
-                  >Week ${milestone.week}</span
-                >`
+              ? html`<span class="text-[10px] text-slate-600">Week ${milestone.week}</span>`
               : ""}
           </div>
           ${milestone.description
-            ? html`<p class="text-xs text-slate-500 ml-6">
-                ${milestone.description}
-              </p>`
+            ? html`<p class="text-xs text-slate-500 ml-6">${milestone.description}</p>`
             : ""}
         </div>
-        <span class="text-xs text-slate-400 flex-shrink-0"
-          >${solved}/${target}</span
-        >
+        <span class="text-xs text-slate-400 flex-shrink-0">${solved}/${target}</span>
       </div>
       <div class="h-1.5 rounded-full bg-white/8 overflow-hidden mb-2">
         <div
@@ -396,14 +367,10 @@ function RoadmapSection({ problems, onNavigate }) {
           reject(new Error("Extension not available"));
           return;
         }
-        chrome.runtime.sendMessage(
-          { type: "GENERATE_ROADMAP", ...form },
-          (r) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
-            else resolve(r);
-          },
-        );
+        chrome.runtime.sendMessage({ type: "GENERATE_ROADMAP", ...form }, (r) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(r);
+        });
       });
       if (!resp?.ok) throw new Error(resp?.error || "Generation failed");
       const roadmap = {
@@ -442,9 +409,8 @@ function RoadmapSection({ problems, onNavigate }) {
 
   const totalMilestones = currentRoadmap?.milestones?.length || 0;
   const completedMilestones =
-    currentRoadmap?.milestones?.filter(
-      (m) => calcProgress(m, problems) >= (m.targetCount || 5),
-    ).length || 0;
+    currentRoadmap?.milestones?.filter((m) => calcProgress(m, problems) >= (m.targetCount || 5))
+      .length || 0;
 
   if (screen === "generating")
     return html`
@@ -467,21 +433,16 @@ function RoadmapSection({ problems, onNavigate }) {
           >
             ← Back
           </button>
-          <h3 class="text-sm font-medium text-slate-200">
-            Create Roadmap with AI
-          </h3>
+          <h3 class="text-sm font-medium text-slate-200">Create Roadmap with AI</h3>
         </div>
         ${msg && html`<p class="text-xs text-rose-400">${msg}</p>`}
         <div class="flex flex-col gap-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="text-xs text-slate-400 mb-1 block"
-                >Current Level</label
-              >
+              <label class="text-xs text-slate-400 mb-1 block">Current Level</label>
               <select
                 value=${form.level}
-                onChange=${(e) =>
-                  setForm((f) => ({ ...f, level: e.target.value }))}
+                onChange=${(e) => setForm((f) => ({ ...f, level: e.target.value }))}
                 class="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50"
               >
                 <option value="beginner">Beginner</option>
@@ -493,8 +454,7 @@ function RoadmapSection({ problems, onNavigate }) {
               <label class="text-xs text-slate-400 mb-1 block">Timeframe</label>
               <select
                 value=${form.timeframe}
-                onChange=${(e) =>
-                  setForm((f) => ({ ...f, timeframe: e.target.value }))}
+                onChange=${(e) => setForm((f) => ({ ...f, timeframe: e.target.value }))}
                 class="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50"
               >
                 <option value="2 weeks">2 Weeks</option>
@@ -515,14 +475,11 @@ function RoadmapSection({ problems, onNavigate }) {
             />
           </div>
           <div>
-            <label class="text-xs text-slate-400 mb-1 block"
-              >Focus Topics (optional)</label
-            >
+            <label class="text-xs text-slate-400 mb-1 block">Focus Topics (optional)</label>
             <input
               type="text"
               value=${form.topics}
-              onInput=${(e) =>
-                setForm((f) => ({ ...f, topics: e.target.value }))}
+              onInput=${(e) => setForm((f) => ({ ...f, topics: e.target.value }))}
               placeholder="e.g. graphs, dynamic programming, trees"
               class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
             />
@@ -551,10 +508,7 @@ function RoadmapSection({ problems, onNavigate }) {
                   class="bg-[#0a0a0f] border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
                 >
                   ${roadmaps.map(
-                    (r) =>
-                      html`<option key=${r.id} value=${r.id}>
-                        ${r.title || "Roadmap"}
-                      </option>`,
+                    (r) => html`<option key=${r.id} value=${r.id}>${r.title || "Roadmap"}</option>`,
                   )}
                 </select>
               `
@@ -562,9 +516,7 @@ function RoadmapSection({ problems, onNavigate }) {
               ? html`<span class="text-sm font-medium text-slate-200"
                   >${currentRoadmap.title}</span
                 >`
-              : html`<span class="text-sm text-slate-500"
-                  >No roadmap yet</span
-                >`}
+              : html`<span class="text-sm text-slate-500">No roadmap yet</span>`}
         </div>
         <div class="flex items-center gap-2">
           ${currentRoadmap && onNavigate
@@ -597,26 +549,19 @@ function RoadmapSection({ problems, onNavigate }) {
       ${currentRoadmap
         ? html`
             <!-- Progress summary -->
-            <div
-              class="p-3 bg-white/3 border border-white/8 rounded-xl flex items-center gap-4"
-            >
+            <div class="p-3 bg-white/3 border border-white/8 rounded-xl flex items-center gap-4">
               <div class="flex-1">
                 <div class="flex items-center justify-between mb-1.5">
                   <span class="text-xs text-slate-400"
-                    >${completedMilestones}/${totalMilestones} milestones
-                    completed</span
+                    >${completedMilestones}/${totalMilestones} milestones completed</span
                   >
-                  <span class="text-xs text-slate-500"
-                    >${currentRoadmap.goal}</span
-                  >
+                  <span class="text-xs text-slate-500">${currentRoadmap.goal}</span>
                 </div>
                 <div class="h-1.5 rounded-full bg-white/8 overflow-hidden">
                   <div
                     class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-500"
                     style="width: ${totalMilestones
-                      ? Math.round(
-                          (completedMilestones / totalMilestones) * 100,
-                        )
+                      ? Math.round((completedMilestones / totalMilestones) * 100)
                       : 0}%"
                   ></div>
                 </div>
@@ -637,16 +582,12 @@ function RoadmapSection({ problems, onNavigate }) {
             </div>
           `
         : html`
-            <div
-              class="p-8 bg-white/3 border border-white/8 rounded-xl text-center"
-            >
+            <div class="p-8 bg-white/3 border border-white/8 rounded-xl text-center">
               <p class="text-2xl mb-3">🗺️</p>
-              <p class="text-sm font-medium text-slate-300 mb-1">
-                No roadmap yet
-              </p>
+              <p class="text-sm font-medium text-slate-300 mb-1">No roadmap yet</p>
               <p class="text-xs text-slate-500 max-w-sm mx-auto">
-                Create an AI-powered study roadmap tailored to your goals.
-                Progress auto-updates as you solve problems.
+                Create an AI-powered study roadmap tailored to your goals. Progress auto-updates as
+                you solve problems.
               </p>
             </div>
           `}
@@ -697,11 +638,7 @@ function SkillsSection() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (
-      !form.id.trim() ||
-      !form.name.trim() ||
-      !form.system_prompt_modifier.trim()
-    ) {
+    if (!form.id.trim() || !form.name.trim() || !form.system_prompt_modifier.trim()) {
       setMsg("ID, name, and prompt modifier are required.");
       return;
     }
@@ -746,11 +683,7 @@ function SkillsSection() {
   return html`
     <div class="flex flex-col gap-4">
       ${msg &&
-      html`<p
-        class="text-xs ${msg.startsWith("Failed")
-          ? "text-rose-400"
-          : "text-emerald-400"}"
-      >
+      html`<p class="text-xs ${msg.startsWith("Failed") ? "text-rose-400" : "text-emerald-400"}">
         ${msg}
       </p>`}
 
@@ -770,18 +703,11 @@ function SkillsSection() {
           <div class="flex flex-col gap-2 mt-3">
             ${BUILTIN_SKILLS.map(
               (skill) => html`
-                <div
-                  key=${skill.id}
-                  class="p-3 bg-white/5 border border-white/8 rounded-lg"
-                >
+                <div key=${skill.id} class="p-3 bg-white/5 border border-white/8 rounded-lg">
                   <div class="flex items-start justify-between gap-2">
                     <div>
-                      <p class="text-xs font-medium text-white">
-                        ${skill.name}
-                      </p>
-                      <p class="text-xs text-slate-500 mt-0.5">
-                        ${skill.description}
-                      </p>
+                      <p class="text-xs font-medium text-white">${skill.name}</p>
+                      <p class="text-xs text-slate-500 mt-0.5">${skill.description}</p>
                     </div>
                     <span
                       class="px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs rounded flex-shrink-0"
@@ -816,9 +742,7 @@ function SkillsSection() {
         >
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="text-xs text-slate-400 mb-1 block"
-                >Skill ID (unique)</label
-              >
+              <label class="text-xs text-slate-400 mb-1 block">Skill ID (unique)</label>
               <input
                 type="text"
                 value=${form.id}
@@ -832,9 +756,7 @@ function SkillsSection() {
               />
             </div>
             <div>
-              <label class="text-xs text-slate-400 mb-1 block"
-                >Display Name</label
-              >
+              <label class="text-xs text-slate-400 mb-1 block">Display Name</label>
               <input
                 type="text"
                 value=${form.name}
@@ -860,18 +782,12 @@ function SkillsSection() {
               class="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50"
             >
               ${SKILL_TRIGGER_OPTIONS.map(
-                (opt) => html`
-                  <option key=${opt.value} value=${opt.value}>
-                    ${opt.label}
-                  </option>
-                `,
+                (opt) => html` <option key=${opt.value} value=${opt.value}>${opt.label}</option> `,
               )}
             </select>
           </div>
           <div>
-            <label class="text-xs text-slate-400 mb-1 block"
-              >Description (optional)</label
-            >
+            <label class="text-xs text-slate-400 mb-1 block">Description (optional)</label>
             <input
               type="text"
               value=${form.description}
@@ -885,9 +801,7 @@ function SkillsSection() {
             />
           </div>
           <div>
-            <label class="text-xs text-slate-400 mb-1 block"
-              >System Prompt Modifier</label
-            >
+            <label class="text-xs text-slate-400 mb-1 block">System Prompt Modifier</label>
             <textarea
               value=${form.system_prompt_modifier}
               onInput=${(e) =>
@@ -910,14 +824,11 @@ function SkillsSection() {
       `}
       ${userSkills.length === 0 && !addForm
         ? html`
-            <div
-              class="p-6 bg-white/3 border border-white/8 rounded-xl text-center"
-            >
+            <div class="p-6 bg-white/3 border border-white/8 rounded-xl text-center">
               <p class="text-sm text-slate-500 mb-1">No custom skills yet.</p>
               <p class="text-xs text-slate-600">
-                Create skills to modify how the AI behaves in specific
-                situations — like a Socratic tutor, a strict time-complexity
-                reviewer, or a language-specific expert.
+                Create skills to modify how the AI behaves in specific situations — like a Socratic
+                tutor, a strict time-complexity reviewer, or a language-specific expert.
               </p>
             </div>
           `
@@ -932,21 +843,15 @@ function SkillsSection() {
                     <div class="flex items-start justify-between gap-2">
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
-                          <p class="text-xs font-medium text-white">
-                            ${skill.name}
-                          </p>
+                          <p class="text-xs font-medium text-white">${skill.name}</p>
                           <span
                             class="px-1.5 py-0.5 bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs rounded"
                             >${skill.trigger}</span
                           >
                         </div>
                         ${skill.description &&
-                        html`<p class="text-xs text-slate-500">
-                          ${skill.description}
-                        </p>`}
-                        <p
-                          class="text-xs text-slate-400 mt-1.5 leading-relaxed line-clamp-2"
-                        >
+                        html`<p class="text-xs text-slate-500">${skill.description}</p>`}
+                        <p class="text-xs text-slate-400 mt-1.5 leading-relaxed line-clamp-2">
                           ${skill.system_prompt_modifier}
                         </p>
                       </div>
@@ -978,22 +883,19 @@ export function BehaviourBankView({ problems = [], onNavigate }) {
       <div>
         <h1 class="text-2xl font-light text-white mb-1">Behaviour Bank</h1>
         <p class="text-sm text-slate-400">
-          Persistent AI memory — insights, roadmap, and custom skills that shape
-          how the AI assists you.
+          Persistent AI memory — insights, roadmap, and custom skills that shape how the AI assists
+          you.
         </p>
       </div>
 
       <!-- Tab switcher -->
-      <div
-        class="flex gap-1 p-1 bg-white/5 border border-white/10 rounded-xl w-fit"
-      >
+      <div class="flex gap-1 p-1 bg-white/5 border border-white/10 rounded-xl w-fit">
         ${TABS.map(
           (t) => html`
             <button
               key=${t.id}
               onClick=${() => setTab(t.id)}
-              class="px-4 py-1.5 rounded-lg text-xs transition-colors ${tab ===
-              t.id
+              class="px-4 py-1.5 rounded-lg text-xs transition-colors ${tab === t.id
                 ? "bg-cyan-600/30 border border-cyan-500/30 text-cyan-300"
                 : "text-slate-400 hover:text-slate-200"}"
             >

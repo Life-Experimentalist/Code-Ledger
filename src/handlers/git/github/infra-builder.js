@@ -25,12 +25,7 @@ import { CONSTANTS } from "../../../core/constants.js";
 import { LAYOUT_VERSION } from "../../../core/path-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { getPagesHtml, getRepoReadme } from "./pages-template.js";
-import {
-  getCommitHistory,
-  getContents,
-  listDirectory,
-  createBlob,
-} from "./api-client.js";
+import { getCommitHistory, getContents, listDirectory, createBlob } from "./api-client.js";
 import { DEFAULT_THEME, getThemePalette } from "../../../core/theme-engine.js";
 
 const dbg = createDebugger("GitHubInfra");
@@ -60,13 +55,7 @@ export async function buildInfraFiles(
   const items = [];
 
   // Dynamic files — always up to date
-  const dynamic = await _buildDynamicFiles(
-    owner,
-    repo,
-    token,
-    settings,
-    indexMetaOverride,
-  );
+  const dynamic = await _buildDynamicFiles(owner, repo, token, settings, indexMetaOverride);
   items.push(...dynamic);
 
   // Bootstrap files — only on first commit so they never re-dirty the tree
@@ -74,9 +63,7 @@ export async function buildInfraFiles(
     items.push(...(await _buildBootstrapFiles(owner, repo, token, settings)));
   }
 
-  dbg.log(
-    `buildInfraFiles(): ${items.length} infra file(s) (isNewRepo=${isNewRepo})`,
-  );
+  dbg.log(`buildInfraFiles(): ${items.length} infra file(s) (isNewRepo=${isNewRepo})`);
   return items;
 }
 
@@ -94,9 +81,7 @@ function _mergeReadme(existing, newBlock) {
   const si = existing.indexOf(STATS_START);
   const ei = existing.indexOf(STATS_END);
   if (si === -1 || ei === -1 || ei < si) return newBlock;
-  return (
-    existing.slice(0, si) + newBlock + existing.slice(ei + STATS_END.length)
-  );
+  return existing.slice(0, si) + newBlock + existing.slice(ei + STATS_END.length);
 }
 
 /** Decode GitHub's base64-encoded file content (handles line-wrapped base64). */
@@ -150,31 +135,18 @@ jobs:
         uses: actions/deploy-pages@v4
 `;
 
-async function _buildDynamicFiles(
-  owner,
-  repo,
-  token,
-  settings,
-  indexMetaOverride = null,
-) {
+async function _buildDynamicFiles(owner, repo, token, settings, indexMetaOverride = null) {
   const theme = await Storage.getTheme().catch(() => null);
   const pagesTheme = _buildPagesTheme(theme);
   // Use caller-supplied meta when available (e.g. REFRESH_INFRA passes fresh local data).
   // Avoids the one-commit-lag where README is generated from the OLD repo index.json.
   const indexMeta =
-    indexMetaOverride ??
-    (await _readIndexMeta(owner, repo, token).catch(() => null));
+    indexMetaOverride ?? (await _readIndexMeta(owner, repo, token).catch(() => null));
 
   const items = [];
 
   if (settings?.github_pages !== false) {
-    const pageHtml = await _buildPagesContent(
-      owner,
-      repo,
-      token,
-      pagesTheme,
-      settings,
-    );
+    const pageHtml = await _buildPagesContent(owner, repo, token, pagesTheme, settings);
     items.push({
       path: "index.html",
       mode: "100644",
@@ -184,24 +156,12 @@ async function _buildDynamicFiles(
   }
 
   // ── README: read-before-write so user content outside the markers is kept ──
-  const pagesUrl =
-    settings?.github_pages_url || `https://${owner}.github.io/${repo}/`;
-  const newStatsBlock = getRepoReadme(
-    owner,
-    repo,
-    pagesUrl,
-    pagesTheme,
-    settings,
-    indexMeta,
-  );
+  const pagesUrl = settings?.github_pages_url || `https://${owner}.github.io/${repo}/`;
+  const newStatsBlock = getRepoReadme(owner, repo, pagesUrl, pagesTheme, settings, indexMeta);
   try {
     const existing = await getContents(owner, repo, "README.md", token);
-    const currentText = existing?.content
-      ? _decodeContent(existing.content)
-      : null;
-    const merged = currentText
-      ? _mergeReadme(currentText, newStatsBlock)
-      : newStatsBlock;
+    const currentText = existing?.content ? _decodeContent(existing.content) : null;
+    const merged = currentText ? _mergeReadme(currentText, newStatsBlock) : newStatsBlock;
     if (merged !== currentText) {
       items.push({
         path: "README.md",
@@ -225,15 +185,8 @@ async function _buildDynamicFiles(
 
   // ── deploy-pages.yml: keep current so existing repos get path-filter fix ──
   try {
-    const existing = await getContents(
-      owner,
-      repo,
-      ".github/workflows/deploy-pages.yml",
-      token,
-    );
-    const currentText = existing?.content
-      ? _decodeContent(existing.content)
-      : null;
+    const existing = await getContents(owner, repo, ".github/workflows/deploy-pages.yml", token);
+    const currentText = existing?.content ? _decodeContent(existing.content) : null;
     if (currentText !== DEPLOY_PAGES_YML) {
       items.push({
         path: ".github/workflows/deploy-pages.yml",
@@ -380,8 +333,7 @@ build/
       const buf = await res.arrayBuffer();
       let binary = "";
       const bytes = new Uint8Array(buf);
-      for (let i = 0; i < bytes.byteLength; i++)
-        binary += String.fromCharCode(bytes[i]);
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
       const b64 = btoa(binary);
       const blob = await createBlob(owner, repo, b64, token);
       items.push({
@@ -392,10 +344,7 @@ build/
       });
       dbg.log(`_buildBootstrapFiles(): added image ${assetPath}`);
     } catch (e) {
-      dbg.warn(
-        `_buildBootstrapFiles(): skipping image ${assetPath}:`,
-        e?.message,
-      );
+      dbg.warn(`_buildBootstrapFiles(): skipping image ${assetPath}:`, e?.message);
     }
   }
 
@@ -412,21 +361,13 @@ async function _buildPagesContent(owner, repo, token, pagesTheme, settings) {
   // Commit verification summary (opt-in)
   if (settings?.pages_show_verification) {
     try {
-      const commits = await getCommitHistory(
-        owner,
-        repo,
-        { per_page: 20 },
-        token,
-      );
+      const commits = await getCommitHistory(owner, repo, { per_page: 20 }, token);
       const list = Array.isArray(commits) ? commits : [];
-      const verified = list.filter(
-        (c) => c?.commit?.verification?.verified,
-      ).length;
+      const verified = list.filter((c) => c?.commit?.verification?.verified).length;
       commitSummary = { total: list.length, verified };
       commitList = list.slice(0, 20).map((c) => ({
         sha: c.sha,
-        url:
-          c.html_url || `https://github.com/${owner}/${repo}/commit/${c.sha}`,
+        url: c.html_url || `https://github.com/${owner}/${repo}/commit/${c.sha}`,
         message: c.commit?.message?.split("\n")[0] || "",
         author: c.author?.login || c.commit?.author?.name || "",
         verified: !!c.commit?.verification?.verified,
@@ -440,9 +381,7 @@ async function _buildPagesContent(owner, repo, token, pagesTheme, settings) {
   try {
     const entries = await listDirectory(owner, repo, "report-images", token);
     reportImages = entries
-      .filter(
-        (e) => e.type === "file" && /\.(png|jpe?g|svg|gif|webp)$/i.test(e.name),
-      )
+      .filter((e) => e.type === "file" && /\.(png|jpe?g|svg|gif|webp)$/i.test(e.name))
       .map((e) => e.path);
   } catch (_) {}
 

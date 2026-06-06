@@ -148,9 +148,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   };
 
   const ghFetch = async (path, opts = {}) => {
-    const url = path.startsWith("http")
-      ? path
-      : `https://api.github.com${path}`;
+    const url = path.startsWith("http") ? path : `https://api.github.com${path}`;
     const res = await fetch(url, {
       ...opts,
       headers: { ...ghHeaders, ...(opts.headers || {}) },
@@ -190,16 +188,13 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       syncPortRef.current = null;
     });
 
-    chrome.runtime.sendMessage(
-      { type: "RESYNC_ALL", mode: "individual" },
-      (resp) => {
-        if (chrome.runtime.lastError || !resp?.ok) {
-          setPostSyncState("error");
-          return;
-        }
-        setPostSyncState({ committed: resp.committed || 0 });
-      },
-    );
+    chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode: "individual" }, (resp) => {
+      if (chrome.runtime.lastError || !resp?.ok) {
+        setPostSyncState("error");
+        return;
+      }
+      setPostSyncState({ committed: resp.committed || 0 });
+    });
   };
 
   const saveRepoConfig = async (owner, repo) => {
@@ -288,39 +283,29 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     setError("");
     setProgress("Validating…");
     try {
-      if (!token)
-        throw new Error(
-          "Authentication token missing. Please reconnect to GitHub.",
-        );
+      if (!token) throw new Error("Authentication token missing. Please reconnect to GitHub.");
 
       const cleanName = sanitize(repoName);
       if (!cleanName)
-        throw new Error(
-          "Invalid repository name. Use letters, numbers, and hyphens.",
-        );
+        throw new Error("Invalid repository name. Use letters, numbers, and hyphens.");
       if (nameCheck === "taken")
-        throw new Error(
-          `Repository "${cleanName}" already exists under ${selectedOwner}.`,
-        );
+        throw new Error(`Repository "${cleanName}" already exists under ${selectedOwner}.`);
 
       const isOrg = selectedOwner !== username;
       setProgress("Creating repository…");
       let repoData;
       try {
-        repoData = await ghFetch(
-          isOrg ? `/orgs/${selectedOwner}/repos` : "/user/repos",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              name: cleanName,
-              description: DEFAULT_REPO_DESC,
-              private: false,
-              auto_init: true,
-              has_wiki: false,
-              has_issues: true,
-            }),
-          },
-        );
+        repoData = await ghFetch(isOrg ? `/orgs/${selectedOwner}/repos` : "/user/repos", {
+          method: "POST",
+          body: JSON.stringify({
+            name: cleanName,
+            description: DEFAULT_REPO_DESC,
+            private: false,
+            auto_init: true,
+            has_wiki: false,
+            has_issues: true,
+          }),
+        });
       } catch (e) {
         if (e.status === 403 || e.status === 401)
           throw new Error(
@@ -337,11 +322,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       await initializeRepository(repoData.owner.login, repoData.name, token);
 
       setProgress("Applying repository settings…");
-      await configureRepositoryPresentation(
-        repoData.owner.login,
-        repoData.name,
-        token,
-      );
+      await configureRepositoryPresentation(repoData.owner.login, repoData.name, token);
 
       setProgress("Enabling GitHub Pages…");
       await enableGitHubPages(repoData.owner.login, repoData.name, token);
@@ -372,16 +353,14 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     setError("");
     setProgress("Validating repository…");
     try {
-      const repoData = await ghFetch(
-        `/repos/${selectedOwner}/${repoToLink}`,
-      ).catch((e) => {
+      const repoData = await ghFetch(`/repos/${selectedOwner}/${repoToLink}`).catch((e) => {
         if (e.status === 404) throw new Error("Repository not found.");
         throw e;
       });
 
-      const contents = await ghFetch(
-        `/repos/${selectedOwner}/${repoToLink}/contents`,
-      ).catch(() => []);
+      const contents = await ghFetch(`/repos/${selectedOwner}/${repoToLink}/contents`).catch(
+        () => [],
+      );
       if (
         Array.isArray(contents) &&
         contents.length > 0 &&
@@ -397,21 +376,14 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
         setProgress("Initializing repository structure…");
         await initializeRepository(repoData.owner.login, repoData.name, token);
         setProgress("Applying repository settings…");
-        await configureRepositoryPresentation(
-          repoData.owner.login,
-          repoData.name,
-          token,
-        );
+        await configureRepositoryPresentation(repoData.owner.login, repoData.name, token);
       }
 
       await saveRepoConfig(repoData.owner.login, repoData.name);
       setFinalRepo(repoData.name);
       setFinalOwner(repoData.owner.login);
 
-      if (
-        Array.isArray(contents) &&
-        contents.some((f) => f.name === "index.json")
-      ) {
+      if (Array.isArray(contents) && contents.some((f) => f.name === "index.json")) {
         setProgress("Reading existing problems from repository…");
         try {
           const _git = registry.getGitProvider("github");
@@ -476,17 +448,11 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       >
         <option value=${username || ""}>${username || "—"} (personal)</option>
         ${orgs.map(
-          (org) => html`
-            <option value=${org.login} key=${org.login}>
-              ${org.login} (org)
-            </option>
-          `,
+          (org) => html` <option value=${org.login} key=${org.login}>${org.login} (org)</option> `,
         )}
       </select>
       ${orgsLoading
-        ? html`<p class="text-[10px] text-slate-600 mt-1">
-            Loading organizations…
-          </p>`
+        ? html`<p class="text-[10px] text-slate-600 mt-1">Loading organizations…</p>`
         : ""}
     </div>
   `;
@@ -504,9 +470,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
   const nameCheckBadge =
     nameCheck === "checking"
-      ? html`<span class="text-[10px] text-slate-500"
-          >Checking availability…</span
-        >`
+      ? html`<span class="text-[10px] text-slate-500">Checking availability…</span>`
       : nameCheck === "available"
         ? html`<span class="text-[10px] text-emerald-400">✓ Available</span>`
         : nameCheck === "taken"
@@ -571,14 +535,10 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
         class="bg-[#0a0a0f] border border-cyan-500/20 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col"
       >
         <!-- Header -->
-        <div
-          class="px-8 py-6 border-b border-white/5 flex items-center justify-between shrink-0"
-        >
+        <div class="px-8 py-6 border-b border-white/5 flex items-center justify-between shrink-0">
           <div>
             <h2 class="text-xl font-bold text-white">${stepTitle}</h2>
-            ${stepLabel
-              ? html`<p class="text-xs text-slate-500 mt-1">${stepLabel}</p>`
-              : ""}
+            ${stepLabel ? html`<p class="text-xs text-slate-500 mt-1">${stepLabel}</p>` : ""}
           </div>
           ${canClose
             ? html`
@@ -598,9 +558,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
           <!-- Token expired banner -->
           ${tokenExpired
             ? html`
-                <div
-                  class="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-3"
-                >
+                <div class="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-3">
                   <div class="flex items-start gap-2">
                     <span class="text-rose-400 shrink-0">⚠</span>
                     <div>
@@ -608,15 +566,14 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                         GitHub token expired or revoked
                       </p>
                       <p class="text-xs text-rose-400/70 mt-0.5">
-                        Your saved token is no longer valid. Please reconnect
-                        your GitHub account to continue.
+                        Your saved token is no longer valid. Please reconnect your GitHub account to
+                        continue.
                       </p>
                     </div>
                   </div>
                   <button
                     onClick=${() => {
-                      const authUrl =
-                        CONSTANTS.URLS.AUTH_WORKER + "/auth/github";
+                      const authUrl = CONSTANTS.URLS.AUTH_WORKER + "/auth/github";
                       window.open(authUrl, "OAuth", "width=600,height=700");
                     }}
                     class="w-full px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-sm rounded-lg transition-colors"
@@ -644,15 +601,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                 <div class="space-y-5 text-center">
                   <div class="text-4xl">✅</div>
                   <div>
-                    <h3 class="text-base font-semibold text-white">
-                      Repository configured
-                    </h3>
-                    <div
-                      class="mt-3 p-3 rounded-xl bg-white/5 border border-white/8 text-left"
-                    >
-                      <p
-                        class="text-[10px] text-slate-500 uppercase tracking-wider mb-1"
-                      >
+                    <h3 class="text-base font-semibold text-white">Repository configured</h3>
+                    <div class="mt-3 p-3 rounded-xl bg-white/5 border border-white/8 text-left">
+                      <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">
                         Connected repository
                       </p>
                       <p class="text-sm font-mono text-cyan-300">
@@ -693,18 +644,15 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                 <div class="space-y-4">
                   <p class="text-sm text-slate-400 mb-6">
                     Welcome,
-                    <span class="text-emerald-400 font-medium">${username}</span
-                    >! Choose how to set up your CodeLedger repository.
+                    <span class="text-emerald-400 font-medium">${username}</span>! Choose how to set
+                    up your CodeLedger repository.
                   </p>
 
                   <button
                     onClick=${() => {
                       setRepoName(DEFAULT_REPO_NAME);
                       setNameCheck(null);
-                      scheduleNameCheck(
-                        DEFAULT_REPO_NAME,
-                        selectedOwner || username,
-                      );
+                      scheduleNameCheck(DEFAULT_REPO_NAME, selectedOwner || username);
                       setStep("new");
                     }}
                     class="w-full p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors text-left group"
@@ -762,9 +710,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                   ${ownerDropdown}
 
                   <div>
-                    <label
-                      class="block text-xs font-medium text-slate-300 mb-2"
-                    >
+                    <label class="block text-xs font-medium text-slate-300 mb-2">
                       Repository Name
                     </label>
                     <input
@@ -772,8 +718,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                       value=${repoName}
                       onInput=${onRepoNameInput}
                       disabled=${busy}
-                      class="w-full px-3 py-2 bg-black border ${nameCheck ===
-                      "taken"
+                      class="w-full px-3 py-2 bg-black border ${nameCheck === "taken"
                         ? "border-rose-500/50"
                         : nameCheck === "available"
                           ? "border-emerald-500/50"
@@ -782,14 +727,11 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                       spellcheck="false"
                       autocomplete="off"
                     />
-                    <div
-                      class="flex items-center justify-between mt-1 min-h-[16px]"
-                    >
+                    <div class="flex items-center justify-between mt-1 min-h-[16px]">
                       ${namePreview} ${nameCheckBadge}
                     </div>
                     <p class="text-[10px] text-slate-600 mt-0.5">
-                      Letters, numbers, hyphens only. Spaces are replaced with
-                      hyphens.
+                      Letters, numbers, hyphens only. Spaces are replaced with hyphens.
                     </p>
                   </div>
 
@@ -802,9 +744,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     : ""}
                   ${progress && !error
                     ? html`
-                        <div
-                          class="flex items-center gap-2 text-xs text-cyan-400"
-                        >
+                        <div class="flex items-center gap-2 text-xs text-cyan-400">
                           <div
                             class="w-3 h-3 rounded-full border border-cyan-500/50 border-t-cyan-500 animate-spin shrink-0"
                           ></div>
@@ -845,17 +785,14 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
             ? html`
                 <div class="space-y-4">
                   <p class="text-xs text-slate-400">
-                    Select a repository to connect. It must be empty or already
-                    contain CodeLedger's
+                    Select a repository to connect. It must be empty or already contain CodeLedger's
                     <code class="text-cyan-400">index.json</code>.
                   </p>
 
                   ${ownerDropdown}
                   ${reposLoading
                     ? html`
-                        <div
-                          class="flex items-center gap-2 text-xs text-slate-400 py-4"
-                        >
+                        <div class="flex items-center gap-2 text-xs text-slate-400 py-4">
                           <div
                             class="w-4 h-4 rounded-full border border-slate-600 border-t-slate-300 animate-spin"
                           ></div>
@@ -864,22 +801,18 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                       `
                     : html`
                         <div>
-                          <label
-                            class="block text-xs font-medium text-slate-300 mb-2"
+                          <label class="block text-xs font-medium text-slate-300 mb-2"
                             >Repository</label
                           >
                           ${userRepos.length === 0
                             ? html`<p class="text-xs text-slate-500">
                                 No repositories found for
-                                <span class="text-slate-300"
-                                  >${selectedOwner}</span
-                                >.
+                                <span class="text-slate-300">${selectedOwner}</span>.
                               </p>`
                             : html`
                                 <select
                                   value=${selectedRepo}
-                                  onChange=${(e) =>
-                                    setSelectedRepo(e.target.value)}
+                                  onChange=${(e) => setSelectedRepo(e.target.value)}
                                   disabled=${busy}
                                   class="w-full px-3 py-2 bg-black border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                                 >
@@ -892,9 +825,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                                   )}
                                 </select>
                                 ${selectedRepo
-                                  ? html`<p
-                                      class="text-[10px] text-slate-500 mt-1 font-mono"
-                                    >
+                                  ? html`<p class="text-[10px] text-slate-500 mt-1 font-mono">
                                       ${selectedOwner}/${selectedRepo}
                                     </p>`
                                   : ""}
@@ -910,9 +841,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     : ""}
                   ${progress && !error
                     ? html`
-                        <div
-                          class="flex items-center gap-2 text-xs text-cyan-400"
-                        >
+                        <div class="flex items-center gap-2 text-xs text-cyan-400">
                           <div
                             class="w-3 h-3 rounded-full border border-cyan-500/50 border-t-cyan-500 animate-spin shrink-0"
                           ></div>
@@ -956,23 +885,18 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                         : "✅"}
                   </div>
                   <div>
-                    <h3 class="text-base font-semibold text-white">
-                      GitHub Setup Complete!
-                    </h3>
+                    <h3 class="text-base font-semibold text-white">GitHub Setup Complete!</h3>
                     <p class="text-sm text-slate-400 mt-2">
                       Every accepted solution will be automatically committed.
                     </p>
                   </div>
-                  <div
-                    class="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20"
-                  >
+                  <div class="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
                     <p class="text-xs text-slate-400 mb-1">Repository</p>
                     <p class="text-sm font-mono text-cyan-300">
                       ${finalOwner || username}/${finalRepo}
                     </p>
                     <a
-                      href="https://github.com/${finalOwner ||
-                      username}/${finalRepo}"
+                      href="https://github.com/${finalOwner || username}/${finalRepo}"
                       target="_blank"
                       rel="noreferrer"
                       class="text-[11px] text-cyan-500 hover:text-cyan-300 underline mt-1 inline-block"
@@ -983,9 +907,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                   ${postSyncState?.phase === "syncing"
                     ? html`
                         <div class="space-y-2">
-                          <div
-                            class="flex items-center justify-between text-xs text-cyan-400"
-                          >
+                          <div class="flex items-center justify-between text-xs text-cyan-400">
                             <span class="flex items-center gap-1.5">
                               <div
                                 class="w-2.5 h-2.5 rounded-full border border-cyan-500/50 border-t-cyan-500 animate-spin shrink-0"
@@ -1000,23 +922,18 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                           </div>
                           ${postSyncState.total > 0
                             ? html`
-                                <div
-                                  class="h-1.5 rounded-full bg-slate-700/60 overflow-hidden"
-                                >
+                                <div class="h-1.5 rounded-full bg-slate-700/60 overflow-hidden">
                                   <div
                                     class="h-full rounded-full bg-cyan-500 transition-all duration-300"
                                     style="width:${Math.round(
-                                      (postSyncState.current /
-                                        postSyncState.total) *
-                                        100,
+                                      (postSyncState.current / postSyncState.total) * 100,
                                     )}%"
                                   ></div>
                                 </div>
                               `
                             : ""}
                           <p class="text-[11px] text-slate-500">
-                            You can close this — sync continues in the
-                            background.
+                            You can close this — sync continues in the background.
                           </p>
                         </div>
                       `
@@ -1031,8 +948,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                         `
                       : postSyncState === "error"
                         ? html`<p class="text-xs text-amber-400">
-                            Could not auto-sync — use the Sync button in Git
-                            settings.
+                            Could not auto-sync — use the Sync button in Git settings.
                           </p>`
                         : ""}
                   <button
@@ -1060,9 +976,7 @@ async function initializeRepository(owner, repo, token) {
   };
 
   const ghFetch = async (path, opts = {}) => {
-    const url = path.startsWith("http")
-      ? path
-      : `https://api.github.com${path}`;
+    const url = path.startsWith("http") ? path : `https://api.github.com${path}`;
     const res = await fetch(url, {
       ...opts,
       headers: { ...headers, ...(opts.headers || {}) },
@@ -1085,14 +999,11 @@ async function initializeRepository(owner, repo, token) {
         ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/master`);
       }
       latestSha = ref.object.sha;
-      const commit = await ghFetch(
-        `/repos/${owner}/${repo}/git/commits/${latestSha}`,
-      );
+      const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
       baseTreeSha = commit.tree.sha;
       break;
     } catch (_) {
-      if (attempt === 5)
-        throw new Error("Repository branch not ready. Please try again.");
+      if (attempt === 5) throw new Error("Repository branch not ready. Please try again.");
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
@@ -1210,13 +1121,11 @@ async function enableGitHubPages(owner, repo, token) {
 
   // Fetch the actual Pages URL and set it as the repo homepage
   try {
-    const pagesRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/pages`,
-      { headers },
-    );
+    const pagesRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
+      headers,
+    });
     const pagesData = pagesRes.ok ? await pagesRes.json() : null;
-    const pagesUrl =
-      pagesData?.html_url || `https://${owner}.github.io/${repo}/`;
+    const pagesUrl = pagesData?.html_url || `https://${owner}.github.io/${repo}/`;
 
     // Save Pages URL to settings so infra-builder uses the real URL
     const settings = await Storage.getSettings();

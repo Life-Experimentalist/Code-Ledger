@@ -47,9 +47,7 @@ export function IncognitoBanner({ settings, onDisable }) {
   }, [settings?.incognitoExpiry]);
 
   return html`
-    <div
-      class="bg-amber-500/10 border-l-4 border-amber-500 p-4 mb-4 flex gap-3 items-start"
-    >
+    <div class="bg-amber-500/10 border-l-4 border-amber-500 p-4 mb-4 flex gap-3 items-start">
       <span class="text-amber-500 mt-0.5 shrink-0">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -68,14 +66,10 @@ export function IncognitoBanner({ settings, onDisable }) {
         </svg>
       </span>
       <div class="flex flex-col flex-1 min-w-0">
-        <span class="font-bold text-amber-500 text-sm"
-          >Incognito Mode Active</span
-        >
+        <span class="font-bold text-amber-500 text-sm">Incognito Mode Active</span>
         <span class="text-xs text-amber-500/80"
           >Solves will not be recorded or committed.
-          ${remaining
-            ? html`<span class="text-amber-400">(${remaining})</span>`
-            : ""}</span
+          ${remaining ? html`<span class="text-amber-400">(${remaining})</span>` : ""}</span
         >
       </div>
       <button

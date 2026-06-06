@@ -24,35 +24,27 @@ export function TelemetryPrompt({ onComplete }) {
           class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.15),transparent_50%)] pointer-events-none"
         ></div>
 
-        <h2 class="text-xl font-bold tracking-tight text-white z-10">
-          Help improve CodeLedger
-        </h2>
+        <h2 class="text-xl font-bold tracking-tight text-white z-10">Help improve CodeLedger</h2>
 
         <p class="text-sm text-slate-300 z-10 leading-relaxed">
-          CodeLedger can collect anonymous usage statistics using
-          CFlair-Counter. This helps us understand which platforms and features
-          are used most.
+          CodeLedger can collect anonymous usage statistics using CFlair-Counter. This helps us
+          understand which platforms and features are used most.
         </p>
 
         <div class="bg-black/30 rounded-lg p-3 border border-white/5 z-10">
-          <p
-            class="text-xs text-slate-400 font-mono flex items-center gap-2 mb-1"
-          >
+          <p class="text-xs text-slate-400 font-mono flex items-center gap-2 mb-1">
             <span class="text-emerald-400">✓</span> What we collect:
           </p>
           <p class="text-xs text-slate-500 mb-2 pl-5">
             Platform solve counts, extension version, and generic errors.
           </p>
 
-          <p
-            class="text-xs text-slate-400 font-mono flex items-center gap-2 mb-1"
-          >
-            <span class="text-rose-400 opacity-80">✗</span> What we NEVER
-            collect:
+          <p class="text-xs text-slate-400 font-mono flex items-center gap-2 mb-1">
+            <span class="text-rose-400 opacity-80">✗</span> What we NEVER collect:
           </p>
           <p class="text-xs text-slate-500 pl-5">
-            Your code, AI API keys, GitHub tokens, problem titles, or personally
-            identifiable information.
+            Your code, AI API keys, GitHub tokens, problem titles, or personally identifiable
+            information.
           </p>
         </div>
 

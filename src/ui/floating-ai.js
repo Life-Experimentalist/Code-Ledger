@@ -20,11 +20,7 @@ import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("FloatingAI");
 
-import {
-  expandChatVariables,
-  getUsedCommands,
-  CHAT_COMMANDS,
-} from "../lib/chat-variables.js";
+import { expandChatVariables, getUsedCommands, CHAT_COMMANDS } from "../lib/chat-variables.js";
 const DEFAULT_PLATFORM = {
   id: "generic",
   label: "AI Assistant",
@@ -39,10 +35,7 @@ const DEFAULT_PLATFORM = {
 
 function readMonacoEditorCode() {
   try {
-    const active = window.monaco?.editor
-      ?.getActiveCodeEditor?.()
-      ?.getModel?.()
-      ?.getValue?.();
+    const active = window.monaco?.editor?.getActiveCodeEditor?.()?.getModel?.()?.getValue?.();
     if (active && active.trim()) return active;
     const editors = window.monaco?.editor?.getEditors?.();
     if (editors?.length) {
@@ -58,13 +51,8 @@ function readMonacoEditorCode() {
     }
   } catch {}
   try {
-    const lineEls = [
-      ...document.querySelectorAll(".monaco-editor .view-lines .view-line"),
-    ];
-    lineEls.sort(
-      (a, b) =>
-        (parseInt(a.style.top, 10) || 0) - (parseInt(b.style.top, 10) || 0),
-    );
+    const lineEls = [...document.querySelectorAll(".monaco-editor .view-lines .view-line")];
+    lineEls.sort((a, b) => (parseInt(a.style.top, 10) || 0) - (parseInt(b.style.top, 10) || 0));
     if (lineEls.length > 0) return lineEls.map((l) => l.textContent).join("\n");
   } catch {}
   return "";
@@ -93,9 +81,7 @@ function readEditorCode() {
   } catch {}
   try {
     // Fallback: read visible lines from the DOM
-    const lines = document.querySelectorAll(
-      ".monaco-editor .view-lines .view-line",
-    );
+    const lines = document.querySelectorAll(".monaco-editor .view-lines .view-line");
     if (lines.length > 0) {
       return Array.from(lines)
         .map((l) => l.textContent)
@@ -109,12 +95,10 @@ function readEditorCode() {
 function readGenericTestFailures() {
   try {
     const resultLines = [];
-    document
-      .querySelectorAll("pre, .console-output, [role='alert']")
-      .forEach((el) => {
-        const t = (el.textContent || "").trim();
-        if (t && t.length > 4) resultLines.push(t);
-      });
+    document.querySelectorAll("pre, .console-output, [role='alert']").forEach((el) => {
+      const t = (el.textContent || "").trim();
+      if (t && t.length > 4) resultLines.push(t);
+    });
     return resultLines.filter(Boolean).slice(0, 8).join("\n\n");
   } catch {
     return "";
@@ -144,8 +128,7 @@ const PANEL_STYLE = `
   .cl-ai-kbd-hint { font-size:9px;color:#334155;margin-left:4px;letter-spacing:0.02em; }
 `;
 
-const TEMP_CHAT_KEY = (slug) =>
-  `cl-temp-chat-${String(slug || "global").trim()}`;
+const TEMP_CHAT_KEY = (slug) => `cl-temp-chat-${String(slug || "global").trim()}`;
 
 export function createFloatingAI(slug = "", opts = {}) {
   const platform = { ...DEFAULT_PLATFORM, ...(opts.platform || {}) };
@@ -201,9 +184,7 @@ export function createFloatingAI(slug = "", opts = {}) {
       const params = new URLSearchParams({ tab: "ai-chats" });
       if (chatSlug) params.set("chatSlug", chatSlug);
       if (chatPrompt) params.set("chatPrompt", chatPrompt);
-      const url = chrome.runtime.getURL(
-        `library/library.html?${params.toString()}`,
-      );
+      const url = chrome.runtime.getURL(`library/library.html?${params.toString()}`);
       window.open(url, "_blank");
     } catch (_) {}
   }
@@ -297,8 +278,7 @@ export function createFloatingAI(slug = "", opts = {}) {
   const input = document.createElement("textarea");
   input.id = "cl-ai-input";
   input.rows = 1;
-  input.placeholder =
-    "Ask… (Enter to send, Shift+Enter for newline, / for commands)";
+  input.placeholder = "Ask… (Enter to send, Shift+Enter for newline, / for commands)";
   Object.assign(input.style, {
     flex: "1",
     background: "rgba(255,255,255,0.05)",
@@ -358,10 +338,7 @@ export function createFloatingAI(slug = "", opts = {}) {
 
   function showAutocomplete(query) {
     const cmds = CHAT_COMMANDS.filter(
-      (c) =>
-        !query ||
-        c.id.startsWith(query) ||
-        c.label?.toLowerCase().includes(query),
+      (c) => !query || c.id.startsWith(query) || c.label?.toLowerCase().includes(query),
     );
     if (!cmds.length) {
       hideAutocomplete();
@@ -487,11 +464,7 @@ export function createFloatingAI(slug = "", opts = {}) {
     const tempRaw = sessionStorage.getItem(TEMP_CHAT_KEY(slug));
     if (tempRaw) {
       const temp = JSON.parse(tempRaw);
-      if (
-        Array.isArray(temp?.messages) &&
-        temp.messages.length > 0 &&
-        messages.length === 0
-      ) {
+      if (Array.isArray(temp?.messages) && temp.messages.length > 0 && messages.length === 0) {
         messages = temp.messages;
         renderMessages();
       }
@@ -553,8 +526,7 @@ export function createFloatingAI(slug = "", opts = {}) {
         padding: "24px 8px",
         lineHeight: "1.6",
       });
-      empty.textContent =
-        "Ask anything about the problem or your current solution.";
+      empty.textContent = "Ask anything about the problem or your current solution.";
       msgList.appendChild(empty);
       return;
     }
@@ -617,8 +589,7 @@ export function createFloatingAI(slug = "", opts = {}) {
         ? platform.readEditorCode({ slug, window, document })
         : readEditorCode()) || "";
     const latestUserMessage =
-      [...messages].reverse().find((msg) => msg?.role === "user")?.content ||
-      "";
+      [...messages].reverse().find((msg) => msg?.role === "user")?.content || "";
     const context = buildAIChatContext({
       surface: "floating-panel",
       text: latestUserMessage,
@@ -672,9 +643,10 @@ export function createFloatingAI(slug = "", opts = {}) {
         requestType: context.requestType || "",
         usedCommands: context.usedCommands || [],
         requestTemplate: latestUserMessage || "",
-        summary: (
-          latestUserMessage || messages.map((m) => m.content || "").join(" ")
-        ).slice(0, 120),
+        summary: (latestUserMessage || messages.map((m) => m.content || "").join(" ")).slice(
+          0,
+          120,
+        ),
       },
     };
   }
@@ -795,11 +767,7 @@ export function createFloatingAI(slug = "", opts = {}) {
     const rect = range.getBoundingClientRect?.();
     if (!rect) return;
     // Preserve whitespace exactly as rendered (do not trim)
-    showCopyPrompt(
-      text,
-      rect.left + window.scrollX,
-      rect.bottom + window.scrollY + 10,
-    );
+    showCopyPrompt(text, rect.left + window.scrollX, rect.bottom + window.scrollY + 10);
   }
 
   function setThinking(on) {
@@ -837,9 +805,7 @@ export function createFloatingAI(slug = "", opts = {}) {
   toggle.addEventListener("click", () => {
     expanded = !expanded;
     panel.style.display = expanded ? "flex" : "none";
-    toggle.style.borderColor = expanded
-      ? "rgba(6,182,212,0.5)"
-      : "rgba(6,182,212,0.3)";
+    toggle.style.borderColor = expanded ? "rgba(6,182,212,0.5)" : "rgba(6,182,212,0.3)";
     toggle.style.color = expanded ? "#06b6d4" : "#94a3b8";
     if (expanded) {
       renderMessages();
@@ -878,9 +844,7 @@ export function createFloatingAI(slug = "", opts = {}) {
         ? platform.readEditorCode({ slug, window, document })
         : readEditorCode()) || "";
     const langName =
-      (typeof platform.readEditorLang === "function"
-        ? platform.readEditorLang()
-        : "") || "";
+      (typeof platform.readEditorLang === "function" ? platform.readEditorLang() : "") || "";
     const problemStatement =
       (typeof platform.readProblemStatement === "function"
         ? platform.readProblemStatement()
@@ -1058,28 +1022,22 @@ export function createFloatingAI(slug = "", opts = {}) {
     }
   });
 
-  closeConfirmEl
-    .querySelector("#cl-ai-close-cancel")
-    ?.addEventListener("click", hideCloseConfirm);
-  closeConfirmEl
-    .querySelector("#cl-ai-close-discard")
-    ?.addEventListener("click", () => {
-      if (chatId) {
-        deleteChat(chatId).catch(() => {});
-        chatId = null;
-      }
-      messages = [];
-      clearTempChat();
+  closeConfirmEl.querySelector("#cl-ai-close-cancel")?.addEventListener("click", hideCloseConfirm);
+  closeConfirmEl.querySelector("#cl-ai-close-discard")?.addEventListener("click", () => {
+    if (chatId) {
+      deleteChat(chatId).catch(() => {});
+      chatId = null;
+    }
+    messages = [];
+    clearTempChat();
+    hideCloseConfirm();
+    collapsePanel();
+  });
+  closeConfirmEl.querySelector("#cl-ai-close-save")?.addEventListener("click", () => {
+    saveConversationAndOpenChats().catch(() => {
       hideCloseConfirm();
-      collapsePanel();
     });
-  closeConfirmEl
-    .querySelector("#cl-ai-close-save")
-    ?.addEventListener("click", () => {
-      saveConversationAndOpenChats().catch(() => {
-        hideCloseConfirm();
-      });
-    });
+  });
 
   sendBtn.addEventListener("click", sendMessage);
   input.addEventListener("keydown", (e) => {

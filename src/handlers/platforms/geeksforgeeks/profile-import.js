@@ -37,19 +37,14 @@ function parseProfileData() {
       for (const key of Object.keys(bucket)) {
         const entry = bucket[key];
         submissions.push({
-          slug:
-            entry.slug ||
-            entry.pname?.toLowerCase().replace(/\s+/g, "-") ||
-            key,
+          slug: entry.slug || entry.pname?.toLowerCase().replace(/\s+/g, "-") || key,
           title: entry.pname || key,
           difficulty: normalizeDifficulty(diff),
         });
       }
     }
 
-    dbg.log(
-      `parseProfileData(): ${submissions.length} problems for user "${username}"`,
-    );
+    dbg.log(`parseProfileData(): ${submissions.length} problems for user "${username}"`);
     return { username, submissions };
   } catch (e) {
     dbg.error("parseProfileData() failed", e);
@@ -208,9 +203,8 @@ async function runProfileImport(makeProblemId, btn) {
     show(`Importing ${bulkProblems.length} problems to CodeLedger…`);
 
     const result = await new Promise((resolve) => {
-      runtime.sendMessage(
-        { type: "BULK_IMPORT", problems: bulkProblems },
-        (res) => resolve(res || {}),
+      runtime.sendMessage({ type: "BULK_IMPORT", problems: bulkProblems }, (res) =>
+        resolve(res || {}),
       );
     });
 

@@ -59,9 +59,7 @@ function normalizeChatRecord(record = {}) {
     attachedProblemSlugs: Array.isArray(record.attachedProblemSlugs)
       ? record.attachedProblemSlugs
       : [],
-    attachedProblems: Array.isArray(record.attachedProblems)
-      ? record.attachedProblems
-      : [],
+    attachedProblems: Array.isArray(record.attachedProblems) ? record.attachedProblems : [],
     surface: record.surface || "problem-modal",
     requestType: record.requestType || "",
     usedCommands: Array.isArray(record.usedCommands) ? record.usedCommands : [],
@@ -84,9 +82,7 @@ export async function saveAIChat(
   platform = "leetcode",
   meta = {},
 ) {
-  dbg.log(
-    `saveAIChat(): ${platform} problem ${problemSlug} (${(messages || []).length} messages)`,
-  );
+  dbg.log(`saveAIChat(): ${platform} problem ${problemSlug} (${(messages || []).length} messages)`);
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_NAME], "readwrite");
@@ -165,13 +161,8 @@ export async function getChatsByProblem(problemSlug) {
           const attachments = Array.isArray(chat.attachedProblemSlugs)
             ? chat.attachedProblemSlugs
             : [];
-          if (
-            attachments.some(
-              (item) => String(item || "").toLowerCase() === slug,
-            )
-          ) {
-            if (!attached.some((item) => item.id === chat.id))
-              attached.push(chat);
+          if (attachments.some((item) => String(item || "").toLowerCase() === slug)) {
+            if (!attached.some((item) => item.id === chat.id)) attached.push(chat);
           }
         });
         resolve(attached.sort((a, b) => b.createdAt - a.createdAt));
@@ -341,9 +332,7 @@ const DELETED_PATHS_KEY = "_deletedChatPaths";
 
 async function _addDeletedChatPath(path) {
   const settings = await Storage.getSettings();
-  const existing = Array.isArray(settings[DELETED_PATHS_KEY])
-    ? settings[DELETED_PATHS_KEY]
-    : [];
+  const existing = Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
   if (!existing.includes(path)) {
     await Storage.setSettings({
       ...settings,
@@ -354,9 +343,7 @@ async function _addDeletedChatPath(path) {
 
 export async function getDeletedChatPaths() {
   const settings = await Storage.getSettings();
-  return Array.isArray(settings[DELETED_PATHS_KEY])
-    ? settings[DELETED_PATHS_KEY]
-    : [];
+  return Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
 }
 
 export async function clearDeletedChatPaths() {
@@ -369,8 +356,7 @@ export async function getPendingSyncChats() {
   return new Promise((resolve) => {
     const tx = db.transaction([STORE_NAME], "readonly");
     const req = tx.objectStore(STORE_NAME).getAll();
-    req.onsuccess = () =>
-      resolve((req.result || []).filter((c) => c._pendingSync === true));
+    req.onsuccess = () => resolve((req.result || []).filter((c) => c._pendingSync === true));
     req.onerror = () => resolve([]);
   });
 }

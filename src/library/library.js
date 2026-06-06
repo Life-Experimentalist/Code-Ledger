@@ -4,12 +4,7 @@
  */
 
 import { h, render } from "/vendor/preact-bundle.js";
-import {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "/vendor/preact-bundle.js";
+import { useState, useEffect, useMemo, useCallback } from "/vendor/preact-bundle.js";
 import { htm } from "/vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -17,10 +12,7 @@ import { Storage } from "/core/storage.js";
 import { CONSTANTS } from "/core/constants.js";
 import { initDebug, setDebug, createDebugger } from "/lib/debug.js";
 const dbg = createDebugger("LibraryApp");
-import {
-  applyThemeFromStorage,
-  setupThemeListener,
-} from "/core/theme-engine.js";
+import { applyThemeFromStorage, setupThemeListener } from "/core/theme-engine.js";
 import { getQueryParam, updateQueryParams } from "/core/url-state.js";
 import { initializeHandlers } from "/handlers/init.js";
 import { ProblemsView } from "./views/ProblemsView.js";
@@ -154,8 +146,7 @@ function LibraryApp() {
         // user handles manual decisions before 10-second auto-resolvers run.
         // Uses classifyDuplicatePair so sort order matches what the modal renders.
         const dups = findDuplicates(p || []).sort((a, b) => {
-          const isDiff = (g) =>
-            classifyDuplicatePair(g[0], g[1]) === "diff-approach";
+          const isDiff = (g) => classifyDuplicatePair(g[0], g[1]) === "diff-approach";
           return isDiff(b) - isDiff(a);
         });
         setDuplicateGroups(dups);
@@ -179,12 +170,9 @@ function LibraryApp() {
             setSettings((prev) => ({ ...prev, github_token: oauthToken }));
           }
           try {
-            const res = await fetch(
-              `${CONSTANTS.GIT_PROVIDERS.github.apiBase}/user`,
-              {
-                headers: { Authorization: `Bearer ${oauthToken}` },
-              },
-            );
+            const res = await fetch(`${CONSTANTS.GIT_PROVIDERS.github.apiBase}/user`, {
+              headers: { Authorization: `Bearer ${oauthToken}` },
+            });
             if (!res.ok) {
               if (res.status === 401) {
                 // Token revoked or invalidated by GitHub — clear and show expired banner.
@@ -250,20 +238,13 @@ function LibraryApp() {
   useEffect(() => {
     const handleOAuthMessage = async (event) => {
       // Validate origin
-      const allowedOrigins = [
-        new URL(CONSTANTS.URLS.AUTH_WORKER).origin,
-        window.location.origin,
-      ];
+      const allowedOrigins = [new URL(CONSTANTS.URLS.AUTH_WORKER).origin, window.location.origin];
       if (event.origin !== "null" && !allowedOrigins.includes(event.origin)) {
         return;
       }
 
       const data = event.data;
-      if (
-        !data ||
-        data.type !== "CODELEDGER_AUTH" ||
-        data.provider !== "github"
-      ) {
+      if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") {
         return;
       }
 
@@ -285,9 +266,7 @@ function LibraryApp() {
 
         // Check if repo is already configured
         const currentSettings = await Storage.getSettings();
-        const hasRepo = !!(
-          currentSettings?.github_repo || currentSettings?.gitRepo
-        );
+        const hasRepo = !!(currentSettings?.github_repo || currentSettings?.gitRepo);
 
         // Save username and avatar to settings for sync operations and UI
         const updatedSettings = {
@@ -409,8 +388,7 @@ function LibraryApp() {
       setProblems((prev) => prev.filter((p) => !deletedIds.includes(p.id)));
     }
     const remaining = duplicateGroups.filter(
-      (g) =>
-        !(g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "same-code"),
+      (g) => !(g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "same-code"),
     );
     setDuplicateGroups(remaining);
     if (remaining.length === 0) {
@@ -423,8 +401,7 @@ function LibraryApp() {
   // Called from SettingsSchema "Set up repository" / "Change repo" button
   const handleSetupRepo = useCallback(
     async (token, _owner) => {
-      const t =
-        token || (await Storage.getAuthToken("github").catch(() => null));
+      const t = token || (await Storage.getAuthToken("github").catch(() => null));
       if (!t) return;
       let uName = gitUser;
       if (!uName) {
@@ -503,11 +480,7 @@ function LibraryApp() {
 
     // GitHub OAuth tokens should NOT be stored in settings — they belong in auth.tokens.
     // Only update state locally for OAuth fields; actual token was saved by handleOAuth in SettingsSchema.
-    const isOAuthField = [
-      "github_token",
-      "gitlab_token",
-      "bitbucket_token",
-    ].includes(key);
+    const isOAuthField = ["github_token", "gitlab_token", "bitbucket_token"].includes(key);
 
     setSettings(next);
 
@@ -529,9 +502,7 @@ function LibraryApp() {
 
   const renderActiveView = () => {
     if (loading)
-      return html`<p
-        class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold p-8"
-      >
+      return html`<p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold p-8">
         Loading workspace...
       </p>`;
 
@@ -556,10 +527,7 @@ function LibraryApp() {
         onNavigate=${setActiveTab}
       />`;
     if (activeTab === "analytics")
-      return html`<${AnalyticsView}
-        problems=${enrichedProblems}
-        onNavigate=${setActiveTab}
-      />`;
+      return html`<${AnalyticsView} problems=${enrichedProblems} onNavigate=${setActiveTab} />`;
     if (activeTab === "graph")
       return html`<${GraphView}
         problems=${enrichedProblems}
@@ -576,12 +544,8 @@ function LibraryApp() {
         settings=${settings}
       />`;
     if (activeTab === "behaviour-bank")
-      return html`<${BehaviourBankView}
-        problems=${enrichedProblems}
-        onNavigate=${setActiveTab}
-      />`;
-    if (activeTab === "canonical")
-      return html`<${CanonicalView} problems=${enrichedProblems} />`;
+      return html`<${BehaviourBankView} problems=${enrichedProblems} onNavigate=${setActiveTab} />`;
+    if (activeTab === "canonical") return html`<${CanonicalView} problems=${enrichedProblems} />`;
     if (activeTab === "settings")
       return html`<${SettingsPageView}
         settings=${settings}
@@ -603,13 +567,11 @@ function LibraryApp() {
           <span class="text-emerald-300 font-medium">Import complete:</span>
           <span class="text-slate-300">${importReport.saved} saved</span>
           ${importReport.autoMerged > 0 &&
-          html`<span class="text-slate-400"
-            >· ${importReport.autoMerged} auto-merged</span
-          >`}
+          html`<span class="text-slate-400">· ${importReport.autoMerged} auto-merged</span>`}
           ${importReport.conflicts > 0 &&
           html`<span class="text-amber-300"
-            >· ${importReport.conflicts}
-            conflict${importReport.conflicts === 1 ? "" : "s"} need review</span
+            >· ${importReport.conflicts} conflict${importReport.conflicts === 1 ? "" : "s"} need
+            review</span
           >`}
           ${importReport.missingCode > 0 &&
           html`<span class="text-slate-400"
@@ -692,19 +654,16 @@ function LibraryApp() {
         <div class="flex items-center gap-6">
           <div class="flex items-center gap-2">
             <div
-              class="w-2 h-2 rounded-full ${typeof chrome !== "undefined" &&
-              chrome.runtime?.id
+              class="w-2 h-2 rounded-full ${typeof chrome !== "undefined" && chrome.runtime?.id
                 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
                 : "bg-slate-600"}"
             ></div>
             <span
-              class="text-xs font-mono uppercase tracking-widest ${typeof chrome !==
-                "undefined" && chrome.runtime?.id
+              class="text-xs font-mono uppercase tracking-widest ${typeof chrome !== "undefined" &&
+              chrome.runtime?.id
                 ? "text-emerald-500/80"
                 : "text-slate-500"}"
-              >${typeof chrome !== "undefined" && chrome.runtime?.id
-                ? "Extension"
-                : "Web"}</span
+              >${typeof chrome !== "undefined" && chrome.runtime?.id ? "Extension" : "Web"}</span
             >
           </div>
           <button
@@ -724,9 +683,7 @@ function LibraryApp() {
             >
               <polyline points="23 4 23 10 17 10" />
               <polyline points="1 20 1 14 7 14" />
-              <path
-                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-              />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
           </button>
           <div class="h-4 w-px bg-white/10"></div>
@@ -735,23 +692,15 @@ function LibraryApp() {
               ? html`
                   <div class="flex items-center gap-2">
                     ${gitAvatar
-                      ? html`<img
-                          src=${gitAvatar}
-                          alt="avatar"
-                          class="w-6 h-6 rounded-full"
-                        />`
+                      ? html`<img src=${gitAvatar} alt="avatar" class="w-6 h-6 rounded-full" />`
                       : html`<div
                           class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
                         ></div>`}
-                    <span class="text-xs font-mono text-emerald-500/80"
-                      >${gitUser}</span
-                    >
+                    <span class="text-xs font-mono text-emerald-500/80">${gitUser}</span>
                     ${settings.github_repo || settings.gitRepo
                       ? (() => {
                           const owner =
-                            settings.github_owner?.trim() ||
-                            settings.github_username ||
-                            gitUser;
+                            settings.github_owner?.trim() || settings.github_username || gitUser;
                           const repoUrl = owner
                             ? `https://github.com/${owner}/${settings.github_repo || settings.gitRepo}`
                             : null;
@@ -787,9 +736,7 @@ function LibraryApp() {
           class="border-r border-white/5 bg-[var(--cl-surface)] flex flex-col p-3 shrink-0 transition-all"
         >
           <div class="mb-4">
-            <p
-              class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold mb-3 px-2"
-            >
+            <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold mb-3 px-2">
               Views
             </p>
             <nav class="space-y-1">
@@ -806,13 +753,9 @@ function LibraryApp() {
                       ? "bg-cyan-500/5 text-cyan-400 border border-cyan-500/20"
                       : "hover:bg-white/5 text-slate-400 border border-transparent"}"
                   >
-                    <span class="text-sm font-medium w-6 text-center"
-                      >${item.icon}</span
-                    >
+                    <span class="text-sm font-medium w-6 text-center">${item.icon}</span>
                     ${!sidebarCollapsed
-                      ? html`<span class="text-sm font-medium"
-                          >${item.label}</span
-                        >`
+                      ? html`<span class="text-sm font-medium">${item.label}</span>`
                       : ""}
                   </a>
                 `,
@@ -828,11 +771,7 @@ function LibraryApp() {
                   class="flex items-center gap-2 px-3 py-2 mb-2 w-full rounded-lg bg-rose-500/10 border border-rose-500/25 text-xs text-rose-300 hover:bg-rose-500/20 transition-colors disabled:opacity-60 text-left"
                 >
                   <span class="shrink-0">⚠</span>
-                  <span
-                    >${reauthBusy
-                      ? "Opening…"
-                      : "Token expired — reconnect"}</span
-                  >
+                  <span>${reauthBusy ? "Opening…" : "Token expired — reconnect"}</span>
                 </button>
               `
             : tokenExpired && sidebarCollapsed
@@ -862,8 +801,7 @@ function LibraryApp() {
                 : setupIncomplete && !setupDismissed && sidebarCollapsed
                   ? html`
                       <a
-                        href=${typeof chrome !== "undefined" &&
-                        chrome.runtime?.id
+                        href=${typeof chrome !== "undefined" && chrome.runtime?.id
                           ? chrome.runtime.getURL("welcome/welcome.html")
                           : "#"}
                         target="_blank"
@@ -881,17 +819,14 @@ function LibraryApp() {
               ${!sidebarCollapsed
                 ? html`
                     <div class="flex items-center justify-between mb-2">
-                      <span
-                        class="text-[10px] uppercase tracking-wider text-slate-500"
+                      <span class="text-[10px] uppercase tracking-wider text-slate-500"
                         >Database Size</span
                       >
                       <span class="text-[10px] font-mono text-cyan-400"
                         >${problems.length} items</span
                       >
                     </div>
-                    <div
-                      class="w-full h-1 bg-white/10 rounded-full overflow-hidden mb-2"
-                    >
+                    <div class="w-full h-1 bg-white/10 rounded-full overflow-hidden mb-2">
                       <div
                         class="h-full bg-cyan-500"
                         style=${{
@@ -899,9 +834,7 @@ function LibraryApp() {
                         }}
                       ></div>
                     </div>
-                    <p
-                      class="mt-2 text-[10px] text-slate-600 italic leading-tight"
-                    >
+                    <p class="mt-2 text-[10px] text-slate-600 italic leading-tight">
                       Local IndexedDB Vault
                     </p>
                   `
@@ -946,14 +879,13 @@ function LibraryApp() {
                     <div class="flex items-center gap-2 min-w-0">
                       <span class="text-amber-400 shrink-0">⚠</span>
                       <p class="text-xs text-amber-300">
-                        Setup incomplete — connect GitHub and link a repo to
-                        start auto-committing solutions.
+                        Setup incomplete — connect GitHub and link a repo to start auto-committing
+                        solutions.
                       </p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                       <a
-                        href=${typeof chrome !== "undefined" &&
-                        chrome.runtime?.id
+                        href=${typeof chrome !== "undefined" && chrome.runtime?.id
                           ? chrome.runtime.getURL("welcome/welcome.html")
                           : "#"}
                         target="_blank"
@@ -985,8 +917,7 @@ function LibraryApp() {
             return active
               ? html`<${IncognitoBanner}
                   settings=${settings}
-                  onDisable=${() =>
-                    handleSettingsChange("incognitoMode", "off")}
+                  onDisable=${() => handleSettingsChange("incognitoMode", "off")}
                 />`
               : "";
           })()}
@@ -1009,14 +940,10 @@ function LibraryApp() {
               duplicateGroup=${currentDuplicateGroup}
               remaining=${duplicateGroups.length}
               diffApproachCount=${duplicateGroups.filter(
-                (g) =>
-                  g.length >= 2 &&
-                  classifyDuplicatePair(g[0], g[1]) === "diff-approach",
+                (g) => g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "diff-approach",
               ).length}
               sameCodeCount=${duplicateGroups.filter(
-                (g) =>
-                  g.length >= 2 &&
-                  classifyDuplicatePair(g[0], g[1]) === "same-code",
+                (g) => g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "same-code",
               ).length}
               onAutoResolveAll=${autoResolveAllSame}
               onResolve=${handleDuplicateResolved}

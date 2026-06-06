@@ -47,14 +47,10 @@ export const PROMPT_MODES = [
 ];
 
 export const PROMPT_MODE_PREFIXES = {
-  tutor:
-    "Guide me toward the solution without giving it away. Ask Socratic questions.\n\n",
-  debug:
-    "Help me debug my code. Identify the error and explain why it happens.\n\n",
-  optimize:
-    "Review my code for performance, readability, and best practices. Be specific.\n\n",
-  review:
-    "Give a thorough code review: correctness, edge cases, complexity, style.\n\n",
+  tutor: "Guide me toward the solution without giving it away. Ask Socratic questions.\n\n",
+  debug: "Help me debug my code. Identify the error and explain why it happens.\n\n",
+  optimize: "Review my code for performance, readability, and best practices. Be specific.\n\n",
+  review: "Give a thorough code review: correctness, edge cases, complexity, style.\n\n",
   custom: "",
 };
 

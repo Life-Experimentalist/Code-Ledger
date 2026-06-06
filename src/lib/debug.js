@@ -12,19 +12,14 @@ let _debugEnabled = false;
 // Called once at extension startup (service-worker) and in handler-loader (content script).
 export async function initDebug() {
   // Constants override takes priority — useful during local development.
-  if (
-    CONSTANTS.DEBUG_OVERRIDE !== null &&
-    CONSTANTS.DEBUG_OVERRIDE !== undefined
-  ) {
+  if (CONSTANTS.DEBUG_OVERRIDE !== null && CONSTANTS.DEBUG_OVERRIDE !== undefined) {
     _debugEnabled = !!CONSTANTS.DEBUG_OVERRIDE;
     // ensure console hooks are updated when override is set
     _updateConsoleHooks();
     return;
   }
   try {
-    const res = await import("./browser-compat.js").then((m) =>
-      m.storage.local.get(DEBUG_KEY),
-    );
+    const res = await import("./browser-compat.js").then((m) => m.storage.local.get(DEBUG_KEY));
     _debugEnabled = res[DEBUG_KEY] === true;
   } catch (_) {
     _debugEnabled = !!CONSTANTS.DEBUG_DEFAULT;
@@ -34,10 +29,7 @@ export async function initDebug() {
 
 export function setDebug(enabled) {
   // If a constant override is set, ignore runtime changes
-  if (
-    CONSTANTS.DEBUG_OVERRIDE !== null &&
-    CONSTANTS.DEBUG_OVERRIDE !== undefined
-  ) {
+  if (CONSTANTS.DEBUG_OVERRIDE !== null && CONSTANTS.DEBUG_OVERRIDE !== undefined) {
     _debugEnabled = !!CONSTANTS.DEBUG_OVERRIDE;
   } else {
     _debugEnabled = !!enabled;

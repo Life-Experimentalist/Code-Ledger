@@ -12,10 +12,7 @@ import { createDebugger } from "./debug.js";
 const dbg = createDebugger("SyntaxHighlight");
 
 function escHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // Keyword sets per language

@@ -63,10 +63,7 @@ function renderTable(block) {
 /** Apply inline formatting to already-escaped text. */
 function renderInline(t) {
   return t
-    .replace(
-      /\*\*(.+?)\*\*/g,
-      '<strong class="text-white font-semibold">$1</strong>',
-    )
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(
       /`([^`]+)`/g,
@@ -92,9 +89,7 @@ export function parseMarkdown(text) {
   let t = String(text);
 
   // 1. Display math $$...$$
-  t = t.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) =>
-    S(renderMath(math.trim(), true)),
-  );
+  t = t.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => S(renderMath(math.trim(), true)));
 
   // 2. Fenced code blocks ```lang\n...\n```
   t = t.replace(/```([\w-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
@@ -114,9 +109,7 @@ export function parseMarkdown(text) {
   });
 
   // 3. Inline math $...$
-  t = t.replace(/\$([^\$\n]+?)\$/g, (_, math) =>
-    S(renderMath(math.trim(), false)),
-  );
+  t = t.replace(/\$([^\$\n]+?)\$/g, (_, math) => S(renderMath(math.trim(), false)));
 
   // 4. Markdown tables (| col | col |\n|---|---|\n...)
   t = t.replace(/((?:\|.+\|\n?){3,})/g, (block) => {
@@ -141,27 +134,18 @@ export function parseMarkdown(text) {
 
   // 7. Block-level markdown (operate on escaped text)
   t = t
-    .replace(
-      /^### (.+)$/gm,
-      '<h3 class="text-sm font-bold text-white mt-4 mb-1">$1</h3>',
-    )
+    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-white mt-4 mb-1">$1</h3>')
     .replace(
       /^## (.+)$/gm,
       '<h2 class="text-sm font-bold text-slate-100 mt-4 mb-1 uppercase tracking-wide">$1</h2>',
     )
-    .replace(
-      /^# (.+)$/gm,
-      '<h1 class="text-base font-bold text-white mt-4 mb-2">$1</h1>',
-    )
+    .replace(/^# (.+)$/gm, '<h1 class="text-base font-bold text-white mt-4 mb-2">$1</h1>')
     .replace(/^---+$/gm, '<hr class="my-3 border-white/10"/>')
     .replace(
       /^> (.+)$/gm,
       '<blockquote class="pl-3 border-l-2 border-cyan-500/40 text-slate-400 italic my-1">$1</blockquote>',
     )
-    .replace(
-      /\*\*(.+?)\*\*/g,
-      '<strong class="text-white font-semibold">$1</strong>',
-    )
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(
       /\[([^\]]+)\]\(([^)]+)\)/g,
@@ -221,10 +205,7 @@ export function AIMarkdownRenderer({ content, copyableEnabled = false }) {
     function onCopy(e) {
       const selected = window.getSelection().toString();
       if (selected.length < 10) return;
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(window.getSelection().anchorNode)
-      )
+      if (containerRef.current && !containerRef.current.contains(window.getSelection().anchorNode))
         return;
       e.preventDefault();
       setCopyPrompt({ text: selected, x: e.clientX, y: e.clientY });

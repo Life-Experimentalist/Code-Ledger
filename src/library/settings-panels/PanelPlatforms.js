@@ -71,8 +71,7 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
       <div>
         <h2 class="text-base font-semibold text-white mb-1">Platforms</h2>
         <p class="text-xs text-slate-500 mb-4">
-          Enable tracking per platform, customize difficulty labels, and trigger
-          profile imports.
+          Enable tracking per platform, customize difficulty labels, and trigger profile imports.
         </p>
       </div>
 
@@ -94,9 +93,7 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                 class="w-2.5 h-2.5 rounded-full shrink-0"
                 style=${"background:" + p.color}
               ></span>
-              <span class="text-sm font-semibold text-slate-200 flex-1"
-                >${p.name}</span
-              >
+              <span class="text-sm font-semibold text-slate-200 flex-1">${p.name}</span>
               ${(() => {
                 const s = p.status;
                 if (!s || s === CONSTANTS.FEATURE_STATUS.STABLE) return null;
@@ -110,9 +107,7 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
               <button
                 onClick=${() => togglePlatform(p.id)}
                 class="relative inline-flex h-5 w-9 items-center rounded-full border transition-colors
-                  ${enabled
-                  ? "bg-cyan-500/30 border-cyan-500/40"
-                  : "bg-white/5 border-white/10"}"
+                  ${enabled ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
                 title=${enabled ? "Disable " + p.name : "Enable " + p.name}
               >
                 <span
@@ -134,15 +129,12 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                   ${DIFFICULTY_LABELS.map(
                     (level) => html`
                       <div key=${level} class="space-y-1">
-                        <label class="text-[10px] text-slate-500"
-                          >${level}</label
-                        >
+                        <label class="text-[10px] text-slate-500">${level}</label>
                         <input
                           type="text"
                           placeholder=${level}
                           value=${diffMap[level] || ""}
-                          onInput=${(e) =>
-                            setDifficultyAlias(p.id, level, e.target.value)}
+                          onInput=${(e) => setDifficultyAlias(p.id, level, e.target.value)}
                           class="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
                         />
                       </div>
@@ -190,24 +182,19 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                 ${p.id === "leetcode" &&
                 html`
                   <p class="text-[10px] text-slate-600 leading-snug">
-                    Profile import syncs your public solve count. Progress page
-                    imports full submission history (first-time only for each
-                    problem+language).
+                    Profile import syncs your public solve count. Progress page imports full
+                    submission history (first-time only for each problem+language).
                   </p>
                 `}
                 ${importMsg[p.id] &&
-                html`
-                  <p class="text-[11px] text-emerald-400">${importMsg[p.id]}</p>
-                `}
+                html` <p class="text-[11px] text-emerald-400">${importMsg[p.id]}</p> `}
               </div>
 
               <!-- LeetCode-specific settings -->
               ${p.id === "leetcode" &&
               html`
                 <div class="pt-1 border-t border-white/5 space-y-3">
-                  <p
-                    class="text-[11px] text-slate-500 uppercase tracking-widest font-medium"
-                  >
+                  <p class="text-[11px] text-slate-500 uppercase tracking-widest font-medium">
                     LeetCode Settings
                   </p>
 
@@ -224,20 +211,14 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                     },
                   ].map(
                     ({ key, label, desc }) => html`
-                      <label
-                        key=${key}
-                        class="flex items-start gap-3 cursor-pointer"
-                      >
+                      <label key=${key} class="flex items-start gap-3 cursor-pointer">
                         <div class="flex-1">
                           <p class="text-xs text-slate-300">${label}</p>
                           <p class="text-[10px] text-slate-600">${desc}</p>
                         </div>
                         <button
                           onClick=${() =>
-                            onSettingsChange(
-                              key,
-                              settings?.[key] !== false ? false : true,
-                            )}
+                            onSettingsChange(key, settings?.[key] !== false ? false : true)}
                           class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
                           ${settings?.[key] !== false
                             ? "bg-cyan-500/30 border-cyan-500/40"
@@ -245,9 +226,7 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                         >
                           <span
                             class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
-                          ${settings?.[key] !== false
-                              ? "translate-x-4"
-                              : "translate-x-0.5"}"
+                          ${settings?.[key] !== false ? "translate-x-4" : "translate-x-0.5"}"
                           >
                           </span>
                         </button>
@@ -257,9 +236,7 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                 </div>
 
                 <div class="pt-1 border-t border-white/5 space-y-3">
-                  <p
-                    class="text-[11px] text-slate-500 uppercase tracking-widest font-medium"
-                  >
+                  <p class="text-[11px] text-slate-500 uppercase tracking-widest font-medium">
                     Quality of Life
                   </p>
 
@@ -288,10 +265,7 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                     },
                   ].map(
                     ({ key, label, desc, defaultOn = true }) => html`
-                      <label
-                        key=${key}
-                        class="flex items-start gap-3 cursor-pointer"
-                      >
+                      <label key=${key} class="flex items-start gap-3 cursor-pointer">
                         <div class="flex-1">
                           <p class="text-xs text-slate-300">${label}</p>
                           <p class="text-[10px] text-slate-600">${desc}</p>
@@ -300,26 +274,16 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                           onClick=${() =>
                             onSettingsChange(
                               key,
-                              settings?.[key] !== undefined
-                                ? !settings[key]
-                                : !defaultOn,
+                              settings?.[key] !== undefined ? !settings[key] : !defaultOn,
                             )}
                           class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-                          ${(
-                            settings?.[key] !== undefined
-                              ? !!settings[key]
-                              : defaultOn
-                          )
+                          ${(settings?.[key] !== undefined ? !!settings[key] : defaultOn)
                             ? "bg-cyan-500/30 border-cyan-500/40"
                             : "bg-white/5 border-white/10"}"
                         >
                           <span
                             class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
-                          ${(
-                              settings?.[key] !== undefined
-                                ? !!settings[key]
-                                : defaultOn
-                            )
+                          ${(settings?.[key] !== undefined ? !!settings[key] : defaultOn)
                               ? "translate-x-4"
                               : "translate-x-0.5"}"
                           >

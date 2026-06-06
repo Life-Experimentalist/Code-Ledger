@@ -7,11 +7,7 @@
  */
 
 import { h } from "../../vendor/preact-bundle.js";
-import {
-  useState,
-  useEffect,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -110,21 +106,17 @@ export function QueueModal({ onClose, onOpenProblem }) {
       return;
     }
     for (const item of doneItems) {
-      chrome.runtime.sendMessage(
-        { type: "REMOVE_QUEUE_ITEM", itemId: item.id },
-        () => {
-          remaining--;
-          if (remaining === 0) {
-            setClearingDone(false);
-            fetchItems();
-          }
-        },
-      );
+      chrome.runtime.sendMessage({ type: "REMOVE_QUEUE_ITEM", itemId: item.id }, () => {
+        remaining--;
+        if (remaining === 0) {
+          setClearingDone(false);
+          fetchItems();
+        }
+      });
     }
   };
 
-  const filtered =
-    activeTab === "all" ? items : items.filter((i) => i.status === activeTab);
+  const filtered = activeTab === "all" ? items : items.filter((i) => i.status === activeTab);
 
   const counts = {
     all: items.length,
@@ -144,16 +136,10 @@ export function QueueModal({ onClose, onOpenProblem }) {
         class="relative z-10 w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl bg-[#0d0d14] border border-white/10 shadow-2xl overflow-hidden"
       >
         <!-- Header -->
-        <div
-          class="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0"
-        >
+        <div class="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0">
           <div class="flex items-center gap-3">
-            <span class="text-base font-semibold text-white"
-              >AI Review Queue</span
-            >
-            <span class="text-xs text-slate-500 font-mono"
-              >${counts.all} items</span
-            >
+            <span class="text-base font-semibold text-white">AI Review Queue</span>
+            <span class="text-xs text-slate-500 font-mono">${counts.all} items</span>
           </div>
           <button
             onClick=${onClose}
@@ -201,8 +187,7 @@ export function QueueModal({ onClose, onOpenProblem }) {
                   </button>
                 `
               : ""}
-            ${(activeTab === "pending" || activeTab === "all") &&
-            counts.pending > 0
+            ${(activeTab === "pending" || activeTab === "all") && counts.pending > 0
               ? html`
                   <button
                     onClick=${handleCancelAllPending}
@@ -220,17 +205,13 @@ export function QueueModal({ onClose, onOpenProblem }) {
         <div class="flex-1 overflow-y-auto">
           ${loading
             ? html`
-                <div
-                  class="flex items-center justify-center py-12 text-slate-500 text-sm"
-                >
+                <div class="flex items-center justify-center py-12 text-slate-500 text-sm">
                   Loading…
                 </div>
               `
             : filtered.length === 0
               ? html`
-                  <div
-                    class="flex items-center justify-center py-12 text-slate-500 text-sm"
-                  >
+                  <div class="flex items-center justify-center py-12 text-slate-500 text-sm">
                     No ${activeTab === "all" ? "" : activeTab} items
                   </div>
                 `
@@ -265,15 +246,13 @@ export function QueueModal({ onClose, onOpenProblem }) {
                             </button>
                             <div class="flex items-center gap-2 mt-0.5">
                               ${item.problemPlatform
-                                ? html`<span
-                                    class="text-[10px] text-slate-500 capitalize"
+                                ? html`<span class="text-[10px] text-slate-500 capitalize"
                                     >${item.problemPlatform}</span
                                   >`
                                 : ""}
                               ${item.problemDifficulty
                                 ? html`<span
-                                    class="text-[10px] ${item.problemDifficulty ===
-                                    "Easy"
+                                    class="text-[10px] ${item.problemDifficulty === "Easy"
                                       ? "text-emerald-500"
                                       : item.problemDifficulty === "Medium"
                                         ? "text-amber-500"
@@ -287,9 +266,7 @@ export function QueueModal({ onClose, onOpenProblem }) {
                               ${item.retryCount > 0
                                 ? html`<span class="text-[10px] text-slate-600"
                                     >${item.retryCount}
-                                    retr${item.retryCount === 1
-                                      ? "y"
-                                      : "ies"}</span
+                                    retr${item.retryCount === 1 ? "y" : "ies"}</span
                                   >`
                                 : ""}
                             </div>

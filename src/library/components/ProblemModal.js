@@ -3,12 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  h,
-  useState,
-  useEffect,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -16,11 +11,7 @@ import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("ProblemModal");
 import { cleanCode, highlightCode } from "../../lib/syntax-highlight.js";
-import {
-  getChatsByProblem,
-  saveAIChat,
-  updateAIChat,
-} from "../../core/ai-chat-storage.js";
+import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { AIReviewPanel } from "../../ui/components/AIReviewPanel.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
@@ -50,34 +41,22 @@ function renderMarkdown(md) {
       '<code class="px-1 py-0.5 rounded bg-white/10 text-cyan-300 text-[0.85em] font-mono">$1</code>',
     )
     // bold
-    .replace(
-      /\*\*(.+?)\*\*/g,
-      '<strong class="text-white font-semibold">$1</strong>',
-    )
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
     // italic
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     // headings
-    .replace(
-      /^### (.+)$/gm,
-      '<h3 class="text-sm font-bold text-white mt-4 mb-1">$1</h3>',
-    )
+    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-white mt-4 mb-1">$1</h3>')
     .replace(
       /^## (.+)$/gm,
       '<h2 class="text-sm font-bold text-slate-100 mt-4 mb-1 uppercase tracking-wide">$1</h2>',
     )
-    .replace(
-      /^# (.+)$/gm,
-      '<h1 class="text-base font-bold text-white mt-4 mb-2">$1</h1>',
-    )
+    .replace(/^# (.+)$/gm, '<h1 class="text-base font-bold text-white mt-4 mb-2">$1</h1>')
     // unordered lists: accumulate items into <ul>
     .replace(/((?:^[*\-] .+\n?)+)/gm, (block) => {
       const items = block
         .trim()
         .split("\n")
-        .map(
-          (l) =>
-            `<li class="ml-4 list-disc">${l.replace(/^[*\-] /, "").trim()}</li>`,
-        )
+        .map((l) => `<li class="ml-4 list-disc">${l.replace(/^[*\-] /, "").trim()}</li>`)
         .join("");
       return `<ul class="my-2 space-y-0.5 text-slate-300">${items}</ul>`;
     })
@@ -85,10 +64,7 @@ function renderMarkdown(md) {
       const items = block
         .trim()
         .split("\n")
-        .map(
-          (l) =>
-            `<li class="ml-4 list-decimal">${l.replace(/^\d+\. /, "").trim()}</li>`,
-        )
+        .map((l) => `<li class="ml-4 list-decimal">${l.replace(/^\d+\. /, "").trim()}</li>`)
         .join("");
       return `<ol class="my-2 space-y-0.5 text-slate-300">${items}</ol>`;
     })
@@ -101,8 +77,7 @@ function renderMarkdown(md) {
 
 export const PLATFORM_META = {
   leetcode: {
-    favicon:
-      "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
     label: "LeetCode",
     color: CONSTANTS.PLATFORMS.leetcode.color,
     url: (slug) => CONSTANTS.PLATFORMS.leetcode.problemsBase + slug + "/",
@@ -209,9 +184,7 @@ export function ProblemModal({
   const handleDeleteMethod = async (idx) => {
     const updatedMethods = methods.filter((_, i) => i !== idx);
     setMethods(updatedMethods);
-    setSelectedMethodIdx(
-      Math.min(selectedMethodIdx, updatedMethods.length - 1),
-    );
+    setSelectedMethodIdx(Math.min(selectedMethodIdx, updatedMethods.length - 1));
     try {
       const updated = { ...problem, methods: updatedMethods };
       await Storage.saveProblem(updated);
@@ -231,22 +204,17 @@ export function ProblemModal({
       return Promise.resolve(null);
     }
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        { type: "GET_AI_REVIEW_QUEUE_STATUS" },
-        (resp) => {
-          if (chrome.runtime.lastError || !resp?.ok) {
-            setQueueStatus(null);
-            setQueueStatusError(
-              resp?.error || chrome.runtime.lastError?.message || "",
-            );
-            resolve(null);
-            return;
-          }
-          setQueueStatus(resp);
-          setQueueStatusError("");
-          resolve(resp);
-        },
-      );
+      chrome.runtime.sendMessage({ type: "GET_AI_REVIEW_QUEUE_STATUS" }, (resp) => {
+        if (chrome.runtime.lastError || !resp?.ok) {
+          setQueueStatus(null);
+          setQueueStatusError(resp?.error || chrome.runtime.lastError?.message || "");
+          resolve(null);
+          return;
+        }
+        setQueueStatus(resp);
+        setQueueStatusError("");
+        resolve(resp);
+      });
     });
   }, []);
 
@@ -266,16 +234,9 @@ export function ProblemModal({
 
   // Reset (or restore) tab and load chat history when problem changes
   useEffect(() => {
-    if (
-      settings?.remember_modal_tab &&
-      _lastModalTab &&
-      _lastModalTab !== "overview"
-    ) {
+    if (settings?.remember_modal_tab && _lastModalTab && _lastModalTab !== "overview") {
       // Check if the remembered tab exists for this problem
-      const regTabs = modalTabRegistry.getTabs(
-        problem?.platform || "leetcode",
-        problem,
-      );
+      const regTabs = modalTabRegistry.getTabs(problem?.platform || "leetcode", problem);
       const available = new Set([
         ...regTabs.map((t) => t.id),
         "notes",
@@ -316,8 +277,7 @@ export function ProblemModal({
 
   const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
   const problemIndex = problemList.findIndex(
-    (entry) =>
-      (entry?.id || entry?.titleSlug) === (problem?.id || problem?.titleSlug),
+    (entry) => (entry?.id || entry?.titleSlug) === (problem?.id || problem?.titleSlug),
   );
   const canNavigate = problemList.length > 1 && problemIndex >= 0;
 
@@ -328,16 +288,12 @@ export function ProblemModal({
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         onNavigateProblem?.(
-          problemList[
-            (problemIndex - 1 + problemList.length) % problemList.length
-          ],
+          problemList[(problemIndex - 1 + problemList.length) % problemList.length],
         );
       }
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        onNavigateProblem?.(
-          problemList[(problemIndex + 1) % problemList.length],
-        );
+        onNavigateProblem?.(problemList[(problemIndex + 1) % problemList.length]);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -384,9 +340,7 @@ export function ProblemModal({
         ? [problem.topic]
         : []
   ).filter((t) => t && t !== "Untagged");
-  const diffClass =
-    DIFF_CLASS[problem.difficulty] ||
-    "bg-white/5 text-slate-400 border-white/10";
+  const diffClass = DIFF_CLASS[problem.difficulty] || "bg-white/5 text-slate-400 border-white/10";
   const langName = problem.lang?.name || problem.language || null;
 
   const copyCode = async () => {
@@ -402,8 +356,7 @@ export function ProblemModal({
   const siblings = problemList.filter((p) => {
     if (!p || p.id === problem.id) return false;
     const sameSlug = p.titleSlug && p.titleSlug === problem.titleSlug;
-    const sameCanonical =
-      p.canonical?.id && p.canonical.id === problem.canonical?.id;
+    const sameCanonical = p.canonical?.id && p.canonical.id === problem.canonical?.id;
     return sameSlug || sameCanonical;
   });
 
@@ -420,13 +373,8 @@ export function ProblemModal({
       for (let i = 0; i < 20; i++) {
         await new Promise((r) => setTimeout(r, 500));
         try {
-          const updated = await Storage.getProblem(
-            problem.id || problem.titleSlug,
-          );
-          if (
-            updated?.problemStatement &&
-            updated.problemStatement !== problem.problemStatement
-          ) {
+          const updated = await Storage.getProblem(problem.id || problem.titleSlug);
+          if (updated?.problemStatement && updated.problemStatement !== problem.problemStatement) {
             onUpdate?.(updated);
             fetched = true;
             break;
@@ -500,8 +448,7 @@ export function ProblemModal({
             context,
           },
           (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (resp?.ok) resolve(resp.response);
             else reject(new Error(resp?.error || "AI failed"));
           },
@@ -559,9 +506,7 @@ export function ProblemModal({
   const handleGenerateAIReview = async () => {
     if (reviewBusy) return;
     if (!problem?.code) {
-      setReviewError(
-        "No code saved for this problem. Solve it on the platform first.",
-      );
+      setReviewError("No code saved for this problem. Solve it on the platform first.");
       return;
     }
     if (typeof chrome === "undefined" || !chrome.runtime?.id) {
@@ -571,9 +516,7 @@ export function ProblemModal({
     setReviewBusy(true);
     setReviewError("");
     try {
-      dbg.log(
-        `Requesting AI review for problem ${problem.id || problem.titleSlug}`,
-      );
+      dbg.log(`Requesting AI review for problem ${problem.id || problem.titleSlug}`);
       const TIMEOUT_MS = 90000;
       // Keep the MV3 service worker alive for the duration of the request.
       // An open runtime port prevents Chrome from terminating the SW mid-call.
@@ -605,30 +548,22 @@ export function ProblemModal({
           reject(new Error("AI review timed out"));
         }, TIMEOUT_MS);
 
-        chrome.runtime.sendMessage(
-          { type: "REGENERATE_AI_REVIEW", problem },
-          (resp) => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            releaseKeepalive();
-            if (chrome.runtime.lastError) {
-              dbg.warn(
-                "REGENERATE_AI_REVIEW message error:",
-                chrome.runtime.lastError.message,
-              );
-              reject(new Error(chrome.runtime.lastError.message));
-            } else if (resp?.ok) {
-              dbg.log(
-                `AI review response received for ${problem.id || problem.titleSlug}`,
-              );
-              resolve(resp);
-            } else {
-              dbg.warn("REGENERATE_AI_REVIEW failed:", resp?.error);
-              reject(new Error(resp?.error || "AI review failed"));
-            }
-          },
-        );
+        chrome.runtime.sendMessage({ type: "REGENERATE_AI_REVIEW", problem }, (resp) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          releaseKeepalive();
+          if (chrome.runtime.lastError) {
+            dbg.warn("REGENERATE_AI_REVIEW message error:", chrome.runtime.lastError.message);
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (resp?.ok) {
+            dbg.log(`AI review response received for ${problem.id || problem.titleSlug}`);
+            resolve(resp);
+          } else {
+            dbg.warn("REGENERATE_AI_REVIEW failed:", resp?.error);
+            reject(new Error(resp?.error || "AI review failed"));
+          }
+        });
       });
 
       if (result?.problem) {
@@ -652,18 +587,15 @@ export function ProblemModal({
     setQueueStatusError("");
     try {
       const result = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: "PROCESS_REVIEW_QUEUE_NOW" },
-          (resp) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-            } else if (resp?.ok) {
-              resolve(resp);
-            } else {
-              reject(new Error(resp?.error || "Failed to start queue"));
-            }
-          },
-        );
+        chrome.runtime.sendMessage({ type: "PROCESS_REVIEW_QUEUE_NOW" }, (resp) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (resp?.ok) {
+            resolve(resp);
+          } else {
+            reject(new Error(resp?.error || "Failed to start queue"));
+          }
+        });
       });
       if (result?.ok) {
         await fetchQueueStatus();
@@ -713,17 +645,11 @@ export function ProblemModal({
       const params = new URLSearchParams({ tab: "ai-chats" });
       if (chatSlug) params.set("chatSlug", chatSlug);
       if (chatPrompt) params.set("chatPrompt", chatPrompt);
-      window.open(
-        chrome.runtime.getURL(`library/library.html?${params.toString()}`),
-        "_blank",
-      );
+      window.open(chrome.runtime.getURL(`library/library.html?${params.toString()}`), "_blank");
     } catch (_) {}
   };
 
-  const registryTabs = modalTabRegistry.getTabs(
-    problem.platform || "leetcode",
-    problem,
-  );
+  const registryTabs = modalTabRegistry.getTabs(problem.platform || "leetcode", problem);
   const baseTabs = registryTabs.map((tab) => ({
     id: tab.id,
     label: typeof tab.label === "function" ? tab.label(problem) : tab.label,
@@ -731,9 +657,7 @@ export function ProblemModal({
   // Add Notes tab
   const tabs = [
     ...baseTabs,
-    ...(methods.length > 0
-      ? [{ id: "methods", label: `🔄 Methods (${methods.length})` }]
-      : []),
+    ...(methods.length > 0 ? [{ id: "methods", label: `🔄 Methods (${methods.length})` }] : []),
     { id: "notes", label: "📝 Notes" },
   ];
 
@@ -749,9 +673,7 @@ export function ProblemModal({
         class="relative w-full max-w-[72rem] max-h-[calc(100vh-80px)] flex flex-col bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
       >
         <!-- ── Header ── -->
-        <div
-          class="flex items-start gap-3 p-5 border-b border-white/5 shrink-0"
-        >
+        <div class="flex items-start gap-3 p-5 border-b border-white/5 shrink-0">
           ${meta.favicon
             ? html`
                 <img
@@ -765,9 +687,7 @@ export function ProblemModal({
               `
             : ""}
           <div class="flex-1 min-w-0">
-            <h2 class="text-base font-semibold text-white leading-snug">
-              ${problem.title}
-            </h2>
+            <h2 class="text-base font-semibold text-white leading-snug">${problem.title}</h2>
             <div class="flex items-center gap-2 mt-1.5 flex-wrap">
               <span
                 class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${diffClass}"
@@ -775,16 +695,12 @@ export function ProblemModal({
               >
               <span class="text-[10px] text-slate-500">${meta.label}</span>
               ${langName
-                ? html`<span class="text-[10px] font-mono text-cyan-500/70"
-                    >${langName}</span
-                  >`
+                ? html`<span class="text-[10px] font-mono text-cyan-500/70">${langName}</span>`
                 : ""}
               ${problem.timestamp
                 ? html`<span class="text-[10px] text-slate-600"
                     >${new Date(
-                      problem.timestamp < 1e12
-                        ? problem.timestamp * 1000
-                        : problem.timestamp,
+                      problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp,
                     ).toLocaleDateString()}</span
                   >`
                 : ""}
@@ -835,14 +751,11 @@ export function ProblemModal({
                     </button>
                   `
                 : ""}
-            ${problem.submissionsUrl ||
-            (problem.platform === "leetcode" && problem.titleSlug)
+            ${problem.submissionsUrl || (problem.platform === "leetcode" && problem.titleSlug)
               ? html`
                   <a
                     href=${problem.submissionsUrl ||
-                    CONSTANTS.PLATFORMS.leetcode.problemsBase +
-                      problem.titleSlug +
-                      "/submissions/"}
+                    CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/submissions/"}
                     target="_blank"
                     rel="noopener"
                     class="shrink-0 px-3 h-8 flex items-center justify-center rounded-lg text-[10px] font-medium text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
@@ -856,10 +769,7 @@ export function ProblemModal({
                   <button
                     onClick=${() =>
                       onNavigateProblem?.(
-                        problemList[
-                          (problemIndex - 1 + problemList.length) %
-                            problemList.length
-                        ],
+                        problemList[(problemIndex - 1 + problemList.length) % problemList.length],
                       )}
                     class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
                     title="Previous problem"
@@ -868,9 +778,7 @@ export function ProblemModal({
                   </button>
                   <button
                     onClick=${() =>
-                      onNavigateProblem?.(
-                        problemList[(problemIndex + 1) % problemList.length],
-                      )}
+                      onNavigateProblem?.(problemList[(problemIndex + 1) % problemList.length])}
                     class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
                     title="Next problem"
                   >
@@ -904,17 +812,13 @@ export function ProblemModal({
           : ""}
 
         <!-- ── Stats row ── -->
-        ${problem.runtime ||
-        problem.memory ||
-        problem.acRate ||
-        problem.elapsedSeconds
+        ${problem.runtime || problem.memory || problem.acRate || problem.elapsedSeconds
           ? html`
               <div class="flex gap-6 px-5 pt-3 shrink-0">
                 ${problem.runtime
                   ? html`
                       <div class="flex flex-col gap-0.5">
-                        <span
-                          class="text-[9px] uppercase tracking-wider text-slate-600"
+                        <span class="text-[9px] uppercase tracking-wider text-slate-600"
                           >Runtime</span
                         >
                         <span class="text-xs text-slate-300">
@@ -931,8 +835,7 @@ export function ProblemModal({
                 ${problem.memory
                   ? html`
                       <div class="flex flex-col gap-0.5">
-                        <span
-                          class="text-[9px] uppercase tracking-wider text-slate-600"
+                        <span class="text-[9px] uppercase tracking-wider text-slate-600"
                           >Memory</span
                         >
                         <span class="text-xs text-slate-300">
@@ -949,8 +852,7 @@ export function ProblemModal({
                 ${problem.acRate
                   ? html`
                       <div class="flex flex-col gap-0.5">
-                        <span
-                          class="text-[9px] uppercase tracking-wider text-slate-600"
+                        <span class="text-[9px] uppercase tracking-wider text-slate-600"
                           >Accept Rate</span
                         >
                         <span class="text-xs text-slate-300"
@@ -964,8 +866,7 @@ export function ProblemModal({
                 ${problem.elapsedSeconds
                   ? html`
                       <div class="flex flex-col gap-0.5">
-                        <span
-                          class="text-[9px] uppercase tracking-wider text-slate-600"
+                        <span class="text-[9px] uppercase tracking-wider text-slate-600"
                           >Solve Time</span
                         >
                         <span class="text-xs text-slate-300"
@@ -982,8 +883,7 @@ export function ProblemModal({
         ${siblings.length
           ? html`
               <div class="flex items-center gap-2 px-5 pt-3 shrink-0 flex-wrap">
-                <span
-                  class="text-[10px] uppercase tracking-wider text-slate-600 shrink-0"
+                <span class="text-[10px] uppercase tracking-wider text-slate-600 shrink-0"
                   >Also solved as</span
                 >
                 ${siblings.map((sib) => {
@@ -1010,9 +910,7 @@ export function ProblemModal({
                           />`
                         : ""}
                       ${!isSamePlatform
-                        ? html`<span class="text-slate-500"
-                            >${sibMeta.label}</span
-                          >`
+                        ? html`<span class="text-slate-500">${sibMeta.label}</span>`
                         : ""}
                       <span class="font-mono text-cyan-400/80">${sibLang}</span>
                     </button>
@@ -1025,9 +923,7 @@ export function ProblemModal({
         <!-- ── Tabs ── -->
         ${tabs.length > 1
           ? html`
-              <div
-                class="flex gap-0.5 px-5 pt-3 border-b border-white/5 shrink-0"
-              >
+              <div class="flex gap-0.5 px-5 pt-3 border-b border-white/5 shrink-0">
                 ${tabs.map(
                   (tab) => html`
                     <button
@@ -1060,15 +956,10 @@ export function ProblemModal({
                           ? "border-cyan-500/50 bg-cyan-500/10"
                           : "border-white/10 bg-white/5"} transition-colors cursor-pointer"
                       >
-                        <button
-                          onClick=${() => setSelectedMethodIdx(idx)}
-                          class="w-full text-left"
-                        >
+                        <button onClick=${() => setSelectedMethodIdx(idx)} class="w-full text-left">
                           <div class="flex items-start justify-between mb-2">
                             <div>
-                              <h4 class="font-semibold text-sm text-white">
-                                ${method.title}
-                              </h4>
+                              <h4 class="font-semibold text-sm text-white">${method.title}</h4>
                               <span class="text-[10px] font-mono text-cyan-400"
                                 >${method.language}</span
                               >
@@ -1105,9 +996,7 @@ export function ProblemModal({
                   </button>
                   ${showAddMethod
                     ? html`
-                        <div
-                          class="border border-white/10 rounded-lg p-3 bg-white/5"
-                        >
+                        <div class="border border-white/10 rounded-lg p-3 bg-white/5">
                           <label
                             class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-1"
                           >
@@ -1180,22 +1069,15 @@ export function ProblemModal({
                     problem.platform || "leetcode",
                     activeTab,
                   );
-                  if (!renderer)
-                    return html`<p class="text-slate-500 text-sm">
-                      No content.
-                    </p>`;
+                  if (!renderer) return html`<p class="text-slate-500 text-sm">No content.</p>`;
                   const onClearChat = async () => {
                     setChatMessages([]);
                     setChatError("");
                     if (chatId) {
                       await updateAIChat(chatId, [], {
                         problemTitle: problem.title || "",
-                        problemTags: Array.isArray(problem.tags)
-                          ? problem.tags
-                          : [],
-                        attachedProblemSlugs: problem.titleSlug
-                          ? [problem.titleSlug]
-                          : [],
+                        problemTags: Array.isArray(problem.tags) ? problem.tags : [],
+                        attachedProblemSlugs: problem.titleSlug ? [problem.titleSlug] : [],
                         attachedProblems: problem.titleSlug
                           ? [
                               {
@@ -1255,9 +1137,7 @@ export function ProblemModal({
         </div>
 
         <!-- ── Footer ── -->
-        <div
-          class="border-t border-white/5 px-5 py-3 flex items-center justify-between shrink-0"
-        >
+        <div class="border-t border-white/5 px-5 py-3 flex items-center justify-between shrink-0">
           <a
             href=${problemUrl}
             target="_blank"
@@ -1276,9 +1156,7 @@ export function ProblemModal({
               : ""}
             Open on ${meta.label} ↗
           </a>
-          <span class="text-[10px] text-slate-700 font-mono"
-            >${problem.titleSlug || ""}</span
-          >
+          <span class="text-[10px] text-slate-700 font-mono">${problem.titleSlug || ""}</span>
         </div>
       </div>
     </div>
@@ -1292,13 +1170,10 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
   const [recoveryError, setRecoveryError] = useState("");
 
   if (!problem.code) {
-    const isExtensionCtx =
-      typeof chrome !== "undefined" && !!chrome.runtime?.id;
+    const isExtensionCtx = typeof chrome !== "undefined" && !!chrome.runtime?.id;
     return html`
       <div class="flex flex-col items-center gap-4 py-12 text-center">
-        <p class="text-slate-500 text-sm">
-          Code was not extracted for this submission.
-        </p>
+        <p class="text-slate-500 text-sm">Code was not extracted for this submission.</p>
         ${isExtensionCtx
           ? html`
               <button
@@ -1319,9 +1194,7 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                       const updated = await Storage.getProblem(problem.id);
                       if (updated) onUpdate(updated);
                     } else {
-                      setRecoveryError(
-                        res?.error || "Recovery failed — no code returned",
-                      );
+                      setRecoveryError(res?.error || "Recovery failed — no code returned");
                     }
                   } catch (e) {
                     setRecoveryError(e?.message || "Recovery failed");
@@ -1332,14 +1205,10 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                 disabled=${recovering}
                 class="px-4 py-2 rounded-lg bg-cyan-600/15 border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-600/30 disabled:opacity-40 transition-colors"
               >
-                ${recovering
-                  ? "Recovering code…"
-                  : "Recover Code from LeetCode"}
+                ${recovering ? "Recovering code…" : "Recover Code from LeetCode"}
               </button>
               ${recoveryError
-                ? html` <p class="text-rose-400 text-xs max-w-xs">
-                      ${recoveryError}
-                    </p>
+                ? html` <p class="text-rose-400 text-xs max-w-xs">${recoveryError}</p>
                     <a
                       href=${CONSTANTS.PLATFORMS.leetcode.baseUrl}
                       target="_blank"
@@ -1350,8 +1219,8 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                     </a>`
                 : ""}
               <p class="text-slate-600 text-[10px] max-w-xs">
-                Opens a background LeetCode tab to fetch your latest accepted
-                submission. Make sure you are logged into LeetCode first.
+                Opens a background LeetCode tab to fetch your latest accepted submission. Make sure
+                you are logged into LeetCode first.
               </p>
             `
           : html`<p class="text-slate-600 text-xs">
@@ -1361,8 +1230,7 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
     `;
   }
 
-  const rawLang =
-    problem.lang?.slug || problem.lang?.name || problem.language || "";
+  const rawLang = problem.lang?.slug || problem.lang?.name || problem.language || "";
   const highlighted = highlightCode(problem.code, rawLang);
   return html`<div class="flex flex-col gap-2">
     <div class="flex justify-between items-center">
@@ -1388,13 +1256,10 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
 function EditTab({ problem, onUpdate, onDelete, onClose }) {
   const initialTags = (() => {
     const fromProblem = Array.isArray(problem.tags) ? problem.tags : [];
-    const fallbackTopic =
-      problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
+    const fallbackTopic = problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
     return [
       ...new Set(
-        [...fromProblem, ...fallbackTopic]
-          .map((t) => String(t || "").trim())
-          .filter(Boolean),
+        [...fromProblem, ...fallbackTopic].map((t) => String(t || "").trim()).filter(Boolean),
       ),
     ];
   })();
@@ -1413,13 +1278,10 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
   useEffect(() => {
     const nextTags = (() => {
       const fromProblem = Array.isArray(problem.tags) ? problem.tags : [];
-      const fallbackTopic =
-        problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
+      const fallbackTopic = problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
       return [
         ...new Set(
-          [...fromProblem, ...fallbackTopic]
-            .map((t) => String(t || "").trim())
-            .filter(Boolean),
+          [...fromProblem, ...fallbackTopic].map((t) => String(t || "").trim()).filter(Boolean),
         ),
       ];
     })();
@@ -1463,9 +1325,7 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
     setSaving(true);
     setError("");
     try {
-      const newTags = [
-        ...new Set(tagList.map((t) => String(t || "").trim()).filter(Boolean)),
-      ];
+      const newTags = [...new Set(tagList.map((t) => String(t || "").trim()).filter(Boolean))];
       const updated = {
         ...problem,
         title: title.trim() || problem.title,
@@ -1477,12 +1337,10 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
       };
       await Storage.saveProblem(updated);
       const slug = String(updated.titleSlug || updated.id || "").trim();
-      const lang =
-        updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
+      const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
       const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
       const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
-      if (pendingKey)
-        await Storage.markPendingProblemKey(pendingKey).catch(() => {});
+      if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => {});
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
       onUpdate?.(updated);
@@ -1508,14 +1366,11 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
 
   return html` <div class="flex flex-col gap-5">
     <p class="text-[11px] text-slate-500">
-      Update metadata for this problem. Changes are saved locally to your
-      browser database.
+      Update metadata for this problem. Changes are saved locally to your browser database.
     </p>
 
     <div class="flex flex-col gap-1.5">
-      <label class="text-[11px] uppercase tracking-wider text-slate-500"
-        >Title</label
-      >
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Title</label>
       <input
         type="text"
         value=${title}
@@ -1525,24 +1380,18 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
     </div>
 
     <div class="flex flex-col gap-1.5">
-      <label class="text-[11px] uppercase tracking-wider text-slate-500"
-        >Difficulty</label
-      >
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Difficulty</label>
       <select
         value=${difficulty}
         onChange=${(e) => setDifficulty(e.target.value)}
         class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
       >
-        ${["Easy", "Medium", "Hard", "Unknown"].map(
-          (d) => html`<option value=${d}>${d}</option>`,
-        )}
+        ${["Easy", "Medium", "Hard", "Unknown"].map((d) => html`<option value=${d}>${d}</option>`)}
       </select>
     </div>
 
     <div class="flex flex-col gap-1.5">
-      <label class="text-[11px] uppercase tracking-wider text-slate-500"
-        >Tag Editor</label
-      >
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Tag Editor</label>
       <div
         class="flex flex-wrap gap-1.5 p-2 bg-black border border-white/10 rounded-lg min-h-[44px]"
       >
@@ -1593,9 +1442,7 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
 
     <!-- Platform metadata (read-only) -->
     <div class="flex flex-col gap-1">
-      <span class="text-[10px] uppercase tracking-wider text-slate-500"
-        >Metadata</span
-      >
+      <span class="text-[10px] uppercase tracking-wider text-slate-500">Metadata</span>
       <div class="grid grid-cols-3 gap-2 text-xs">
         ${[
           ["Platform", problem.platform],
@@ -1605,18 +1452,15 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
           [
             "Accept Rate",
             problem.acRate
-              ? (typeof problem.acRate === "number"
-                  ? problem.acRate.toFixed(1)
-                  : problem.acRate) + "%"
+              ? (typeof problem.acRate === "number" ? problem.acRate.toFixed(1) : problem.acRate) +
+                "%"
               : null,
           ],
           [
             "Solved",
             problem.timestamp
               ? new Date(
-                  problem.timestamp < 1e12
-                    ? problem.timestamp * 1000
-                    : problem.timestamp,
+                  problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp,
                 ).toLocaleDateString()
               : null,
           ],
@@ -1634,9 +1478,7 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
     </div>
 
     <div class="flex flex-col gap-1.5">
-      <label class="text-[11px] uppercase tracking-wider text-slate-500"
-        >Notes</label
-      >
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Notes</label>
       <textarea
         value=${notes}
         onInput=${(e) => setNotes(e.target.value)}
@@ -1648,14 +1490,8 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
 
     <div class="flex items-center justify-between mt-1">
       <div>
-        ${saved
-          ? html`<span class="text-xs text-emerald-400"
-              >✓ Saved successfully</span
-            >`
-          : ""}
-        ${error
-          ? html`<span class="text-xs text-rose-400">${error}</span>`
-          : ""}
+        ${saved ? html`<span class="text-xs text-emerald-400">✓ Saved successfully</span>` : ""}
+        ${error ? html`<span class="text-xs text-rose-400">${error}</span>` : ""}
       </div>
       <button
         onClick=${save}
@@ -1668,8 +1504,7 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
 
     <div class="border-t border-white/5 pt-4 mt-2">
       <p class="text-[10px] text-slate-600 mb-2">
-        Danger zone — this removes the problem from your local database
-        permanently.
+        Danger zone — this removes the problem from your local database permanently.
       </p>
       ${confirmDelete
         ? html`
@@ -1755,15 +1590,13 @@ function MethodCard({ method, methodIndex, problem, onUpdate }) {
             settled = true;
             clearTimeout(timer);
             release();
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (resp?.ok) resolve(resp);
             else reject(new Error(resp?.error || "AI review failed"));
           },
         );
       });
-      const methodReview =
-        result.problem?.methods?.[methodIndex]?.aiReview || result.review || "";
+      const methodReview = result.problem?.methods?.[methodIndex]?.aiReview || result.review || "";
       setLocalReview(methodReview);
       if (result.problem) onUpdate?.(result.problem);
     } catch (e) {
@@ -1774,23 +1607,17 @@ function MethodCard({ method, methodIndex, problem, onUpdate }) {
   };
 
   return html`<div class="border border-white/10 rounded-xl overflow-hidden">
-    <div
-      class="px-4 py-2.5 bg-white/[0.02] border-b border-white/5 flex items-center gap-3"
-    >
+    <div class="px-4 py-2.5 bg-white/[0.02] border-b border-white/5 flex items-center gap-3">
       <span class="text-xs font-medium text-slate-300">
         ${method.title || `Approach ${methodIndex + 1}`}
       </span>
       ${method.language
-        ? html`<span
-            class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500"
-          >
+        ? html`<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500">
             ${method.language}
           </span>`
         : ""}
       ${method.description
-        ? html`<span
-            class="text-[10px] text-slate-600 ml-auto truncate max-w-xs"
-          >
+        ? html`<span class="text-[10px] text-slate-600 ml-auto truncate max-w-xs">
             ${method.description}
           </span>`
         : ""}
@@ -1798,10 +1625,7 @@ function MethodCard({ method, methodIndex, problem, onUpdate }) {
     <pre
       class="text-xs leading-relaxed overflow-x-auto bg-black/50 p-4 whitespace-pre font-mono m-0 max-h-96"
       dangerouslySetInnerHTML=${{
-        __html: highlightCode(
-          method.code || "// (no code)",
-          (method.language || "").toLowerCase(),
-        ),
+        __html: highlightCode(method.code || "// (no code)", (method.language || "").toLowerCase()),
       }}
     ></pre>
     <div class="border-t border-white/10 p-3">
@@ -1869,9 +1693,7 @@ modalTabRegistry.register("*", [
     show: (p) => !!p?.notes,
     render(problem, { html }) {
       return html` <div class="prose prose-invert prose-sm max-w-none">
-        <pre
-          class="whitespace-pre-wrap text-sm text-slate-300 font-sans leading-relaxed"
-        >
+        <pre class="whitespace-pre-wrap text-sm text-slate-300 font-sans leading-relaxed">
 ${problem.notes}</pre
         >
       </div>`;

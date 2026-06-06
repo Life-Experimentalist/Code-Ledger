@@ -40,13 +40,7 @@ export function buildTreeItems(files, deletes = []) {
  * @param {object} [user]        { name, login, email } from getCurrentUser
  * @returns {object}             Payload for POST /git/commits
  */
-export function buildCommitPayload(
-  message,
-  treeSha,
-  parentSha,
-  opts = {},
-  user = {},
-) {
+export function buildCommitPayload(message, treeSha, parentSha, opts = {}, user = {}) {
   const payload = {
     message,
     tree: treeSha,
@@ -56,8 +50,7 @@ export function buildCommitPayload(
   if (opts.date) {
     const iso = new Date(opts.date).toISOString();
     const name = user.name || user.login || "CodeLedger";
-    const email =
-      user.email || `${user.login || "codeledger"}@users.noreply.github.com`;
+    const email = user.email || `${user.login || "codeledger"}@users.noreply.github.com`;
     payload.author = { name, email, date: iso };
     payload.committer = { ...payload.author };
   }

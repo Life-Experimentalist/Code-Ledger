@@ -25,9 +25,7 @@
 
   const version = _rt.getManifest?.()?.version || "unknown";
   const libraryUrl = _rt.getURL("library/library.html");
-  console.log(
-    `[CodeLedger:PresenceMarker] version=${version}, libraryUrl=${libraryUrl}`,
-  );
+  console.log(`[CodeLedger:PresenceMarker] version=${version}, libraryUrl=${libraryUrl}`);
 
   // ── 1. DOM marker (legacy + MutationObserver path) ──────────────────────
   if (!document.getElementById("codeledger-present")) {
@@ -58,9 +56,7 @@
     fire();
     if (++n >= 10) {
       clearInterval(iv);
-      console.log(
-        `[CodeLedger:PresenceMarker] ✓ retry loop complete (10 retries sent)`,
-      );
+      console.log(`[CodeLedger:PresenceMarker] ✓ retry loop complete (10 retries sent)`);
     }
   }, 250);
 })();

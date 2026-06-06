@@ -11,13 +11,7 @@
  * - Comprehensive dedup logging
  */
 
-import {
-  h,
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useRef, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -48,13 +42,10 @@ function fmtDate(ts) {
 function CodeBlock({ code, label, meta }) {
   return html`
     <div class="flex-1 min-w-0">
-      <div
-        class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1"
-      >
+      <div class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1">
         ${label}
       </div>
-      ${meta &&
-      html`<div class="text-[10px] text-slate-500 mb-1">${meta}</div>`}
+      ${meta && html`<div class="text-[10px] text-slate-500 mb-1">${meta}</div>`}
       <pre
         class="bg-black/30 border border-white/5 rounded-lg p-3 text-[11px] text-slate-300 overflow-auto max-h-48 whitespace-pre-wrap break-all"
       >
@@ -64,13 +55,7 @@ ${code || "(no code)"}</pre
   `;
 }
 
-function ConflictItem({
-  item,
-  candidate,
-  onResolved,
-  globalFrozen,
-  onShowAIDecision,
-}) {
+function ConflictItem({ item, candidate, onResolved, globalFrozen, onShowAIDecision }) {
   const [seconds, setSeconds] = useState(COUNTDOWN_SECONDS);
   const [resolving, setResolving] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
@@ -81,11 +66,8 @@ function ConflictItem({
   const effectivelyFrozen = isFrozen || globalFrozen;
 
   // Check at mount whether codes are actually identical (normalized).
-  const codesAreIdentical =
-    normalizeCode(item.code) === normalizeCode(candidate.code);
-  const [identicalCountdown, setIdenticalCountdown] = useState(
-    codesAreIdentical ? 3 : null,
-  );
+  const codesAreIdentical = normalizeCode(item.code) === normalizeCode(candidate.code);
+  const [identicalCountdown, setIdenticalCountdown] = useState(codesAreIdentical ? 3 : null);
 
   const cancelTimer = useCallback(() => {
     cancelledRef.current = true;
@@ -95,16 +77,12 @@ function ConflictItem({
   const freezeTimer = useCallback(() => {
     setIsFrozen(true);
     if (timerRef.current) clearInterval(timerRef.current);
-    dbg.log(
-      `[CodeLedger:DedupReviewQueue] ⏸ Froze timer for ${item.titleSlug}`,
-    );
+    dbg.log(`[CodeLedger:DedupReviewQueue] ⏸ Froze timer for ${item.titleSlug}`);
   }, [item.titleSlug]);
 
   const resumeTimer = useCallback(() => {
     setIsFrozen(false);
-    dbg.log(
-      `[CodeLedger:DedupReviewQueue] ▶ Resumed timer for ${item.titleSlug}`,
-    );
+    dbg.log(`[CodeLedger:DedupReviewQueue] ▶ Resumed timer for ${item.titleSlug}`);
   }, [item.titleSlug]);
 
   // Keep oldest (primary wins)
@@ -114,9 +92,7 @@ function ConflictItem({
     try {
       const primary = await Storage.getProblem(item.id);
       if (!primary) {
-        dbg.error(
-          `[CodeLedger:DedupReviewQueue] ✗ resolveKeepPrimary: item ${item.id} not found`,
-        );
+        dbg.error(`[CodeLedger:DedupReviewQueue] ✗ resolveKeepPrimary: item ${item.id} not found`);
         setResolving(false);
         return;
       }
@@ -141,9 +117,7 @@ function ConflictItem({
       );
       onResolved(item.id);
     } catch (e) {
-      dbg.error(
-        `[CodeLedger:DedupReviewQueue] ✗ resolveKeepPrimary failed: ${e?.message}`,
-      );
+      dbg.error(`[CodeLedger:DedupReviewQueue] ✗ resolveKeepPrimary failed: ${e?.message}`);
       setResolving(false);
     }
   }, [item, candidate, cancelTimer, onResolved]);
@@ -191,9 +165,7 @@ function ConflictItem({
       );
       onResolved(item.id);
     } catch (e) {
-      dbg.error(
-        `[CodeLedger:DedupReviewQueue] ✗ resolveKeepCandidate failed: ${e?.message}`,
-      );
+      dbg.error(`[CodeLedger:DedupReviewQueue] ✗ resolveKeepCandidate failed: ${e?.message}`);
       setResolving(false);
     }
   }, [item, candidate, cancelTimer, onResolved]);
@@ -238,14 +210,10 @@ function ConflictItem({
           );
         }
       }
-      dbg.log(
-        `[CodeLedger:DedupReviewQueue] ✓ Resolved ${primary.titleSlug} — added as methods`,
-      );
+      dbg.log(`[CodeLedger:DedupReviewQueue] ✓ Resolved ${primary.titleSlug} — added as methods`);
       onResolved(item.id);
     } catch (e) {
-      dbg.error(
-        `[CodeLedger:DedupReviewQueue] ✗ resolveBothAsMethods failed: ${e?.message}`,
-      );
+      dbg.error(`[CodeLedger:DedupReviewQueue] ✗ resolveBothAsMethods failed: ${e?.message}`);
       setResolving(false);
     }
   }, [item, candidate, cancelTimer, onResolved]);
@@ -267,10 +235,7 @@ function ConflictItem({
           );
         }),
         new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("AI timeout")),
-            AI_DECIDE_TIMEOUT_MS,
-          ),
+          setTimeout(() => reject(new Error("AI timeout")), AI_DECIDE_TIMEOUT_MS),
         ),
       ]);
       setAiDecision(result);
@@ -282,15 +247,11 @@ function ConflictItem({
           item,
           candidate,
           decision: result?.same ? "keep_primary" : "both_as_methods",
-          reason: result?.same
-            ? "Code is functionally identical"
-            : "Different approaches detected",
+          reason: result?.same ? "Code is functionally identical" : "Different approaches detected",
         });
       }
     } catch (e) {
-      dbg.warn(
-        `[CodeLedger:DedupReviewQueue] ✗ AI decision failed: ${e?.message}`,
-      );
+      dbg.warn(`[CodeLedger:DedupReviewQueue] ✗ AI decision failed: ${e?.message}`);
       setAiDecision({ error: e?.message });
     } finally {
       setAiDeciding(false);
@@ -340,9 +301,7 @@ function ConflictItem({
             >`
           : identicalCountdown > 0 && effectivelyFrozen
             ? html`<span class="ml-auto text-xs text-slate-400">⏸ Paused</span>`
-            : html`<span class="ml-auto text-xs text-slate-400"
-                >Merging…</span
-              >`}
+            : html`<span class="ml-auto text-xs text-slate-400">Merging…</span>`}
       </div>
     `;
   }
@@ -375,9 +334,7 @@ function ConflictItem({
   return html`
     <div class="p-4 bg-white/3 border border-white/8 rounded-xl space-y-3">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-sm font-medium text-white"
-          >${item.title || item.titleSlug}</span
-        >
+        <span class="text-sm font-medium text-white">${item.title || item.titleSlug}</span>
         <span
           class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300"
         >
@@ -400,21 +357,14 @@ function ConflictItem({
                 ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
                 : "bg-purple-500/15 border border-purple-500/30 text-purple-300"}"
           >
-            🤖
-            ${aiDecision.error
-              ? "Error"
-              : aiDecision.same
-                ? "Same"
-                : "Different"}
+            🤖 ${aiDecision.error ? "Error" : aiDecision.same ? "Same" : "Different"}
           </span>
         `}
       </div>
 
       <div class="flex gap-3">
         <div class="flex-1 min-w-0">
-          <div
-            class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1"
-          >
+          <div class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1">
             Primary (oldest)
           </div>
           <div class="text-[10px] text-slate-500 mb-1">
@@ -431,9 +381,7 @@ ${item.code || "(no code)"}</pre
           >
         </div>
         <div class="flex-1 min-w-0">
-          <div
-            class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1"
-          >
+          <div class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1">
             Candidate
           </div>
           <div class="text-[10px] text-slate-500 mb-1">
@@ -453,17 +401,11 @@ ${candidate.code || "(no code)"}</pre
 
       ${aiDecision
         ? html`
-            <div
-              class="p-3 bg-blue-900/20 border border-blue-500/20 rounded-lg"
-            >
-              <div class="text-xs font-medium text-blue-200 mb-2">
-                🤖 AI Decision
-              </div>
+            <div class="p-3 bg-blue-900/20 border border-blue-500/20 rounded-lg">
+              <div class="text-xs font-medium text-blue-200 mb-2">🤖 AI Decision</div>
               <div class="text-xs text-blue-100 mb-3">
                 ${aiDecision.error
-                  ? html`<span class="text-red-300"
-                      >Error: ${aiDecision.error}</span
-                    >`
+                  ? html`<span class="text-red-300">Error: ${aiDecision.error}</span>`
                   : aiDecision.same
                     ? html`<span
                         >Code is functionally identical. Recommendation:
@@ -547,13 +489,9 @@ ${candidate.code || "(no code)"}</pre
           ? html`<span class="ml-auto text-xs text-slate-400">Resolving…</span>`
           : seconds > 0 && !effectivelyFrozen
             ? html`
-                <span
-                  class="ml-auto flex items-center gap-2 text-xs text-slate-400"
-                >
+                <span class="ml-auto flex items-center gap-2 text-xs text-slate-400">
                   Decide in
-                  <span
-                    class="relative w-16 h-1.5 bg-white/10 rounded-full overflow-hidden"
-                  >
+                  <span class="relative w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
                     <span
                       class="absolute inset-y-0 left-0 bg-amber-400 rounded-full transition-all"
                       style="width: ${progress}%"
@@ -563,12 +501,8 @@ ${candidate.code || "(no code)"}</pre
                 </span>
               `
             : effectivelyFrozen
-              ? html`<span class="ml-auto text-xs text-orange-400"
-                  >⏸ Paused</span
-                >`
-              : html`<span class="ml-auto text-xs text-slate-400"
-                  >Will auto-ask AI…</span
-                >`}
+              ? html`<span class="ml-auto text-xs text-orange-400">⏸ Paused</span>`
+              : html`<span class="ml-auto text-xs text-slate-400">Will auto-ask AI…</span>`}
       </div>
     </div>
   `;
@@ -590,9 +524,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
       const problems = await Storage.getAllProblems().catch(() => []);
       // Show new conflictPending items AND legacy aiMergePending items
       const conflictItems = (problems || [])
-        .filter(
-          (p) => p?.conflictPending === true || p?.aiMergePending === true,
-        )
+        .filter((p) => p?.conflictPending === true || p?.aiMergePending === true)
         .map((p, idx) => ({ ...p, _queueIdx: idx }));
       setAllItems(conflictItems);
       dbg.log(
@@ -612,9 +544,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
       if (updated.length === 0) {
         dbg.log("[CodeLedger:DedupReviewQueue] ✓ All conflicts resolved!");
       } else {
-        dbg.log(
-          `[CodeLedger:DedupReviewQueue] Remaining: ${updated.length} conflict(s)`,
-        );
+        dbg.log(`[CodeLedger:DedupReviewQueue] Remaining: ${updated.length} conflict(s)`);
       }
       return updated;
     });
@@ -634,9 +564,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
     delete p.aiMergeProposedCode;
     delete p.aiMergeSources;
     await Storage.saveProblem(p).catch(() => {});
-    dbg.log(
-      `[CodeLedger:DedupReviewQueue] ✓ Legacy item approved: ${item.titleSlug}`,
-    );
+    dbg.log(`[CodeLedger:DedupReviewQueue] ✓ Legacy item approved: ${item.titleSlug}`);
     handleResolved(item.id);
   }
 
@@ -649,9 +577,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
     delete p.aiMergeProposedCode;
     delete p.aiMergeSources;
     await Storage.saveProblem(p).catch(() => {});
-    dbg.log(
-      `[CodeLedger:DedupReviewQueue] ✓ Legacy item rejected: ${item.titleSlug}`,
-    );
+    dbg.log(`[CodeLedger:DedupReviewQueue] ✓ Legacy item rejected: ${item.titleSlug}`);
     handleResolved(item.id);
   }
 
@@ -662,9 +588,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
     if (hasMore) {
       setCurrentIdx((idx) => idx + 1);
       setAiDecisionItem(null);
-      dbg.log(
-        `[CodeLedger:DedupReviewQueue] → Next: item ${currentIdx + 2}/${allItems.length}`,
-      );
+      dbg.log(`[CodeLedger:DedupReviewQueue] → Next: item ${currentIdx + 2}/${allItems.length}`);
     }
   };
 
@@ -672,9 +596,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
     if (currentIdx > 0) {
       setCurrentIdx((idx) => idx - 1);
       setAiDecisionItem(null);
-      dbg.log(
-        `[CodeLedger:DedupReviewQueue] ← Prev: item ${currentIdx}/${allItems.length}`,
-      );
+      dbg.log(`[CodeLedger:DedupReviewQueue] ← Prev: item ${currentIdx}/${allItems.length}`);
     }
   };
 
@@ -682,9 +604,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
     if (idx >= 0 && idx < allItems.length) {
       setCurrentIdx(idx);
       setAiDecisionItem(null);
-      dbg.log(
-        `[CodeLedger:DedupReviewQueue] Jump to item ${idx + 1}/${allItems.length}`,
-      );
+      dbg.log(`[CodeLedger:DedupReviewQueue] Jump to item ${idx + 1}/${allItems.length}`);
     }
   };
 
@@ -695,9 +615,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
         class="relative w-full max-w-4xl mx-4 bg-slate-900 rounded-xl border border-white/10 flex flex-col max-h-[90vh]"
       >
         <!-- Header with global controls -->
-        <div
-          class="flex items-center justify-between gap-4 px-6 py-4 border-b border-white/8"
-        >
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-white/8">
           <div>
             <h3 class="text-base font-semibold text-white">
               ${allItems.length === 0
@@ -723,10 +641,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
             >
               ${globalFrozen ? "▶ Resume All" : "⏸ Freeze All"}
             </button>
-            <button
-              onClick=${onClose}
-              class="text-slate-400 hover:text-white text-xl leading-none"
-            >
+            <button onClick=${onClose} class="text-slate-400 hover:text-white text-xl leading-none">
               ✕
             </button>
           </div>
@@ -743,8 +658,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
               : currentItem
                 ? html`
                     <!-- Display current item -->
-                    ${currentItem.conflictPending &&
-                    currentItem.conflictCandidates?.length
+                    ${currentItem.conflictPending && currentItem.conflictCandidates?.length
                       ? html`
                           <${ConflictItem}
                             item=${currentItem}
@@ -756,34 +670,24 @@ export function DedupReviewQueue({ onClose = () => {} }) {
                         `
                       : html`
                           <!-- Legacy aiMergePending -->
-                          <div
-                            class="p-4 bg-white/3 border border-white/8 rounded-xl space-y-3"
-                          >
-                            <div class="text-sm font-medium text-white">
-                              ${currentItem.title}
-                            </div>
+                          <div class="p-4 bg-white/3 border border-white/8 rounded-xl space-y-3">
+                            <div class="text-sm font-medium text-white">${currentItem.title}</div>
                             <div class="text-xs text-slate-400">
-                              AI merge proposal ·
-                              ${currentItem.lang?.name || "unknown"}
+                              AI merge proposal · ${currentItem.lang?.name || "unknown"}
                             </div>
                             <div class="text-xs text-slate-500 space-y-1">
                               <div>
-                                Original:
-                                ${String(currentItem.aiMergeOriginalCode || "")
-                                  .length}
+                                Original: ${String(currentItem.aiMergeOriginalCode || "").length}
                                 chars
                               </div>
                               <div>
-                                Proposed:
-                                ${String(currentItem.aiMergeProposedCode || "")
-                                  .length}
+                                Proposed: ${String(currentItem.aiMergeProposedCode || "").length}
                                 chars
                               </div>
                             </div>
                             <div class="flex gap-2">
                               <button
-                                onClick=${() =>
-                                  handleLegacyApprove(currentItem)}
+                                onClick=${() => handleLegacyApprove(currentItem)}
                                 class="px-3 py-1 bg-emerald-600/20 border border-emerald-500/30 text-emerald-200 text-xs rounded hover:bg-emerald-600/40 transition-colors"
                               >
                                 Approve
@@ -827,17 +731,13 @@ export function DedupReviewQueue({ onClose = () => {} }) {
                 <!-- Quick jump -->
                 <div class="flex gap-1">
                   ${allItems
-                    .slice(
-                      Math.max(0, currentIdx - 2),
-                      Math.min(allItems.length, currentIdx + 3),
-                    )
+                    .slice(Math.max(0, currentIdx - 2), Math.min(allItems.length, currentIdx + 3))
                     .map((item, relIdx) => {
                       const actualIdx = currentIdx - 2 + relIdx;
                       return html`
                         <button
                           onClick=${() => jumpToIndex(actualIdx)}
-                          class="px-2 py-1 text-xs rounded-lg ${actualIdx ===
-                          currentIdx
+                          class="px-2 py-1 text-xs rounded-lg ${actualIdx === currentIdx
                             ? "bg-blue-600 border border-blue-500 text-white"
                             : "bg-slate-600/20 border border-slate-500/30 text-slate-300 hover:bg-slate-600/40"} transition-colors"
                         >
@@ -847,9 +747,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
                     })}
                 </div>
 
-                <div class="text-xs text-slate-500">
-                  ${currentIdx + 1} / ${allItems.length}
-                </div>
+                <div class="text-xs text-slate-500">${currentIdx + 1} / ${allItems.length}</div>
               </div>
             `
           : ""}

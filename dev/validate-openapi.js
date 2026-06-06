@@ -24,8 +24,7 @@ function readSpec(specPath) {
 
 function extractWorkerRoutes(workerPath) {
   const src = fs.readFileSync(workerPath, "utf8");
-  const regex =
-    /app\.(get|post|put|delete|patch|options)\(\s*['\"`]([^'\"`]+)['\"`]/g;
+  const regex = /app\.(get|post|put|delete|patch|options)\(\s*['\"`]([^'\"`]+)['\"`]/g;
   const routes = {};
   let m;
   while ((m = regex.exec(src)) !== null) {
@@ -87,9 +86,7 @@ async function main() {
     exitCode = 2;
   }
   if (missingImpl.length) {
-    console.warn(
-      "\nWARN: OpenAPI declares routes that are not implemented in worker:",
-    );
+    console.warn("\nWARN: OpenAPI declares routes that are not implemented in worker:");
     missingImpl.forEach((p) => console.warn("  -", p));
     // keep as warning but report; you may want to enforce later
   }
@@ -99,9 +96,7 @@ async function main() {
       "\nOpenAPI validation FAILED. Please update docs/OPENAPI.yaml or implement the missing routes.",
     );
   } else {
-    console.log(
-      "\nOpenAPI validation passed — implemented routes are present in the spec.",
-    );
+    console.log("\nOpenAPI validation passed — implemented routes are present in the spec.");
   }
   process.exit(exitCode);
 }

@@ -56,8 +56,7 @@ export const BUILTIN_SKILLS = [
   {
     id: "next-problem",
     name: "Next Problem Guide",
-    description:
-      "After solving, suggest the next problem in roadmap or by weak topic",
+    description: "After solving, suggest the next problem in roadmap or by weak topic",
     trigger: "after_solve",
     system_prompt_modifier:
       "The user has just solved a problem. Congratulate them briefly, then suggest the next problem to tackle based on their roadmap or weakest topic. Use the get-next-suggestion tool if available.",
@@ -92,9 +91,7 @@ const SK_USER_SKILLS = "userDefinedSkills";
  */
 export async function getAllSkills() {
   const settings = await Storage.getSettings();
-  const userSkills = Array.isArray(settings[SK_USER_SKILLS])
-    ? settings[SK_USER_SKILLS]
-    : [];
+  const userSkills = Array.isArray(settings[SK_USER_SKILLS]) ? settings[SK_USER_SKILLS] : [];
   return [...BUILTIN_SKILLS, ...userSkills];
 }
 
@@ -103,12 +100,9 @@ export async function getAllSkills() {
  * @param {object} skill
  */
 export async function saveUserSkill(skill) {
-  if (!skill?.id || !skill?.name)
-    throw new Error("Skill must have id and name");
+  if (!skill?.id || !skill?.name) throw new Error("Skill must have id and name");
   const settings = await Storage.getSettings();
-  const existing = Array.isArray(settings[SK_USER_SKILLS])
-    ? settings[SK_USER_SKILLS]
-    : [];
+  const existing = Array.isArray(settings[SK_USER_SKILLS]) ? settings[SK_USER_SKILLS] : [];
   const idx = existing.findIndex((s) => s.id === skill.id);
   if (idx >= 0) existing[idx] = skill;
   else existing.push(skill);
@@ -122,9 +116,7 @@ export async function saveUserSkill(skill) {
  */
 export async function deleteUserSkill(id) {
   const settings = await Storage.getSettings();
-  const existing = Array.isArray(settings[SK_USER_SKILLS])
-    ? settings[SK_USER_SKILLS]
-    : [];
+  const existing = Array.isArray(settings[SK_USER_SKILLS]) ? settings[SK_USER_SKILLS] : [];
   await Storage.setSettings({
     ...settings,
     [SK_USER_SKILLS]: existing.filter((s) => s.id !== id),

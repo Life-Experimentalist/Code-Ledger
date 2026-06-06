@@ -14,9 +14,7 @@ export const GitEngine = {
       dbg.log(`commitSolve(): git disabled, skipping commit`);
       return;
     }
-    dbg.log(
-      `commitSolve(): starting solve commit for ${problemContext?.titleSlug || "unknown"}`,
-    );
+    dbg.log(`commitSolve(): starting solve commit for ${problemContext?.titleSlug || "unknown"}`);
 
     const providerId = settings.gitProvider || "github";
     const gitHandler = registry.getGitProvider(providerId);
@@ -28,11 +26,10 @@ export const GitEngine = {
 
     try {
       const topicFolder = problemContext.topic || "Untagged";
-      const cleanTitle = (
-        problemContext.titleSlug ||
-        problemContext.title ||
-        "unknown"
-      ).replace(/[^a-zA-Z0-9-]/g, "-");
+      const cleanTitle = (problemContext.titleSlug || problemContext.title || "unknown").replace(
+        /[^a-zA-Z0-9-]/g,
+        "-",
+      );
       const langExt = problemContext.lang?.ext || "txt";
       const filePath = `topics/${topicFolder}/${cleanTitle}/solution.${langExt}`;
       dbg.log(`commitSolve(): prepared file path=${filePath}`);

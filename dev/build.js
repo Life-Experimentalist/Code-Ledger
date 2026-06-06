@@ -28,8 +28,7 @@ if (!SKIP_CSS) {
   execSync("npm run build:css", { stdio: "inherit", cwd: ROOT });
 }
 
-if (fs.existsSync(DIST_DIR))
-  fs.rmSync(DIST_DIR, { recursive: true, force: true });
+if (fs.existsSync(DIST_DIR)) fs.rmSync(DIST_DIR, { recursive: true, force: true });
 
 function copyRecursive(src, dest) {
   if (fs.statSync(src).isDirectory()) {
@@ -64,6 +63,4 @@ fs.writeFileSync(
   JSON.stringify(ffManifest, null, 4) + "\n",
 );
 
-console.log(
-  "Dist build complete. Run `node dev/package.js` to create release zips.",
-);
+console.log("Dist build complete. Run `node dev/package.js` to create release zips.");

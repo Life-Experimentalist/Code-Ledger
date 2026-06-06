@@ -4,10 +4,7 @@
  */
 
 // Works for OpenAI AND any OpenAI-compatible endpoint (Groq, Together, etc.)
-export async function fetchOpenAIModels(
-  apiKey,
-  endpoint = "https://api.openai.com/v1",
-) {
+export async function fetchOpenAIModels(apiKey, endpoint = "https://api.openai.com/v1") {
   const res = await fetch(`${endpoint}/models`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });

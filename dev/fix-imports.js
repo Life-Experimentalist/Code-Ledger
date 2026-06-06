@@ -18,34 +18,22 @@ function fixPath(filePaths) {
       /from\s+['"]https:\/\/esm\.sh\/preact['"]/g,
       `from '${preactBundle}'`,
     );
-    content = content.replace(
-      /from\s+['"]preact['"]/g,
-      `from '${preactBundle}'`,
-    );
+    content = content.replace(/from\s+['"]preact['"]/g, `from '${preactBundle}'`);
 
     content = content.replace(
       /from\s+['"]https:\/\/esm\.sh\/preact\/hooks['"]/g,
       `from '${preactBundle}'`,
     );
-    content = content.replace(
-      /from\s+['"]preact\/hooks['"]/g,
-      `from '${preactBundle}'`,
-    );
+    content = content.replace(/from\s+['"]preact\/hooks['"]/g, `from '${preactBundle}'`);
 
-    content = content.replace(
-      /from\s+['"]https:\/\/esm\.sh\/htm['"]/g,
-      `from '${preactBundle}'`,
-    );
+    content = content.replace(/from\s+['"]https:\/\/esm\.sh\/htm['"]/g, `from '${preactBundle}'`);
     content = content.replace(/from\s+['"]htm['"]/g, `from '${preactBundle}'`);
 
     content = content.replace(
       /from\s+['"]https:\/\/esm\.sh\/chart\.js\/auto['"]/g,
       `from '${chartBundle}'`,
     );
-    content = content.replace(
-      /from\s+['"]chart\.js\/auto['"]/g,
-      `from '${chartBundle}'`,
-    );
+    content = content.replace(/from\s+['"]chart\.js\/auto['"]/g, `from '${chartBundle}'`);
 
     writeFileSync(filePath, content, "utf-8");
   }

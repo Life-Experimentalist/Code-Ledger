@@ -90,24 +90,21 @@ Be concise. Max 200 words.`;
           label: "Include problem description",
           type: "toggle",
           default: true,
-          description:
-            "Save full problem statement and your stats to README.md.",
+          description: "Save full problem statement and your stats to README.md.",
         },
         {
           key: "gfg_timer",
           label: "Show solve timer",
           type: "toggle",
           default: true,
-          description:
-            "Display a floating stopwatch overlay while solving problems on GFG.",
+          description: "Display a floating stopwatch overlay while solving problems on GFG.",
         },
         {
           key: "gfg_copy_btn",
           label: "Copy code button",
           type: "toggle",
           default: true,
-          description:
-            "Inject a copy-to-clipboard button into the GFG editor area.",
+          description: "Inject a copy-to-clipboard button into the GFG editor area.",
         },
         {
           key: "gfg_ai_panel",
@@ -122,8 +119,7 @@ Be concise. Max 200 words.`;
           label: "GFG username",
           type: "text",
           default: "",
-          description:
-            "Your GeeksForGeeks username for importing your profile history.",
+          description: "Your GeeksForGeeks username for importing your profile history.",
           advanced: true,
           placeholder: "e.g. vkrishna04",
         },
@@ -155,9 +151,7 @@ Be concise. Max 200 words.`;
     }
 
     if (page.type === PAGE_TYPES.PROFILE) {
-      injectProfileImportBtn((slug) => this.makeProblemId(slug)).catch(
-        () => {},
-      );
+      injectProfileImportBtn((slug) => this.makeProblemId(slug)).catch(() => {});
     }
 
     try {
@@ -207,9 +201,7 @@ Be concise. Max 200 words.`;
     const titleEl = document.querySelector(
       '[class^="problems_header_content__title"] h3, .problem-title h3, h1',
     );
-    const diffEl = document.querySelector(
-      '[class*="difficulty"], .difficulty-tag',
-    );
+    const diffEl = document.querySelector('[class*="difficulty"], .difficulty-tag');
     return {
       title: (titleEl?.textContent || "").trim(),
       difficulty: (diffEl?.textContent || "").trim(),
@@ -217,9 +209,7 @@ Be concise. Max 200 words.`;
   }
 
   _readProblemStatement() {
-    const el = document.querySelector(
-      '[class^="problems_problem_content"], .problem-statement',
-    );
+    const el = document.querySelector('[class^="problems_problem_content"], .problem-statement');
     return el ? (el.textContent || "").trim().slice(0, 3000) : "";
   }
 
@@ -240,9 +230,7 @@ Be concise. Max 200 words.`;
       const lang = this._extractLanguage();
       const langSlug = lang.name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-      const existing = await Storage.getProblem(this.makeProblemId(slug)).catch(
-        () => null,
-      );
+      const existing = await Storage.getProblem(this.makeProblemId(slug)).catch(() => null);
       const problem = {
         ...(existing || {}),
         platform: "geeksforgeeks",
@@ -252,11 +240,8 @@ Be concise. Max 200 words.`;
         difficulty: meta.difficulty || existing?.difficulty || null,
         tags: meta.tags?.length ? meta.tags : existing?.tags || [],
         code: code || existing?.code || "",
-        lang: code
-          ? { name: lang.name, ext: lang.ext, slug: langSlug }
-          : existing?.lang,
-        problemStatement:
-          meta.description || existing?.problemStatement || null,
+        lang: code ? { name: lang.name, ext: lang.ext, slug: langSlug } : existing?.lang,
+        problemStatement: meta.description || existing?.problemStatement || null,
         timestamp: existing?.timestamp || Date.now(),
       };
 
@@ -326,17 +311,13 @@ Be concise. Max 200 words.`;
 
     // Fallback: text search across known classes
     const candidates = [
-      ...document.querySelectorAll(
-        '[class*="success"], [class*="accepted"], [class*="correct"]',
-      ),
+      ...document.querySelectorAll('[class*="success"], [class*="accepted"], [class*="correct"]'),
     ];
     return (
       candidates.find((el) => {
         const t = (el.textContent || "").toLowerCase();
         return (
-          t.includes("problem solved") ||
-          t.includes("correct answer") ||
-          t.includes("accepted")
+          t.includes("problem solved") || t.includes("correct answer") || t.includes("accepted")
         );
       }) || null
     );
@@ -379,14 +360,7 @@ Be concise. Max 200 words.`;
       const canonical = await this.resolveCanonical(slug);
 
       // Build file set
-      const files = this._buildFileSet(
-        meta,
-        code,
-        lang,
-        settings,
-        slug,
-        canonical,
-      );
+      const files = this._buildFileSet(meta, code, lang, settings, slug, canonical);
       const readmeFile = files.find((f) => f.path.endsWith("README.md"));
 
       const elapsedSeconds = this._timer.getElapsedSeconds();
@@ -437,9 +411,7 @@ Be concise. Max 200 words.`;
 
     return {
       title: titleEl ? titleEl.textContent.trim() : slug,
-      difficulty: diffEl
-        ? normalizeDifficulty(diffEl.textContent.trim())
-        : null,
+      difficulty: diffEl ? normalizeDifficulty(diffEl.textContent.trim()) : null,
       tags,
       runtime: runtime ? runtime.textContent.trim() : null,
       memory: memory ? memory.textContent.trim() : null,
@@ -475,15 +447,11 @@ Be concise. Max 200 words.`;
     // Fallback: CodeMirror / Ace content
     const cm = document.querySelector(".CodeMirror-code");
     if (cm) {
-      return [...cm.querySelectorAll(".CodeMirror-line")]
-        .map((l) => l.textContent)
-        .join("\n");
+      return [...cm.querySelectorAll(".CodeMirror-line")].map((l) => l.textContent).join("\n");
     }
     const ace = document.querySelector(".ace_content .ace_text-layer");
     if (ace) {
-      return [...ace.querySelectorAll(".ace_line")]
-        .map((l) => l.textContent)
-        .join("\n");
+      return [...ace.querySelectorAll(".ace_line")].map((l) => l.textContent).join("\n");
     }
     return "// Code extraction failed";
   }
@@ -504,8 +472,7 @@ Be concise. Max 200 words.`;
   _readTestFailures() {
     try {
       const lines = [];
-      const SKIP =
-        /problem\s+solved|correct\s+answer|accepted|compilation\s+success/i;
+      const SKIP = /problem\s+solved|correct\s+answer|accepted|compilation\s+success/i;
 
       // Result/verdict container used after submission
       const resultContainers = document.querySelectorAll(
@@ -528,11 +495,7 @@ Be concise. Max 200 words.`;
         )
         .forEach((el) => {
           const t = (el.textContent || "").trim();
-          if (
-            t &&
-            t.length > 4 &&
-            !lines.some((l) => l.includes(t.slice(0, 40)))
-          ) {
+          if (t && t.length > 4 && !lines.some((l) => l.includes(t.slice(0, 40)))) {
             lines.push(t.slice(0, 600));
           }
         });
@@ -545,11 +508,7 @@ Be concise. Max 200 words.`;
         )
         .forEach((el) => {
           const t = (el.textContent || "").trim();
-          if (
-            t &&
-            t.length > 4 &&
-            !lines.some((l) => l.includes(t.slice(0, 40)))
-          ) {
+          if (t && t.length > 4 && !lines.some((l) => l.includes(t.slice(0, 40)))) {
             lines.push(t.slice(0, 400));
           }
         });
@@ -580,13 +539,7 @@ Be concise. Max 200 words.`;
     const files = [];
 
     files.push({
-      path: solutionPath(
-        problemId,
-        "geeksforgeeks",
-        langObj,
-        canonical,
-        settings,
-      ),
+      path: solutionPath(problemId, "geeksforgeeks", langObj, canonical, settings),
       content: code,
     });
 
@@ -609,10 +562,7 @@ Be concise. Max 200 words.`;
     ];
 
     if (meta.tags?.length) {
-      lines.push(
-        "",
-        `**Tags:** ${meta.tags.map((t) => `\`${t}\``).join(", ")}`,
-      );
+      lines.push("", `**Tags:** ${meta.tags.map((t) => `\`${t}\``).join(", ")}`);
     }
 
     if (meta.description) {
@@ -633,10 +583,7 @@ Be concise. Max 200 words.`;
       lines.push("", "## My Submission", "", ...stats.map((s) => `- ${s}`));
     }
 
-    lines.push(
-      "",
-      `**Source:** https://www.geeksforgeeks.org/problems/${slug}/`,
-    );
+    lines.push("", `**Source:** https://www.geeksforgeeks.org/problems/${slug}/`);
 
     return lines.join("\n");
   }

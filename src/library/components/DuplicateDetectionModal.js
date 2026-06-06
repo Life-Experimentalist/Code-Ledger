@@ -82,8 +82,7 @@ function fmtDate(ts) {
 
 export function buildPendingKey(problem) {
   const slug = String(problem.titleSlug || problem.id || "").trim();
-  const lang =
-    problem.lang?.name || problem.lang?.slug || problem.lang?.ext || "";
+  const lang = problem.lang?.name || problem.lang?.slug || problem.lang?.ext || "";
   const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
   return slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
 }
@@ -117,8 +116,7 @@ export async function executeAction(action, first, second) {
     // Keep the "better" problem as the primary entry.
     // Add the other's code as a Method on it, then delete the subordinated one.
     const betterSide = pickBetter(first, second);
-    const [keeper, subordinate] =
-      betterSide === "first" ? [first, second] : [second, first];
+    const [keeper, subordinate] = betterSide === "first" ? [first, second] : [second, first];
 
     const primaryRecord = await Storage.getProblem(keeper.id).catch(() => null);
     if (primaryRecord) {
@@ -151,9 +149,7 @@ export async function executeAction(action, first, second) {
 
 function SameCodeCard({ first, second, onResolved, onCancel }) {
   const autoSide = pickBetter(first, second);
-  const [countdown, setCountdown] = useState(
-    CONSTANTS.DEDUP.SAME_CODE_COUNTDOWN_S,
-  );
+  const [countdown, setCountdown] = useState(CONSTANTS.DEDUP.SAME_CODE_COUNTDOWN_S);
   const [chosen, setChosen] = useState(null); // null | "first" | "second"
   const [resolving, setResolving] = useState(false);
 
@@ -195,9 +191,7 @@ function SameCodeCard({ first, second, onResolved, onCancel }) {
   return html`
     <div class="border border-white/10 rounded-xl overflow-hidden">
       <!-- Header -->
-      <div
-        class="px-4 py-2.5 bg-white/[0.02] flex items-center justify-between gap-4"
-      >
+      <div class="px-4 py-2.5 bg-white/[0.02] flex items-center justify-between gap-4">
         <div class="flex items-center gap-2 min-w-0">
           <span class="text-sm font-medium text-slate-200 truncate">
             ${first.title || first.titleSlug}
@@ -209,16 +203,11 @@ function SameCodeCard({ first, second, onResolved, onCancel }) {
           </span>
         </div>
         ${resolving
-          ? html`<span class="text-[10px] text-slate-400 shrink-0"
-              >Resolving…</span
-            >`
+          ? html`<span class="text-[10px] text-slate-400 shrink-0">Resolving…</span>`
           : chosen !== null
-            ? html`<span class="text-[10px] text-cyan-400 shrink-0"
-                >✓ resolved</span
-              >`
+            ? html`<span class="text-[10px] text-cyan-400 shrink-0">✓ resolved</span>`
             : html`<span class="text-[10px] text-amber-400 shrink-0">
-                Auto-keeping ${autoSide === "first" ? "left" : "right"} in
-                ${countdown}s…
+                Auto-keeping ${autoSide === "first" ? "left" : "right"} in ${countdown}s…
               </span>`}
       </div>
 
@@ -245,21 +234,15 @@ function SameCodeCard({ first, second, onResolved, onCancel }) {
                   ${label}
                 </span>
                 ${isAuto && !chosen
-                  ? html`<span class="text-[10px] text-amber-400/70"
-                      >← auto</span
-                    >`
+                  ? html`<span class="text-[10px] text-amber-400/70">← auto</span>`
                   : ""}
-                ${active
-                  ? html`<span class="text-[10px] text-cyan-400">✓</span>`
-                  : ""}
+                ${active ? html`<span class="text-[10px] text-cyan-400">✓</span>` : ""}
               </div>
               <div class="text-[11px] text-slate-400 space-y-1">
                 <div>${p.difficulty || "?"} · ${p.lang?.name || "?"}</div>
                 <div class="text-slate-600">${fmtDate(p.timestamp)}</div>
                 ${p.aiReview
-                  ? html`<div class="text-emerald-600 text-[10px]">
-                      has AI review
-                    </div>`
+                  ? html`<div class="text-emerald-600 text-[10px]">has AI review</div>`
                   : ""}
                 ${Array.isArray(p.tags) && p.tags.length
                   ? html`<div class="text-slate-600 text-[10px]">
@@ -277,8 +260,8 @@ function SameCodeCard({ first, second, onResolved, onCancel }) {
         class="px-4 py-2 bg-black/20 border-t border-white/5 flex items-center justify-between gap-3"
       >
         <p class="text-[10px] text-slate-600">
-          Code is identical after normalisation — only metadata differs. Keeping
-          the richer version automatically.
+          Code is identical after normalisation — only metadata differs. Keeping the richer version
+          automatically.
         </p>
         <button
           onClick=${onCancel}
@@ -306,14 +289,8 @@ function DiffApproachCard({ first, second, onResolved, onCancel }) {
   const firstLang = first.lang?.slug || first.lang?.name || "";
   const secondLang = second.lang?.slug || second.lang?.name || "";
   // Compute highlighted once — they don't change
-  const firstHighlighted = highlightCode(
-    first.code || "// (no code)",
-    firstLang,
-  );
-  const secondHighlighted = highlightCode(
-    second.code || "// (no code)",
-    secondLang,
-  );
+  const firstHighlighted = highlightCode(first.code || "// (no code)", firstLang);
+  const secondHighlighted = highlightCode(second.code || "// (no code)", secondLang);
 
   // Auto-resolve when one side has no code
   useEffect(() => {
@@ -324,9 +301,7 @@ function DiffApproachCard({ first, second, onResolved, onCancel }) {
     } else if (secondEmpty && !firstEmpty) {
       apply("keep-first");
     } else if (firstEmpty && secondEmpty) {
-      apply(
-        pickBetter(first, second) === "first" ? "keep-first" : "keep-second",
-      );
+      apply(pickBetter(first, second) === "first" ? "keep-first" : "keep-second");
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -367,9 +342,7 @@ function DiffApproachCard({ first, second, onResolved, onCancel }) {
   return html`
     <div class="border border-white/10 rounded-xl overflow-hidden">
       <!-- Header -->
-      <div
-        class="px-4 py-2.5 bg-white/[0.02] flex items-center justify-between gap-4"
-      >
+      <div class="px-4 py-2.5 bg-white/[0.02] flex items-center justify-between gap-4">
         <div class="flex items-center gap-2 min-w-0">
           <span class="text-sm font-medium text-slate-200 truncate">
             ${first.title || first.titleSlug}
@@ -381,33 +354,24 @@ function DiffApproachCard({ first, second, onResolved, onCancel }) {
           </span>
         </div>
         ${resolving
-          ? html`<span class="text-[10px] text-slate-400 shrink-0"
-              >Resolving…</span
-            >`
+          ? html`<span class="text-[10px] text-slate-400 shrink-0">Resolving…</span>`
           : chosen
-            ? html`<span class="text-[10px] text-cyan-400 shrink-0"
-                >✓ resolved</span
-              >`
+            ? html`<span class="text-[10px] text-cyan-400 shrink-0">✓ resolved</span>`
             : ""}
       </div>
 
       <!-- Code panels — always visible -->
-      <div
-        class="grid grid-cols-2 divide-x divide-white/5 border-t border-white/5"
-      >
+      <div class="grid grid-cols-2 divide-x divide-white/5 border-t border-white/5">
         ${sides.map(
           ({ label, highlighted, lang }) => html`
             <div class="flex flex-col">
               <div
                 class="px-3 py-1.5 bg-black/30 flex items-center justify-between border-b border-white/5"
               >
-                <span
-                  class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold"
+                <span class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold"
                   >${label}</span
                 >
-                <span class="text-[10px] font-mono text-cyan-500/60"
-                  >${lang}</span
-                >
+                <span class="text-[10px] font-mono text-cyan-500/60">${lang}</span>
               </div>
               <pre
                 class="text-[11px] leading-relaxed overflow-x-auto bg-black/40 p-3 whitespace-pre font-mono m-0 max-h-64"
@@ -419,9 +383,7 @@ function DiffApproachCard({ first, second, onResolved, onCancel }) {
       </div>
 
       <!-- Side choosers -->
-      <div
-        class="grid grid-cols-2 divide-x divide-white/5 border-t border-white/5"
-      >
+      <div class="grid grid-cols-2 divide-x divide-white/5 border-t border-white/5">
         ${sides.map(({ action, label, p }) => {
           const active = chosen === action;
           return html`
@@ -440,17 +402,13 @@ function DiffApproachCard({ first, second, onResolved, onCancel }) {
                 >
                   ${label}
                 </span>
-                ${active
-                  ? html`<span class="text-[10px] text-cyan-400">✓</span>`
-                  : ""}
+                ${active ? html`<span class="text-[10px] text-cyan-400">✓</span>` : ""}
               </div>
               <div class="text-[11px] text-slate-400 space-y-0.5">
                 <div>${p.difficulty || "?"} · ${p.lang?.name || "?"}</div>
                 <div class="text-slate-600">${fmtDate(p.timestamp)}</div>
                 ${p.aiReview
-                  ? html`<div class="text-emerald-600 text-[10px]">
-                      has AI review
-                    </div>`
+                  ? html`<div class="text-emerald-600 text-[10px]">has AI review</div>`
                   : ""}
               </div>
             </button>
@@ -467,9 +425,7 @@ function DiffApproachCard({ first, second, onResolved, onCancel }) {
           disabled=${resolving}
           class="text-[10px] px-3 py-1.5 rounded-lg bg-violet-600/15 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 transition-colors"
         >
-          ${chosen === "both-methods"
-            ? "✓ Saved as methods"
-            : "⊕ Keep both as Methods"}
+          ${chosen === "both-methods" ? "✓ Saved as methods" : "⊕ Keep both as Methods"}
         </button>
         <button
           onClick=${onCancel}
@@ -502,10 +458,7 @@ export function DuplicateDetectionModal({
   const [autoResolving, setAutoResolving] = useState(false);
 
   function handleResolved(deletedId) {
-    setTimeout(
-      () => onResolve?.(deletedId, "resolved"),
-      CONSTANTS.DEDUP.ADVANCE_DELAY_MS,
-    );
+    setTimeout(() => onResolve?.(deletedId, "resolved"), CONSTANTS.DEDUP.ADVANCE_DELAY_MS);
   }
 
   async function handleAutoResolveAll() {
@@ -537,9 +490,7 @@ export function DuplicateDetectionModal({
         >
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-3 flex-wrap">
-              <h2 class="text-base font-bold text-rose-300 shrink-0">
-                Duplicate Problem Detected
-              </h2>
+              <h2 class="text-base font-bold text-rose-300 shrink-0">Duplicate Problem Detected</h2>
               ${diffApproachCount > 0 || sameCodeCount > 0
                 ? html`<div class="flex items-center gap-2 text-[11px]">
                     ${diffApproachCount > 0
@@ -558,9 +509,7 @@ export function DuplicateDetectionModal({
                       : ""}
                   </div>`
                 : remaining > 1
-                  ? html`<span class="text-xs text-slate-500"
-                      >(${remaining} remaining)</span
-                    >`
+                  ? html`<span class="text-xs text-slate-500">(${remaining} remaining)</span>`
                   : ""}
             </div>
             <p class="text-xs text-slate-500 mt-1">
@@ -568,9 +517,7 @@ export function DuplicateDetectionModal({
                 ? "Identical code — auto-keeping the version with richer metadata."
                 : "Different code — review both approaches and choose how to resolve."}
               ${moreAfter > 0
-                ? html`<span class="ml-1 text-slate-600"
-                    >${moreAfter} more will follow.</span
-                  >`
+                ? html`<span class="ml-1 text-slate-600">${moreAfter} more will follow.</span>`
                 : ""}
             </p>
           </div>
@@ -581,9 +528,7 @@ export function DuplicateDetectionModal({
                   disabled=${autoResolving}
                   class="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-600/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 disabled:opacity-40 transition-colors"
                 >
-                  ${autoResolving
-                    ? "Resolving…"
-                    : `Auto-resolve ${sameCodeCount} same-code`}
+                  ${autoResolving ? "Resolving…" : `Auto-resolve ${sameCodeCount} same-code`}
                 </button>`
               : ""}
             <button

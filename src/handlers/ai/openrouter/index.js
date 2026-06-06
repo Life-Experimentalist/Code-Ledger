@@ -59,9 +59,7 @@ export class OpenRouterHandler extends BaseAIHandler {
   }
 
   async review(code, problemContext) {
-    dbg.log(
-      `review(): starting OpenRouter review for ${problemContext?.titleSlug || "unknown"}`,
-    );
+    dbg.log(`review(): starting OpenRouter review for ${problemContext?.titleSlug || "unknown"}`);
     const settings = await Storage.getSettings();
     const model =
       problemContext?.aiModelOverride ||
@@ -108,15 +106,11 @@ export class OpenRouterHandler extends BaseAIHandler {
       } catch (err) {
         lastErr = err;
         this.keyPool.markFailed(key);
-        this.dbg.warn(
-          `OpenRouter key failed, trying next key (${attempt + 1}/${keyCount})`,
-        );
+        this.dbg.warn(`OpenRouter key failed, trying next key (${attempt + 1}/${keyCount})`);
       }
     }
 
     this.dbg.error("OpenRouter review failed", lastErr);
-    throw (
-      lastErr || new Error("OpenRouter review failed with all available keys.")
-    );
+    throw lastErr || new Error("OpenRouter review failed with all available keys.");
   }
 }

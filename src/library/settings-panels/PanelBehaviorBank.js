@@ -57,8 +57,7 @@ export function PanelBehaviorBank() {
       });
 
       if (entry.platform) {
-        stats.platforms[entry.platform] =
-          (stats.platforms[entry.platform] || 0) + 1;
+        stats.platforms[entry.platform] = (stats.platforms[entry.platform] || 0) + 1;
       }
 
       if (entry.lang) {
@@ -144,8 +143,7 @@ export function PanelBehaviorBank() {
   };
 
   const handleClear = async () => {
-    if (!confirm("Clear all behavior bank data? This cannot be undone."))
-      return;
+    if (!confirm("Clear all behavior bank data? This cannot be undone.")) return;
     try {
       setLoading(true);
       setMsg("Clearing behavior bank…");
@@ -186,8 +184,7 @@ export function PanelBehaviorBank() {
       <div class="p-6 bg-[#0a0a0f] border border-white/5 rounded-2xl">
         <h2 class="text-xl font-light text-white mb-1">Behavior Bank</h2>
         <p class="text-sm text-slate-400 mb-6">
-          Track your coding patterns: solve history, platforms, languages, and
-          topics.
+          Track your coding patterns: solve history, platforms, languages, and topics.
         </p>
 
         <!-- Aggregate Stats -->
@@ -196,21 +193,15 @@ export function PanelBehaviorBank() {
               <div class="grid grid-cols-2 gap-3 mb-6">
                 <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
                   <p class="text-xs text-slate-400 mb-1">Problems Solved</p>
-                  <p class="text-lg font-semibold text-white">
-                    ${stats.totalProblems}
-                  </p>
+                  <p class="text-lg font-semibold text-white">${stats.totalProblems}</p>
                 </div>
                 <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
                   <p class="text-xs text-slate-400 mb-1">Total Solves</p>
-                  <p class="text-lg font-semibold text-white">
-                    ${stats.totalSolves}
-                  </p>
+                  <p class="text-lg font-semibold text-white">${stats.totalSolves}</p>
                 </div>
                 <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
                   <p class="text-xs text-slate-400 mb-1">Total Time</p>
-                  <p class="text-lg font-semibold text-white">
-                    ${formatTime(stats.totalTime)}
-                  </p>
+                  <p class="text-lg font-semibold text-white">${formatTime(stats.totalTime)}</p>
                 </div>
                 <div class="p-3 bg-white/5 border border-white/10 rounded-lg">
                   <p class="text-xs text-slate-400 mb-1">Avg per Solve</p>
@@ -222,8 +213,7 @@ export function PanelBehaviorBank() {
             `
           : html`
               <p class="text-sm text-slate-400 mb-6 py-4">
-                No behavior data yet. Start solving problems to build your
-                behavior bank!
+                No behavior data yet. Start solving problems to build your behavior bank!
               </p>
             `}
 
@@ -231,9 +221,7 @@ export function PanelBehaviorBank() {
         ${topPlatforms.length > 0
           ? html`
               <div class="mb-6">
-                <h3
-                  class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3"
-                >
+                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">
                   Top Platforms
                 </h3>
                 <div class="grid grid-cols-2 gap-2">
@@ -256,9 +244,7 @@ export function PanelBehaviorBank() {
         ${topLanguages.length > 0
           ? html`
               <div class="mb-6">
-                <h3
-                  class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3"
-                >
+                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">
                   Top Languages
                 </h3>
                 <div class="grid grid-cols-3 gap-2">
@@ -281,9 +267,7 @@ export function PanelBehaviorBank() {
         ${topTopics.length > 0
           ? html`
               <div class="mb-6">
-                <h3
-                  class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3"
-                >
+                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">
                   Top 10 Topics
                 </h3>
                 <div class="grid grid-cols-2 gap-2">
@@ -331,11 +315,7 @@ export function PanelBehaviorBank() {
         </div>
         ${msg &&
         html`
-          <p
-            class="text-xs ${msg.includes("Failed")
-              ? "text-rose-400"
-              : "text-emerald-400"}"
-          >
+          <p class="text-xs ${msg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">
             ${msg}
           </p>
         `}

@@ -15,11 +15,7 @@ export function isAcceptedStatusVisible() {
   const ariaStatus = document.querySelector('[role="status"], [role="alert"]');
   if (ariaStatus && /accepted/i.test(ariaStatus.textContent || "")) {
     const style = window.getComputedStyle(ariaStatus);
-    if (
-      style.display !== "none" &&
-      style.visibility !== "hidden" &&
-      style.opacity !== "0"
-    ) {
+    if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
       return true;
     }
   }
@@ -54,11 +50,7 @@ export function isAcceptedStatusVisible() {
     const el = document.querySelector(selector);
     if (el && /accepted/i.test(el.textContent || "")) {
       const style = window.getComputedStyle(el);
-      if (
-        style.display !== "none" &&
-        style.visibility !== "hidden" &&
-        style.opacity !== "0"
-      ) {
+      if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
         return true;
       }
     }
@@ -79,11 +71,7 @@ export function isAcceptedStatusVisible() {
   for (const container of searchContainers) {
     if (!container) continue;
 
-    const walker = document.createTreeWalker(
-      container,
-      NodeFilter.SHOW_TEXT,
-      null,
-    );
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
 
     let node;
     while ((node = walker.nextNode())) {
@@ -94,11 +82,7 @@ export function isAcceptedStatusVisible() {
 
         // Verify the element is actually visible
         const style = window.getComputedStyle(parent);
-        if (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          style.opacity !== "0"
-        ) {
+        if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
           return true;
         }
       }
@@ -156,9 +140,5 @@ export function isSubmissionDetailsPanelVisible() {
   if (!resultEl) return false;
 
   const style = window.getComputedStyle(resultEl);
-  return (
-    style.display !== "none" &&
-    style.visibility !== "hidden" &&
-    style.opacity !== "0"
-  );
+  return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
 }

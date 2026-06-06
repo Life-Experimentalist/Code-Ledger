@@ -65,11 +65,7 @@ export function isAcceptedVisible(handler) {
         const el = node.parentElement;
         if (!el) continue;
         const style = window.getComputedStyle(el);
-        if (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          style.opacity !== "0"
-        ) {
+        if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
           return true;
         }
       }
@@ -88,9 +84,7 @@ export function onSubmitFired(handler) {
   }
 
   const initialText =
-    document
-      .querySelector('[data-e2e-locator="submission-result"]')
-      ?.textContent?.trim() ?? null;
+    document.querySelector('[data-e2e-locator="submission-result"]')?.textContent?.trim() ?? null;
 
   let wasCleared = initialText === null;
   let attempts = 0;
@@ -105,9 +99,7 @@ export function onSubmitFired(handler) {
       return;
     }
 
-    const resultEl = document.querySelector(
-      '[data-e2e-locator="submission-result"]',
-    );
+    const resultEl = document.querySelector('[data-e2e-locator="submission-result"]');
 
     if (!resultEl || !/\S/.test(resultEl.textContent || "")) {
       wasCleared = true;
@@ -133,9 +125,7 @@ export function onSubmitFired(handler) {
 
     dbg.log("Accepted result detected via submit hook");
     const page = detectPage(window.location.pathname);
-    processSubmission(handler, page, false).catch((e) =>
-      dbg.error("processSubmission failed", e),
-    );
+    processSubmission(handler, page, false).catch((e) => dbg.error("processSubmission failed", e));
   }, 1000);
 }
 
@@ -163,8 +153,7 @@ export async function processSubmission(handler, page, isManual) {
         questionSlug: slug,
       });
       const subs = listRes.data?.questionSubmissionList?.submissions || [];
-      const latest =
-        subs.find((s) => /accepted/i.test(s.statusDisplay)) || subs[0];
+      const latest = subs.find((s) => /accepted/i.test(s.statusDisplay)) || subs[0];
       if (!latest) return false;
 
       const dedupKey = `cl_committed_${slug}`;
@@ -219,23 +208,15 @@ export async function processSubmission(handler, page, isManual) {
     const lang = resolveLang(submission.lang);
     const elapsedSeconds = handler._timer.getElapsedSeconds();
 
-    const files = handler._buildFileSet(
-      submission,
-      meta,
-      settings,
-      slug,
-      elapsedSeconds,
-    );
+    const files = handler._buildFileSet(submission, meta, settings, slug, elapsedSeconds);
     const readmeFile = files.find((f) => f.path.endsWith("README.md"));
 
-    const tsMs = submission.timestamp
-      ? Number(submission.timestamp) * 1000
-      : Date.now();
+    const tsMs = submission.timestamp ? Number(submission.timestamp) * 1000 : Date.now();
 
     try {
-      const existingProblem = await Storage.getProblem(
-        handler.makeProblemId(slug),
-      ).catch(() => null);
+      const existingProblem = await Storage.getProblem(handler.makeProblemId(slug)).catch(
+        () => null,
+      );
       if (existingProblem) {
         const existingCode = String(existingProblem.code || "").trim();
         const newCode = String(submission.code || "").trim();
@@ -256,14 +237,10 @@ export async function processSubmission(handler, page, isManual) {
       submissionId: submission.id || null,
       title: meta?.title || submission.question?.title || slug,
       titleSlug: slug,
-      difficulty: normalizeDifficulty(
-        meta?.difficulty || submission.question?.difficulty || "",
-      ),
+      difficulty: normalizeDifficulty(meta?.difficulty || submission.question?.difficulty || ""),
       topic: resolvePrimaryTopic(meta?.topicTags?.map((t) => t.name) || []),
       tags: meta?.topicTags?.map((t) => t.name) || [],
-      canonical: canonical
-        ? { id: canonical.canonicalId, title: canonical.canonicalTitle }
-        : null,
+      canonical: canonical ? { id: canonical.canonicalId, title: canonical.canonicalTitle } : null,
       readmeContent: readmeFile?.content || null,
       code: submission.code || "",
       files,
@@ -292,9 +269,7 @@ export async function processSubmission(handler, page, isManual) {
     dbg.log("Solve emitted", { slug, canonical: canonical?.canonicalId });
   } catch (err) {
     if (/extension context invalidated/i.test(err?.message || "")) {
-      dbg.warn(
-        "Extension context invalidated — stopping all polling and observers",
-      );
+      dbg.warn("Extension context invalidated — stopping all polling and observers");
       handler._stopSubmissionPolling();
       if (handler._resultPollTimer) {
         clearInterval(handler._resultPollTimer);

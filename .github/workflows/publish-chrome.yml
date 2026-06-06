@@ -1,0 +1,111 @@
+name: Publish to Chrome Web Store
+
+# Runs after a GitHub Release is published — completely independent of the
+# build-and-release workflow so a store failure never blocks the GitHub release.
+#
+# Required repository secrets:
+#   CWS_CLIENT_ID      — Google OAuth client ID (Desktop app type)
+#   CWS_CLIENT_SECRET  — Google OAuth client secret
+#   CWS_REFRESH_TOKEN  — Long-lived refresh token (see docs/guides/release/cws-oauth-setup.md)
+#
+# Extension ID: dpalidbhndcbppmjgmbloffehbhfchmb
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish-chrome:
+    name: Upload & publish to Chrome Web Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip pre-releases (tags containing a hyphen e.g. v1.2.0-rc.1)
+    if: "!contains(github.ref_name, '-')"
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Download the chromium zip that was already attached to the GitHub Release.
+      # This guarantees we publish exactly what was released — no rebuild needed.
+      - name: Download chromium zip from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p release-assets
+          gh release download "${{ steps.version.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "codeledger-chromium-*.zip" \
+            --dir release-assets/
+          ls -lh release-assets/
+
+      - name: Get Chrome Web Store OAuth access token
+        id: cws_token
+        run: |
+          RESPONSE=$(curl -s -X POST https://oauth2.googleapis.com/token \
+            -d "client_id=${{ secrets.CWS_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.CWS_CLIENT_SECRET }}" \
+            -d "refresh_token=${{ secrets.CWS_REFRESH_TOKEN }}" \
+            -d "grant_type=refresh_token")
+          ACCESS_TOKEN=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Upload package to Chrome Web Store
+        id: upload
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP="release-assets/codeledger-chromium-v${VERSION}.zip"
+          ITEM_ID="dpalidbhndcbppmjgmbloffehbhfchmb"
+
+          RESPONSE=$(curl -s \
+            -H "Authorization: Bearer ${{ steps.cws_token.outputs.access_token }}" \
+            -H "x-goog-api-version: 2" \
+            -X PUT \
+            --data-binary "@$ZIP" \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$ITEM_ID")
+
+          echo "Upload response: $RESPONSE"
+          UPLOAD_STATE=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('uploadState','UNKNOWN'))")
+          echo "upload_state=$UPLOAD_STATE" >> "$GITHUB_OUTPUT"
+
+          if [ "$UPLOAD_STATE" != "SUCCESS" ]; then
+            echo "::error::CWS upload failed with state: $UPLOAD_STATE"
+            exit 1
+          fi
+
+      - name: Publish to Chrome Web Store
+        run: |
+          ITEM_ID="dpalidbhndcbppmjgmbloffehbhfchmb"
+          RESPONSE=$(curl -s \
+            -H "Authorization: Bearer ${{ steps.cws_token.outputs.access_token }}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            -X POST \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/$ITEM_ID/publish")
+
+          echo "Publish response: $RESPONSE"
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',['UNKNOWN'])[0] if isinstance(d.get('status',[]), list) else d.get('status','UNKNOWN'))")
+          echo "Publish status: $STATUS"
+
+          # OK = already live; ITEM_PENDING_REVIEW = in review queue — both are success
+          if [ "$STATUS" != "OK" ] && [ "$STATUS" != "ITEM_PENDING_REVIEW" ]; then
+            echo "::error::CWS publish returned unexpected status: $STATUS"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          echo "### Chrome Web Store publish complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: ${{ steps.version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Upload state: ${{ steps.upload.outputs.upload_state }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Extension: https://chrome.google.com/webstore/detail/dpalidbhndcbppmjgmbloffehbhfchmb" >> "$GITHUB_STEP_SUMMARY"

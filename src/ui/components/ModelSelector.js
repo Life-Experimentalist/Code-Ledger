@@ -81,10 +81,7 @@ export function ModelSelector({
       </button>
     </div>`;
 
-  if (loading)
-    return html`<span class="p-2 text-gray-500 italic"
-      >Loading models...</span
-    >`;
+  if (loading) return html`<span class="p-2 text-gray-500 italic">Loading models...</span>`;
 
   if (error && providerId === "ollama" && paused)
     return html`<div class="p-2 text-sm text-red-400">
@@ -133,9 +130,7 @@ export function ModelSelector({
           : ""}
         ${models.map(
           (m) => html`
-            <option key=${m.id} value=${m.id}>
-              ${m.label || m.displayName || m.id}
-            </option>
+            <option key=${m.id} value=${m.id}>${m.label || m.displayName || m.id}</option>
           `,
         )}
       </select>

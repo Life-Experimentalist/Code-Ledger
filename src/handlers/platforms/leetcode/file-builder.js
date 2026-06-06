@@ -8,11 +8,7 @@
 
 import { CONSTANTS } from "../../../core/constants.js";
 import { createDebugger } from "../../../lib/debug.js";
-import {
-  solutionPath,
-  readmePath,
-  hintsPath,
-} from "../../../core/path-builder.js";
+import { solutionPath, readmePath, hintsPath } from "../../../core/path-builder.js";
 
 const dbg = createDebugger("LeetCodeFileBuilder");
 
@@ -36,8 +32,7 @@ export async function gql(query, variables, csrfToken) {
   });
   if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`);
   const json = await res.json();
-  if (json.errors?.length)
-    throw new Error(json.errors[0]?.message || "GraphQL error");
+  if (json.errors?.length) throw new Error(json.errors[0]?.message || "GraphQL error");
   return json;
 }
 
@@ -154,8 +149,7 @@ export function formatStats(submission, meta, elapsedSeconds = null) {
     const h = Math.floor(elapsedSeconds / 3600);
     const m = Math.floor((elapsedSeconds % 3600) / 60);
     const s = elapsedSeconds % 60;
-    const timeStr =
-      h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+    const timeStr = h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
     parts.push(`Solve time: ${timeStr}`);
   }
   if (!parts.length) return "";
@@ -164,9 +158,7 @@ export function formatStats(submission, meta, elapsedSeconds = null) {
 
 export function formatSimilar(meta, settings) {
   if (settings.leetcode_similar === false) return "";
-  const similar = (meta?.similarQuestionList || [])
-    .filter((q) => !q.isPaidOnly)
-    .slice(0, 5);
+  const similar = (meta?.similarQuestionList || []).filter((q) => !q.isPaidOnly).slice(0, 5);
   if (!similar.length) return "";
   return [
     "## Similar Problems",
@@ -179,10 +171,7 @@ export function formatSimilar(meta, settings) {
   ].join("\n");
 }
 
-export function buildBulkReadme(
-  sub,
-  { title, difficulty, tags, acRate, similar, descHtml },
-) {
+export function buildBulkReadme(sub, { title, difficulty, tags, acRate, similar, descHtml }) {
   const tagStr = tags.length ? tags.map((t) => `\`${t}\``).join(", ") : "—";
   const simList = (similar || []).filter((q) => !q.isPaidOnly).slice(0, 5);
   const parts = [

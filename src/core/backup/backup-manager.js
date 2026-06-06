@@ -37,10 +37,7 @@ export async function buildSnapshot() {
   const safeSettings = Object.fromEntries(
     Object.entries(settings).filter(
       ([k]) =>
-        !k.startsWith("_") &&
-        !k.includes("token") &&
-        !k.includes("key") &&
-        !k.includes("secret"),
+        !k.startsWith("_") && !k.includes("token") && !k.includes("key") && !k.includes("secret"),
     ),
   );
 
@@ -78,12 +75,7 @@ export function backupFilePath(ts = new Date()) {
  * @param {number} [keep=10] - Number of backups to retain
  * @returns {Promise<void>}
  */
-export async function commitBackupToGitHub(
-  owner,
-  repo,
-  git,
-  keep = DEFAULT_KEEP,
-) {
+export async function commitBackupToGitHub(owner, repo, git, keep = DEFAULT_KEEP) {
   try {
     const snapshot = await buildSnapshot();
     const filePath = backupFilePath();
@@ -143,10 +135,7 @@ export async function maybeCommitRollingBackup(owner, repo, git) {
     const enabled = settings.githubRollingBackups !== false; // default on
     if (!enabled) return;
 
-    const interval = Math.max(
-      1,
-      parseInt(settings.githubBackupInterval || "10", 10),
-    );
+    const interval = Math.max(1, parseInt(settings.githubBackupInterval || "10", 10));
     const keep = Math.max(1, parseInt(settings.githubBackupKeep || "10", 10));
     const count = (settings[COMMIT_INTERVAL_KEY] || 0) + 1;
 
@@ -156,9 +145,7 @@ export async function maybeCommitRollingBackup(owner, repo, git) {
     });
 
     if (count % interval === 0) {
-      dbg.log(
-        `maybeCommitRollingBackup(): triggering backup at commit #${count}`,
-      );
+      dbg.log(`maybeCommitRollingBackup(): triggering backup at commit #${count}`);
       await commitBackupToGitHub(owner, repo, git, keep);
     }
   } catch (e) {

@@ -21,12 +21,7 @@ const DEFAULT_COMMIT_TPL = CONSTANTS.COMMIT_MESSAGE_TEMPLATE;
 const GIT_PROVIDERS = Object.values(CONSTANTS.GIT_PROVIDERS || {});
 const STATUS_META = CONSTANTS.FEATURE_STATUS_META;
 
-export function PanelGit({
-  settings,
-  onSettingsChange,
-  onSetupRepo,
-  onConnect,
-}) {
+export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect }) {
   const [oauthToken, setOauthToken] = useState("");
   const [msg, setMsg] = useState({ text: "", ok: true });
   const [syncBusy, setSyncBusy] = useState(false);
@@ -73,21 +68,17 @@ export function PanelGit({
     Storage.getAuthToken("github")
       .then((token) => {
         if (!token) return;
-        fetch(
-          "https://api.github.com/user/repos?type=all&per_page=100&sort=updated",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/vnd.github+json",
-            },
+        fetch("https://api.github.com/user/repos?type=all&per_page=100&sort=updated", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
           },
-        )
+        })
           .then((r) => r.json())
           .then((repos) => {
             if (!Array.isArray(repos)) return;
             const found = repos.find(
-              (r) =>
-                Array.isArray(r.topics) && r.topics.includes("code-ledger"),
+              (r) => Array.isArray(r.topics) && r.topics.includes("code-ledger"),
             );
             if (found)
               setDetectedRepo({
@@ -142,9 +133,7 @@ export function PanelGit({
 
   const unlinkGitHub = async () => {
     if (
-      !confirm(
-        "Unlink GitHub account? This removes the OAuth token but keeps your repo settings.",
-      )
+      !confirm("Unlink GitHub account? This removes the OAuth token but keeps your repo settings.")
     )
       return;
     try {
@@ -163,17 +152,13 @@ export function PanelGit({
   };
 
   const handleSync = async (mode = "bulk") => {
-    if (
-      activeProvider?.status &&
-      activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE
-    ) {
+    if (activeProvider?.status && activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE) {
       return flash(
         `${STATUS_META[activeProvider.status]?.label || "This provider"} is under construction.`,
         false,
       );
     }
-    if (!gitEnabled)
-      return flash("Git commits are disabled — enable them first.", false);
+    if (!gitEnabled) return flash("Git commits are disabled — enable them first.", false);
     setSyncBusy(true);
     setSyncProgress(null);
 
@@ -233,8 +218,7 @@ export function PanelGit({
           return;
         }
         chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode }, (resp) => {
-          if (chrome.runtime.lastError)
-            reject(new Error(chrome.runtime.lastError.message));
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp);
           else reject(new Error(resp?.error || "Sync failed"));
         });
@@ -271,8 +255,7 @@ export function PanelGit({
           return;
         }
         chrome.runtime.sendMessage({ type: "BACKUP_TO_REPO" }, (resp) => {
-          if (chrome.runtime.lastError)
-            reject(new Error(chrome.runtime.lastError.message));
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp);
           else reject(new Error(resp?.error || "Backup failed"));
         });
@@ -298,8 +281,7 @@ export function PanelGit({
           return;
         }
         chrome.runtime.sendMessage({ type: "REFRESH_INFRA" }, (resp) => {
-          if (chrome.runtime.lastError)
-            reject(new Error(chrome.runtime.lastError.message));
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp);
           else reject(new Error(resp?.error || "Refresh failed"));
         });
@@ -325,15 +307,11 @@ export function PanelGit({
           reject(new Error("Extension not available"));
           return;
         }
-        chrome.runtime.sendMessage(
-          { type: "SYNC_SETTINGS_TO_GITHUB" },
-          (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp);
-            else reject(new Error(resp?.error || "Push failed"));
-          },
-        );
+        chrome.runtime.sendMessage({ type: "SYNC_SETTINGS_TO_GITHUB" }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Push failed"));
+        });
       });
       flashSettingsSync("Settings pushed to GitHub");
     } catch (e) {
@@ -351,15 +329,11 @@ export function PanelGit({
           reject(new Error("Extension not available"));
           return;
         }
-        chrome.runtime.sendMessage(
-          { type: "SYNC_SETTINGS_FROM_GITHUB" },
-          (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp);
-            else reject(new Error(resp?.error || "Pull failed"));
-          },
-        );
+        chrome.runtime.sendMessage({ type: "SYNC_SETTINGS_FROM_GITHUB" }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Pull failed"));
+        });
       });
       flashSettingsSync(resp?.message || "Settings pulled from GitHub");
     } catch (e) {
@@ -370,10 +344,7 @@ export function PanelGit({
   };
 
   const handleImport = async () => {
-    if (
-      activeProvider?.status &&
-      activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE
-    ) {
+    if (activeProvider?.status && activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE) {
       setImportMsg(
         `${STATUS_META[activeProvider.status]?.label || "This provider"} is under construction.`,
       );
@@ -410,9 +381,7 @@ export function PanelGit({
             `Imported ${remoteOnly.length} new problem${remoteOnly.length !== 1 ? "s" : ""}.`,
           );
         } else {
-          setImportMsg(
-            "Repository is already in sync — no new problems found.",
-          );
+          setImportMsg("Repository is already in sync — no new problems found.");
         }
       }
     } catch (e) {
@@ -429,26 +398,14 @@ export function PanelGit({
       ? settings.git_mirrors
       : // De-duplicate: remove any mirror whose owner/repo matches the main repo
         []
-  ).filter(
-    (m) =>
-      !(
-        repoName &&
-        m.repo === repoName &&
-        (m.owner || "") === (repoOwner || "")
-      ),
-  );
+  ).filter((m) => !(repoName && m.repo === repoName && (m.owner || "") === (repoOwner || "")));
 
   const saveMirrors = (updated) => onSettingsChange("git_mirrors", updated);
 
-  const removeMirror = (idx) =>
-    saveMirrors(mirrors.filter((_, i) => i !== idx));
+  const removeMirror = (idx) => saveMirrors(mirrors.filter((_, i) => i !== idx));
 
   const toggleMirrorEnabled = (idx) =>
-    saveMirrors(
-      mirrors.map((m, i) =>
-        i === idx ? { ...m, enabled: m.enabled === false } : m,
-      ),
-    );
+    saveMirrors(mirrors.map((m, i) => (i === idx ? { ...m, enabled: m.enabled === false } : m)));
 
   const checkMirrorRepo = (owner, repo, provider) => {
     if (mirrorCheckTimer.current) clearTimeout(mirrorCheckTimer.current);
@@ -481,8 +438,7 @@ export function PanelGit({
     if (!mirrorOwner.trim() || !mirrorRepo.trim()) return;
     // Prevent duplicates
     const key = `${mirrorProvider}:${mirrorOwner.trim()}/${mirrorRepo.trim()}`;
-    if (mirrors.some((m) => `${m.provider}:${m.owner}/${m.repo}` === key))
-      return;
+    if (mirrors.some((m) => `${m.provider}:${m.owner}/${m.repo}` === key)) return;
     saveMirrors([
       ...mirrors,
       {
@@ -505,8 +461,7 @@ export function PanelGit({
     { id: "bitbucket", label: "Bitbucket", ready: false },
   ];
 
-  const repoUrl =
-    repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}` : "";
+  const repoUrl = repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}` : "";
 
   return html`
     <div class="space-y-6 w-full">
@@ -521,20 +476,15 @@ export function PanelGit({
       <div class="p-4 rounded-xl border border-white/8 bg-white/2">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-slate-300">
-              Auto-commit solved problems
-            </p>
+            <p class="text-sm font-medium text-slate-300">Auto-commit solved problems</p>
             <p class="text-[11px] text-slate-500 mt-0.5">
-              When enabled, each accepted solution is automatically committed to
-              your repository.
+              When enabled, each accepted solution is automatically committed to your repository.
             </p>
           </div>
           <button
             onClick=${() => onSettingsChange("gitEnabled", !gitEnabled)}
             class="relative ml-4 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-              ${gitEnabled
-              ? "bg-cyan-500/30 border-cyan-500/40"
-              : "bg-white/5 border-white/10"}"
+              ${gitEnabled ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
           >
             <span
               class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
@@ -547,22 +497,17 @@ export function PanelGit({
 
       <!-- Git provider -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
-          Git Provider
-        </h3>
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Git Provider</h3>
         <p class="text-[11px] text-slate-500">
-          Only GitHub is fully supported right now. GitLab and Bitbucket are
-          marked under construction and stay disabled until they are ready.
+          Only GitHub is fully supported right now. GitLab and Bitbucket are marked under
+          construction and stay disabled until they are ready.
         </p>
         <div class="flex gap-2">
           ${GIT_PROVIDERS.length
             ? GIT_PROVIDERS.map((gp) => {
                 const status = gp.status || CONSTANTS.FEATURE_STATUS.STABLE;
                 const statusMeta =
-                  STATUS_META[status] ||
-                  STATUS_META[CONSTANTS.FEATURE_STATUS.STABLE];
+                  STATUS_META[status] || STATUS_META[CONSTANTS.FEATURE_STATUS.STABLE];
                 const disabled = status !== CONSTANTS.FEATURE_STATUS.STABLE;
                 return html`
                   <button
@@ -596,11 +541,7 @@ export function PanelGit({
 
       <!-- GitHub account -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
-          GitHub Account
-        </h3>
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">GitHub Account</h3>
         ${effectiveToken
           ? html`
               <div class="flex items-center gap-3">
@@ -617,9 +558,7 @@ export function PanelGit({
                     </div>`}
 
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-slate-200">
-                    ${githubUser || "Connected"}
-                  </p>
+                  <p class="text-sm font-medium text-slate-200">${githubUser || "Connected"}</p>
                   <p class="text-[11px] text-slate-500">OAuth connected</p>
                 </div>
                 <button
@@ -649,9 +588,7 @@ export function PanelGit({
             >
               <span class="text-cyan-400 text-base leading-none">🔍</span>
               <div class="flex-1 min-w-0">
-                <p class="text-sm text-cyan-300 font-medium">
-                  CodeLedger repo found
-                </p>
+                <p class="text-sm text-cyan-300 font-medium">CodeLedger repo found</p>
                 <p class="text-xs text-cyan-500/80 font-mono truncate">
                   ${detectedRepo.owner}/${detectedRepo.repo}
                 </p>
@@ -682,11 +619,7 @@ export function PanelGit({
       <!-- Repository (read-only — managed via setup wizard) -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
         <div class="flex items-center justify-between">
-          <h3
-            class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-          >
-            Repository
-          </h3>
+          <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Repository</h3>
           ${repoName
             ? html`
                 <button
@@ -701,18 +634,12 @@ export function PanelGit({
 
         ${repoName
           ? html`
-              <div
-                class="flex items-center gap-3 p-3 rounded-lg bg-white/3 border border-white/8"
-              >
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-white/3 border border-white/8">
                 <div class="flex-1 min-w-0">
-                  <p
-                    class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5"
-                  >
+                  <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">
                     Main repository
                   </p>
-                  <p class="text-sm font-mono text-cyan-300 truncate">
-                    ${repoOwner}/${repoName}
-                  </p>
+                  <p class="text-sm font-mono text-cyan-300 truncate">${repoOwner}/${repoName}</p>
                 </div>
                 ${repoUrl
                   ? html`
@@ -723,12 +650,7 @@ export function PanelGit({
                         class="shrink-0 text-slate-500 hover:text-cyan-400 transition-colors"
                         title="View on GitHub"
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                           <path
                             d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"
                           />
@@ -756,20 +678,16 @@ export function PanelGit({
         class="${repoName
           ? ""
           : "opacity-50 pointer-events-none"} p-4 rounded-xl border border-white/8 bg-white/2 space-y-3"
-        title="${!repoName
-          ? "Set up a main repository first before configuring mirrors"
-          : ""}"
+        title="${!repoName ? "Set up a main repository first before configuring mirrors" : ""}"
       >
         <div class="flex items-center justify-between">
           <div>
-            <h3
-              class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-            >
+            <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
               Mirror Repositories
             </h3>
             <p class="text-[11px] text-slate-600 mt-0.5">
-              Optional. Every commit to the main repo is replicated here
-              exactly. Disabled by default.
+              Optional. Every commit to the main repo is replicated here exactly. Disabled by
+              default.
             </p>
           </div>
           ${!showAddMirror
@@ -783,9 +701,7 @@ export function PanelGit({
                   }}
                   disabled=${!effectiveToken}
                   class="text-[11px] px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  title=${!effectiveToken
-                    ? "Connect GitHub first"
-                    : "Add mirror"}
+                  title=${!effectiveToken ? "Connect GitHub first" : "Add mirror"}
                 >
                   + Add
                 </button>
@@ -813,8 +729,7 @@ export function PanelGit({
                         ${m.provider}
                       </span>
                       <span
-                        class="flex-1 min-w-0 font-mono text-xs ${m.enabled ===
-                        false
+                        class="flex-1 min-w-0 font-mono text-xs ${m.enabled === false
                           ? "text-slate-600 line-through"
                           : "text-slate-300"} truncate"
                       >
@@ -822,9 +737,7 @@ export function PanelGit({
                       </span>
                       <button
                         onClick=${() => toggleMirrorEnabled(i)}
-                        title=${m.enabled === false
-                          ? "Enable mirror"
-                          : "Disable mirror"}
+                        title=${m.enabled === false ? "Enable mirror" : "Disable mirror"}
                         class="shrink-0 relative inline-flex h-4 w-7 items-center rounded-full border transition-colors ${m.enabled ===
                         false
                           ? "bg-white/5 border-white/10"
@@ -852,9 +765,7 @@ export function PanelGit({
           : html`<p class="text-xs text-slate-600">No mirrors configured.</p>`}
         ${showAddMirror
           ? html`
-              <div
-                class="space-y-2 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/3"
-              >
+              <div class="space-y-2 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/3">
                 <div class="flex gap-2">
                   ${MIRROR_PROVIDERS.map(
                     (p) => html`
@@ -875,9 +786,7 @@ export function PanelGit({
                           : "bg-white/5 border-white/10 text-slate-500"} disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         ${p.label}${!p.ready
-                          ? html`<span class="ml-1 text-[8px] opacity-60"
-                              >soon</span
-                            >`
+                          ? html`<span class="ml-1 text-[8px] opacity-60">soon</span>`
                           : ""}
                       </button>
                     `,
@@ -890,11 +799,7 @@ export function PanelGit({
                     placeholder="owner / org"
                     onInput=${(e) => {
                       setMirrorOwner(e.target.value);
-                      checkMirrorRepo(
-                        e.target.value,
-                        mirrorRepo,
-                        mirrorProvider,
-                      );
+                      checkMirrorRepo(e.target.value, mirrorRepo, mirrorProvider);
                     }}
                     class="flex-1 px-2.5 py-1.5 bg-black border border-white/10 rounded-lg text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
                   />
@@ -905,11 +810,7 @@ export function PanelGit({
                     placeholder="repo-name"
                     onInput=${(e) => {
                       setMirrorRepo(e.target.value);
-                      checkMirrorRepo(
-                        mirrorOwner,
-                        e.target.value,
-                        mirrorProvider,
-                      );
+                      checkMirrorRepo(mirrorOwner, e.target.value, mirrorProvider);
                     }}
                     class="flex-1 px-2.5 py-1.5 bg-black border border-white/10 rounded-lg text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
                   />
@@ -960,15 +861,10 @@ export function PanelGit({
 
       <!-- Sync -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
-          Sync
-        </h3>
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Sync</h3>
         <p class="text-[11px] text-slate-500">
-          Pulls any new problems from the repository into the local library,
-          then pushes all unsynced local solutions — one commit per problem,
-          backdated to the original solve time.
+          Pulls any new problems from the repository into the local library, then pushes all
+          unsynced local solutions — one commit per problem, backdated to the original solve time.
           ${syncCount !== null && syncCount > 0
             ? html`<span class="text-amber-400">
                 ${syncCount} problem${syncCount !== 1 ? "s" : ""} pending.</span
@@ -980,9 +876,7 @@ export function PanelGit({
               <div class="flex-1 h-1 rounded-full bg-white/8 overflow-hidden">
                 <div
                   class="h-full bg-cyan-500 transition-all duration-300 rounded-full"
-                  style="width: ${Math.round(
-                    (syncProgress.current / syncProgress.total) * 100,
-                  )}%"
+                  style="width: ${Math.round((syncProgress.current / syncProgress.total) * 100)}%"
                 ></div>
               </div>
               <span class="text-[11px] text-slate-400 tabular-nums shrink-0">
@@ -1025,26 +919,18 @@ export function PanelGit({
             ${refreshInfraBusy ? "Refreshing…" : "Refresh README Stats"}
           </button>
         </div>
-        ${activeProvider?.status &&
-        activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE
+        ${activeProvider?.status && activeProvider.status !== CONSTANTS.FEATURE_STATUS.STABLE
           ? html`<p class="text-[11px] text-amber-400">
-              ${STATUS_META[activeProvider.status]?.label || "This provider"} is
-              not ready yet.
+              ${STATUS_META[activeProvider.status]?.label || "This provider"} is not ready yet.
             </p>`
           : ""}
         ${msg.text &&
-        html`<p
-          class="text-xs ${msg.ok ? "text-emerald-400" : "text-rose-400"}"
-        >
-          ${msg.text}
-        </p>`}
+        html`<p class="text-xs ${msg.ok ? "text-emerald-400" : "text-rose-400"}">${msg.text}</p>`}
       </div>
 
       <!-- Commit message template -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
           Commit Message Template
         </h3>
         <p class="text-[11px] text-slate-500">
@@ -1058,13 +944,11 @@ export function PanelGit({
           <input
             type="text"
             value=${commitTpl}
-            onInput=${(e) =>
-              onSettingsChange("commitMessageTemplate", e.target.value)}
+            onInput=${(e) => onSettingsChange("commitMessageTemplate", e.target.value)}
             class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-300 font-mono placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
           />
           <button
-            onClick=${() =>
-              onSettingsChange("commitMessageTemplate", DEFAULT_COMMIT_TPL)}
+            onClick=${() => onSettingsChange("commitMessageTemplate", DEFAULT_COMMIT_TPL)}
             class="px-3 py-1.5 text-slate-500 hover:text-slate-300 text-xs transition-colors"
           >
             Reset
@@ -1076,32 +960,26 @@ export function PanelGit({
             <div
               class="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
             >
-              <span class="text-amber-400 text-base leading-none mt-0.5"
-                >⚠</span
-              >
+              <span class="text-amber-400 text-base leading-none mt-0.5">⚠</span>
               <div class="flex-1 min-w-0">
                 <p class="text-sm text-amber-300 font-medium">
                   ${settings._pendingConflicts}
-                  ${" conflict"}${settings._pendingConflicts !== 1 ? "s" : ""}
-                  detected during background sync.
+                  ${" conflict"}${settings._pendingConflicts !== 1 ? "s" : ""} detected during
+                  background sync.
                 </p>
                 ${!repoName
                   ? html`<p class="text-xs text-amber-500/80 mt-0.5">
                       Set up a repository below to resolve conflicts.
                     </p>`
                   : importing
-                    ? html`<p
-                        class="text-xs text-amber-400/70 mt-0.5 flex items-center gap-1.5"
-                      >
+                    ? html`<p class="text-xs text-amber-400/70 mt-0.5 flex items-center gap-1.5">
                         <span
                           class="inline-block w-3 h-3 rounded-full border-2 border-amber-400/40 border-t-amber-400 animate-spin"
                         ></span>
                         Fetching conflicts from repository…
                       </p>`
                     : importMsg && !importData
-                      ? html`<p class="text-xs text-rose-400 mt-0.5">
-                          ${importMsg}
-                        </p>`
+                      ? html`<p class="text-xs text-rose-400 mt-0.5">${importMsg}</p>`
                       : html`<button
                           onClick=${handleImport}
                           class="text-xs text-amber-300 underline hover:no-underline mt-0.5"
@@ -1114,22 +992,13 @@ export function PanelGit({
         : ""}
       ${repoName
         ? html`
-            <div
-              class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3"
-            >
-              <h3
-                class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-              >
-                Import
-              </h3>
+            <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
+              <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Import</h3>
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-medium text-slate-200">
-                    Import from repository
-                  </p>
+                  <p class="text-sm font-medium text-slate-200">Import from repository</p>
                   <p class="text-xs text-slate-500">
-                    Pull all problems from your connected repo into the local
-                    library.
+                    Pull all problems from your connected repo into the local library.
                   </p>
                 </div>
                 <button
@@ -1140,9 +1009,7 @@ export function PanelGit({
                   ${importing ? "Importing…" : "Import"}
                 </button>
               </div>
-              ${importMsg
-                ? html`<p class="text-xs text-cyan-400">${importMsg}</p>`
-                : ""}
+              ${importMsg ? html`<p class="text-xs text-cyan-400">${importMsg}</p>` : ""}
             </div>
           `
         : ""}
@@ -1169,24 +1036,19 @@ export function PanelGit({
                       reject(new Error("Extension not available"));
                       return;
                     }
-                    chrome.runtime.sendMessage(
-                      { type: "RESYNC_ALL", mode: "bulk" },
-                      (resp) => {
-                        if (chrome.runtime.lastError)
-                          reject(new Error(chrome.runtime.lastError.message));
-                        else if (resp?.ok) resolve(resp);
-                        else reject(new Error(resp?.error || "Sync failed"));
-                      },
-                    );
+                    chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode: "bulk" }, (resp) => {
+                      if (chrome.runtime.lastError)
+                        reject(new Error(chrome.runtime.lastError.message));
+                      else if (resp?.ok) resolve(resp);
+                      else reject(new Error(resp?.error || "Sync failed"));
+                    });
                   });
                   flash(
                     `Conflicts resolved — ${resolved.length} problem${resolved.length !== 1 ? "s" : ""} pushed to repository.`,
                   );
                   setImportMsg("");
                 } catch (e) {
-                  setImportMsg(
-                    `Resolved locally, but repo push failed: ${e.message}`,
-                  );
+                  setImportMsg(`Resolved locally, but repo push failed: ${e.message}`);
                 } finally {
                   setSyncBusy(false);
                   loadSyncCount();
@@ -1211,17 +1073,14 @@ export function PanelGit({
             <h3 class="text-sm font-medium text-slate-300">Settings sync</h3>
             <p class="text-[11px] text-slate-500 mt-0.5">
               Saves appearance, AI config, and platform settings to
-              <span class="font-mono">.codeledger/sync.json</span> in your repo
-              so any device connecting to the same repo picks them up
-              automatically. API keys and auth tokens are never included.
+              <span class="font-mono">.codeledger/sync.json</span> in your repo so any device
+              connecting to the same repo picks them up automatically. API keys and auth tokens are
+              never included.
             </p>
           </div>
           <button
             onClick=${() =>
-              onSettingsChange?.(
-                "settingsSyncEnabled",
-                !(settings?.settingsSyncEnabled !== false),
-              )}
+              onSettingsChange?.("settingsSyncEnabled", !(settings?.settingsSyncEnabled !== false))}
             class="relative ml-4 shrink-0 inline-flex h-5 w-9 items-center rounded-full border transition-colors
                             ${settings?.settingsSyncEnabled !== false
               ? "bg-cyan-500/30 border-cyan-500/40"
@@ -1260,11 +1119,7 @@ export function PanelGit({
             </button>
             ${settingsSyncMsg.text &&
             html`
-              <span
-                class="text-xs ${settingsSyncMsg.ok
-                  ? "text-emerald-400"
-                  : "text-rose-400"}"
-              >
+              <span class="text-xs ${settingsSyncMsg.ok ? "text-emerald-400" : "text-rose-400"}">
                 ${settingsSyncMsg.text}
               </span>
             `}

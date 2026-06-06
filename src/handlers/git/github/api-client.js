@@ -49,10 +49,7 @@ export async function apiFetch(url, token, opts = {}, _left = 2) {
 
   // Rate-limit — wait for Retry-After then retry
   if (res.status === 429 && _left > 0) {
-    const wait = Math.max(
-      1,
-      parseInt(res.headers.get("Retry-After") || "2", 10),
-    );
+    const wait = Math.max(1, parseInt(res.headers.get("Retry-After") || "2", 10));
     dbg.warn(`rate-limited — waiting ${wait}s then retrying (${_left} left)`);
     await _sleep(wait * 1000);
     return apiFetch(url, token, opts, _left - 1);
@@ -67,9 +64,7 @@ export async function apiFetch(url, token, opts = {}, _left = 2) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const err = new Error(
-      `GitHub ${res.status}: ${body.message || res.statusText}`,
-    );
+    const err = new Error(`GitHub ${res.status}: ${body.message || res.statusText}`);
     err.status = res.status;
     dbg.error(`${method} ${fullUrl} → ${res.status}:`, err.message);
     throw err;
@@ -215,8 +210,5 @@ export async function listDirectory(owner, repo, path, token) {
 /** GET /repos/{owner}/{repo}/commits with optional query params */
 export function getCommitHistory(owner, repo, params, token) {
   const qs = new URLSearchParams(params || {}).toString();
-  return apiFetch(
-    `/repos/${owner}/${repo}/commits${qs ? "?" + qs : ""}`,
-    token,
-  );
+  return apiFetch(`/repos/${owner}/${repo}/commits${qs ? "?" + qs : ""}`, token);
 }

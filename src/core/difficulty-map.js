@@ -54,11 +54,9 @@ export function guessCategory(raw) {
   // Exact built-in match
   if (BUILT_IN_MAP[s]) return BUILT_IN_MAP[s];
   // Substring heuristics (catches "Very Hard", "Extra Hard", etc.)
-  if (s.includes("very hard") || s.includes("extra") || s.includes("extreme"))
-    return "Hard";
+  if (s.includes("very hard") || s.includes("extra") || s.includes("extreme")) return "Hard";
   if (s.includes("hard")) return "Hard";
-  if (s.includes("med") || s.includes("intermediate") || s.includes("moderate"))
-    return "Medium";
+  if (s.includes("med") || s.includes("intermediate") || s.includes("moderate")) return "Medium";
   if (
     s.includes("easy") ||
     s.includes("simple") ||
@@ -84,8 +82,7 @@ export function normalizeDifficulty(raw, userMap = {}) {
   const lower = r.toLowerCase();
 
   // 1. Exact user override
-  if (userMap && Object.prototype.hasOwnProperty.call(userMap, r))
-    return userMap[r];
+  if (userMap && Object.prototype.hasOwnProperty.call(userMap, r)) return userMap[r];
   // 2. Case-insensitive user override
   for (const k of Object.keys(userMap || {})) {
     if (k.toLowerCase() === lower) return userMap[k];

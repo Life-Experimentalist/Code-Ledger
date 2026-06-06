@@ -72,9 +72,7 @@ export async function taskRelease(ctx, logger, options = {}) {
       logger.section("Release Complete");
       logger.info(`Version: ${ctx.version}`);
       logger.info(`Tag: v${ctx.version}`);
-      logger.dim(
-        "GitHub Actions will create release with artifacts automatically.",
-      );
+      logger.dim("GitHub Actions will create release with artifacts automatically.");
     } catch (e) {
       logger.error("Git operation failed");
       throw e;

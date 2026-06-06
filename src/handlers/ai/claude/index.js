@@ -66,9 +66,7 @@ export class ClaudeHandler extends BaseAIHandler {
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.claude.defaultModel;
     const endpoint =
-      settings.claude_endpoint ||
-      settings.aiEndpoint ||
-      CONSTANTS.AI_PROVIDERS.claude.endpoint;
+      settings.claude_endpoint || settings.aiEndpoint || CONSTANTS.AI_PROVIDERS.claude.endpoint;
 
     const prompts = await Storage.getAIPrompts();
     const prompt = buildReviewPrompt(problemContext, code, prompts);
@@ -105,9 +103,7 @@ export class ClaudeHandler extends BaseAIHandler {
       } catch (err) {
         lastErr = err;
         this.keyPool.markFailed(key);
-        this.dbg.warn(
-          `Claude key failed, trying next key (${attempt + 1}/${keyCount})`,
-        );
+        this.dbg.warn(`Claude key failed, trying next key (${attempt + 1}/${keyCount})`);
       }
     }
 

@@ -18,9 +18,7 @@ const REQUEST_COMMANDS = new Set([
 ]);
 
 function normalizeList(value) {
-  return Array.isArray(value)
-    ? value.filter((item) => item != null && item !== "")
-    : [];
+  return Array.isArray(value) ? value.filter((item) => item != null && item !== "") : [];
 }
 
 function normalizeLang(lang) {
@@ -36,16 +34,8 @@ function normalizeLang(lang) {
 function normalizeProblem(problem = {}) {
   return {
     title: problem.title || "",
-    statement:
-      problem.statement ||
-      problem.problemStatement ||
-      problem.description ||
-      "",
-    description:
-      problem.description ||
-      problem.statement ||
-      problem.problemStatement ||
-      "",
+    statement: problem.statement || problem.problemStatement || problem.description || "",
+    description: problem.description || problem.statement || problem.problemStatement || "",
     constraints: problem.constraints || "",
     hints: normalizeList(problem.hints),
     similar: normalizeList(problem.similar),
@@ -95,22 +85,13 @@ export function buildAIChatContext({
   const resolvedCode = String(code || userCode || normalizedProblem.code || "");
   const resolvedText = String(text || "");
   const resolvedRequestType = requestType || inferChatRequestType(resolvedText);
-  const resolvedHints = normalizeList(
-    hints.length ? hints : normalizedProblem.hints,
-  );
-  const resolvedSimilar = normalizeList(
-    similar.length ? similar : normalizedProblem.similar,
-  );
-  const resolvedConstraints =
-    constraints || normalizedProblem.constraints || "";
+  const resolvedHints = normalizeList(hints.length ? hints : normalizedProblem.hints);
+  const resolvedSimilar = normalizeList(similar.length ? similar : normalizedProblem.similar);
+  const resolvedConstraints = constraints || normalizedProblem.constraints || "";
   const resolvedStatement =
-    problemStatement ||
-    normalizedProblem.statement ||
-    normalizedProblem.description ||
-    "";
+    problemStatement || normalizedProblem.statement || normalizedProblem.description || "";
   const resolvedLang = normalizeLang(lang || normalizedProblem.lang);
-  const resolvedMethodTitle =
-    methodTitle || normalizedProblem.methodTitle || "";
+  const resolvedMethodTitle = methodTitle || normalizedProblem.methodTitle || "";
 
   return {
     surface,

@@ -60,13 +60,10 @@ export function detectDuplicate(newProblem, allProblems = []) {
     // Check for exact code match (after normalization)
     const existingCodeNorm = normalizeCode(existing.code);
     if (newCodeNorm && newCodeNorm === existingCodeNorm) {
-      dbg.log(
-        `Duplicate detected: ${newTitle} (${newLang}) matches ${existing.titleSlug}`,
-      );
+      dbg.log(`Duplicate detected: ${newTitle} (${newLang}) matches ${existing.titleSlug}`);
       return {
         isDuplicate: true,
-        duplicateOf:
-          existing.id || `${existing.platform}:${existing.titleSlug}`,
+        duplicateOf: existing.id || `${existing.platform}:${existing.titleSlug}`,
       };
     }
   }

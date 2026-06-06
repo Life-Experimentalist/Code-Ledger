@@ -23,12 +23,8 @@ export function StatsRing({ completed, total, label }) {
 
     if (chartRef.current) chartRef.current.destroy();
 
-    const color = window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "#06b6d4"
-      : "#3b82f6";
-    const bg = window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "#1e293b"
-      : "#e2e8f0";
+    const color = window.matchMedia("(prefers-color-scheme: dark)").matches ? "#06b6d4" : "#3b82f6";
+    const bg = window.matchMedia("(prefers-color-scheme: dark)").matches ? "#1e293b" : "#e2e8f0";
 
     chartRef.current = new Chart(canvasRef.current, {
       type: "doughnut",
@@ -63,9 +59,7 @@ export function StatsRing({ completed, total, label }) {
       <canvas ref=${canvasRef} class="absolute inset-0"></canvas>
       <div class="z-10 flex flex-col items-center">
         <span class="text-xl font-bold text-white">${completed}</span>
-        <span class="text-[10px] text-slate-400 uppercase tracking-widest"
-          >${label}</span
-        >
+        <span class="text-[10px] text-slate-400 uppercase tracking-widest">${label}</span>
       </div>
     </div>
   `;

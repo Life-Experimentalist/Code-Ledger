@@ -68,17 +68,14 @@ export function DifficultyMapPanel() {
   const builtInEntries = Object.entries(BUILT_IN_MAP);
 
   return html`
-    <div
-      class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-5"
-    >
+    <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-5">
       <div>
         <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">
           Difficulty Normalization
         </h3>
         <p class="text-[11px] text-slate-500">
-          Platform labels like "School" and "Basic" are automatically mapped to
-          Easy/Medium/Hard. Add overrides below for any label the built-in rules
-          don't cover.
+          Platform labels like "School" and "Basic" are automatically mapped to Easy/Medium/Hard.
+          Add overrides below for any label the built-in rules don't cover.
         </p>
       </div>
 
@@ -107,9 +104,7 @@ export function DifficultyMapPanel() {
 
       <!-- User overrides -->
       <div>
-        <div class="text-[10px] text-slate-600 uppercase tracking-wider mb-2">
-          Your overrides
-        </div>
+        <div class="text-[10px] text-slate-600 uppercase tracking-wider mb-2">Your overrides</div>
         ${Object.keys(userMap).length === 0
           ? html`<p class="text-[11px] text-slate-600">No overrides yet.</p>`
           : html`
@@ -117,19 +112,14 @@ export function DifficultyMapPanel() {
                 ${Object.entries(userMap).map(
                   ([raw, mapped]) => html`
                     <div key=${raw} class="flex items-center gap-2">
-                      <span
-                        class="text-[11px] text-slate-300 min-w-[120px] font-mono"
-                        >${raw}</span
-                      >
+                      <span class="text-[11px] text-slate-300 min-w-[120px] font-mono">${raw}</span>
                       <span class="text-slate-600 text-[10px]">→</span>
                       <select
                         value=${mapped}
                         onChange=${(e) => changeOverride(raw, e.target.value)}
                         class="bg-[#0d1117] border border-white/10 text-xs text-slate-300 px-2 py-0.5 rounded"
                       >
-                        ${CANONICAL.map(
-                          (c) => html`<option value=${c}>${c}</option>`,
-                        )}
+                        ${CANONICAL.map((c) => html`<option value=${c}>${c}</option>`)}
                       </select>
                       <button
                         onClick=${() => removeOverride(raw)}
@@ -170,9 +160,7 @@ export function DifficultyMapPanel() {
         </button>
       </div>
 
-      ${status
-        ? html`<p class="text-[11px] text-emerald-400">${status}</p>`
-        : ""}
+      ${status ? html`<p class="text-[11px] text-emerald-400">${status}</p>` : ""}
     </div>
   `;
 }

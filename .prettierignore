@@ -1,0 +1,8 @@
+node_modules/
+dist/
+releases/
+src/vendor/
+src/ui/styles/compiled.css
+worker/node_modules/
+worker/dist/
+*.min.js

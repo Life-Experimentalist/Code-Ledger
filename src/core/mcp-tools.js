@@ -16,11 +16,7 @@ import {
   deleteInsight,
   buildKnowledgeContext,
 } from "./memory/knowledge-bank.js";
-import {
-  getAllChats,
-  deleteChat,
-  getChatsByProblem,
-} from "./ai-chat-storage.js";
+import { getAllChats, deleteChat, getChatsByProblem } from "./ai-chat-storage.js";
 
 const dbg = createDebugger("MCPTools");
 
@@ -31,14 +27,7 @@ const dbg = createDebugger("MCPTools");
 export async function queryProblems(filters = {}) {
   try {
     const allProblems = (await Storage.getAllProblems()) || [];
-    const {
-      platform,
-      difficulty,
-      topic,
-      minSolveTime,
-      maxSolveTime,
-      limit = 20,
-    } = filters;
+    const { platform, difficulty, topic, minSolveTime, maxSolveTime, limit = 20 } = filters;
 
     let results = allProblems;
 
@@ -149,9 +138,7 @@ export async function getNextProblemSuggestion() {
     // Suggest problem from weakest topic
     const suggestion =
       weakestTopics.length > 0
-        ? allProblems.find(
-            (p) => (p.tags && p.tags[0]) === weakestTopics[0].topic,
-          )
+        ? allProblems.find((p) => (p.tags && p.tags[0]) === weakestTopics[0].topic)
         : allProblems[0];
 
     return {
@@ -192,9 +179,7 @@ export async function analyzeCodeQuality(code, problemId) {
       code: {
         lineCount: code.split("\n").length,
         hasComments: /\/\/|\/\*/.test(code),
-        hasTypeAnnotations: /:\s*(int|str|bool|list|dict|void|function)/i.test(
-          code,
-        ),
+        hasTypeAnnotations: /:\s*(int|str|bool|list|dict|void|function)/i.test(code),
         estimatedComplexity: estimateComplexity(code),
         edgeCasesDetected: detectEdgeCases(code),
       },
@@ -243,8 +228,7 @@ export async function getTrendAnalysis(days = 30) {
       .map(([date, stats]) => ({
         date,
         problemsSolved: stats.count,
-        avgTimePerProblem:
-          stats.count > 0 ? Math.round(stats.totalTime / stats.count) : 0,
+        avgTimePerProblem: stats.count > 0 ? Math.round(stats.totalTime / stats.count) : 0,
         topTopics: Object.entries(stats.topics)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
@@ -268,10 +252,7 @@ export async function getTrendAnalysis(days = 30) {
       totalSolves: recent.length,
       averageTimePerSolve:
         recent.length > 0
-          ? Math.round(
-              recent.reduce((s, p) => s + (p.elapsedSeconds || 0), 0) /
-                recent.length,
-            )
+          ? Math.round(recent.reduce((s, p) => s + (p.elapsedSeconds || 0), 0) / recent.length)
           : 0,
       daily: dailyData,
       platforms: platformDist,
@@ -356,8 +337,7 @@ export async function getUserProfileContext() {
     allProblems.forEach((p) => {
       platformDist[p.platform] = (platformDist[p.platform] || 0) + 1;
       if (p.lang)
-        languageDist[p.lang.name || p.lang] =
-          (languageDist[p.lang.name || p.lang] || 0) + 1;
+        languageDist[p.lang.name || p.lang] = (languageDist[p.lang.name || p.lang] || 0) + 1;
       const topic = (p.tags && p.tags[0]) || "uncategorized";
       topicDist[topic] = (topicDist[topic] || 0) + 1;
       difficultyDist[p.difficulty || "unknown"] =
@@ -391,9 +371,7 @@ export async function getUserProfileContext() {
         totalProblems: allProblems.length,
         totalTime,
         averageTimePerProblem:
-          allProblems.length > 0
-            ? Math.round(totalTime / allProblems.length)
-            : 0,
+          allProblems.length > 0 ? Math.round(totalTime / allProblems.length) : 0,
         topPlatforms,
         topLanguages,
         topTopics,
@@ -410,11 +388,8 @@ export async function getUserProfileContext() {
 // ===== Internal Helpers =====
 
 function estimateComplexity(code) {
-  const hasNestedLoop = /for.*for|while.*while|for.*while|while.*for/.test(
-    code,
-  );
-  const hasRecursion =
-    /function.*{[\s\S]*?\(/.test(code) || /def.*:[\s\S]*?\(/.test(code);
+  const hasNestedLoop = /for.*for|while.*while|for.*while|while.*for/.test(code);
+  const hasRecursion = /function.*{[\s\S]*?\(/.test(code) || /def.*:[\s\S]*?\(/.test(code);
   const hasSort = /sort|sorted/.test(code);
 
   if (hasNestedLoop) return "O(n²) or worse (nested loops)";
@@ -425,11 +400,9 @@ function estimateComplexity(code) {
 
 function detectEdgeCases(code) {
   const cases = [];
-  if (/length.*===?.*0|empty|null|undefined/.test(code))
-    cases.push("Empty input");
+  if (/length.*===?.*0|empty|null|undefined/.test(code)) cases.push("Empty input");
   if (/length.*===?.*1|single/.test(code)) cases.push("Single element");
-  if (/===?\s*null|===?\s*undefined/.test(code))
-    cases.push("Null/undefined check");
+  if (/===?\s*null|===?\s*undefined/.test(code)) cases.push("Null/undefined check");
   if (/negative|< 0/.test(code)) cases.push("Negative values");
   if (/overflow|MAX|MIN/.test(code)) cases.push("Integer overflow");
   return cases.length > 0 ? cases : ["No explicit edge case handling detected"];
@@ -443,9 +416,7 @@ function generateSuggestions(code, problem) {
   }
 
   if (code.split("\n").length > 100) {
-    suggestions.push(
-      "Consider breaking the solution into smaller helper functions",
-    );
+    suggestions.push("Consider breaking the solution into smaller helper functions");
   }
 
   if (/\.includes|\.indexOf|\.find/.test(code) && code.includes("for")) {
@@ -454,11 +425,7 @@ function generateSuggestions(code, problem) {
     );
   }
 
-  if (
-    !detectEdgeCases(code).some(
-      (c) => c !== "No explicit edge case handling detected",
-    )
-  ) {
+  if (!detectEdgeCases(code).some((c) => c !== "No explicit edge case handling detected")) {
     suggestions.push(
       "Add explicit edge case handling for empty inputs, null values, and boundary conditions",
     );
@@ -549,13 +516,11 @@ export async function getRoadmapProgress() {
     const solvedSlugs = new Set(allProblems.map((p) => p.titleSlug || p.id));
     const total = roadmap.problems.length;
     const done = roadmap.problems.filter((p) => {
-      const slug =
-        typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
+      const slug = typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
       return solvedSlugs.has(slug);
     }).length;
     const nextProblem = roadmap.problems.find((p) => {
-      const slug =
-        typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
+      const slug = typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
       return !solvedSlugs.has(slug);
     });
     return {
@@ -575,9 +540,7 @@ export async function getRoadmapProgress() {
 
 export async function getChats({ problemSlug, limit }) {
   try {
-    const chats = problemSlug
-      ? await getChatsByProblem(problemSlug)
-      : await getAllChats();
+    const chats = problemSlug ? await getChatsByProblem(problemSlug) : await getAllChats();
     const sliced = (chats || []).slice(0, limit || 20);
     return {
       ok: true,
@@ -626,8 +589,7 @@ export const MCP_TOOLS = [
   {
     id: "query-problems",
     name: "Query Problems",
-    description:
-      "Search for problems by platform, difficulty, topic, or solve time",
+    description: "Search for problems by platform, difficulty, topic, or solve time",
     parameters: {
       type: "object",
       properties: {
@@ -675,8 +637,7 @@ export const MCP_TOOLS = [
   {
     id: "get-next-suggestion",
     name: "Get Next Problem Suggestion",
-    description:
-      "Analyze weak topics and suggest the next best problem to solve",
+    description: "Analyze weak topics and suggest the next best problem to solve",
     parameters: {
       type: "object",
       properties: {},
@@ -686,8 +647,7 @@ export const MCP_TOOLS = [
   {
     id: "analyze-code-quality",
     name: "Analyze Code Quality",
-    description:
-      "Analyze code for complexity, edge cases, and improvement opportunities",
+    description: "Analyze code for complexity, edge cases, and improvement opportunities",
     parameters: {
       type: "object",
       properties: {
@@ -720,8 +680,7 @@ export const MCP_TOOLS = [
   {
     id: "find-similar-problems",
     name: "Find Similar Problems",
-    description:
-      "Find problems similar to a given problem based on tags, difficulty, and platform",
+    description: "Find problems similar to a given problem based on tags, difficulty, and platform",
     parameters: {
       type: "object",
       properties: {
@@ -753,15 +712,13 @@ export const MCP_TOOLS = [
   {
     id: "remember",
     name: "Remember Insight",
-    description:
-      "Save a note, preference, or observation to the user's persistent knowledge bank",
+    description: "Save a note, preference, or observation to the user's persistent knowledge bank",
     parameters: {
       type: "object",
       properties: {
         topic: {
           type: "string",
-          description:
-            "Topic category (e.g. 'trees', 'learning-style', 'roadmap')",
+          description: "Topic category (e.g. 'trees', 'learning-style', 'roadmap')",
         },
         content: {
           type: "string",
@@ -780,8 +737,7 @@ export const MCP_TOOLS = [
   {
     id: "recall",
     name: "Recall Insights",
-    description:
-      "Retrieve stored insights from the knowledge bank, optionally filtered by topic",
+    description: "Retrieve stored insights from the knowledge bank, optionally filtered by topic",
     parameters: {
       type: "object",
       properties: {
@@ -814,16 +770,14 @@ export const MCP_TOOLS = [
   {
     id: "set-roadmap",
     name: "Set Roadmap",
-    description:
-      "Save a DSA study roadmap (list of problem slugs or objects with slug/title)",
+    description: "Save a DSA study roadmap (list of problem slugs or objects with slug/title)",
     parameters: {
       type: "object",
       properties: {
         name: { type: "string", description: "Roadmap name" },
         problems: {
           type: "array",
-          description:
-            "Array of problem slugs or {slug, title, difficulty} objects",
+          description: "Array of problem slugs or {slug, title, difficulty} objects",
         },
       },
       required: ["problems"],
@@ -833,8 +787,7 @@ export const MCP_TOOLS = [
   {
     id: "get-roadmap-progress",
     name: "Get Roadmap Progress",
-    description:
-      "Get progress on the active DSA roadmap: how many done, what's next",
+    description: "Get progress on the active DSA roadmap: how many done, what's next",
     parameters: { type: "object", properties: {} },
     handler: () => getRoadmapProgress(),
   },
@@ -842,8 +795,7 @@ export const MCP_TOOLS = [
   {
     id: "get-chats",
     name: "Get Saved Chats",
-    description:
-      "Retrieve saved AI chat conversations, optionally filtered by problem slug",
+    description: "Retrieve saved AI chat conversations, optionally filtered by problem slug",
     parameters: {
       type: "object",
       properties: {

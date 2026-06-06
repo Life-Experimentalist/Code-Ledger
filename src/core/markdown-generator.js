@@ -40,10 +40,7 @@ export function generateProblemMarkdown(problem) {
   const langName = lang.name || lang.slug || "Unknown";
   const langExt = lang.ext || "txt";
 
-  const problemUrl = CONSTANTS.makeProblemUrl(
-    platform.toLowerCase(),
-    titleSlug,
-  );
+  const problemUrl = CONSTANTS.makeProblemUrl(platform.toLowerCase(), titleSlug);
 
   // Format timestamp
   const dateStr = timestamp
@@ -139,8 +136,7 @@ export function generateProblemMarkdown(problem) {
       if (sim.title && sim.titleSlug) {
         let simUrl = "#";
         if (platform.toLowerCase() === "leetcode") {
-          simUrl =
-            CONSTANTS.PLATFORMS.leetcode.problemsBase + sim.titleSlug + "/";
+          simUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + sim.titleSlug + "/";
         }
         lines.push(`- [${sim.title}](${simUrl})`);
       }
@@ -221,12 +217,7 @@ export function generateProblemsIndexMarkdown(problems) {
     byTopic[topic].push(p);
   }
 
-  const lines = [
-    "# All Problems",
-    "",
-    `Total: **${problems.length}** problems`,
-    "",
-  ];
+  const lines = ["# All Problems", "", `Total: **${problems.length}** problems`, ""];
 
   // Sort topics
   const sortedTopics = Object.keys(byTopic).sort();
@@ -239,12 +230,7 @@ export function generateProblemsIndexMarkdown(problems) {
 
     for (const p of probs) {
       const mdFile = `${p.titleSlug}.md`;
-      const badge =
-        p.difficulty === "Easy"
-          ? "🟢"
-          : p.difficulty === "Medium"
-            ? "🟡"
-            : "🔴";
+      const badge = p.difficulty === "Easy" ? "🟢" : p.difficulty === "Medium" ? "🟡" : "🔴";
       lines.push(`- ${badge} [${p.title}](./${mdFile})`);
     }
 

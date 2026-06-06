@@ -13,9 +13,7 @@ function normalizeAliases(entry) {
   if (!entry || typeof entry !== "object") return [];
 
   if (Array.isArray(entry.aliases)) {
-    return entry.aliases.filter(
-      (alias) => alias && alias.platform && alias.slug,
-    );
+    return entry.aliases.filter((alias) => alias && alias.platform && alias.slug);
   }
 
   if (entry.platforms && typeof entry.platforms === "object") {
@@ -39,12 +37,7 @@ try {
   }
 
   for (const item of entries) {
-    if (
-      !item.canonicalId ||
-      !item.canonicalTitle ||
-      !item.topic ||
-      !item.difficulty
-    ) {
+    if (!item.canonicalId || !item.canonicalTitle || !item.topic || !item.difficulty) {
       console.error(`Invalid item missing required fields:`, item);
       isValid = false;
     }
@@ -55,9 +48,7 @@ try {
     }
   }
   if (isValid) {
-    console.log(
-      `Canonical map validated successfully! Total items: ${entries.length}`,
-    );
+    console.log(`Canonical map validated successfully! Total items: ${entries.length}`);
   } else {
     process.exit(1);
   }

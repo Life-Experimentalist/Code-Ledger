@@ -1577,9 +1577,7 @@ export function resolveMode(mode, themeSettings = {}) {
       return nowH >= rise && nowH < set ? "light" : "dark";
     }
     if (typeof window !== "undefined" && window.matchMedia) {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
   }
   return "dark";
@@ -1592,20 +1590,17 @@ export function getThemePalette(theme) {
   const palette = { ...(preset[effectiveMode] || preset.dark) };
 
   const skipOverrides =
-    theme?.mode === "auto" &&
-    (theme?.autoBehavior === "sun" || theme?.autoBehavior === "schedule");
+    theme?.mode === "auto" && (theme?.autoBehavior === "sun" || theme?.autoBehavior === "schedule");
   if (!skipOverrides) {
     if (theme?.accentPrimary) palette["primary-color"] = theme.accentPrimary;
-    if (theme?.accentSecondary)
-      palette["primary-hover"] = theme.accentSecondary;
+    if (theme?.accentSecondary) palette["primary-hover"] = theme.accentSecondary;
     if (theme?.bgColor) {
       palette["bg-primary"] = theme.bgColor;
       if (!theme?.bgSecondary) {
         palette["bg-secondary"] = adjustHexBrightness(theme.bgColor, 10);
         palette["bg-card"] = adjustHexBrightness(theme.bgColor, 20);
       }
-      if (!theme?.bgTertiary)
-        palette["bg-tertiary"] = adjustHexBrightness(theme.bgColor, 20);
+      if (!theme?.bgTertiary) palette["bg-tertiary"] = adjustHexBrightness(theme.bgColor, 20);
     }
     if (theme?.bgSecondary) {
       palette["bg-secondary"] = theme.bgSecondary;
@@ -1650,10 +1645,7 @@ export function setThemeVariables(theme) {
       } catch (_) {}
       window.__clOSThemeFn = null;
     }
-    if (
-      theme?.mode === "auto" &&
-      (!theme?.autoBehavior || theme?.autoBehavior === "system")
-    ) {
+    if (theme?.mode === "auto" && (!theme?.autoBehavior || theme?.autoBehavior === "system")) {
       window.__clOSThemeFn = () => applyThemeFromStorage();
       mq.addEventListener("change", window.__clOSThemeFn);
     }
@@ -1668,10 +1660,7 @@ export function setThemeVariables(theme) {
       theme?.mode === "auto" &&
       (theme?.autoBehavior === "sun" || theme?.autoBehavior === "schedule")
     ) {
-      window.__clTimerHandle = setInterval(
-        () => applyThemeFromStorage(),
-        60000,
-      );
+      window.__clTimerHandle = setInterval(() => applyThemeFromStorage(), 60000);
     }
   }
 
@@ -1681,38 +1670,20 @@ export function setThemeVariables(theme) {
 
   // CodeLedger-specific --cl-* aliases
   root.style.setProperty("--cl-accent", palette["primary-color"]);
-  root.style.setProperty(
-    "--cl-accent-hover",
-    palette["primary-hover"] || palette["primary-color"],
-  );
+  root.style.setProperty("--cl-accent-hover", palette["primary-hover"] || palette["primary-color"]);
   root.style.setProperty("--cl-bg", palette["bg-primary"]);
-  root.style.setProperty(
-    "--cl-surface",
-    palette["bg-secondary"] || palette["bg-primary"],
-  );
-  root.style.setProperty(
-    "--cl-card",
-    palette["bg-card"] || palette["bg-tertiary"],
-  );
+  root.style.setProperty("--cl-surface", palette["bg-secondary"] || palette["bg-primary"]);
+  root.style.setProperty("--cl-card", palette["bg-card"] || palette["bg-tertiary"]);
   root.style.setProperty("--cl-text", palette["text-primary"]);
-  root.style.setProperty(
-    "--cl-text-muted",
-    palette["text-muted"] || palette["text-secondary"],
-  );
+  root.style.setProperty("--cl-text-muted", palette["text-muted"] || palette["text-secondary"]);
   root.style.setProperty("--cl-border", palette["border-color"]);
 
   // Derived aliases for legacy code
   root.style.setProperty("--accent-primary", palette["primary-color"]);
   root.style.setProperty("--accent-secondary", palette["primary-hover"]);
-  root.style.setProperty(
-    "--container-bg",
-    palette["bg-secondary"] || palette["bg-primary"],
-  );
+  root.style.setProperty("--container-bg", palette["bg-secondary"] || palette["bg-primary"]);
   root.style.setProperty("--text-primary", palette["text-primary"]);
-  root.style.setProperty(
-    "--text-muted",
-    palette["text-muted"] || palette["text-secondary"],
-  );
+  root.style.setProperty("--text-muted", palette["text-muted"] || palette["text-secondary"]);
 }
 
 export async function applyThemeFromStorage() {

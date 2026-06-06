@@ -71,11 +71,7 @@ export function querySubmissionResult(context = document) {
       if (el) {
         // Verify element is visible
         const style = window.getComputedStyle(el);
-        if (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          style.opacity !== "0"
-        ) {
+        if (style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0") {
           return el;
         }
       }

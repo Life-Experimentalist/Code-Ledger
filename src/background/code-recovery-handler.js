@@ -56,9 +56,7 @@ export async function triggerCodeRecovery(problem) {
     const timeoutHandle = setTimeout(() => {
       if (settled) return;
       settled = true;
-      dbg.warn(
-        `triggerCodeRecovery(${titleSlug}): timed out after ${RECOVERY_TIMEOUT_MS}ms`,
-      );
+      dbg.warn(`triggerCodeRecovery(${titleSlug}): timed out after ${RECOVERY_TIMEOUT_MS}ms`);
       if (tabId != null) {
         tabs.remove?.(tabId)?.catch?.(() => {});
       }
@@ -93,9 +91,7 @@ export async function triggerCodeRecovery(problem) {
         tabs.remove?.(tabId)?.catch?.(() => {});
       }
       if (msg.error) {
-        dbg.warn(
-          `triggerCodeRecovery(${titleSlug}): content script error: ${msg.error}`,
-        );
+        dbg.warn(`triggerCodeRecovery(${titleSlug}): content script error: ${msg.error}`);
         resolve({ ok: false, error: msg.error });
       } else {
         dbg.log(
@@ -127,19 +123,9 @@ export async function triggerCodeRecovery(problem) {
             return Storage.saveProblem(updated).then(async () => {
               // Mark for GitHub commit — problem now has code it lacked before
               const slug = String(updated.titleSlug || updated.id || "").trim();
-              const langRaw =
-                updated.lang?.name ||
-                updated.lang?.slug ||
-                updated.lang?.ext ||
-                "";
-              const normLang = String(langRaw)
-                .toLowerCase()
-                .replace(/\s+/g, "");
-              const key = slug
-                ? normLang
-                  ? `${slug}::${normLang}`
-                  : slug
-                : "";
+              const langRaw = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
+              const normLang = String(langRaw).toLowerCase().replace(/\s+/g, "");
+              const key = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
               if (key) await Storage.markPendingProblemKey(key).catch(() => {});
             });
           })
@@ -180,10 +166,7 @@ export async function triggerCodeRecovery(problem) {
         settled = true;
         clearTimeout(timeoutHandle);
         runtime.onMessage.removeListener?.(listener);
-        dbg.error(
-          `triggerCodeRecovery(${titleSlug}): ✗ tab creation failed:`,
-          e?.message,
-        );
+        dbg.error(`triggerCodeRecovery(${titleSlug}): ✗ tab creation failed:`, e?.message);
         resolve({ ok: false, error: `Tab creation failed: ${e?.message}` });
       });
   });

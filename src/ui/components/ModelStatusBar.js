@@ -24,9 +24,7 @@ const PROVIDER_LABELS = {
 function shortModel(model) {
   if (!model) return "";
   // Trim common prefix noise: "gemini-2.0-flash" → "2.0-flash", "gpt-4o" → "gpt-4o"
-  return model
-    .replace(/^(gemini|gpt|claude|deepseek)-/, (_, p) => `${p}-`)
-    .slice(0, 24);
+  return model.replace(/^(gemini|gpt|claude|deepseek)-/, (_, p) => `${p}-`).slice(0, 24);
 }
 
 export function ModelStatusBar({ settings }) {
@@ -53,9 +51,7 @@ export function ModelStatusBar({ settings }) {
         <span class="text-slate-600">→</span>
         <span class="text-slate-500">${fallbackLabel}</span>
         ${fallbackModel &&
-        html`<span class="text-slate-600 text-[10px]"
-          >${shortModel(fallbackModel)}</span
-        >`}
+        html`<span class="text-slate-600 text-[10px]">${shortModel(fallbackModel)}</span>`}
       `}
     </div>
   `;

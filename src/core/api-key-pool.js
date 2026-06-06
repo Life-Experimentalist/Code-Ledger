@@ -18,9 +18,7 @@ export class APIKeyPool {
   }
 
   async getAllKeys() {
-    const { [CONSTANTS.SK.AI_KEYS]: allKeys = {} } = await storage.local.get(
-      CONSTANTS.SK.AI_KEYS,
-    );
+    const { [CONSTANTS.SK.AI_KEYS]: allKeys = {} } = await storage.local.get(CONSTANTS.SK.AI_KEYS);
     const keys = (allKeys[this.providerId] || [])
       .map((k) => String(k || "").trim())
       .filter(Boolean);
@@ -48,9 +46,7 @@ export class APIKeyPool {
 
     const strategy = await this.getStrategy();
 
-    const available = keys.filter(
-      (k) => Date.now() > (this.cooldowns.get(k) || 0),
-    );
+    const available = keys.filter((k) => Date.now() > (this.cooldowns.get(k) || 0));
     if (available.length === 0) {
       dbg.warn(`All keys for ${this.providerId} are in cooldown.`);
       return null;
@@ -67,8 +63,9 @@ export class APIKeyPool {
       return available[0];
     }
 
-    const { [CONSTANTS.SK.AI_KEY_INDICES]: allIndices = {} } =
-      await storage.local.get(CONSTANTS.SK.AI_KEY_INDICES);
+    const { [CONSTANTS.SK.AI_KEY_INDICES]: allIndices = {} } = await storage.local.get(
+      CONSTANTS.SK.AI_KEY_INDICES,
+    );
     let currentIndex = allIndices[this.providerId] || 0;
 
     // Find the next available key not in cooldown

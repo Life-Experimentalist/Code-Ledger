@@ -31,18 +31,13 @@ export async function compareSolutions(providerId, a, b) {
       dbg.log(`compareSolutions(): using ${providerId} provider`);
       const res = await prov.compareSolutions(a, b);
       if (res && typeof res.same === "boolean") {
-        dbg.log(
-          `compareSolutions(): ✓ result from provider - same: ${res.same}`,
-        );
+        dbg.log(`compareSolutions(): ✓ result from provider - same: ${res.same}`);
         return res;
       }
     }
   } catch (e) {
     // ignore provider errors and fallback
-    dbg.warn(
-      `compareSolutions(): provider ${providerId} failed, using fallback:`,
-      e?.message,
-    );
+    dbg.warn(`compareSolutions(): provider ${providerId} failed, using fallback:`, e?.message);
   }
 
   // Fallback: normalized equality + length heuristic
@@ -61,9 +56,7 @@ export async function compareSolutions(providerId, a, b) {
 
 export async function findDuplicatesForProblem(problem, providerId) {
   // problem: may contain `solutions` array
-  dbg.log(
-    `findDuplicatesForProblem(): ${problem?.titleSlug} with ${providerId}`,
-  );
+  dbg.log(`findDuplicatesForProblem(): ${problem?.titleSlug} with ${providerId}`);
   const sols = problem?.solutions || [];
   const groups = [];
   const used = new Set();
@@ -96,9 +89,7 @@ export async function mergeSolutions(providerId, solutions = [], lang = null) {
     dbg.log(`mergeSolutions(): no solutions provided`);
     return null;
   }
-  dbg.log(
-    `mergeSolutions(): merging ${solutions.length} solutions with ${providerId} in ${lang}`,
-  );
+  dbg.log(`mergeSolutions(): merging ${solutions.length} solutions with ${providerId} in ${lang}`);
   try {
     const prov = registry.getAIProvider(providerId);
     const promptParts = [];

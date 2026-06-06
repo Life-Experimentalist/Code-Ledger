@@ -32,6 +32,9 @@ jobs:
       - name: Type check
         run: npm run lint
 
+      - name: Format check
+        run: npm run format:check
+
       - name: Sync regression checks
         run: npm run test:sync-regression
 
@@ -47,10 +50,10 @@ jobs:
       # ── Validate manifest version matches tag ────────────────────────────
       - name: Validate manifest version
         run: |
-          MANIFEST_VER=$(node -p "JSON.parse(require('fs').readFileSync('src/manifest.json','utf8')).version")
+          MANIFEST_VER=$(node -p "JSON.parse(require('fs').readFileSync('src/manifest-chromium.json','utf8')).version")
           TAG_VER="${{ steps.version.outputs.version }}"
           if [ "$MANIFEST_VER" != "$TAG_VER" ]; then
-            echo "::error::manifest.json version ($MANIFEST_VER) does not match tag ($TAG_VER)"
+            echo "::error::manifest-chromium.json version ($MANIFEST_VER) does not match tag ($TAG_VER)"
             exit 1
           fi
           echo "Versions match: $MANIFEST_VER"

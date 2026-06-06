@@ -46,38 +46,32 @@ const MCP_TOOL_INFO = {
   },
   "get-problem-stats": {
     name: "Get Problem Stats",
-    description:
-      "Detailed statistics for a single problem (time, complexity, percentiles)",
+    description: "Detailed statistics for a single problem (time, complexity, percentiles)",
     category: "Context",
   },
   "get-next-suggestion": {
     name: "Get Next Suggestion",
-    description:
-      "Analyze weak topics and suggest the next best problem to practice",
+    description: "Analyze weak topics and suggest the next best problem to practice",
     category: "Suggestions",
   },
   "analyze-code-quality": {
     name: "Analyze Code Quality",
-    description:
-      "Analyze code for complexity, edge cases, and improvement opportunities",
+    description: "Analyze code for complexity, edge cases, and improvement opportunities",
     category: "Analysis",
   },
   "get-trend-analysis": {
     name: "Get Trend Analysis",
-    description:
-      "Analyze 30-day solving trends, platform distribution, difficulty progression",
+    description: "Analyze 30-day solving trends, platform distribution, difficulty progression",
     category: "Analysis",
   },
   "find-similar-problems": {
     name: "Find Similar Problems",
-    description:
-      "Find problems similar to a given one based on difficulty, platform, tags",
+    description: "Find problems similar to a given one based on difficulty, platform, tags",
     category: "Context",
   },
   "get-user-profile": {
     name: "Get User Profile",
-    description:
-      "Comprehensive user context: total problems, top platforms/languages/topics",
+    description: "Comprehensive user context: total problems, top platforms/languages/topics",
     category: "Context",
   },
 };
@@ -152,8 +146,7 @@ export function PanelAI({ settings, onSettingsChange }) {
 
   const isProviderEnabled = (id) => settings?.[`${id}_enabled`] !== false;
 
-  const toggleProvider = (id) =>
-    onSettingsChange(`${id}_enabled`, !isProviderEnabled(id));
+  const toggleProvider = (id) => onSettingsChange(`${id}_enabled`, !isProviderEnabled(id));
 
   const saveKeys = async (providerId) => {
     const raw = keyDraft[providerId] || "";
@@ -224,8 +217,7 @@ export function PanelAI({ settings, onSettingsChange }) {
         setTestResult((r) => ({
           ...r,
           [providerId]:
-            r[providerId] === "Endpoint saved" ||
-            r[providerId] === "Reset to default"
+            r[providerId] === "Endpoint saved" || r[providerId] === "Reset to default"
               ? ""
               : r[providerId],
         })),
@@ -238,8 +230,7 @@ export function PanelAI({ settings, onSettingsChange }) {
       if (typeof chrome === "undefined" || !chrome.runtime?.id)
         return reject(new Error("Extension not available"));
       chrome.runtime.sendMessage({ type }, (resp) => {
-        if (chrome.runtime.lastError)
-          return reject(new Error(chrome.runtime.lastError.message));
+        if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
         if (resp?.ok) return resolve(resp);
         reject(new Error(resp?.error || "Failed"));
       });
@@ -276,8 +267,7 @@ export function PanelAI({ settings, onSettingsChange }) {
   };
 
   const handleCancelQueue = async () => {
-    if (!confirm("Cancel pending reviews? The current one will finish first."))
-      return;
+    if (!confirm("Cancel pending reviews? The current one will finish first.")) return;
     try {
       const res = await _sendQueueMsg("CANCEL_AI_REVIEW_QUEUE");
       setQueueMsg(`Cancelled ${res.cancelled || 0} pending review(s).`);
@@ -312,8 +302,8 @@ export function PanelAI({ settings, onSettingsChange }) {
       <div>
         <h2 class="text-base font-semibold text-white mb-1">AI Providers</h2>
         <p class="text-xs text-slate-500 mb-4">
-          Configure AI providers for code review and chat. Providers are
-          disabled by default until you add a key.
+          Configure AI providers for code review and chat. Providers are disabled by default until
+          you add a key.
         </p>
       </div>
 
@@ -321,20 +311,15 @@ export function PanelAI({ settings, onSettingsChange }) {
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-2">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-slate-300">
-              Auto-review on solve
-            </p>
+            <p class="text-sm font-medium text-slate-300">Auto-review on solve</p>
             <p class="text-[11px] text-slate-500">
-              Automatically run AI review each time a solution is committed to
-              GitHub.
+              Automatically run AI review each time a solution is committed to GitHub.
             </p>
           </div>
           <button
             onClick=${() => onSettingsChange("autoReview", !autoReview)}
             class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-              ${autoReview
-              ? "bg-cyan-500/30 border-cyan-500/40"
-              : "bg-white/5 border-white/10"}"
+              ${autoReview ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
           >
             <span
               class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
@@ -369,9 +354,7 @@ export function PanelAI({ settings, onSettingsChange }) {
             ${queueStats.total > 0
               ? html`<span class="ml-1 text-[10px] opacity-70"
                   >(${queueStats.pending}p
-                  ${queueStats.done}d${queueStats.failed > 0
-                    ? ` ${queueStats.failed}!`
-                    : ""})</span
+                  ${queueStats.done}d${queueStats.failed > 0 ? ` ${queueStats.failed}!` : ""})</span
                 >`
               : ""}
           </button>
@@ -396,9 +379,7 @@ export function PanelAI({ settings, onSettingsChange }) {
         </div>
         ${queueMsg &&
         html`<p
-          class="text-xs ${queueMsg.includes("Failed")
-            ? "text-rose-400"
-            : "text-emerald-400"}"
+          class="text-xs ${queueMsg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}"
         >
           ${queueMsg}
         </p>`}
@@ -406,19 +387,13 @@ export function PanelAI({ settings, onSettingsChange }) {
         html`
           <div class="flex flex-wrap gap-2 text-[11px] text-slate-400 pt-1">
             ${queueStats.pending > 0 &&
-            html`<span class="text-amber-300"
-              >${queueStats.pending} pending</span
-            >`}
+            html`<span class="text-amber-300">${queueStats.pending} pending</span>`}
             ${queueStats.processing > 0 &&
-            html`<span class="text-cyan-300"
-              >${queueStats.processing} processing</span
-            >`}
+            html`<span class="text-cyan-300">${queueStats.processing} processing</span>`}
             ${queueStats.done > 0 &&
             html`<span class="text-emerald-400">${queueStats.done} done</span>`}
             ${queueStats.failed > 0 &&
-            html`<span class="text-rose-400"
-              >${queueStats.failed} failed</span
-            >`}
+            html`<span class="text-rose-400">${queueStats.failed} failed</span>`}
           </div>
         `}
       </div>
@@ -426,45 +401,33 @@ export function PanelAI({ settings, onSettingsChange }) {
       <!-- Snail Mode (background AI review rate limiting) -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
         <div>
-          <h3
-            class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-          >
-            Snail Mode
-          </h3>
+          <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Snail Mode</h3>
           <p class="text-[11px] text-slate-500 mt-1">
-            Background AI review processes in small batches to avoid API rate
-            limits. Reviews run automatically — no user action needed.
+            Background AI review processes in small batches to avoid API rate limits. Reviews run
+            automatically — no user action needed.
           </p>
         </div>
         <div class="flex flex-wrap gap-4">
           <label class="flex flex-col gap-1">
-            <span class="text-[11px] text-slate-400"
-              >Batch size (problems per run)</span
-            >
+            <span class="text-[11px] text-slate-400">Batch size (problems per run)</span>
             <input
               type="number"
               min="1"
               max="20"
-              value=${settings?.snailMode_batchSize ??
-              CONSTANTS.SNAIL_MODE.BATCH_SIZE}
+              value=${settings?.snailMode_batchSize ?? CONSTANTS.SNAIL_MODE.BATCH_SIZE}
               onInput=${(e) =>
                 onSettingsChange(
                   "snailMode_batchSize",
                   Math.max(
                     1,
-                    Math.min(
-                      20,
-                      Number(e.target.value) || CONSTANTS.SNAIL_MODE.BATCH_SIZE,
-                    ),
+                    Math.min(20, Number(e.target.value) || CONSTANTS.SNAIL_MODE.BATCH_SIZE),
                   ),
                 )}
               class="w-20 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-cyan-500/50"
             />
           </label>
           <label class="flex flex-col gap-1">
-            <span class="text-[11px] text-slate-400"
-              >Interval between batches (hours)</span
-            >
+            <span class="text-[11px] text-slate-400">Interval between batches (hours)</span>
             <input
               type="number"
               min="0.25"
@@ -483,19 +446,14 @@ export function PanelAI({ settings, onSettingsChange }) {
         </div>
         <p class="text-[11px] text-slate-600">
           Default: ${CONSTANTS.SNAIL_MODE.BATCH_SIZE} problems every
-          ${CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS / 3600000}h. Pauses
-          automatically after ${CONSTANTS.SNAIL_MODE.ERROR_THRESHOLD}
-          consecutive errors.
+          ${CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS / 3600000}h. Pauses automatically after
+          ${CONSTANTS.SNAIL_MODE.ERROR_THRESHOLD} consecutive errors.
         </p>
       </div>
 
       <!-- Primary + Fallback selectors -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
-          Provider Order
-        </h3>
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Provider Order</h3>
 
         <div class="space-y-2">
           <label class="block text-xs text-slate-400">Primary provider</label>
@@ -504,11 +462,7 @@ export function PanelAI({ settings, onSettingsChange }) {
             onChange=${(e) => onSettingsChange("aiProvider", e.target.value)}
             class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-cyan-500/40"
           >
-            ${PROVIDERS.map(
-              (p) => html`
-                <option key=${p.id} value=${p.id}>${p.name}</option>
-              `,
-            )}
+            ${PROVIDERS.map((p) => html` <option key=${p.id} value=${p.id}>${p.name}</option> `)}
           </select>
           <${ModelSelector}
             providerId=${primaryProvider}
@@ -527,15 +481,10 @@ export function PanelAI({ settings, onSettingsChange }) {
             class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-cyan-500/40"
           >
             <option value="">None</option>
-            ${PROVIDERS.map(
-              (p) => html`
-                <option key=${p.id} value=${p.id}>${p.name}</option>
-              `,
-            )}
+            ${PROVIDERS.map((p) => html` <option key=${p.id} value=${p.id}>${p.name}</option> `)}
           </select>
           <p class="text-[11px] text-cyan-400/80">
-            You can reuse the same provider as primary if the fallback model is
-            different.
+            You can reuse the same provider as primary if the fallback model is different.
           </p>
           ${fallbackProvider &&
           html`
@@ -552,9 +501,7 @@ export function PanelAI({ settings, onSettingsChange }) {
 
       <!-- Per-provider configuration -->
       <div class="space-y-3">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
           Provider Configuration
         </h3>
         ${PROVIDERS.map((p) => {
@@ -566,8 +513,7 @@ export function PanelAI({ settings, onSettingsChange }) {
             res.startsWith("Saved") ||
             res.startsWith("Endpoint") ||
             res.startsWith("Reset");
-          const customEndpoint =
-            endpointDraft[p.id] ?? (settings?.[`${p.id}_endpoint`] || "");
+          const customEndpoint = endpointDraft[p.id] ?? (settings?.[`${p.id}_endpoint`] || "");
           const defaultEp = CONSTANTS.AI_PROVIDERS[p.id]?.endpoint || "";
 
           return html`
@@ -580,21 +526,16 @@ export function PanelAI({ settings, onSettingsChange }) {
               <!-- Header: name + enable toggle -->
               <div class="flex items-center gap-3">
                 <div class="flex-1">
-                  <span class="text-sm font-medium text-slate-300"
-                    >${p.name}</span
-                  >
+                  <span class="text-sm font-medium text-slate-300">${p.name}</span>
                   ${!enabled &&
-                  html`<span
-                    class="ml-2 text-[10px] text-slate-600 uppercase tracking-wide"
+                  html`<span class="ml-2 text-[10px] text-slate-600 uppercase tracking-wide"
                     >disabled</span
                   >`}
                 </div>
                 <button
                   onClick=${() => toggleProvider(p.id)}
                   class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-                    ${enabled
-                    ? "bg-cyan-500/30 border-cyan-500/40"
-                    : "bg-white/5 border-white/10"}"
+                    ${enabled ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
                   title=${enabled ? "Disable " + p.name : "Enable " + p.name}
                 >
                   <span
@@ -717,13 +658,7 @@ export function PanelAI({ settings, onSettingsChange }) {
               `}
               ${res &&
               html`
-                <p
-                  class="text-[11px] ${isOk
-                    ? "text-emerald-400"
-                    : "text-rose-400"}"
-                >
-                  ${res}
-                </p>
+                <p class="text-[11px] ${isOk ? "text-emerald-400" : "text-rose-400"}">${res}</p>
               `}
             </div>
           `;
@@ -737,11 +672,7 @@ export function PanelAI({ settings, onSettingsChange }) {
           class="flex items-center justify-between w-full text-left"
         >
           <div>
-            <p
-              class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-            >
-              MCP Tools
-            </p>
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-widest">MCP Tools</p>
             <p class="text-[11px] text-slate-600 mt-0.5">
               Context tools available to AI providers during chat and review
             </p>
@@ -776,9 +707,7 @@ export function PanelAI({ settings, onSettingsChange }) {
                   )}
                 </div>
                 ${["Context", "Suggestions", "Analysis"].map((cat) => {
-                  const tools = Object.entries(MCP_TOOL_INFO).filter(
-                    ([, i]) => i.category === cat,
-                  );
+                  const tools = Object.entries(MCP_TOOL_INFO).filter(([, i]) => i.category === cat);
                   return html`
                     <div>
                       <p
@@ -807,12 +736,8 @@ export function PanelAI({ settings, onSettingsChange }) {
                                 class="w-3.5 h-3.5 rounded mt-0.5 flex-shrink-0"
                               />
                               <div>
-                                <p class="text-xs font-medium text-slate-300">
-                                  ${toolInfo.name}
-                                </p>
-                                <p class="text-[10px] text-slate-500">
-                                  ${toolInfo.description}
-                                </p>
+                                <p class="text-xs font-medium text-slate-300">${toolInfo.name}</p>
+                                <p class="text-[10px] text-slate-500">${toolInfo.description}</p>
                               </div>
                             </label>
                           `,
@@ -824,9 +749,7 @@ export function PanelAI({ settings, onSettingsChange }) {
               </div>
             `
           : mcpOpen
-            ? html`<p class="mt-3 text-xs text-slate-500">
-                Loading MCP config…
-              </p>`
+            ? html`<p class="mt-3 text-xs text-slate-500">Loading MCP config…</p>`
             : ""}
       </div>
     </div>

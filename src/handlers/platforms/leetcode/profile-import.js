@@ -10,11 +10,7 @@ import { Storage } from "../../../core/storage.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { runtime, tabs } from "../../../lib/browser-compat.js";
 import { QUERIES } from "./graphql-queries.js";
-import {
-  gql as _gqlCall,
-  fetchMetadata,
-  buildBulkReadme,
-} from "./file-builder.js";
+import { gql as _gqlCall, fetchMetadata, buildBulkReadme } from "./file-builder.js";
 import { resolveLang } from "./lang-utils.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
@@ -40,9 +36,7 @@ function createImportBtn(handler, pageUsername) {
     `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">` +
     `<path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm1 14H11v-4H8l4-4 4 4h-3v4z"/>` +
     `</svg> Import All Solves to CodeLedger`;
-  btn.addEventListener("click", () =>
-    runProfileImport(handler, pageUsername, btn),
-  );
+  btn.addEventListener("click", () => runProfileImport(handler, pageUsername, btn));
   return btn;
 }
 
@@ -69,10 +63,9 @@ async function runProfileImport(handler, pageUsername, btn) {
     const similarMap = {};
 
     try {
-      const apiRes = await fetch(
-        CONSTANTS.PLATFORMS.leetcode.apiBase + "/problems/all/",
-        { credentials: "include" },
-      );
+      const apiRes = await fetch(CONSTANTS.PLATFORMS.leetcode.apiBase + "/problems/all/", {
+        credentials: "include",
+      });
       if (apiRes.ok) {
         const apiData = await apiRes.json();
         const LEVEL = { 1: "Easy", 2: "Medium", 3: "Hard" };
@@ -132,8 +125,7 @@ async function runProfileImport(handler, pageUsername, btn) {
       for (const s of raw) {
         const titleSlug = s.title_slug || s.titleSlug || "";
         const langSlug = (s.lang || "").toLowerCase().replace(/\s+/g, "");
-        const statusOk =
-          s.status_display === "Accepted" || s.statusDisplay === "Accepted";
+        const statusOk = s.status_display === "Accepted" || s.statusDisplay === "Accepted";
         if (!statusOk || !titleSlug) continue;
         const tsRaw = Number(s.timestamp || s.time || 0);
         const ts = tsRaw > 4_102_444_800 ? tsRaw : tsRaw * 1000;
@@ -155,24 +147,18 @@ async function runProfileImport(handler, pageUsername, btn) {
     }
 
     if (allSubs.length === 0) {
-      show(
-        "No accepted submissions found. Make sure you are logged in to LeetCode.",
-      );
+      show("No accepted submissions found. Make sure you are logged in to LeetCode.");
       btn.disabled = false;
       return;
     }
 
     const picks = allSubs.slice();
-    show(
-      `Found ${picks.length} accepted submissions (preserving all languages).`,
-    );
+    show(`Found ${picks.length} accepted submissions (preserving all languages).`);
 
     // ── Phase 4: Fetch metadata via QUESTION query ──
     const needMeta = [
       ...new Set(
-        picks
-          .filter((s) => !diffMap[s.titleSlug] || !tagsMap[s.titleSlug])
-          .map((s) => s.titleSlug),
+        picks.filter((s) => !diffMap[s.titleSlug] || !tagsMap[s.titleSlug]).map((s) => s.titleSlug),
       ),
     ];
 
@@ -185,17 +171,14 @@ async function runProfileImport(handler, pageUsername, btn) {
           if (meta) {
             if (meta.difficulty) diffMap[slug] = meta.difficulty;
             if (meta.title) titleMap[slug] = meta.title;
-            if (meta.topicTags?.length)
-              tagsMap[slug] = meta.topicTags.map((t) => t.name);
+            if (meta.topicTags?.length) tagsMap[slug] = meta.topicTags.map((t) => t.name);
             if (meta.content) descMap[slug] = meta.content;
             if (meta.hints?.length) hintsMap[slug] = meta.hints;
             if (meta.acRate != null) acRateMap[slug] = meta.acRate;
-            if (meta.similarQuestionList?.length)
-              similarMap[slug] = meta.similarQuestionList;
+            if (meta.similarQuestionList?.length) similarMap[slug] = meta.similarQuestionList;
           }
         } catch (_) {}
-        if (i < needMeta.length - 1)
-          await new Promise((r) => setTimeout(r, 200));
+        if (i < needMeta.length - 1) await new Promise((r) => setTimeout(r, 200));
         if ((i + 1) % 10 === 0) show(`Tags… ${i + 1}/${needMeta.length}`);
       }
     }
@@ -239,8 +222,7 @@ async function runProfileImport(handler, pageUsername, btn) {
           }
         }),
       );
-      if (i + BATCH < picks.length)
-        await new Promise((r) => setTimeout(r, 400));
+      if (i + BATCH < picks.length) await new Promise((r) => setTimeout(r, 400));
       if ((i / BATCH) % 5 === 0 || i + BATCH >= picks.length) {
         show(`Code ${Math.min(i + BATCH, picks.length)}/${picks.length}…`);
       }
@@ -279,13 +261,7 @@ async function runProfileImport(handler, pageUsername, btn) {
       const files = [];
       if (sub.code) {
         files.push({
-          path: solutionPath(
-            sub.titleSlug,
-            "leetcode",
-            lang,
-            canonical,
-            settings,
-          ),
+          path: solutionPath(sub.titleSlug, "leetcode", lang, canonical, settings),
           content: sub.code,
         });
       }
@@ -336,15 +312,13 @@ async function runProfileImport(handler, pageUsername, btn) {
     });
 
     const result = await new Promise((resolve) => {
-      runtime.sendMessage(
-        { type: "BULK_IMPORT", problems: bulkProblems },
-        (res) => resolve(res || {}),
+      runtime.sendMessage({ type: "BULK_IMPORT", problems: bulkProblems }, (res) =>
+        resolve(res || {}),
       );
     });
     const imported = result.saved ?? bulkProblems.length;
 
-    const skippedMsg =
-      noCodeCount > 0 ? ` (${noCodeCount} skipped — no code)` : "";
+    const skippedMsg = noCodeCount > 0 ? ` (${noCodeCount} skipped — no code)` : "";
     show(`Done! Imported ${imported} submission(s)${skippedMsg}.`);
     btn.textContent = `✓ Imported ${imported} solves`;
     btn.style.color = "#34d399";
@@ -381,9 +355,7 @@ async function runProfileImport(handler, pageUsername, btn) {
             );
           });
           if (result.ok) {
-            show(
-              `✓ Committed ${result.committed ?? imported} problems to GitHub.`,
-            );
+            show(`✓ Committed ${result.committed ?? imported} problems to GitHub.`);
             commitBtn.textContent = `✓ Committed ${result.committed ?? imported}`;
             commitBtn.style.color = "#34d399";
           } else {
@@ -411,9 +383,7 @@ async function runProfileImport(handler, pageUsername, btn) {
             );
             try {
               tabs.create({
-                url: runtime.getURL(
-                  "library/library.html?tab=settings&settingsTab=git",
-                ),
+                url: runtime.getURL("library/library.html?tab=settings&settingsTab=git"),
               });
             } catch (_) {}
           } else if (res.pendingRemoteOnly) {
@@ -445,9 +415,7 @@ export async function injectProgressImportBtn(handler) {
 
     const anchor =
       document.querySelector("[class*='progress-header']") ||
-      document.querySelector(
-        "[class*='userProfile'], [class*='user-profile']",
-      ) ||
+      document.querySelector("[class*='userProfile'], [class*='user-profile']") ||
       document.querySelector("h1, h2") ||
       document.querySelector("main");
 
@@ -464,8 +432,7 @@ export async function injectProgressImportBtn(handler) {
 
       container.appendChild(btn);
       container.appendChild(prog);
-      anchor.parentElement?.insertBefore(container, anchor) ||
-        document.body.appendChild(container);
+      anchor.parentElement?.insertBefore(container, anchor) || document.body.appendChild(container);
       return;
     }
 

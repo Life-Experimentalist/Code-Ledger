@@ -11,20 +11,13 @@
  */
 
 import { execSync } from "child_process";
-import {
-  createReadStream,
-  createWriteStream,
-  mkdirSync,
-  readFileSync,
-} from "fs";
+import { createReadStream, createWriteStream, mkdirSync, readFileSync } from "fs";
 import { resolve, relative, join } from "path";
 import { createGzip } from "zlib";
 import { pipeline } from "stream/promises";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-const manifest = JSON.parse(
-  readFileSync(join("src", "manifest-chromium.json"), "utf8"),
-);
+const manifest = JSON.parse(readFileSync(join("src", "manifest-chromium.json"), "utf8"));
 const version = pkg.version;
 
 if (manifest.version !== version) {
@@ -59,10 +52,7 @@ run(
 );
 
 // 3. Firefox package
-run(
-  "node dev/package-firefox.js",
-  `Package Firefox → releases/codeledger-firefox-v${version}.zip`,
-);
+run("node dev/package-firefox.js", `Package Firefox → releases/codeledger-firefox-v${version}.zip`);
 
 // 4. Source zip
 import AdmZip from "adm-zip";
@@ -102,6 +92,4 @@ console.log(`  codeledger-source-v${version}.zip`);
 console.log(`\nNext steps:`);
 console.log(`  git commit -m "chore: release v${version}"`);
 console.log(`  git tag v${version}`);
-console.log(
-  `  git push origin main v${version}   # triggers GitHub Actions release`,
-);
+console.log(`  git push origin main v${version}   # triggers GitHub Actions release`);

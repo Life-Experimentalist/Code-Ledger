@@ -191,11 +191,10 @@ export function getCommandSuggestions(query = "") {
   const q = String(query || "").toLowerCase();
   return CHAT_COMMANDS.filter((command) => {
     if (!q) return true;
-    return [command.id, command.label, command.description, command.usage].some(
-      (value) =>
-        String(value || "")
-          .toLowerCase()
-          .includes(q),
+    return [command.id, command.label, command.description, command.usage].some((value) =>
+      String(value || "")
+        .toLowerCase()
+        .includes(q),
     );
   });
 }
@@ -218,10 +217,7 @@ export function getUsedCommands(text) {
   let match;
   while ((match = regex.exec(text)) !== null) {
     const command = match[1];
-    if (
-      CHAT_COMMANDS.some((item) => item.id === command) &&
-      !vars.includes(command)
-    ) {
+    if (CHAT_COMMANDS.some((item) => item.id === command) && !vars.includes(command)) {
       vars.push(command);
     }
   }
@@ -229,16 +225,13 @@ export function getUsedCommands(text) {
 }
 
 export async function expandChatVariables(text, context = {}) {
-  const { problem, userCode, errors, submission, hints, similar, constraints } =
-    context;
+  const { problem, userCode, errors, submission, hints, similar, constraints } = context;
 
   let expanded = text;
 
   // /mycode → user's latest code
   if (expanded.includes("/mycode")) {
-    const codeBlock = userCode
-      ? `\`\`\`\n${userCode}\n\`\`\``
-      : "(no code found)";
+    const codeBlock = userCode ? `\`\`\`\n${userCode}\n\`\`\`` : "(no code found)";
     expanded = expanded.replace(/\/mycode/g, codeBlock);
   }
 

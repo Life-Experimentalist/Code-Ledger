@@ -23,25 +23,18 @@ function openNextRefreshTab() {
 
   const next = refreshQueueState.queue.shift();
   refreshQueueState.current = next;
-  dbg.log(
-    `openNextRefreshTab(): opening tab for ${next.url.substring(0, 60)}...`,
-  );
+  dbg.log(`openNextRefreshTab(): opening tab for ${next.url.substring(0, 60)}...`);
 
   chrome.tabs.create({ url: next.url, active: false }, (tab) => {
     if (chrome.runtime.lastError) {
-      dbg.error(
-        `openNextRefreshTab(): ✗ failed to open tab:`,
-        chrome.runtime.lastError.message,
-      );
+      dbg.error(`openNextRefreshTab(): ✗ failed to open tab:`, chrome.runtime.lastError.message);
       refreshQueueState.current = null;
       setTimeout(openNextRefreshTab, 0);
       return;
     }
 
     refreshQueueState.current = { ...next, tabId: tab.id };
-    dbg.log(
-      `openNextRefreshTab(): ✓ opened background tab ${tab.id} for metadata refresh`,
-    );
+    dbg.log(`openNextRefreshTab(): ✓ opened background tab ${tab.id} for metadata refresh`);
   });
 }
 
@@ -51,11 +44,7 @@ export function completeRefreshMetadata(tabId) {
     dbg.log(`completeRefreshMetadata(): no current tab, ${queued} queued`);
     return { queued, completed: true };
   }
-  if (
-    tabId &&
-    refreshQueueState.current.tabId &&
-    refreshQueueState.current.tabId !== tabId
-  ) {
+  if (tabId && refreshQueueState.current.tabId && refreshQueueState.current.tabId !== tabId) {
     dbg.log(
       `completeRefreshMetadata(): tab mismatch (${tabId} vs ${refreshQueueState.current.tabId}), not completing`,
     );
@@ -76,9 +65,7 @@ export function completeRefreshMetadata(tabId) {
  * The handler will save metadata and close the tab when done.
  */
 export async function handleRefreshMetadata(problems = []) {
-  const toRefresh = problems
-    .filter((p) => !p.tags || p.tags.length === 0)
-    .slice(0, 50);
+  const toRefresh = problems.filter((p) => !p.tags || p.tags.length === 0).slice(0, 50);
   dbg.log(
     `handleRefreshMetadata(): filtering ${problems.length} problems, ${toRefresh.length} need refresh (max 50)`,
   );
@@ -93,9 +80,7 @@ export async function handleRefreshMetadata(problems = []) {
     .map((p, idx) => {
       const { titleSlug, platform } = p;
       if (!titleSlug || !platform) {
-        dbg.warn(
-          `handleRefreshMetadata(): problem ${idx} missing titleSlug or platform`,
-        );
+        dbg.warn(`handleRefreshMetadata(): problem ${idx} missing titleSlug or platform`);
         return null;
       }
 

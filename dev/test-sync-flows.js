@@ -43,9 +43,7 @@ const MOCK_LOCAL = [
     lang: { name: "Python3", ext: "py" },
     tags: ["array", "hash-table"],
     code: "def twoSum(nums, target):\n  return [0, 1]",
-    files: [
-      { path: "problems/lc-two-sum/lc-two-sum.py", content: "def twoSum..." },
-    ],
+    files: [{ path: "problems/lc-two-sum/lc-two-sum.py", content: "def twoSum..." }],
     timestamp: Date.now() - 86400000,
   },
   {
@@ -57,9 +55,7 @@ const MOCK_LOCAL = [
     lang: { name: "JavaScript", ext: "js" },
     tags: ["array", "hash-table"],
     code: "const twoSum = () => [0, 1];",
-    files: [
-      { path: "problems/lc-two-sum/lc-two-sum.js", content: "const twoSum..." },
-    ],
+    files: [{ path: "problems/lc-two-sum/lc-two-sum.js", content: "const twoSum..." }],
     timestamp: Date.now(),
   },
 ];
@@ -74,9 +70,7 @@ const MOCK_REMOTE = [
     lang: { name: "Python3", ext: "py" },
     tags: ["array", "hash-table"],
     code: "def twoSum(nums, target): pass",
-    files: [
-      { path: "problems/lc-two-sum/lc-two-sum.py", content: "def twoSum..." },
-    ],
+    files: [{ path: "problems/lc-two-sum/lc-two-sum.py", content: "def twoSum..." }],
     timestamp: Date.now() - 86400000,
   },
 ];
@@ -87,9 +81,7 @@ async function testSyncPreview() {
 
   try {
     // Simulate preview: compare local vs remote
-    const remoteIds = new Set(
-      MOCK_REMOTE.map((p) => `${p.id}::${p.lang.name}`),
-    );
+    const remoteIds = new Set(MOCK_REMOTE.map((p) => `${p.id}::${p.lang.name}`));
     const conflicts = [];
     const remoteOnly = [];
 
@@ -120,11 +112,7 @@ async function testSyncPreview() {
     };
 
     if (remoteOnly.length > 0) {
-      success(
-        "Sync preview: detected",
-        remoteOnly.length,
-        "problem(s) to sync",
-      );
+      success("Sync preview: detected", remoteOnly.length, "problem(s) to sync");
       if (VERBOSE) {
         remoteOnly.forEach((p) => console.log(`  - ${p.id} (${p.lang.name})`));
       }
@@ -180,11 +168,7 @@ async function testSyncAllCommit() {
 
     files.push({
       path: "index.json",
-      content: JSON.stringify(
-        { problems: MOCK_LOCAL, total: MOCK_LOCAL.length },
-        null,
-        2,
-      ),
+      content: JSON.stringify({ problems: MOCK_LOCAL, total: MOCK_LOCAL.length }, null, 2),
     });
 
     vlog("Commit payload:", files.length, "files");
@@ -280,22 +264,14 @@ async function testPrimaryFailureFailover() {
     ];
 
     vlog("Attempting ordered failover:");
-    vlog(
-      "1. Primary:",
-      targets[0].provider,
-      targets[0].owner + "/" + targets[0].repo,
-    );
+    vlog("1. Primary:", targets[0].provider, targets[0].owner + "/" + targets[0].repo);
 
     // Simulate primary failure
     const primaryErr = new Error("Network timeout on primary");
     vlog(`   ✗ Failed: ${primaryErr.message}`);
 
     // Failover to mirror 1
-    vlog(
-      "2. Mirror 1:",
-      targets[1].provider,
-      targets[1].owner + "/" + targets[1].repo,
-    );
+    vlog("2. Mirror 1:", targets[1].provider, targets[1].owner + "/" + targets[1].repo);
     vlog(`   ✓ Success: commit abcd1234 pushed`);
     const activeTarget = targets[1];
 

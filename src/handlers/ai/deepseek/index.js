@@ -66,9 +66,7 @@ export class DeepSeekHandler extends BaseAIHandler {
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.deepseek.defaultModel;
     const endpoint =
-      settings.deepseek_endpoint ||
-      settings.aiEndpoint ||
-      CONSTANTS.AI_PROVIDERS.deepseek.endpoint;
+      settings.deepseek_endpoint || settings.aiEndpoint || CONSTANTS.AI_PROVIDERS.deepseek.endpoint;
     this.dbg.log(`review(): model=${model}, endpoint=${endpoint}`);
 
     const prompts = await Storage.getAIPrompts();
@@ -103,15 +101,11 @@ export class DeepSeekHandler extends BaseAIHandler {
       } catch (err) {
         lastErr = err;
         this.keyPool.markFailed(key);
-        this.dbg.warn(
-          `DeepSeek key failed, trying next key (${attempt + 1}/${keyCount})`,
-        );
+        this.dbg.warn(`DeepSeek key failed, trying next key (${attempt + 1}/${keyCount})`);
       }
     }
 
     this.dbg.error("DeepSeek review failed", lastErr);
-    throw (
-      lastErr || new Error("DeepSeek review failed with all available keys.")
-    );
+    throw lastErr || new Error("DeepSeek review failed with all available keys.");
   }
 }

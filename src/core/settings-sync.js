@@ -86,12 +86,7 @@ const PORTABLE_PREFIXES = [
 const CRITICAL_KEYS = ["github_owner", "github_repo", "github_username"];
 
 /** Keys that must NEVER be written to sync.json. */
-const SECRET_KEYS = [
-  "github_token",
-  "auth",
-  "_defaultsApplied",
-  "_pendingConflicts",
-];
+const SECRET_KEYS = ["github_token", "auth", "_defaultsApplied", "_pendingConflicts"];
 
 function _isPortable(key, settings) {
   if (SECRET_KEYS.some((sk) => key.startsWith(sk))) return false;
@@ -109,8 +104,7 @@ async function _fetchSyncFile(owner, repo, git) {
     const raw = atob((res.content || "").replace(/\n/g, ""));
     return { data: JSON.parse(raw), sha: res.sha || null };
   } catch (e) {
-    if (String(e?.message || e).includes("404"))
-      return { data: null, sha: null };
+    if (String(e?.message || e).includes("404")) return { data: null, sha: null };
     dbg.warn("_fetchSyncFile(): failed:", e?.message);
     return { data: null, sha: null };
   }
@@ -119,9 +113,7 @@ async function _fetchSyncFile(owner, repo, git) {
 async function _writeSyncFile(owner, repo, git, payload, existingSha) {
   const body = {
     message: "chore: sync CodeLedger settings",
-    content: btoa(
-      unescape(encodeURIComponent(JSON.stringify(payload, null, 2))),
-    ),
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2)))),
     branch: "main",
   };
   if (existingSha) body.sha = existingSha;
@@ -189,9 +181,7 @@ export async function syncSettingsFromGitHub() {
     return {
       synced: syncedCount,
       message:
-        syncedCount > 0
-          ? `Applied ${syncedCount} setting(s) from repo`
-          : "Already up-to-date",
+        syncedCount > 0 ? `Applied ${syncedCount} setting(s) from repo` : "Already up-to-date",
     };
   } catch (e) {
     dbg.error("syncSettingsFromGitHub(): failed:", e?.message);
@@ -211,8 +201,7 @@ export async function syncSettingsToGitHub() {
     const owner = settings.github_owner || settings.github_username;
     const repo = settings.github_repo || settings.gitRepo;
 
-    if (!git || !token || !owner || !repo)
-      throw new Error("GitHub not configured");
+    if (!git || !token || !owner || !repo) throw new Error("GitHub not configured");
 
     // Build portable payload
     const payload = {};
@@ -230,9 +219,7 @@ export async function syncSettingsToGitHub() {
     const { sha } = await _fetchSyncFile(owner, repo, git);
 
     await _writeSyncFile(owner, repo, git, payload, sha);
-    dbg.log(
-      `syncSettingsToGitHub(): ✓ pushed ${Object.keys(payload).length} key(s)`,
-    );
+    dbg.log(`syncSettingsToGitHub(): ✓ pushed ${Object.keys(payload).length} key(s)`);
     return { committed: true, message: "Settings pushed to GitHub" };
   } catch (e) {
     dbg.error("syncSettingsToGitHub(): failed:", e?.message);

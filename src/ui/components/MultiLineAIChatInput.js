@@ -100,9 +100,7 @@ export function MultiLineAIChatInput({
 
     if (!result) {
       tokenActiveRef.current = false;
-      setSuggestionState((prev) =>
-        prev.visible ? { ...prev, visible: false } : prev,
-      );
+      setSuggestionState((prev) => (prev.visible ? { ...prev, visible: false } : prev));
       return;
     }
 
@@ -154,18 +152,12 @@ export function MultiLineAIChatInput({
 
     function onInput() {
       // Use textarea.value directly — this is the real DOM value, always up to date
-      showSuggestions(
-        textarea.value,
-        textarea.selectionStart ?? textarea.value.length,
-      );
+      showSuggestions(textarea.value, textarea.selectionStart ?? textarea.value.length);
     }
 
     function onClick() {
       // Re-evaluate on click in case cursor moved into/out of a token
-      showSuggestions(
-        textarea.value,
-        textarea.selectionStart ?? textarea.value.length,
-      );
+      showSuggestions(textarea.value, textarea.selectionStart ?? textarea.value.length);
     }
 
     textarea.addEventListener("input", onInput);
@@ -193,8 +185,7 @@ export function MultiLineAIChatInput({
         e.preventDefault();
         setSuggestionState((prev) => ({
           ...prev,
-          activeIndex:
-            (prev.activeIndex - 1 + prev.items.length) % prev.items.length,
+          activeIndex: (prev.activeIndex - 1 + prev.items.length) % prev.items.length,
         }));
         return;
       }
@@ -202,8 +193,7 @@ export function MultiLineAIChatInput({
         e.preventDefault();
         const sel = suggestionState.items[suggestionState.activeIndex];
         if (sel) {
-          const insert =
-            suggestionState.mode === "command" ? `/${sel.id} ` : `@${sel.id} `;
+          const insert = suggestionState.mode === "command" ? `/${sel.id} ` : `@${sel.id} `;
           replaceToken(insert, suggestionState.start, suggestionState.end);
         }
         return;
@@ -218,8 +208,7 @@ export function MultiLineAIChatInput({
         e.preventDefault();
         const sel = suggestionState.items[suggestionState.activeIndex];
         if (sel) {
-          const insert =
-            suggestionState.mode === "command" ? `/${sel.id} ` : `@${sel.id} `;
+          const insert = suggestionState.mode === "command" ? `/${sel.id} ` : `@${sel.id} `;
           replaceToken(insert, suggestionState.start, suggestionState.end);
         }
         return;
@@ -232,8 +221,7 @@ export function MultiLineAIChatInput({
       const ta = textareaRef.current;
       const start = ta.selectionStart;
       const end = ta.selectionEnd;
-      const nextVal =
-        (value || "").substring(0, start) + "  " + (value || "").substring(end);
+      const nextVal = (value || "").substring(0, start) + "  " + (value || "").substring(end);
       onChange?.(nextVal);
       requestAnimationFrame(() => {
         ta.selectionStart = ta.selectionEnd = start + 2;
@@ -252,9 +240,7 @@ export function MultiLineAIChatInput({
 
   const cmdLabel = suggestionState.mode === "command" ? "Commands" : "Mentions";
   const cmdEmpty =
-    suggestionState.mode === "command"
-      ? "No matching commands."
-      : "No matching tags.";
+    suggestionState.mode === "command" ? "No matching commands." : "No matching tags.";
 
   return html`
     <div class="relative w-full">
@@ -283,10 +269,7 @@ export function MultiLineAIChatInput({
             }
           : {}}
         onSelect=${(item) => {
-          const insert =
-            suggestionState.mode === "command"
-              ? `/${item.id} `
-              : `@${item.id} `;
+          const insert = suggestionState.mode === "command" ? `/${item.id} ` : `@${item.id} `;
           replaceToken(insert, suggestionState.start, suggestionState.end);
         }}
       />
@@ -303,16 +286,14 @@ export function MultiLineAIChatInput({
             .slice(0, 4)
             .map(
               (v) => html`
-                <code
-                  class="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-[10px]"
+                <code class="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-[10px]"
                   >/${v}</code
                 >
               `,
             )}
           ${availableVariables.length > 4
             ? html`
-                <code
-                  class="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-[10px]"
+                <code class="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-[10px]"
                   >+${availableVariables.length - 4}</code
                 >
               `

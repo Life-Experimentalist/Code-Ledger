@@ -27,14 +27,12 @@ function fmt(ms) {
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);
   const s = t % 60;
-  if (h > 0)
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export function createFloatingTimer(slug = "", opts = {}) {
-  const { autoStart = true, position = { bottom: "20px", right: "20px" } } =
-    opts;
+  const { autoStart = true, position = { bottom: "20px", right: "20px" } } = opts;
 
   // Restore or initialize state
   let state = loadState(slug) || {
@@ -65,8 +63,7 @@ export function createFloatingTimer(slug = "", opts = {}) {
     right: position.right,
     zIndex: "2147483647",
     background: "rgba(10,10,20,0.92)",
-    border:
-      "1px solid color-mix(in srgb, var(--cl-accent, #06b6d4) 30%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--cl-accent, #06b6d4) 30%, transparent)",
     borderRadius: "10px",
     padding: "6px 10px",
     display: "flex",

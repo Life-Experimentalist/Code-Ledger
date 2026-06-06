@@ -24,9 +24,7 @@ export function syncButtonsForCurrentPage(handler) {
     if (!detailSyncBtn) injectDetailSyncBtn(handler, page);
   } else if (page.type === PAGE_TYPES.PROBLEM) {
     if (listSyncBtn) listSyncBtn.remove();
-    const resultEl = document.querySelector(
-      '[data-e2e-locator="submission-result"]',
-    );
+    const resultEl = document.querySelector('[data-e2e-locator="submission-result"]');
     if (resultEl && resultEl.offsetParent) {
       if (!detailSyncBtn) injectDetailSyncBtn(handler, page);
     } else {
@@ -53,19 +51,14 @@ export function injectDetailSyncBtn(handler, page) {
   if (document.getElementById("cl-sync-btn")) return;
 
   const findResultRow = () => {
-    const resultEl = document.querySelector(
-      '[data-e2e-locator="submission-result"]',
-    );
+    const resultEl = document.querySelector('[data-e2e-locator="submission-result"]');
     if (!resultEl || !resultEl.offsetParent) return null;
     let el = resultEl;
     for (let i = 0; i < 8; i++) {
       if (!el.parentElement || el.parentElement === document.body) break;
       el = el.parentElement;
       const { display, flexDirection } = window.getComputedStyle(el);
-      if (
-        (display === "flex" || display === "grid") &&
-        flexDirection !== "column"
-      ) {
+      if ((display === "flex" || display === "grid") && flexDirection !== "column") {
         return el;
       }
     }
@@ -168,15 +161,10 @@ export async function injectProfileActionButtons(handler) {
 
       actions.appendChild(
         createProfileActionButton("Open GitHub Repo", async () => {
-          const fallbackUrl = runtime.getURL(
-            "library/library.html?tab=settings&settingsTab=git",
-          );
+          const fallbackUrl = runtime.getURL("library/library.html?tab=settings&settingsTab=git");
           try {
             const settings = await Storage.getSettings();
-            const owner =
-              settings.github_owner ||
-              settings.github_username ||
-              settings.gitUser;
+            const owner = settings.github_owner || settings.github_username || settings.gitUser;
             const repo = settings.github_repo || settings.gitRepo;
             if (owner && repo) {
               tabs.create({ url: `https://github.com/${owner}/${repo}` });

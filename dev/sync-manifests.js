@@ -17,11 +17,7 @@ function readJson(rel) {
 }
 
 function writeJson(rel, obj) {
-  writeFileSync(
-    resolve(root, rel),
-    JSON.stringify(obj, null, 4) + "\n",
-    "utf8",
-  );
+  writeFileSync(resolve(root, rel), JSON.stringify(obj, null, 4) + "\n", "utf8");
 }
 
 const setArg = process.argv.indexOf("--set");
@@ -35,11 +31,7 @@ if (!targetVersion || !/^\d+\.\d+\.\d+$/.test(targetVersion)) {
 
 if (pkg.version !== targetVersion) {
   pkg.version = targetVersion;
-  writeFileSync(
-    resolve(root, "package.json"),
-    JSON.stringify(pkg, null, 2) + "\n",
-    "utf8",
-  );
+  writeFileSync(resolve(root, "package.json"), JSON.stringify(pkg, null, 2) + "\n", "utf8");
   console.log(`  package.json               → ${targetVersion}`);
 }
 

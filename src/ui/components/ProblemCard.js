@@ -14,8 +14,7 @@ const dbg = createDebugger("ProblemCard");
 
 const PLATFORM_META = {
   leetcode: {
-    favicon:
-      "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
     label: "LeetCode",
     color: CONSTANTS.PLATFORMS.leetcode.color,
     url: (slug) => CONSTANTS.PLATFORMS.leetcode.problemsBase + slug + "/",
@@ -56,8 +55,7 @@ export function ProblemCard({
   onToggleSelect,
 }) {
   const diffStyle =
-    DIFF_STYLE[problem.difficulty] ||
-    "bg-slate-500/10 text-slate-400 border border-slate-500/30";
+    DIFF_STYLE[problem.difficulty] || "bg-slate-500/10 text-slate-400 border border-slate-500/30";
   const meta = PLATFORM_META[problem.platform] || {
     label: problem.platform,
     color: "#64748b",
@@ -113,9 +111,7 @@ export function ProblemCard({
 
       <!-- Header: title + platform badge -->
       <div class="flex items-start justify-between gap-2 z-10">
-        <h3 class="text-sm font-semibold text-white leading-snug">
-          ${problem.title}
-        </h3>
+        <h3 class="text-sm font-semibold text-white leading-snug">${problem.title}</h3>
         <div
           class="flex items-center gap-1.5 shrink-0 px-2 py-1 bg-white/5 border border-white/10 rounded"
         >
@@ -129,8 +125,7 @@ export function ProblemCard({
                 }}
               />`
             : ""}
-          <span
-            class="text-[10px] font-mono uppercase tracking-wider text-slate-400"
+          <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400"
             >${meta.label}</span
           >
         </div>
@@ -138,14 +133,11 @@ export function ProblemCard({
 
       <!-- Difficulty + language -->
       <div class="flex items-center gap-2 z-10">
-        <span
-          class="px-2 py-0.5 text-[10px] font-bold rounded uppercase ${diffStyle}"
+        <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase ${diffStyle}"
           >${problem.difficulty || "?"}</span
         >
         ${langName
-          ? html`<span class="text-[10px] font-mono text-cyan-500/70"
-              >${langName}</span
-            >`
+          ? html`<span class="text-[10px] font-mono text-cyan-500/70">${langName}</span>`
           : ""}
       </div>
 
@@ -162,9 +154,7 @@ export function ProblemCard({
             `,
           )}
         ${topics.length > 5
-          ? html`<span class="text-[9px] text-slate-600"
-              >+${topics.length - 5}</span
-            >`
+          ? html`<span class="text-[9px] text-slate-600">+${topics.length - 5}</span>`
           : ""}
       </div>
 
@@ -175,9 +165,7 @@ export function ProblemCard({
         <span class="text-[10px] font-mono text-slate-600">
           ${problem.timestamp
             ? new Date(
-                problem.timestamp < 1e10
-                  ? problem.timestamp * 1000
-                  : problem.timestamp,
+                problem.timestamp < 1e10 ? problem.timestamp * 1000 : problem.timestamp,
               ).toLocaleDateString()
             : ""}
         </span>

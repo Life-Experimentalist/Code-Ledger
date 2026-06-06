@@ -11,10 +11,7 @@ import {
   executeMCPTool,
   formatToolResultsForAI,
 } from "../../core/mcp-executor.js";
-import {
-  getAvailableMCPToolsForAI,
-  shouldUseToolsForAI,
-} from "../../core/mcp-config.js";
+import { getAvailableMCPToolsForAI, shouldUseToolsForAI } from "../../core/mcp-config.js";
 
 export class BaseAIHandler {
   constructor(id, name) {
@@ -41,9 +38,7 @@ export class BaseAIHandler {
       const tools = await getAvailableMCPToolsForAI(this.mcpToolFormat);
       if (!tools || tools.length === 0) return "";
 
-      const toolDescriptions = tools
-        .map((t) => `- ${t.name}: ${t.description}`)
-        .join("\n");
+      const toolDescriptions = tools.map((t) => `- ${t.name}: ${t.description}`).join("\n");
 
       return `\n\n[AVAILABLE_MCP_TOOLS]\nYou can use these tools to enhance your analysis:\n${toolDescriptions}\n[END_MCP_TOOLS]`;
     } catch (e) {
@@ -71,9 +66,7 @@ export class BaseAIHandler {
 
     if (context.code) {
       const lang = context.lang?.name || "";
-      lines.push(
-        `\nSolution (${lang}):\n\`\`\`${lang}\n${context.code}\n\`\`\``,
-      );
+      lines.push(`\nSolution (${lang}):\n\`\`\`${lang}\n${context.code}\n\`\`\``);
     }
 
     if (context.aiReview) {
@@ -89,9 +82,7 @@ export class BaseAIHandler {
     if (messages.length > 1) {
       lines.push("\n---");
       for (const msg of messages.slice(0, -1)) {
-        lines.push(
-          `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`,
-        );
+        lines.push(`${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`);
       }
     }
 

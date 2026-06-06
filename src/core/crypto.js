@@ -38,11 +38,7 @@ export const Crypto = {
       const key = await this._getKey(password);
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const encoded = new TextEncoder().encode(text);
-      const ciphertext = await crypto.subtle.encrypt(
-        { name: "AES-GCM", iv },
-        key,
-        encoded,
-      );
+      const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
 
       const combined = new Uint8Array(iv.length + ciphertext.byteLength);
       combined.set(iv);
@@ -66,11 +62,7 @@ export const Crypto = {
       const iv = combined.slice(0, 12);
       const ciphertext = combined.slice(12);
 
-      const decrypted = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv },
-        key,
-        ciphertext,
-      );
+      const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
       return new TextDecoder().decode(decrypted);
     } catch (err) {
       dbg.error("Decryption failed", err);

@@ -122,8 +122,7 @@ export function injectGFGQoL(opts = {}) {
     return;
   }
 
-  const copyOk =
-    !showCopy || document.getElementById("cl-gfg-copy")?.isConnected;
+  const copyOk = !showCopy || document.getElementById("cl-gfg-copy")?.isConnected;
   const aiOk = !showAI || document.getElementById("cl-gfg-ai-btn")?.isConnected;
   if (copyOk && aiOk) {
     _injected = true;
@@ -165,7 +164,5 @@ export function resetGFGQoL() {
 }
 
 function _cleanupGFGQoL() {
-  ["cl-gfg-copy", "cl-gfg-ai-btn"].forEach((id) =>
-    document.getElementById(id)?.remove(),
-  );
+  ["cl-gfg-copy", "cl-gfg-ai-btn"].forEach((id) => document.getElementById(id)?.remove());
 }

@@ -11,8 +11,7 @@ const dbg = createDebugger("GFGDetector");
 
 const SUBMIT_BTN_SEL =
   '[class^="ui button problems_submit_button"], .problems-submit-btn, button.ui.button[class*="submit"]';
-const RESULT_SEL =
-  '[class^="problems_content"], .problems-content, #problems-content';
+const RESULT_SEL = '[class^="problems_content"], .problems-content, #problems-content';
 const SUCCESS_TEXTS = ["problem solved successfully", "correct answer"];
 
 const MAX_POLL_ATTEMPTS = 60; // 60 s

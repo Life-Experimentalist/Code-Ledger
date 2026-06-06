@@ -12,10 +12,7 @@ import {
   useRef,
   useCallback,
 } from "../../vendor/preact-bundle.js";
-import {
-  mapDifficulty,
-  loadUserDifficultyMap,
-} from "../../core/difficulty-map.js";
+import { mapDifficulty, loadUserDifficultyMap } from "../../core/difficulty-map.js";
 const html = htm.bind(h);
 
 import { createDebugger } from "../../lib/debug.js";
@@ -90,8 +87,7 @@ export function HeatMap({ problems = [] }) {
     } else {
       const year = parseInt(selectedPeriod, 10);
       yearStart = new Date(year, 0, 1); // Jan 1
-      endDate =
-        year === today.getFullYear() ? new Date(today) : new Date(year, 11, 31);
+      endDate = year === today.getFullYear() ? new Date(today) : new Date(year, 11, 31);
       // Grid starts from the Sunday on/before Jan 1
       startDate = new Date(yearStart);
       startDate.setDate(startDate.getDate() - startDate.getDay());
@@ -101,8 +97,7 @@ export function HeatMap({ problems = [] }) {
     const dayMap = {};
     const addToDay = (ds, rawLabel, category) => {
       if (!dayMap[ds]) dayMap[ds] = { easy: 0, medium: 0, hard: 0, raw: {} };
-      dayMap[ds][category.toLowerCase()] =
-        (dayMap[ds][category.toLowerCase()] || 0) + 1;
+      dayMap[ds][category.toLowerCase()] = (dayMap[ds][category.toLowerCase()] || 0) + 1;
       dayMap[ds].raw[rawLabel] = (dayMap[ds].raw[rawLabel] || 0) + 1;
     };
 
@@ -121,11 +116,7 @@ export function HeatMap({ problems = [] }) {
       temp = 0;
     const streakStart = new Date(today);
     streakStart.setFullYear(streakStart.getFullYear() - 5);
-    for (
-      let it = new Date(streakStart);
-      it <= today;
-      it.setDate(it.getDate() + 1)
-    ) {
+    for (let it = new Date(streakStart); it <= today; it.setDate(it.getDate() + 1)) {
       const total =
         (dayMap[toDateStr(it)]?.easy || 0) +
         (dayMap[toDateStr(it)]?.medium || 0) +
@@ -138,11 +129,7 @@ export function HeatMap({ problems = [] }) {
       }
     }
     mStreak = Math.max(mStreak, temp);
-    for (
-      let d = new Date(today);
-      d >= streakStart;
-      d.setDate(d.getDate() - 1)
-    ) {
+    for (let d = new Date(today); d >= streakStart; d.setDate(d.getDate() - 1)) {
       const total =
         (dayMap[toDateStr(d)]?.easy || 0) +
         (dayMap[toDateStr(d)]?.medium || 0) +
@@ -155,8 +142,7 @@ export function HeatMap({ problems = [] }) {
     // For specific-year mode: cells before Jan 1 are null (padding — no data outside the year)
     const compiled = [];
     let cur = new Date(startDate);
-    const totalDays =
-      Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
     const weeks = Math.ceil(totalDays / 7);
 
     for (let w = 0; w < weeks; w++) {
@@ -185,9 +171,7 @@ export function HeatMap({ problems = [] }) {
       if (week.length > 0) compiled.push(week);
     }
 
-    const allTotals = Object.values(dayMap).map(
-      (d) => d.easy + d.medium + d.hard,
-    );
+    const allTotals = Object.values(dayMap).map((d) => d.easy + d.medium + d.hard);
     const max = allTotals.length ? Math.max(...allTotals) : 0;
 
     return {
@@ -226,9 +210,7 @@ export function HeatMap({ problems = [] }) {
     ev.stopPropagation();
     const x = ev.clientX + 12;
     const y = ev.clientY - 8;
-    setPinned((prev) =>
-      prev?.day.date === day.date ? null : { pos: { x, y }, day },
-    );
+    setPinned((prev) => (prev?.day.date === day.date ? null : { pos: { x, y }, day }));
   };
 
   const active = pinned || hover;
@@ -260,10 +242,9 @@ export function HeatMap({ problems = [] }) {
       if (!firstDay) continue;
       const m = firstDay.date.slice(5, 7); // "MM"
       if (m !== lastMonth) {
-        const name = new Date(firstDay.date + "T00:00:00Z").toLocaleString(
-          "default",
-          { month: "short" },
-        );
+        const name = new Date(firstDay.date + "T00:00:00Z").toLocaleString("default", {
+          month: "short",
+        });
         labels.push({ colIndex: wi, name });
         lastMonth = m;
       }
@@ -281,9 +262,7 @@ export function HeatMap({ problems = [] }) {
     >
       <!-- Header row -->
       <div class="flex justify-between items-center">
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
-          Consistency Map
-        </h3>
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Consistency Map</h3>
         <div class="flex items-center gap-2">
           <span class="text-[10px] text-slate-600"
             >Current: <b class="text-cyan-400">${currentStreak}d</b></span
@@ -301,9 +280,7 @@ export function HeatMap({ problems = [] }) {
             onClick=${(e) => e.stopPropagation()}
           >
             <option value="past_year">Past Year</option>
-            ${availableYears.map(
-              (y) => html`<option value="${y}">${y}</option>`,
-            )}
+            ${availableYears.map((y) => html`<option value="${y}">${y}</option>`)}
           </select>
         </div>
       </div>
@@ -331,10 +308,7 @@ export function HeatMap({ problems = [] }) {
         <!-- Day labels + cell columns -->
         <div class="flex" style="gap: 0;">
           <!-- Day labels column (every other label for space) -->
-          <div
-            class="flex flex-col shrink-0"
-            style="width:28px; gap:2px; padding-top: 0;"
-          >
+          <div class="flex flex-col shrink-0" style="width:28px; gap:2px; padding-top: 0;">
             ${DAY_LABELS.map(
               (d, i) => html`
                 <div
@@ -374,8 +348,8 @@ export function HeatMap({ problems = [] }) {
                           }}
                           class="rounded-sm ${getColor(
                             day.total,
-                          )} cursor-pointer transition-colors duration-150 ${pinned
-                            ?.day.date === day.date
+                          )} cursor-pointer transition-colors duration-150 ${pinned?.day.date ===
+                          day.date
                             ? "ring-1 ring-cyan-400"
                             : ""}"
                           onMouseEnter=${(e) => onDayEnter(e, day)}
@@ -426,9 +400,7 @@ export function HeatMap({ problems = [] }) {
               onClick=${(e) => e.stopPropagation()}
             >
               <div class="flex items-center justify-between mb-2">
-                <div class="text-xs text-slate-400">
-                  ${fmtDateLabel(active.day.date)}
-                </div>
+                <div class="text-xs text-slate-400">${fmtDateLabel(active.day.date)}</div>
                 ${pinned
                   ? html`<button
                       onClick=${() => setPinned(null)}
@@ -436,36 +408,24 @@ export function HeatMap({ problems = [] }) {
                     >
                       ✕
                     </button>`
-                  : html`<span class="text-[9px] text-slate-600"
-                      >click to pin</span
-                    >`}
+                  : html`<span class="text-[9px] text-slate-600">click to pin</span>`}
               </div>
               <div class="flex gap-3 mb-2">
                 <div class="text-center">
-                  <div class="text-[11px] text-emerald-400 font-medium">
-                    Easy
-                  </div>
-                  <div class="text-xs text-slate-300">
-                    ${active.day.data.easy || 0}
-                  </div>
+                  <div class="text-[11px] text-emerald-400 font-medium">Easy</div>
+                  <div class="text-xs text-slate-300">${active.day.data.easy || 0}</div>
                 </div>
                 <div class="text-center">
                   <div class="text-[11px] text-amber-400 font-medium">Med</div>
-                  <div class="text-xs text-slate-300">
-                    ${active.day.data.medium || 0}
-                  </div>
+                  <div class="text-xs text-slate-300">${active.day.data.medium || 0}</div>
                 </div>
                 <div class="text-center">
                   <div class="text-[11px] text-rose-400 font-medium">Hard</div>
-                  <div class="text-xs text-slate-300">
-                    ${active.day.data.hard || 0}
-                  </div>
+                  <div class="text-xs text-slate-300">${active.day.data.hard || 0}</div>
                 </div>
                 <div class="text-center ml-auto">
                   <div class="text-[11px] text-slate-500">Total</div>
-                  <div class="text-xs font-bold text-white">
-                    ${active.day.total || 0}
-                  </div>
+                  <div class="text-xs font-bold text-white">${active.day.total || 0}</div>
                 </div>
               </div>
               ${active.day.total === 0

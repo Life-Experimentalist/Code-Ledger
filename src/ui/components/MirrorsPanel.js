@@ -32,9 +32,7 @@ export function MirrorsPanel() {
 
   useEffect(() => {
     Storage.getSettings()
-      .then((s) =>
-        setMirrors(Array.isArray(s?.git_mirrors) ? s.git_mirrors : []),
-      )
+      .then((s) => setMirrors(Array.isArray(s?.git_mirrors) ? s.git_mirrors : []))
       .catch(() => {});
   }, []);
 
@@ -68,18 +66,15 @@ export function MirrorsPanel() {
   const providerLabel = (id) => PROVIDERS.find((p) => p.id === id)?.label || id;
 
   return html`
-    <div
-      class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-5"
-    >
+    <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-5">
       <div>
         <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">
           Mirror Repositories
         </h3>
         <p class="text-[11px] text-slate-500">
-          After each commit to the primary repository, the same files are pushed
-          to every mirror. If the active primary target fails, mirrors are
-          attempted in the order shown below and the first healthy target
-          becomes active. Mirrors require the provider's token to be configured
+          After each commit to the primary repository, the same files are pushed to every mirror. If
+          the active primary target fails, mirrors are attempted in the order shown below and the
+          first healthy target becomes active. Mirrors require the provider's token to be configured
           in its settings section.
         </p>
       </div>
@@ -118,9 +113,7 @@ export function MirrorsPanel() {
 
       <!-- Add mirror -->
       <div class="flex flex-col gap-2">
-        <div class="text-[10px] text-slate-600 uppercase tracking-wider">
-          Add mirror
-        </div>
+        <div class="text-[10px] text-slate-600 uppercase tracking-wider">Add mirror</div>
         <div class="flex items-center gap-2 flex-wrap">
           <select
             value=${draft.provider}
@@ -131,9 +124,7 @@ export function MirrorsPanel() {
               }))}
             class="bg-[#0d1117] border border-white/10 text-xs text-slate-300 px-2 py-1.5 rounded-lg"
           >
-            ${PROVIDERS.map(
-              (p) => html`<option value=${p.id}>${p.label}</option>`,
-            )}
+            ${PROVIDERS.map((p) => html`<option value=${p.id}>${p.label}</option>`)}
           </select>
           <input
             type="text"
@@ -160,9 +151,7 @@ export function MirrorsPanel() {
         </div>
       </div>
 
-      ${status
-        ? html`<p class="text-[11px] text-emerald-400">${status}</p>`
-        : ""}
+      ${status ? html`<p class="text-[11px] text-emerald-400">${status}</p>` : ""}
     </div>
   `;
 }

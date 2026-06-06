@@ -50,10 +50,7 @@ export async function ensureKatex() {
 
 export function renderMath(tex, display = false) {
   const substituted = substituteLatex(tex);
-  const escaped = substituted
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  const escaped = substituted.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   if (display) {
     return `<div class="my-2 overflow-x-auto rounded bg-black/40 border border-cyan-500/20 px-3 py-2 text-xs font-mono text-cyan-300/80 text-center">${escaped}</div>`;
   }

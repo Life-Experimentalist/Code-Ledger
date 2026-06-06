@@ -1,101 +1,117 @@
 {
-  "manifest_version": 3,
-  "name": "CodeLedger",
-  "version": "1.4.3",
-  "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
-  "author": "VKrishna04",
-  "homepage_url": "https://codeledger.vkrishna04.me",
-  "icons": {
-    "16": "assets/images/icon-16.png",
-    "32": "assets/images/icon-32.png",
-    "48": "assets/images/icon-48.png",
-    "128": "assets/images/icon-128.png"
-  },
-  "permissions": ["storage", "alarms"],
-  "host_permissions": [
-    "*://*.leetcode.com/*",
-    "*://*.geeksforgeeks.org/*",
-    "*://*.codeforces.com/*",
-    "https://api.github.com/*",
-    "https://api.gitlab.com/*",
-    "https://api.openai.com/*",
-    "https://api.anthropic.com/*",
-    "https://generativelanguage.googleapis.com/*",
-    "https://api.deepseek.com/*",
-    "http://localhost:11434/*"
-  ],
-  "background": {
-    "scripts": ["background/service-worker.js"],
-    "type": "module"
-  },
-  "content_scripts": [
-    {
-      "matches": [
+    "manifest_version": 3,
+    "name": "CodeLedger",
+    "version": "1.4.4",
+    "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
+    "author": "VKrishna04",
+    "homepage_url": "https://codeledger.vkrishna04.me",
+    "icons": {
+        "16": "assets/images/icon-16.png",
+        "32": "assets/images/icon-32.png",
+        "48": "assets/images/icon-48.png",
+        "128": "assets/images/icon-128.png"
+    },
+    "permissions": [
+        "storage",
+        "alarms"
+    ],
+    "host_permissions": [
         "*://*.leetcode.com/*",
         "*://*.geeksforgeeks.org/*",
-        "*://*.codeforces.com/*"
-      ],
-      "js": ["content/handler-loader.js"],
-      "run_at": "document_idle",
-      "all_frames": false
+        "*://*.codeforces.com/*",
+        "https://api.github.com/*",
+        "https://api.gitlab.com/*",
+        "https://api.openai.com/*",
+        "https://api.anthropic.com/*",
+        "https://generativelanguage.googleapis.com/*",
+        "https://api.deepseek.com/*",
+        "http://localhost:11434/*"
+    ],
+    "background": {
+        "scripts": [
+            "background/service-worker.js"
+        ],
+        "type": "module"
     },
-    {
-      "matches": ["*://codeledger.vkrishna04.me/*"],
-      "js": ["content/presence-marker.js"],
-      "run_at": "document_end",
-      "all_frames": false
-    }
-  ],
-  "action": {
-    "default_title": "CodeLedger",
-    "default_popup": "popup/popup.html",
-    "default_icon": {
-      "16": "assets/images/icon-16.png",
-      "32": "assets/images/icon-32.png",
-      "48": "assets/images/icon-48.png"
-    }
-  },
-  "sidebar_action": {
-    "default_title": "CodeLedger Library",
-    "default_panel": "library/library.html",
-    "default_icon": {
-      "16": "assets/images/icon-16.png",
-      "48": "assets/images/icon-48.png"
-    }
-  },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "handlers/platforms/leetcode/*",
-        "handlers/platforms/geeksforgeeks/*",
-        "handlers/platforms/codeforces/*",
-        "handlers/_base/*",
-        "handlers/ai/*",
-        "handlers/git/*",
-        "handlers/init.js",
-        "core/*",
-        "lib/*",
-        "vendor/*",
-        "data/*",
-        "content/*"
-      ],
-      "matches": [
-        "*://*.leetcode.com/*",
-        "*://*.geeksforgeeks.org/*",
-        "*://*.codeforces.com/*"
-      ]
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.leetcode.com/*",
+                "*://*.geeksforgeeks.org/*",
+                "*://*.codeforces.com/*"
+            ],
+            "js": [
+                "content/handler-loader.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": false
+        },
+        {
+            "matches": [
+                "*://codeledger.vkrishna04.me/*"
+            ],
+            "js": [
+                "content/presence-marker.js"
+            ],
+            "run_at": "document_end",
+            "all_frames": false
+        }
+    ],
+    "action": {
+        "default_title": "CodeLedger",
+        "default_popup": "popup/popup.html",
+        "default_icon": {
+            "16": "assets/images/icon-16.png",
+            "32": "assets/images/icon-32.png",
+            "48": "assets/images/icon-48.png"
+        }
     },
-    {
-      "resources": [
-        "content/presence-marker.js"
-      ],
-      "matches": ["*://codeledger.vkrishna04.me/*"]
+    "sidebar_action": {
+        "default_title": "CodeLedger Library",
+        "default_panel": "library/library.html",
+        "default_icon": {
+            "16": "assets/images/icon-16.png",
+            "48": "assets/images/icon-48.png"
+        }
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "handlers/platforms/leetcode/*",
+                "handlers/platforms/geeksforgeeks/*",
+                "handlers/platforms/codeforces/*",
+                "handlers/_base/*",
+                "handlers/ai/*",
+                "handlers/git/*",
+                "handlers/init.js",
+                "core/*",
+                "lib/*",
+                "vendor/*",
+                "data/*",
+                "content/*",
+                "ui/floating-ai.js",
+                "ui/floating-timer.js",
+                "ui/components/AIMarkdownRenderer.js"
+            ],
+            "matches": [
+                "*://*.leetcode.com/*",
+                "*://*.geeksforgeeks.org/*",
+                "*://*.codeforces.com/*"
+            ]
+        },
+        {
+            "resources": [
+                "content/presence-marker.js"
+            ],
+            "matches": [
+                "*://codeledger.vkrishna04.me/*"
+            ]
+        }
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "codeledger@vkrishna04.me",
+            "strict_min_version": "109.0"
+        }
     }
-  ],
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "codeledger@vkrishna04.me",
-      "strict_min_version": "109.0"
-    }
-  }
 }

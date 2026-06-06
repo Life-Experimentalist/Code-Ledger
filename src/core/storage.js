@@ -17,28 +17,19 @@ export const Storage = {
    * Gets settings with defaults applied.
    */
   async getSettings() {
-    const { [CONSTANTS.SK.SETTINGS]: settings } =
-      await browserStorage.local.get(CONSTANTS.SK.SETTINGS);
-    const s = settings || {};
-    dbg.log(
-      `getSettings(): loaded settings with ${Object.keys(s).length} keys`,
+    const { [CONSTANTS.SK.SETTINGS]: settings } = await browserStorage.local.get(
+      CONSTANTS.SK.SETTINGS,
     );
+    const s = settings || {};
+    dbg.log(`getSettings(): loaded settings with ${Object.keys(s).length} keys`);
     // Migration: if legacy primaryModel/secondaryModel were used to store provider ids,
     // copy them to new keys `aiProvider` / `aiSecondary` when appropriate.
     try {
       const providerIds = Object.keys(CONSTANTS.AI_PROVIDERS || {});
-      if (
-        !s.aiProvider &&
-        s.primaryModel &&
-        providerIds.includes(s.primaryModel)
-      ) {
+      if (!s.aiProvider && s.primaryModel && providerIds.includes(s.primaryModel)) {
         s.aiProvider = s.primaryModel;
       }
-      if (
-        !s.aiSecondary &&
-        s.secondaryModel &&
-        providerIds.includes(s.secondaryModel)
-      ) {
+      if (!s.aiSecondary && s.secondaryModel && providerIds.includes(s.secondaryModel)) {
         s.aiSecondary = s.secondaryModel;
       }
     } catch (e) {
@@ -49,9 +40,7 @@ export const Storage = {
   },
 
   async setSettings(settings) {
-    dbg.log(
-      `setSettings(): saving ${Object.keys(settings || {}).length} settings keys`,
-    );
+    dbg.log(`setSettings(): saving ${Object.keys(settings || {}).length} settings keys`);
     await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: settings });
   },
 
@@ -59,9 +48,7 @@ export const Storage = {
   async getAIKeys() {
     const res = await browserStorage.local.get(CONSTANTS.SK.AI_KEYS);
     const all = res[CONSTANTS.SK.AI_KEYS] || {};
-    dbg.log(
-      `getAIKeys(): found keys for ${Object.keys(all).length} provider(s)`,
-    );
+    dbg.log(`getAIKeys(): found keys for ${Object.keys(all).length} provider(s)`);
     return all;
   },
 
@@ -132,8 +119,7 @@ export const Storage = {
     const res = await browserStorage.local.get(CONSTANTS.SK.ROLLING_BACKUPS);
     const raw = res[CONSTANTS.SK.ROLLING_BACKUPS] || {};
     // Migrate old array format (pre-3-type) → manual list
-    if (Array.isArray(raw))
-      return { manual: raw.slice(0, 10), scheduled: [], rolling: null };
+    if (Array.isArray(raw)) return { manual: raw.slice(0, 10), scheduled: [], rolling: null };
     return {
       manual: raw.manual || [],
       scheduled: raw.scheduled || [],
@@ -217,9 +203,7 @@ export const Storage = {
   // User-owned overrides merged with the CDN canonical-map on lookup.
 
   async getLocalCanonicalEntries() {
-    const res = await browserStorage.local.get(
-      CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES,
-    );
+    const res = await browserStorage.local.get(CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES);
     return res[CONSTANTS.SK.CANONICAL_LOCAL_ENTRIES] || [];
   },
 
@@ -242,9 +226,7 @@ export const Storage = {
 
   async deleteLocalCanonicalEntry(canonicalId) {
     const entries = await this.getLocalCanonicalEntries();
-    await this.setLocalCanonicalEntries(
-      entries.filter((e) => e.canonicalId !== canonicalId),
-    );
+    await this.setLocalCanonicalEntries(entries.filter((e) => e.canonicalId !== canonicalId));
   },
 
   async getAIPrompts() {
@@ -263,9 +245,7 @@ export const Storage = {
     const keys = await browserStorage.local.get(CONSTANTS.SK.AUTH_TOKENS);
     const tokens = keys[CONSTANTS.SK.AUTH_TOKENS] || {};
     const exists = !!tokens[provider];
-    dbg.log(
-      `getAuthToken(${provider}): token ${exists ? "found" : "NOT found"}`,
-    );
+    dbg.log(`getAuthToken(${provider}): token ${exists ? "found" : "NOT found"}`);
     return tokens[provider];
   },
 
@@ -273,9 +253,7 @@ export const Storage = {
     const keys = await browserStorage.local.get(CONSTANTS.SK.AUTH_TOKENS);
     const tokens = keys[CONSTANTS.SK.AUTH_TOKENS] || {};
     tokens[provider] = token;
-    dbg.log(
-      `setAuthToken(${provider}): token set (${String(token || "").substring(0, 20)}...)`,
-    );
+    dbg.log(`setAuthToken(${provider}): token set (${String(token || "").substring(0, 20)}...)`);
     await browserStorage.local.set({ [CONSTANTS.SK.AUTH_TOKENS]: tokens });
   },
 
@@ -319,13 +297,8 @@ export const Storage = {
 
   async saveProblem(problem) {
     const problemId = problem?.id || problem?.titleSlug || "unknown";
-    dbg.log(
-      `saveProblem(): saving problem ${problemId} (${problem?.platform || "unknown"})`,
-    );
-    const store = await this.queryDB(
-      CONSTANTS.IDB_STORES.PROBLEMS,
-      "readwrite",
-    );
+    dbg.log(`saveProblem(): saving problem ${problemId} (${problem?.platform || "unknown"})`);
+    const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS, "readwrite");
     return new Promise((resolve, reject) => {
       const request = store.put(problem);
       request.onsuccess = () => {
@@ -402,10 +375,7 @@ export const Storage = {
 
   async deleteProblem(id) {
     dbg.log(`deleteProblem(): deleting ${id}`);
-    const store = await this.queryDB(
-      CONSTANTS.IDB_STORES.PROBLEMS,
-      "readwrite",
-    );
+    const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS, "readwrite");
     return new Promise((resolve, reject) => {
       const request = store.delete(id);
       request.onsuccess = () => {

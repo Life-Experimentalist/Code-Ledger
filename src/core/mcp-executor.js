@@ -81,17 +81,14 @@ export function getAvailableMCPTools(format = "generic") {
       description: tool.description,
       parameters: {
         type: "OBJECT",
-        properties: Object.entries(tool.parameters.properties || {}).reduce(
-          (acc, [key, value]) => {
-            acc[key] = {
-              type: (value.type || "string").toUpperCase(),
-              description: value.description || "",
-              enum: value.enum,
-            };
-            return acc;
-          },
-          {},
-        ),
+        properties: Object.entries(tool.parameters.properties || {}).reduce((acc, [key, value]) => {
+          acc[key] = {
+            type: (value.type || "string").toUpperCase(),
+            description: value.description || "",
+            enum: value.enum,
+          };
+          return acc;
+        }, {}),
         required: tool.parameters.required || [],
       },
     }));
@@ -121,9 +118,7 @@ export async function processMCPToolCalls(toolCalls, format = "generic") {
     dbg.log(`processMCPToolCalls(): no tool calls`);
     return [];
   }
-  dbg.log(
-    `processMCPToolCalls(): processing ${toolCalls.length} calls (format=${format})`,
-  );
+  dbg.log(`processMCPToolCalls(): processing ${toolCalls.length} calls (format=${format})`);
   const results = [];
 
   for (const call of toolCalls) {
@@ -133,9 +128,7 @@ export async function processMCPToolCalls(toolCalls, format = "generic") {
     if (format === "openai") {
       // OpenAI: call.function = { name, arguments (JSON string) }
       toolId = call.function?.name;
-      args = call.function?.arguments
-        ? JSON.parse(call.function.arguments)
-        : {};
+      args = call.function?.arguments ? JSON.parse(call.function.arguments) : {};
     } else if (format === "claude") {
       // Claude: call.name, call.input
       toolId = call.name;
@@ -147,9 +140,7 @@ export async function processMCPToolCalls(toolCalls, format = "generic") {
     } else if (format === "deepseek") {
       // DeepSeek: same as OpenAI
       toolId = call.function?.name;
-      args = call.function?.arguments
-        ? JSON.parse(call.function.arguments)
-        : {};
+      args = call.function?.arguments ? JSON.parse(call.function.arguments) : {};
     } else {
       // Generic: toolId and args direct
       toolId = call.toolId || call.id;

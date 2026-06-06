@@ -112,9 +112,7 @@ export function normalizeAIPrompts(raw) {
       out[key] = raw[key];
     }
   }
-  dbg.log(
-    `normalizeAIPrompts(): merged raw + defaults (${Object.keys(out).length} keys)`,
-  );
+  dbg.log(`normalizeAIPrompts(): merged raw + defaults (${Object.keys(out).length} keys)`);
   return out;
 }
 
@@ -142,11 +140,7 @@ export function fillPromptTemplate(template, ctx = {}) {
  * @param {Record<string, string>} [prompts]  Optional overrides (from user storage); falls back to registered defaults
  * @returns {string}               Complete prompt ready to send to an AI provider
  */
-export function buildReviewPrompt(
-  problemContext = {},
-  code = "",
-  prompts = {},
-) {
+export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) {
   // Raw mode: the caller has already built the full prompt — return it as-is.
   if (problemContext._rawPrompt) {
     dbg.log(`buildReviewPrompt(): raw mode (pre-built prompt)`);
@@ -157,13 +151,9 @@ export function buildReviewPrompt(
 
   // Preference order: user stored override → registered platform default → registered default fallback
   const template =
-    (prompts[platform] && prompts[platform].trim()
-      ? prompts[platform]
-      : null) ||
+    (prompts[platform] && prompts[platform].trim() ? prompts[platform] : null) ||
     _platformPrompts[platform] ||
-    (prompts["default"] && prompts["default"].trim()
-      ? prompts["default"]
-      : null) ||
+    (prompts["default"] && prompts["default"].trim() ? prompts["default"] : null) ||
     _platformPrompts["default"] ||
     DEFAULT_PROMPT_TEMPLATE;
 
@@ -181,29 +171,20 @@ export function buildReviewPrompt(
 }
 
 export function buildConversationSystemPrompt(context = {}) {
-  const surface = String(
-    context.surface || context.mode || "default",
-  ).toLowerCase();
+  const surface = String(context.surface || context.mode || "default").toLowerCase();
   // For floating-panel, chatMode "direct" opts out of guided Socratic prompting
   const effectiveSurface =
     surface === "floating-panel" && context.chatMode === "direct"
       ? "floating-panel-direct"
       : surface;
-  const base =
-    AI_CHAT_SURFACE_PROMPTS[effectiveSurface] ||
-    AI_CHAT_SURFACE_PROMPTS.default;
+  const base = AI_CHAT_SURFACE_PROMPTS[effectiveSurface] || AI_CHAT_SURFACE_PROMPTS.default;
   const hints = [];
 
   if (context.title)
-    hints.push(
-      `Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`,
-    );
+    hints.push(`Problem: ${context.title}${context.difficulty ? ` (${context.difficulty})` : ""}`);
   if (context.platform) hints.push(`Platform: ${context.platform}`);
   if (context.methodTitle) hints.push(`Method: ${context.methodTitle}`);
-  if (
-    Array.isArray(context.attachedProblemSlugs) &&
-    context.attachedProblemSlugs.length
-  ) {
+  if (Array.isArray(context.attachedProblemSlugs) && context.attachedProblemSlugs.length) {
     hints.push(`Related problems: ${context.attachedProblemSlugs.join(", ")}`);
   }
   if (context.requestType) {
@@ -213,16 +194,12 @@ export function buildConversationSystemPrompt(context = {}) {
       optimize: "Suggest a concrete improvement and explain the trade-off.",
       complexity: "Give a precise time and space complexity analysis.",
       test: "Return useful tests and edge cases.",
-      diagram:
-        "If helpful, use a Mermaid diagram or structured flow description.",
-      formula:
-        "Use math notation where appropriate and keep the output readable.",
+      diagram: "If helpful, use a Mermaid diagram or structured flow description.",
+      formula: "Use math notation where appropriate and keep the output readable.",
     };
     if (requestMap[type]) hints.push(requestMap[type]);
   }
 
-  dbg.log(
-    `buildConversationSystemPrompt(): surface=${surface} (${hints.length} hints)`,
-  );
+  dbg.log(`buildConversationSystemPrompt(): surface=${surface} (${hints.length} hints)`);
   return hints.length ? `${base}\n\nContext:\n${hints.join("\n")}` : base;
 }

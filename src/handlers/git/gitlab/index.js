@@ -13,8 +13,7 @@ import { createDebugger } from "../../../lib/debug.js";
 
 const dbg = createDebugger("GitLabHandler");
 
-export const GITLAB_FEATURE_STATUS =
-  CONSTANTS.FEATURE_STATUS.UNDER_CONSTRUCTION;
+export const GITLAB_FEATURE_STATUS = CONSTANTS.FEATURE_STATUS.UNDER_CONSTRUCTION;
 
 export class GitLabHandler extends BaseGitHandler {
   constructor() {
@@ -27,8 +26,7 @@ export class GitLabHandler extends BaseGitHandler {
       title: "GitLab Integration",
       order: 2,
       status: GITLAB_FEATURE_STATUS,
-      description:
-        "GitLab support is under construction and is not currently editable.",
+      description: "GitLab support is under construction and is not currently editable.",
       fields: [],
     };
   }
@@ -49,10 +47,7 @@ export class GitLabHandler extends BaseGitHandler {
   async apiFetch(path, options = {}) {
     const token = await this.getToken();
     const settings = await Storage.getSettings();
-    const base = (settings["gitlab_endpoint"] || "https://gitlab.com").replace(
-      /\/$/,
-      "",
-    );
+    const base = (settings["gitlab_endpoint"] || "https://gitlab.com").replace(/\/$/, "");
     const url = path.startsWith("http") ? path : `${base}/api/v4${path}`;
     const method = (options.method || "GET").toUpperCase();
     const headers = {
@@ -65,9 +60,7 @@ export class GitLabHandler extends BaseGitHandler {
     const res = await fetch(url, { ...options, method, headers });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      const err = new Error(
-        `GitLab API Error: ${body.message || res.statusText}`,
-      );
+      const err = new Error(`GitLab API Error: ${body.message || res.statusText}`);
       err.status = res.status;
       throw err;
     }
@@ -92,11 +85,8 @@ export class GitLabHandler extends BaseGitHandler {
     if (!token) throw new Error("Not authenticated with GitLab");
 
     const settings = await Storage.getSettings();
-    const project = encodeURIComponent(
-      repoName || settings["gitlab_repo"] || "",
-    );
-    if (!project)
-      throw new Error("No GitLab repository configured (settings.gitlab_repo)");
+    const project = encodeURIComponent(repoName || settings["gitlab_repo"] || "");
+    if (!project) throw new Error("No GitLab repository configured (settings.gitlab_repo)");
 
     const branch = CONSTANTS.REPO_BRANCH || "main";
 
@@ -124,9 +114,7 @@ export class GitLabHandler extends BaseGitHandler {
           await new Promise((r) => setTimeout(r, 2000));
           branchExists = true;
         } catch (createErr) {
-          throw new Error(
-            `GitLab: could not find or create project: ${createErr.message}`,
-          );
+          throw new Error(`GitLab: could not find or create project: ${createErr.message}`);
         }
       } else {
         throw e;
@@ -184,9 +172,7 @@ export class GitLabHandler extends BaseGitHandler {
 
   async commitHistorical(commits) {
     if (!commits?.length) return;
-    const sorted = [...commits].sort(
-      (a, b) => new Date(a.date) - new Date(b.date),
-    );
+    const sorted = [...commits].sort((a, b) => new Date(a.date) - new Date(b.date));
     for (const entry of sorted) {
       await this.commit(entry.files, entry.message, entry.repoName, {
         date: entry.date,

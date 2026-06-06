@@ -15,10 +15,7 @@ import { createFloatingAI } from "../../../ui/floating-ai.js";
 import { runtime, tabs } from "../../../lib/browser-compat.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { resolveLang, langExt, LANG_VERBOSE } from "./lang-utils.js";
-import {
-  injectProgressImportBtn,
-  removeProgressImportButton,
-} from "./profile-import.js";
+import { injectProgressImportBtn, removeProgressImportButton } from "./profile-import.js";
 import {
   checkSubmission,
   processSubmission,
@@ -85,16 +82,14 @@ Be concise. Max 200 words.`;
           label: "Enable tracking",
           type: "toggle",
           default: true,
-          description:
-            "Auto-detect accepted submissions on LeetCode and save them to CodeLedger.",
+          description: "Auto-detect accepted submissions on LeetCode and save them to CodeLedger.",
         },
         {
           key: "leetcode_auto_review",
           label: "AI review on accept",
           type: "toggle",
           default: true,
-          description:
-            "Automatically analyze your code with AI immediately after acceptance.",
+          description: "Automatically analyze your code with AI immediately after acceptance.",
         },
 
         // ── Commit Content ─────────────────────────────────────────
@@ -103,8 +98,7 @@ Be concise. Max 200 words.`;
           label: "Include problem description",
           type: "toggle",
           default: true,
-          description:
-            "Save full problem statement and your stats to README.md.",
+          description: "Save full problem statement and your stats to README.md.",
         },
         {
           key: "leetcode_similar",
@@ -118,8 +112,7 @@ Be concise. Max 200 words.`;
           label: "Include hints",
           type: "toggle",
           default: false,
-          description:
-            "Save problem hints to hints.md alongside your solution.",
+          description: "Save problem hints to hints.md alongside your solution.",
           advanced: true,
         },
 
@@ -129,24 +122,21 @@ Be concise. Max 200 words.`;
           label: "Floating AI assistant",
           type: "toggle",
           default: true,
-          description:
-            "Show a floating AI chat panel for instant code feedback on problem pages.",
+          description: "Show a floating AI chat panel for instant code feedback on problem pages.",
         },
         {
           key: "leetcode_copy_btn",
           label: "Copy code button",
           type: "toggle",
           default: true,
-          description:
-            "Inject a copy-to-clipboard button into the editor toolbar.",
+          description: "Inject a copy-to-clipboard button into the editor toolbar.",
         },
         {
           key: "leetcode_paste_btn",
           label: "Paste without auto-indent button",
           type: "toggle",
           default: true,
-          description:
-            "Inject a paste button that bypasses Monaco's auto-indentation.",
+          description: "Inject a paste button that bypasses Monaco's auto-indentation.",
         },
 
         // ── Import (Advanced) ──────────────────────────────────────
@@ -155,8 +145,7 @@ Be concise. Max 200 words.`;
           label: "LeetCode username",
           type: "text",
           default: "",
-          description:
-            "Your public LeetCode username for importing your profile history.",
+          description: "Your public LeetCode username for importing your profile history.",
           advanced: true,
           placeholder: "e.g. VKrishna04",
         },
@@ -189,12 +178,10 @@ Be concise. Max 200 words.`;
 
   /** Re-inject QoL copy/paste buttons if React removed them from the toolbar. */
   _maybeReinjectQoL() {
-    if (detectPage(window.location.pathname).type !== PAGE_TYPES.PROBLEM)
-      return;
+    if (detectPage(window.location.pathname).type !== PAGE_TYPES.PROBLEM) return;
     const copyMissing = !document.getElementById("cl-code-copy")?.isConnected;
     const pasteMissing = !document.getElementById("cl-code-paste")?.isConnected;
-    const aiMissing =
-      !document.getElementById("cl-ai-toolbar-btn")?.isConnected;
+    const aiMissing = !document.getElementById("cl-ai-toolbar-btn")?.isConnected;
     if (!copyMissing && !pasteMissing && !aiMissing) return;
     this._scheduleDebounce(() => {
       Storage.getSettings()
@@ -205,9 +192,7 @@ Be concise. Max 200 words.`;
               injectQoL({
                 showCopy: s.leetcode_copy_btn !== false,
                 showPaste: s.leetcode_paste_btn !== false,
-                showAI:
-                  s.leetcode_ai_panel !== false &&
-                  s.floatingAIEnabled !== false,
+                showAI: s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
                 onAIClick: () => this._aiPanel?.expand(),
               });
             })
@@ -231,9 +216,7 @@ Be concise. Max 200 words.`;
         id: this.makeProblemId(slug),
         title: meta?.title || existing?.title || slug,
         titleSlug: slug,
-        difficulty: normalizeDifficulty(
-          meta?.difficulty || existing?.difficulty || "",
-        ),
+        difficulty: normalizeDifficulty(meta?.difficulty || existing?.difficulty || ""),
         tags: (meta?.topicTags || []).map((t) => t.name),
         problemStatement: meta?.content || existing?.problemStatement || null,
         timestamp: existing?.timestamp || Date.now(),
@@ -278,8 +261,7 @@ Be concise. Max 200 words.`;
           const opts = {
             showCopy: s.leetcode_copy_btn !== false,
             showPaste: s.leetcode_paste_btn !== false,
-            showAI:
-              s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
+            showAI: s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
             onAIClick: () => this._aiPanel?.expand(),
           };
           setTimeout(() => injectQoL(opts), 1500);
@@ -290,10 +272,7 @@ Be concise. Max 200 words.`;
     }
 
     // AI panel on problem and submission pages
-    if (
-      page.type === PAGE_TYPES.PROBLEM ||
-      page.type === PAGE_TYPES.SUBMISSION
-    ) {
+    if (page.type === PAGE_TYPES.PROBLEM || page.type === PAGE_TYPES.SUBMISSION) {
       if (page.slug) this._startAIPanel(page.slug);
       this._startSubmissionPolling();
     } else {
@@ -351,9 +330,7 @@ Be concise. Max 200 words.`;
 
   _getEditorLanguage() {
     try {
-      const langId = window.monaco?.editor
-        ?.getModels?.()?.[0]
-        ?.getLanguageId?.();
+      const langId = window.monaco?.editor?.getModels?.()?.[0]?.getLanguageId?.();
       if (langId) return LANG_VERBOSE[langId.toLowerCase()] || langId;
     } catch (_) {}
     try {
@@ -367,9 +344,7 @@ Be concise. Max 200 words.`;
 
   _readProblemStatement() {
     try {
-      const descEl = document.querySelector(
-        '[data-track-load="description_content"]',
-      );
+      const descEl = document.querySelector('[data-track-load="description_content"]');
       if (descEl) {
         return (descEl.textContent || "").trim().slice(0, 3000);
       }
@@ -447,8 +422,7 @@ Be concise. Max 200 words.`;
           const opts = {
             showCopy: s.leetcode_copy_btn !== false,
             showPaste: s.leetcode_paste_btn !== false,
-            showAI:
-              s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
+            showAI: s.leetcode_ai_panel !== false && s.floatingAIEnabled !== false,
             onAIClick: () => this._aiPanel?.expand(),
           };
           setTimeout(() => injectQoL(opts), 1500);
@@ -464,10 +438,7 @@ Be concise. Max 200 words.`;
       this._stopAIPanel();
     }
 
-    if (
-      page.type === PAGE_TYPES.PROBLEM ||
-      page.type === PAGE_TYPES.SUBMISSION
-    ) {
+    if (page.type === PAGE_TYPES.PROBLEM || page.type === PAGE_TYPES.SUBMISSION) {
       this._startSubmissionPolling();
     } else {
       this._stopSubmissionPolling();
@@ -548,9 +519,7 @@ Be concise. Max 200 words.`;
 
     // Hook keyboard shortcut on the editor textarea (Ctrl+Enter / Cmd+Enter)
     const hookKeyboard = () => {
-      const textarea = document.querySelector(
-        ".monaco-editor .inputarea.monaco-mouse-cursor-text",
-      );
+      const textarea = document.querySelector(".monaco-editor .inputarea.monaco-mouse-cursor-text");
       if (textarea && !textarea._clHooked) {
         textarea._clHooked = true;
         textarea.addEventListener("keydown", (e) => {
@@ -564,9 +533,7 @@ Be concise. Max 200 words.`;
 
     // Try to hook immediately (page may already be rendered)
     const tryHook = () => {
-      const btn = document.querySelector(
-        '[data-e2e-locator="console-submit-button"]',
-      );
+      const btn = document.querySelector('[data-e2e-locator="console-submit-button"]');
       if (btn) hookBtn(btn);
       hookKeyboard();
     };
@@ -587,10 +554,7 @@ Be concise. Max 200 words.`;
 
   _getCodeFromMonaco() {
     try {
-      const active = window.monaco?.editor
-        ?.getActiveCodeEditor?.()
-        ?.getModel?.()
-        ?.getValue?.();
+      const active = window.monaco?.editor?.getActiveCodeEditor?.()?.getModel?.()?.getValue?.();
       if (typeof active === "string" && active.trim()) return active;
       const editors = window.monaco?.editor?.getEditors?.();
       if (editors?.length) {
@@ -624,9 +588,7 @@ Be concise. Max 200 words.`;
     const monacoCode = this._getCodeFromMonaco();
     if (monacoCode) return monacoCode;
     try {
-      const lines = document.querySelectorAll(
-        ".monaco-editor .view-lines .view-line",
-      );
+      const lines = document.querySelectorAll(".monaco-editor .view-lines .view-line");
       if (lines.length > 0)
         return Array.from(lines)
           .map((l) => l.textContent)
@@ -638,24 +600,18 @@ Be concise. Max 200 words.`;
   _readFloatingAITestFailures() {
     try {
       const resultLines = [];
-      const errorBanner = document.querySelector(
-        '[data-e2e-locator="console-result"]',
-      );
+      const errorBanner = document.querySelector('[data-e2e-locator="console-result"]');
       if (errorBanner) resultLines.push((errorBanner.textContent || "").trim());
       document
-        .querySelectorAll(
-          ".testcase-result-block, [data-e2e-locator='submission-result']",
-        )
+        .querySelectorAll(".testcase-result-block, [data-e2e-locator='submission-result']")
         .forEach((el) => {
           const text = (el.textContent || "").trim();
           if (text) resultLines.push(text);
         });
-      document
-        .querySelectorAll(".result-panel pre, .console-output pre")
-        .forEach((el) => {
-          const text = (el.textContent || "").trim();
-          if (text) resultLines.push(text);
-        });
+      document.querySelectorAll(".result-panel pre, .console-output pre").forEach((el) => {
+        const text = (el.textContent || "").trim();
+        if (text) resultLines.push(text);
+      });
       return resultLines.filter(Boolean).join("\n\n");
     } catch (_) {
       return "";
@@ -684,15 +640,7 @@ Be concise. Max 200 words.`;
   _buildFileSet(submission, meta, settings, slug, elapsedSeconds = null) {
     const lang = resolveLang(submission.lang);
     const canonical = this._canonical || null;
-    return _buildFileSetFn(
-      submission,
-      meta,
-      settings,
-      slug,
-      lang,
-      canonical,
-      elapsedSeconds,
-    );
+    return _buildFileSetFn(submission, meta, settings, slug, lang, canonical, elapsedSeconds);
   }
 
   _buildBulkReadme(sub, opts) {
@@ -711,22 +659,18 @@ Be concise. Max 200 words.`;
   async handleCodeFetch(problemId) {
     // Take only the first path segment after /problems/ — LeetCode redirects to
     // /problems/{slug}/description/ so replace(/\//g,"") would give "slugdescription".
-    const slug =
-      window.location.pathname.split("/problems/")[1]?.split("/")[0] || "";
+    const slug = window.location.pathname.split("/problems/")[1]?.split("/")[0] || "";
     dbg.log(`handleCodeFetch(${problemId}): slug=${slug}`);
 
     if (!problemId) {
       // URL redirect stripped codeledger_problemid and hash fallback also missing.
       // Can't match the listener without the ID — report error so the queue
       // doesn't silently wait 30 s for a response that will never match.
-      dbg.error(
-        "handleCodeFetch: problemId is empty — URL params lost in redirect",
-      );
+      dbg.error("handleCodeFetch: problemId is empty — URL params lost in redirect");
       runtime.sendMessage({
         type: "CODELEDGER_CODE_FETCH_ID_MISSING",
         slug,
-        error:
-          "URL redirect stripped problemId — cannot identify which queue item to resolve",
+        error: "URL redirect stripped problemId — cannot identify which queue item to resolve",
       });
       return;
     }
@@ -739,15 +683,12 @@ Be concise. Max 200 words.`;
 
       let detail;
       if (embeddedSubId) {
-        dbg.log(
-          `handleCodeFetch(${problemId}): using embedded submissionId=${embeddedSubId}`,
-        );
+        dbg.log(`handleCodeFetch(${problemId}): using embedded submissionId=${embeddedSubId}`);
         const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, {
           submissionId: +embeddedSubId,
         });
         detail = detailRes?.data?.submissionDetails;
-        if (!detail?.code)
-          throw new Error("Submission details returned no code");
+        if (!detail?.code) throw new Error("Submission details returned no code");
       } else {
         // Fallback: find the latest accepted submission via submission list
         const listRes = await this._gql(QUERIES.SUBMISSION_LIST, {
@@ -756,18 +697,14 @@ Be concise. Max 200 words.`;
           limit: 10,
           lastKey: null,
         });
-        const submissions =
-          listRes?.data?.questionSubmissionList?.submissions || [];
-        const accepted = submissions.find((s) =>
-          /accepted/i.test(s.statusDisplay),
-        );
+        const submissions = listRes?.data?.questionSubmissionList?.submissions || [];
+        const accepted = submissions.find((s) => /accepted/i.test(s.statusDisplay));
         if (!accepted) throw new Error("No accepted submissions found");
         const detailRes = await this._gql(QUERIES.SUBMISSION_DETAIL, {
           submissionId: +accepted.id,
         });
         detail = detailRes?.data?.submissionDetails;
-        if (!detail?.code)
-          throw new Error("Submission details returned no code");
+        if (!detail?.code) throw new Error("Submission details returned no code");
       }
 
       // Tags come directly from submissionDetails — no extra QUESTION call needed.

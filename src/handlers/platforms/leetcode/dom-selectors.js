@@ -8,13 +8,11 @@ export const SELECTORS = {
 
   page: {
     // LeetCode 2025: problem title lives in an anchor inside the title area
-    isProblemPage:
-      '[data-track-load="description_content"], [data-e2e-locator="question-title"]',
+    isProblemPage: '[data-track-load="description_content"], [data-e2e-locator="question-title"]',
   },
 
   problem: {
-    title:
-      '[data-e2e-locator="question-title"], [data-cy="question-title"], h1',
+    title: '[data-e2e-locator="question-title"], [data-cy="question-title"], h1',
     difficulty: '[data-e2e-locator="question-difficulty"], div[diff]',
     tags: 'a[href*="/tag/"]',
     description: '[data-track-load="description_content"]',
@@ -35,16 +33,14 @@ export const SELECTORS = {
       '[class*="Accepted"]',
     ].join(", "),
     code: ".monaco-editor",
-    language:
-      '[id*="headlessui-listbox-button"], button[aria-haspopup="listbox"]',
+    language: '[id*="headlessui-listbox-button"], button[aria-haspopup="listbox"]',
   },
 
   qol: {
     // The Monaco editor container — stable across LeetCode rebuilds
     editorContainer: ".monaco-editor",
     // Submit button — LeetCode 2025 uses data-e2e-locator
-    submitButton:
-      '[data-e2e-locator="console-submit-button"], button[data-cy="submit-code-btn"]',
+    submitButton: '[data-e2e-locator="console-submit-button"], button[data-cy="submit-code-btn"]',
   },
 };
 

@@ -184,11 +184,7 @@ function applyCircularLayout(nodes, edges) {
     perTopicIdx.set(tid, idx + 1);
     const angle = (idx / count) * Math.PI * 2;
     const spread = n.solved ? 28 + Math.random() * 18 : 48 + Math.random() * 22;
-    seedNode(
-      n,
-      base.x + Math.cos(angle) * spread,
-      base.y + Math.sin(angle) * spread,
-    );
+    seedNode(n, base.x + Math.cos(angle) * spread, base.y + Math.sin(angle) * spread);
   });
 }
 
@@ -196,17 +192,12 @@ function applyLayeredLayout(nodes, edges) {
   const topicNodes = nodes
     .filter((n) => n.type === "topic")
     .sort(
-      (a, b) =>
-        (b.count || 0) - (a.count || 0) ||
-        String(a.label).localeCompare(String(b.label)),
+      (a, b) => (b.count || 0) - (a.count || 0) || String(a.label).localeCompare(String(b.label)),
     );
   const problemNodes = nodes.filter((n) => n.type === "problem");
   const primaryTopic = getPrimaryTopics(edges);
 
-  const topicGap = Math.max(
-    180,
-    Math.min(300, 1200 / Math.max(topicNodes.length, 1)),
-  );
+  const topicGap = Math.max(180, Math.min(300, 1200 / Math.max(topicNodes.length, 1)));
   const topicY = -280;
   const topicBase = (topicNodes.length - 1) / 2;
   const topicPos = new Map();
@@ -348,12 +339,9 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       (hovered.id === e.source ||
         hovered.id === e.target ||
         (selected && (selected.id === e.source || selected.id === e.target)));
-    const isSelectedEdge =
-      selected && (selected.id === e.source || selected.id === e.target);
+    const isSelectedEdge = selected && (selected.id === e.source || selected.id === e.target);
     const isNeighborEdge =
-      selected &&
-      !isSelectedEdge &&
-      (neighborIds.has(e.source) || neighborIds.has(e.target));
+      selected && !isSelectedEdge && (neighborIds.has(e.source) || neighborIds.has(e.target));
 
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
@@ -388,11 +376,7 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     ctx.beginPath();
     ctx.arc(n.x, n.y, r + (isH ? 3 : 0), 0, Math.PI * 2);
     ctx.shadowBlur = isSel ? 24 : isNeighbor ? 12 : 0;
-    ctx.shadowColor = isSel
-      ? n.color
-      : isNeighbor
-        ? `${n.color}88`
-        : "transparent";
+    ctx.shadowColor = isSel ? n.color : isNeighbor ? `${n.color}88` : "transparent";
 
     if (n.type === "topic") {
       ctx.fillStyle = n.color + "33";
@@ -403,16 +387,8 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     } else if (n.solved) {
       ctx.fillStyle = n.color;
       ctx.fill();
-      ctx.strokeStyle = isSel
-        ? "#fff"
-        : n.platformColor || PLATFORM_COLOR[n.platform] || "#64748b";
-      ctx.lineWidth = isSel
-        ? 2.5
-        : isNeighbor
-          ? 2.2
-          : n.isMultiPlatform
-            ? 2.5
-            : 1.5;
+      ctx.strokeStyle = isSel ? "#fff" : n.platformColor || PLATFORM_COLOR[n.platform] || "#64748b";
+      ctx.lineWidth = isSel ? 2.5 : isNeighbor ? 2.2 : n.isMultiPlatform ? 2.5 : 1.5;
       ctx.globalAlpha = isSel ? 1 : isNeighbor ? 0.82 : 0.85;
       ctx.stroke();
       ctx.globalAlpha = 1;
@@ -425,13 +401,7 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    if (
-      n.type === "topic" ||
-      isH ||
-      isSel ||
-      isNeighbor ||
-      scale > LOD_PROBLEM_LABEL_SCALE
-    ) {
+    if (n.type === "topic" || isH || isSel || isNeighbor || scale > LOD_PROBLEM_LABEL_SCALE) {
       if (isSel) {
         ctx.shadowBlur = 28;
         ctx.shadowColor = n.color;
@@ -448,9 +418,7 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       }
       ctx.fillStyle = "#e2e8f0";
       ctx.font =
-        n.type === "topic"
-          ? `bold ${Math.max(11, r * 0.7)}px sans-serif`
-          : "11px sans-serif";
+        n.type === "topic" ? `bold ${Math.max(11, r * 0.7)}px sans-serif` : "11px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const label = n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label;
@@ -487,8 +455,7 @@ function getLogicalSize(canvas) {
 }
 
 const PLATFORM_FAVICON = {
-  leetcode:
-    "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+  leetcode: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
   geeksforgeeks: `${CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl}/favicon.ico`,
   codeforces: `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/favicon.ico`,
 };
@@ -563,13 +530,10 @@ export function GraphView({
     let out = problems || [];
     if (filterDifficultyGraph !== "All")
       out = out.filter((p) => p.difficulty === filterDifficultyGraph);
-    if (filterPlatformGraph !== "All")
-      out = out.filter((p) => p.platform === filterPlatformGraph);
+    if (filterPlatformGraph !== "All") out = out.filter((p) => p.platform === filterPlatformGraph);
     if (filterTopicGraph !== "All")
       out = out.filter(
-        (p) =>
-          (p.tags || []).includes(filterTopicGraph) ||
-          p.topic === filterTopicGraph,
+        (p) => (p.tags || []).includes(filterTopicGraph) || p.topic === filterTopicGraph,
       );
     if (graphSearch) {
       const q = graphSearch.toLowerCase();
@@ -580,21 +544,13 @@ export function GraphView({
       );
     }
     return out;
-  }, [
-    problems,
-    filterDifficultyGraph,
-    filterPlatformGraph,
-    filterTopicGraph,
-    graphSearch,
-  ]);
+  }, [problems, filterDifficultyGraph, filterPlatformGraph, filterTopicGraph, graphSearch]);
 
   /* ── fitView ─────────────────────────────────────────────────────── */
   const fitView = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const nodes = simRef.current.nodes.filter(
-      (n) => !isNaN(n.x) && !isNaN(n.y),
-    );
+    const nodes = simRef.current.nodes.filter((n) => !isNaN(n.x) && !isNaN(n.y));
     if (!nodes.length) return;
     const { w, h } = getLogicalSize(canvas);
     if (!w || !h) {
@@ -670,8 +626,7 @@ export function GraphView({
     setStats({
       topics: newNodes.filter((n) => n.type === "topic").length,
       solved: newNodes.filter((n) => n.type === "problem" && n.solved).length,
-      suggested: newNodes.filter((n) => n.type === "problem" && !n.solved)
-        .length,
+      suggested: newNodes.filter((n) => n.type === "problem" && !n.solved).length,
     });
   }, [problems, layoutMode]);
 
@@ -743,8 +698,7 @@ export function GraphView({
     for (const n of nodes) {
       if (n.type !== "problem") continue;
       if (solvedOnly && !n.solved) continue;
-      if (diff !== "All" && String(n.difficulty || "Unknown") !== diff)
-        continue;
+      if (diff !== "All" && String(n.difficulty || "Unknown") !== diff) continue;
       if (platform !== "All" && String(n.platform || "") !== platform) continue;
       if (topic !== "All") {
         const tags = n.tags || [];
@@ -794,9 +748,7 @@ export function GraphView({
 
     const drawNodes = nodes.filter((n) => drawNodeIds.has(n.id));
     const ids = new Set(drawNodes.map((n) => n.id));
-    const drawEdges = edges.filter(
-      (e) => ids.has(e.source) && ids.has(e.target),
-    );
+    const drawEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
     return { drawNodes, drawEdges };
   }
 
@@ -881,8 +833,7 @@ export function GraphView({
       return hay.includes(q);
     });
     const rank = (n) => {
-      if (graphSort === "difficulty")
-        return DIFF_ORDER[String(n.difficulty || "Unknown")] ?? 3;
+      if (graphSort === "difficulty") return DIFF_ORDER[String(n.difficulty || "Unknown")] ?? 3;
       if (graphSort === "platform") return String(n.platform || "");
       return String(n.label || "").toLowerCase();
     };
@@ -1008,12 +959,8 @@ export function GraphView({
             q.push({ id: nxt, depth: cur.depth + 1 });
           }
         }
-        const movedNodes = simRef.current.nodes.filter((n) =>
-          neighbors.has(n.id),
-        );
-        const snapshot = new Map(
-          movedNodes.map((n) => [n.id, { x: n.x, y: n.y }]),
-        );
+        const movedNodes = simRef.current.nodes.filter((n) => neighbors.has(n.id));
+        const snapshot = new Map(movedNodes.map((n) => [n.id, { x: n.x, y: n.y }]));
         const startMouse = {
           x: e.clientX - rect.left,
           y: e.clientY - rect.top,
@@ -1111,10 +1058,7 @@ export function GraphView({
   /* ── Problem URL ─────────────────────────────────────────────────── */
   function problemUrl(node) {
     if (!node?.titleSlug) return null;
-    return CONSTANTS.makeProblemUrl(
-      node.platform || "leetcode",
-      node.titleSlug,
-    );
+    return CONSTANTS.makeProblemUrl(node.platform || "leetcode", node.titleSlug);
   }
 
   /* ── Node detail (tooltip + selected panel) ─────────────────────── */
@@ -1124,8 +1068,7 @@ export function GraphView({
       const topicProblems = simRef.current.nodes
         .filter(
           (candidate) =>
-            candidate.type === "problem" &&
-            (candidate.tags || []).includes(node.label),
+            candidate.type === "problem" && (candidate.tags || []).includes(node.label),
         )
         .sort((a, b) =>
           a.solved === b.solved
@@ -1149,17 +1092,9 @@ export function GraphView({
           </div>
           ${!compact && topicProblems.length
             ? html`
-                <div
-                  class="mt-1 border-t border-white/5 pt-2 flex flex-col gap-1"
-                >
-                  <div
-                    class="text-[10px] uppercase tracking-wider text-slate-600"
-                  >
-                    Problems
-                  </div>
-                  <div
-                    class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1"
-                  >
+                <div class="mt-1 border-t border-white/5 pt-2 flex flex-col gap-1">
+                  <div class="text-[10px] uppercase tracking-wider text-slate-600">Problems</div>
+                  <div class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
                     ${topicProblems.map(
                       (problem) => html`
                         <button
@@ -1172,8 +1107,7 @@ export function GraphView({
                           class="text-left px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-500/20 transition-colors"
                         >
                           <div class="flex items-center justify-between gap-2">
-                            <span
-                              class="text-[11px] text-slate-200 leading-snug"
+                            <span class="text-[11px] text-slate-200 leading-snug"
                               >${problem.label}</span
                             >
                             <span class="text-[10px] text-slate-500 shrink-0"
@@ -1213,25 +1147,17 @@ export function GraphView({
                 }}
               />`
             : ""}
-          <span class="text-xs font-semibold text-white leading-snug"
-            >${node.label}</span
-          >
+          <span class="text-xs font-semibold text-white leading-snug">${node.label}</span>
         </div>
         <div class="flex items-center gap-1.5 flex-wrap">
-          <span
-            class="px-1.5 py-0.5 rounded text-[10px] font-medium ${diffClass}"
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-medium ${diffClass}"
             >${node.difficulty || "?"}</span
           >
-          <span
-            class="text-[10px] ${node.solved
-              ? "text-emerald-400"
-              : "text-slate-600"}"
+          <span class="text-[10px] ${node.solved ? "text-emerald-400" : "text-slate-600"}"
             >${node.solved ? "✓ Solved" : "○ Suggested"}</span
           >
           ${node.lang
-            ? html`<span class="text-[10px] font-mono text-cyan-500/70"
-                >${node.lang}</span
-              >`
+            ? html`<span class="text-[10px] font-mono text-cyan-500/70">${node.lang}</span>`
             : ""}
         </div>
         ${!compact
@@ -1269,9 +1195,7 @@ export function GraphView({
                         ? html`<span class="text-slate-500">Solved</span
                             ><span class="text-slate-200 text-right"
                               >${new Date(
-                                node.timestamp < 1e10
-                                  ? node.timestamp * 1000
-                                  : node.timestamp,
+                                node.timestamp < 1e10 ? node.timestamp * 1000 : node.timestamp,
                               ).toLocaleDateString()}</span
                             >`
                         : ""}
@@ -1345,8 +1269,7 @@ export function GraphView({
                   setLayoutMode(mode.id);
                   updateQueryParams({ graphLayout: mode.id });
                 }}
-                class="px-2 py-1 rounded-md transition-colors ${layoutMode ===
-                mode.id
+                class="px-2 py-1 rounded-md transition-colors ${layoutMode === mode.id
                   ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
                   : "text-slate-500 hover:text-slate-300 hover:bg-white/5"}"
                 title=${mode.id === "layered"
@@ -1413,10 +1336,7 @@ export function GraphView({
             >
               <option value="">Compare…</option>
               ${topicList.map(
-                (t) =>
-                  html`<option value=${t}>
-                    ${t} (${topicCounts.get(t) || 0})
-                  </option>`,
+                (t) => html`<option value=${t}>${t} (${topicCounts.get(t) || 0})</option>`,
               )}
             </select>
             <select
@@ -1426,15 +1346,10 @@ export function GraphView({
             >
               <option value=""></option>
               ${topicList.map(
-                (t) =>
-                  html`<option value=${t}>
-                    ${t} (${topicCounts.get(t) || 0})
-                  </option>`,
+                (t) => html`<option value=${t}>${t} (${topicCounts.get(t) || 0})</option>`,
               )}
             </select>
-            <div
-              class="flex items-center gap-1 text-[10px] text-slate-400 ml-1"
-            >
+            <div class="flex items-center gap-1 text-[10px] text-slate-400 ml-1">
               Depth
               <input
                 type="range"
@@ -1448,25 +1363,16 @@ export function GraphView({
             </div>
             ${topicA && topicB
               ? html`<div class="text-[10px] text-slate-300">
-                  A: ${topicCounts.get(topicA) || 0} · B:
-                  ${topicCounts.get(topicB) || 0} · ∩:
+                  A: ${topicCounts.get(topicA) || 0} · B: ${topicCounts.get(topicB) || 0} · ∩:
                   ${(() => {
                     const a = new Set(
                       simRef.current.nodes
-                        .filter(
-                          (n) =>
-                            n.type === "problem" &&
-                            (n.tags || []).includes(topicA),
-                        )
+                        .filter((n) => n.type === "problem" && (n.tags || []).includes(topicA))
                         .map((n) => n.id),
                     );
                     const b = new Set(
                       simRef.current.nodes
-                        .filter(
-                          (n) =>
-                            n.type === "problem" &&
-                            (n.tags || []).includes(topicB),
-                        )
+                        .filter((n) => n.type === "problem" && (n.tags || []).includes(topicB))
                         .map((n) => n.id),
                     );
                     let inter = 0;
@@ -1477,9 +1383,7 @@ export function GraphView({
               : ""}
           </div>
         </div>
-        <label
-          class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer ml-auto"
-        >
+        <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer ml-auto">
           <input
             type="checkbox"
             checked=${filterSolved}
@@ -1487,9 +1391,7 @@ export function GraphView({
           />
           Solved only
         </label>
-        <div
-          class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-0.5"
-        >
+        <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-0.5">
           <button
             onClick=${() => zoomBy(1.25)}
             title="Zoom in"
@@ -1542,12 +1444,8 @@ export function GraphView({
 
       ${graphSearch && searchResults.length
         ? html`
-            <div
-              class="rounded-lg border border-white/10 bg-black/40 p-2 max-h-36 overflow-y-auto"
-            >
-              <div
-                class="text-[10px] uppercase tracking-wider text-slate-500 mb-2"
-              >
+            <div class="rounded-lg border border-white/10 bg-black/40 p-2 max-h-36 overflow-y-auto">
+              <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">
                 Search Results
               </div>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-1">
@@ -1595,26 +1493,18 @@ export function GraphView({
         <div
           class="absolute bottom-3 left-3 flex flex-col gap-1 text-[10px] text-slate-400 bg-black/60 backdrop-blur px-3 py-2 rounded-lg border border-white/5"
         >
-          <div
-            class="text-[9px] text-slate-600 uppercase tracking-wider mb-0.5"
-          >
-            Difficulty
+          <div class="text-[9px] text-slate-600 uppercase tracking-wider mb-0.5">Difficulty</div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-[#22c55e] inline-block"></span>Easy
           </div>
           <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-[#22c55e] inline-block"></span
-            >Easy
+            <span class="w-3 h-3 rounded-full bg-[#f59e0b] inline-block"></span>Medium
           </div>
           <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-[#f59e0b] inline-block"></span
-            >Medium
+            <span class="w-3 h-3 rounded-full bg-[#ef4444] inline-block"></span>Hard
           </div>
           <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-[#ef4444] inline-block"></span
-            >Hard
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full bg-[#64748b] inline-block"></span
-            >Unknown
+            <span class="w-3 h-3 rounded-full bg-[#64748b] inline-block"></span>Unknown
           </div>
           <div class="flex items-center gap-2">
             <span
@@ -1622,33 +1512,19 @@ export function GraphView({
             ></span
             >Suggested
           </div>
-          <div
-            class="text-[9px] text-slate-600 uppercase tracking-wider mt-1 mb-0.5"
-          >
+          <div class="text-[9px] text-slate-600 uppercase tracking-wider mt-1 mb-0.5">
             Platform (ring)
           </div>
           <div class="flex items-center gap-2">
-            <img
-              src=${PLATFORM_FAVICON.leetcode}
-              class="w-3 h-3 object-contain"
-              alt=""
-            />
+            <img src=${PLATFORM_FAVICON.leetcode} class="w-3 h-3 object-contain" alt="" />
             LeetCode
           </div>
           <div class="flex items-center gap-2">
-            <img
-              src=${PLATFORM_FAVICON.geeksforgeeks}
-              class="w-3 h-3 object-contain"
-              alt=""
-            />
+            <img src=${PLATFORM_FAVICON.geeksforgeeks} class="w-3 h-3 object-contain" alt="" />
             GFG
           </div>
           <div class="flex items-center gap-2">
-            <img
-              src=${PLATFORM_FAVICON.codeforces}
-              class="w-3 h-3 object-contain"
-              alt=""
-            />
+            <img src=${PLATFORM_FAVICON.codeforces} class="w-3 h-3 object-contain" alt="" />
             Codeforces
           </div>
         </div>
@@ -1657,9 +1533,7 @@ export function GraphView({
         ${!problems?.length &&
         html`
           <div class="absolute inset-0 flex items-center justify-center">
-            <p class="text-slate-500 text-sm">
-              Solve some problems to build the graph.
-            </p>
+            <p class="text-slate-500 text-sm">Solve some problems to build the graph.</p>
           </div>
         `}
 
@@ -1672,10 +1546,7 @@ export function GraphView({
             style=${{
               left: `${mousePos.x + 14}px`,
               top: `${mousePos.y - 10}px`,
-              transform:
-                mousePos.x > window.innerWidth - 230
-                  ? "translateX(-110%)"
-                  : "none",
+              transform: mousePos.x > window.innerWidth - 230 ? "translateX(-110%)" : "none",
             }}
           >
             <${NodeDetail} node=${hovered} compact=${true} />
@@ -1719,8 +1590,8 @@ export function GraphView({
       </div>
 
       <p class="text-[10px] text-slate-600 text-center">
-        Drag nodes · scroll or +/− to zoom · ▣ fit view · hover to preview ·
-        click to pin · double-click drag to move a cluster
+        Drag nodes · scroll or +/− to zoom · ▣ fit view · hover to preview · click to pin ·
+        double-click drag to move a cluster
       </p>
 
       <${ProblemModal}

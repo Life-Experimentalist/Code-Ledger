@@ -47,8 +47,7 @@ export function resolveLang(rawLang) {
  * Returns "Unknown" for unrated or non-numeric input.
  */
 export function normalizeCFRating(rating) {
-  if (rating === null || rating === undefined || isNaN(+rating))
-    return "Unknown";
+  if (rating === null || rating === undefined || isNaN(+rating)) return "Unknown";
   const r = +rating;
   if (r <= 1200) return "Easy";
   if (r <= 1900) return "Medium";

@@ -13,9 +13,7 @@ export function getPagesHtml(opts = {}) {
   const theme = opts.theme || {};
   const settings = opts.settings || {};
   const commitSummary = opts.commitSummary || null;
-  const reportImages = Array.isArray(opts.reportImages)
-    ? opts.reportImages
-    : [];
+  const reportImages = Array.isArray(opts.reportImages) ? opts.reportImages : [];
   const commitList = Array.isArray(opts.commitList) ? opts.commitList : [];
   // GitHub owner and repo embedded at generation time so custom domains work correctly
   const repoOwner = opts.owner || "";
@@ -933,14 +931,7 @@ export function getActionsWorkflow() {
  * Returns a root README.md for the user's CodeLedger repo.
  * pagesUrl is the GitHub Pages URL (or custom domain if configured).
  */
-export function getRepoReadme(
-  owner,
-  repo,
-  pagesUrl,
-  _theme,
-  _settings,
-  indexMeta,
-) {
+export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMeta) {
   const url = pagesUrl || "https://" + owner + ".github.io/" + repo + "/";
   const stats = indexMeta?.stats || null;
 
@@ -1030,13 +1021,8 @@ export function getRepoReadme(
 
     // Platform breakdown
     if (stats.byPlatform && Object.keys(stats.byPlatform).length) {
-      const platRows = Object.entries(stats.byPlatform).sort(
-        (a, b) => b[1] - a[1],
-      );
-      lines.push(
-        "**By Platform:** " +
-          platRows.map(([p, n]) => p + " (" + n + ")").join(" · "),
-      );
+      const platRows = Object.entries(stats.byPlatform).sort((a, b) => b[1] - a[1]);
+      lines.push("**By Platform:** " + platRows.map(([p, n]) => p + " (" + n + ")").join(" · "));
       lines.push("");
     }
 
@@ -1045,10 +1031,7 @@ export function getRepoReadme(
       const langRows = Object.entries(stats.byLang)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8);
-      lines.push(
-        "**Top Languages:** " +
-          langRows.map(([l, n]) => l + " (" + n + ")").join(" · "),
-      );
+      lines.push("**Top Languages:** " + langRows.map(([l, n]) => l + " (" + n + ")").join(" · "));
       lines.push("");
     }
 
@@ -1057,10 +1040,7 @@ export function getRepoReadme(
       const topicRows = Object.entries(stats.byTopic)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
-      lines.push(
-        "**Top Topics:** " +
-          topicRows.map(([t, n]) => t + " (" + n + ")").join(" · "),
-      );
+      lines.push("**Top Topics:** " + topicRows.map(([t, n]) => t + " (" + n + ")").join(" · "));
       lines.push("");
     }
 
@@ -1105,11 +1085,7 @@ export function getRepoReadme(
       const slug = p.titleSlug || "";
       const titleText = p.title || slug || "?";
       const titleCell = slug
-        ? "[" +
-          titleText +
-          "](" +
-          CONSTANTS.makeProblemUrl(p.platform || "leetcode", slug) +
-          ")"
+        ? "[" + titleText + "](" + CONSTANTS.makeProblemUrl(p.platform || "leetcode", slug) + ")"
         : titleText;
       const diff = p.difficulty || "?";
       const plat = p.platform || "?";

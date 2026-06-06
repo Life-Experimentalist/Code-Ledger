@@ -24,9 +24,7 @@ function copyRecursiveSync(src, dest) {
   }
 }
 
-const pkg = JSON.parse(
-  fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
-);
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 const version = pkg.version;
 
 console.log("Syncing files to dist/unpacked...");
@@ -37,20 +35,12 @@ const chromeManifest = JSON.parse(
   fs.readFileSync(path.join(SRC_DIR, "manifest-chromium.json"), "utf8"),
 );
 chromeManifest.version = version;
-fs.writeFileSync(
-  path.join(DIST_CHROME, "manifest.json"),
-  JSON.stringify(chromeManifest, null, 4),
-);
+fs.writeFileSync(path.join(DIST_CHROME, "manifest.json"), JSON.stringify(chromeManifest, null, 4));
 
 // Firefox
 copyRecursiveSync(SRC_DIR, DIST_FIREFOX);
-const ffManifest = JSON.parse(
-  fs.readFileSync(path.join(SRC_DIR, "manifest-firefox.json"), "utf8"),
-);
+const ffManifest = JSON.parse(fs.readFileSync(path.join(SRC_DIR, "manifest-firefox.json"), "utf8"));
 ffManifest.version = version;
-fs.writeFileSync(
-  path.join(DIST_FIREFOX, "manifest.json"),
-  JSON.stringify(ffManifest, null, 4),
-);
+fs.writeFileSync(path.join(DIST_FIREFOX, "manifest.json"), JSON.stringify(ffManifest, null, 4));
 
 console.log("Sync complete.");

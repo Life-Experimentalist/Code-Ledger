@@ -33,9 +33,7 @@ class EventBus {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event).add(callback);
-    dbg.log(
-      `on(${event}): listener registered (total: ${this.listeners.get(event).size})`,
-    );
+    dbg.log(`on(${event}): listener registered (total: ${this.listeners.get(event).size})`);
     return () => this.off(event, callback);
   }
 

@@ -54,10 +54,7 @@ class ModalTabRegistry {
     const specific = this._tabs.get(platform) || [];
     // Platform-specific tabs override global "*" tabs with the same id
     const specificIds = new Set(specific.map((t) => t.id));
-    const merged = [
-      ...global.filter((t) => !specificIds.has(t.id)),
-      ...specific,
-    ];
+    const merged = [...global.filter((t) => !specificIds.has(t.id)), ...specific];
     return merged.filter((tab) => !tab.show || tab.show(problem));
   }
 

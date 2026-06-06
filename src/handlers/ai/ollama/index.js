@@ -57,8 +57,7 @@ export class OllamaHandler extends BaseAIHandler {
       problemContext?.aiModelOverride ||
       settings.ollama_model ||
       CONSTANTS.AI_PROVIDERS.ollama.defaultModel;
-    const endpoint =
-      settings.ollama_endpoint || CONSTANTS.AI_PROVIDERS.ollama.endpoint;
+    const endpoint = settings.ollama_endpoint || CONSTANTS.AI_PROVIDERS.ollama.endpoint;
 
     const prompts = await Storage.getAIPrompts();
     const prompt = buildReviewPrompt(problemContext, code, prompts);

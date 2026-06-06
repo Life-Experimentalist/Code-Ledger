@@ -104,8 +104,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const q = new URLSearchParams({
       installation_id: params.get("installation_id"),
     });
-    if (params.get("setup_action"))
-      q.set("setup_action", params.get("setup_action"));
+    if (params.get("setup_action")) q.set("setup_action", params.get("setup_action"));
     window.location.href = `/library?${q}`;
     return;
   }
@@ -120,28 +119,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Populate install links from config ───────────────────────────────────
   const installBtn = document.getElementById("install-btn");
   if (installBtn && installBtn.href === window.location.origin + "/#") {
-    const storeUrl =
-      config.chrome_store ||
-      config.github_releases ||
-      config.github_repo ||
-      "#";
+    const storeUrl = config.chrome_store || config.github_releases || config.github_repo || "#";
     installBtn.href = storeUrl;
   }
   const chromeBtn = document.getElementById("install-btn-chrome");
   if (chromeBtn) {
-    chromeBtn.href =
-      config.chrome_store ||
-      config.github_releases ||
-      config.github_repo ||
-      "#";
+    chromeBtn.href = config.chrome_store || config.github_releases || config.github_repo || "#";
   }
   const ffBtn = document.getElementById("install-btn-firefox");
   if (ffBtn) {
-    ffBtn.href =
-      config.firefox_store ||
-      config.github_releases ||
-      config.github_repo ||
-      "#";
+    ffBtn.href = config.firefox_store || config.github_releases || config.github_repo || "#";
   }
   const ghBtn = document.getElementById("install-btn-github");
   if (ghBtn) {
@@ -183,10 +170,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Not detected after timeout — show install links ──────────────────────
   if (!detected) {
     const installFallbackUrl =
-      config.chrome_store ||
-      config.github_releases ||
-      config.github_repo ||
-      "#";
+      config.chrome_store || config.github_releases || config.github_repo || "#";
     if (installBtn && !installBtn.classList.contains("btn-success")) {
       installBtn.href = installFallbackUrl;
     }

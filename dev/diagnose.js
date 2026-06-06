@@ -60,8 +60,7 @@ async function checkHandler(handlerPath) {
 
 async function checkAllHandlers() {
   console.log(
-    "\n📋 CodeLedger Handler Diagnostic Report\n" +
-      "========================================\n",
+    "\n📋 CodeLedger Handler Diagnostic Report\n" + "========================================\n",
   );
 
   const categories = {
@@ -110,13 +109,7 @@ async function checkAllHandlers() {
 
   // Check OAuth setup
   console.log("🔐 OAuth Configuration:");
-  const workerConfig = path.join(
-    __dirname,
-    "..",
-    "worker",
-    "public",
-    "config.json",
-  );
+  const workerConfig = path.join(__dirname, "..", "worker", "public", "config.json");
   if (fs.existsSync(workerConfig)) {
     const config = JSON.parse(fs.readFileSync(workerConfig, "utf-8"));
     console.log(`   ✅ Worker config found`);
@@ -128,13 +121,7 @@ async function checkAllHandlers() {
 
   // Check storage constants
   console.log("\n💾 Storage Configuration:");
-  const constantsPath = path.join(
-    __dirname,
-    "..",
-    "src",
-    "core",
-    "constants.js",
-  );
+  const constantsPath = path.join(__dirname, "..", "src", "core", "constants.js");
   if (fs.existsSync(constantsPath)) {
     const content = fs.readFileSync(constantsPath, "utf-8");
     if (content.includes("SK:")) {

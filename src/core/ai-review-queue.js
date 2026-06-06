@@ -168,9 +168,7 @@ export async function getNextPendingReview() {
         const items = req.result || [];
         const now = Date.now();
         // Skip items whose retry cooldown hasn't elapsed yet
-        const ready = items.filter(
-          (i) => !i.nextRetryAt || i.nextRetryAt <= now,
-        );
+        const ready = items.filter((i) => !i.nextRetryAt || i.nextRetryAt <= now);
         // Sort by priority (lower = higher priority), then by createdAt
         ready.sort((a, b) => {
           if (a.priority !== b.priority) return a.priority - b.priority;
@@ -179,9 +177,7 @@ export async function getNextPendingReview() {
         db.close();
         const picked = ready[0] || null;
         if (picked)
-          dbg.log(
-            `getNextPendingReview: selected ${picked.id} for problem ${picked.problemId}`,
-          );
+          dbg.log(`getNextPendingReview: selected ${picked.id} for problem ${picked.problemId}`);
         else
           dbg.log(
             `getNextPendingReview: no ready items (${items.length - ready.length} in backoff)`,
@@ -321,8 +317,7 @@ export async function getQueueStats() {
         const items = req.result || [];
         const stats = {
           pending: items.filter((i) => i.status === STATUS.PENDING).length,
-          processing: items.filter((i) => i.status === STATUS.PROCESSING)
-            .length,
+          processing: items.filter((i) => i.status === STATUS.PROCESSING).length,
           done: items.filter((i) => i.status === STATUS.DONE).length,
           failed: items.filter((i) => i.status === STATUS.FAILED).length,
           total: items.length,
@@ -363,9 +358,7 @@ export async function getPendingReviewsForProblem(problemId) {
       const req = problemIdx.getAll(problemId);
       req.onsuccess = () => {
         const items = req.result || [];
-        const pending = items.filter((i) =>
-          [STATUS.PENDING, STATUS.PROCESSING].includes(i.status),
-        );
+        const pending = items.filter((i) => [STATUS.PENDING, STATUS.PROCESSING].includes(i.status));
         db.close();
         resolve(pending);
       };

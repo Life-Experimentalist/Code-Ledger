@@ -32,9 +32,7 @@ export const PROBLEMS_ROOT = "problems";
  * Idempotent: if id already starts with the prefix, returns it unchanged.
  */
 export function platformId(platform, id) {
-  const prefix =
-    CONSTANTS.PLATFORM_CODE[platform] ||
-    String(platform).slice(0, 3).toLowerCase();
+  const prefix = CONSTANTS.PLATFORM_CODE[platform] || String(platform).slice(0, 3).toLowerCase();
   // Strip ::submissionId suffix that LeetCode bulk importer appends (e.g. "two-sum::1427680302")
   const s = String(id).split("::")[0];
   if (s.startsWith(`${prefix}-`)) return s;
@@ -55,8 +53,7 @@ export function platformId(platform, id) {
  * @param {string} [platform]  Platform name — required when canonical is absent
  */
 export function problemBase(id, canonical, _settings = {}, platform = "") {
-  if (canonical?.canonicalId)
-    return `${PROBLEMS_ROOT}/${canonical.canonicalId}`;
+  if (canonical?.canonicalId) return `${PROBLEMS_ROOT}/${canonical.canonicalId}`;
   const pid = platform ? platformId(platform, id) : id;
   return `${PROBLEMS_ROOT}/${pid}`;
 }
@@ -89,14 +86,7 @@ export function problemDir(id, platform, canonical) {
  * @param {object} [_settings]  Reserved for future use
  * @param {string} [methodTitle] Optional approach title (e.g. "greedy")
  */
-export function solutionPath(
-  id,
-  platform,
-  lang,
-  canonical,
-  _settings = {},
-  methodTitle = "",
-) {
+export function solutionPath(id, platform, lang, canonical, _settings = {}, methodTitle = "") {
   const dir = problemDir(id, platform, canonical);
   const pid = platformId(platform, id);
   const ext = lang?.ext || "txt";
@@ -144,17 +134,12 @@ export function buildProblemMarkdown(problem) {
   // Metadata table
   const rows = [];
   if (problem.difficulty) rows.push(`| Difficulty | ${problem.difficulty} |`);
-  if (platform !== "unknown")
-    rows.push(`| Platform | ${_capitalise(platform)} |`);
+  if (platform !== "unknown") rows.push(`| Platform | ${_capitalise(platform)} |`);
   rows.push(`| Problem ID | \`${pid}\` |`);
-  if (problem.tags?.length)
-    rows.push(`| Topics | ${problem.tags.join(", ")} |`);
+  if (problem.tags?.length) rows.push(`| Topics | ${problem.tags.join(", ")} |`);
   if (problem.timestamp)
-    rows.push(
-      `| Solved | ${new Date(problem.timestamp).toISOString().slice(0, 10)} |`,
-    );
-  if (problem.elapsedSeconds)
-    rows.push(`| Solve Time | ${_formatTime(problem.elapsedSeconds)} |`);
+    rows.push(`| Solved | ${new Date(problem.timestamp).toISOString().slice(0, 10)} |`);
+  if (problem.elapsedSeconds) rows.push(`| Solve Time | ${_formatTime(problem.elapsedSeconds)} |`);
   if (problem.runtime)
     rows.push(
       `| Runtime | ${problem.runtime}${problem.runtimePct ? ` (beats ${problem.runtimePct}%)` : ""} |`,
@@ -181,9 +166,7 @@ export function buildProblemMarkdown(problem) {
   }
 
   // Collapsible hints
-  const hints = Array.isArray(problem.hints)
-    ? problem.hints.filter(Boolean)
-    : [];
+  const hints = Array.isArray(problem.hints) ? problem.hints.filter(Boolean) : [];
   if (hints.length > 0) {
     lines.push("## Hints");
     lines.push("");
@@ -204,8 +187,7 @@ export function buildProblemMarkdown(problem) {
     lines.push("");
     for (let i = 0; i < approaches.length; i++) {
       const a = approaches[i];
-      const heading =
-        a.title || (approaches.length > 1 ? `Approach ${i + 1}` : "");
+      const heading = a.title || (approaches.length > 1 ? `Approach ${i + 1}` : "");
       if (heading) {
         lines.push(`### ${heading}`);
         lines.push("");
@@ -264,14 +246,7 @@ export function buildProblemFiles(problem, _settings = {}) {
     if (!approach.code) continue;
     const lang = _normLangObj(approach.lang || problem.lang);
     files.push({
-      path: solutionPath(
-        id,
-        platform,
-        lang,
-        canonical,
-        {},
-        approach.title || "",
-      ),
+      path: solutionPath(id, platform, lang, canonical, {}, approach.title || ""),
       content: approach.code,
     });
   }

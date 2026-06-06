@@ -60,9 +60,7 @@ export class OpenAIHandler extends BaseAIHandler {
   }
 
   async review(code, problemContext) {
-    dbg.log(
-      `review(): starting OpenAI review for ${problemContext?.titleSlug || "unknown"}`,
-    );
+    dbg.log(`review(): starting OpenAI review for ${problemContext?.titleSlug || "unknown"}`);
     const settings = await Storage.getSettings();
     const model =
       problemContext?.aiModelOverride ||
@@ -70,9 +68,7 @@ export class OpenAIHandler extends BaseAIHandler {
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.openai.defaultModel;
     const endpoint =
-      settings.openai_endpoint ||
-      settings.aiEndpoint ||
-      CONSTANTS.AI_PROVIDERS.openai.endpoint;
+      settings.openai_endpoint || settings.aiEndpoint || CONSTANTS.AI_PROVIDERS.openai.endpoint;
 
     dbg.log(`review(): model=${model}, endpoint=${endpoint}`);
     const prompts = await Storage.getAIPrompts();
@@ -89,9 +85,7 @@ export class OpenAIHandler extends BaseAIHandler {
       if (!key) break;
 
       try {
-        dbg.log(
-          `review(): attempt ${attempt + 1}/${keyCount}, calling OpenAI API...`,
-        );
+        dbg.log(`review(): attempt ${attempt + 1}/${keyCount}, calling OpenAI API...`);
         const res = await fetch(`${endpoint}/chat/completions`, {
           method: "POST",
           headers: {
@@ -109,9 +103,7 @@ export class OpenAIHandler extends BaseAIHandler {
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content || "";
         if (!content) {
-          dbg.warn(
-            `review(): empty response at attempt ${attempt + 1}/${keyCount}`,
-          );
+          dbg.warn(`review(): empty response at attempt ${attempt + 1}/${keyCount}`);
           throw new Error("Empty OpenAI response");
         }
         dbg.log(
@@ -127,10 +119,7 @@ export class OpenAIHandler extends BaseAIHandler {
       }
     }
 
-    dbg.error(
-      `review(): ✗ all ${keyCount} key(s) exhausted:`,
-      lastErr?.message,
-    );
+    dbg.error(`review(): ✗ all ${keyCount} key(s) exhausted:`, lastErr?.message);
     throw lastErr || new Error("OpenAI review failed with all available keys.");
   }
 }

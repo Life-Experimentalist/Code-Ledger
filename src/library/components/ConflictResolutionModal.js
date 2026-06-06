@@ -3,12 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  h,
-  useState,
-  useEffect,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 import { highlightCode } from "../../lib/syntax-highlight.js";
 import { normalizeCode } from "../../core/ai-deduplication.js";
@@ -28,14 +23,8 @@ function classifyConflict(local, remote) {
     "duplicateOf",
   ];
   const diffFields = DIFF_FIELDS.filter((k) => {
-    const l =
-      typeof local[k] === "object"
-        ? JSON.stringify(local[k])
-        : String(local[k] ?? "");
-    const r =
-      typeof remote[k] === "object"
-        ? JSON.stringify(remote[k])
-        : String(remote[k] ?? "");
+    const l = typeof local[k] === "object" ? JSON.stringify(local[k]) : String(local[k] ?? "");
+    const r = typeof remote[k] === "object" ? JSON.stringify(remote[k]) : String(remote[k] ?? "");
     return l !== r;
   });
   if (normalizeCode(local.code || "") === normalizeCode(remote.code || "")) {
@@ -100,9 +89,7 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
           class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-semibold"
           >same code</span
         >
-        <span class="text-[11px] text-slate-500"
-          >Code is identical — only metadata differs</span
-        >
+        <span class="text-[11px] text-slate-500">Code is identical — only metadata differs</span>
       </div>
 
       <div class="grid grid-cols-3 gap-2">
@@ -133,16 +120,12 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
                 >
                 ${active
                   ? html`<span
-                      class="text-[10px] ${side === "both"
-                        ? "text-violet-400"
-                        : "text-cyan-400"}"
+                      class="text-[10px] ${side === "both" ? "text-violet-400" : "text-cyan-400"}"
                       >✓</span
                     >`
                   : ""}
                 ${isAuto && choice === null && side !== "both"
-                  ? html`<span class="text-[9px] text-amber-400/80"
-                      >auto ${countdown}s</span
-                    >`
+                  ? html`<span class="text-[9px] text-amber-400/80">auto ${countdown}s</span>`
                   : ""}
               </div>
               ${side === "both"
@@ -152,19 +135,15 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
                 : html`
                     <div class="space-y-1 text-[11px] text-slate-400">
                       <div class="font-medium">
-                        ${p?.difficulty || "?"} ·
-                        ${p?.lang?.name || p?.language || "?"}
+                        ${p?.difficulty || "?"} · ${p?.lang?.name || p?.language || "?"}
                       </div>
                       <div class="text-slate-500">${fmtDate(p?.timestamp)}</div>
                       ${p?.aiReview
-                        ? html`<div class="text-emerald-500/80 text-[10px]">
-                            ✓ AI review
-                          </div>`
+                        ? html`<div class="text-emerald-500/80 text-[10px]">✓ AI review</div>`
                         : ""}
                       ${Array.isArray(p?.tags) && p?.tags.length
                         ? html`<div class="text-slate-600 text-[10px]">
-                            ${p?.tags.length}
-                            tag${p?.tags.length !== 1 ? "s" : ""}
+                            ${p?.tags.length} tag${p?.tags.length !== 1 ? "s" : ""}
                           </div>`
                         : ""}
                     </div>
@@ -191,9 +170,7 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
             </div>
           `
         : html`
-            <div class="text-center text-[11px] text-emerald-400/70">
-              ✓ Resolved — advancing…
-            </div>
+            <div class="text-center text-[11px] text-emerald-400/70">✓ Resolved — advancing…</div>
           `}
     </div>
   `;
@@ -204,18 +181,10 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
 function DiffApproachStep({ conflict, choice, onChoose }) {
   const { local, remote } = conflict;
   const [expanded, setExpanded] = useState(true);
-  const localLang =
-    local.lang?.slug || local.lang?.name || local.language || "";
-  const remoteLang =
-    remote.lang?.slug || remote.lang?.name || remote.language || "";
-  const localHighlighted = highlightCode(
-    local.code || "// (no code)",
-    localLang,
-  );
-  const remoteHighlighted = highlightCode(
-    remote.code || "// (no code)",
-    remoteLang,
-  );
+  const localLang = local.lang?.slug || local.lang?.name || local.language || "";
+  const remoteLang = remote.lang?.slug || remote.lang?.name || remote.language || "";
+  const localHighlighted = highlightCode(local.code || "// (no code)", localLang);
+  const remoteHighlighted = highlightCode(remote.code || "// (no code)", remoteLang);
 
   return html`
     <div class="flex flex-col gap-4">
@@ -254,9 +223,7 @@ function DiffApproachStep({ conflict, choice, onChoose }) {
                 >
                 ${active
                   ? html`<span
-                      class="text-[10px] ${side === "both"
-                        ? "text-violet-400"
-                        : "text-cyan-400"}"
+                      class="text-[10px] ${side === "both" ? "text-violet-400" : "text-cyan-400"}"
                       >✓</span
                     >`
                   : ""}
@@ -268,14 +235,11 @@ function DiffApproachStep({ conflict, choice, onChoose }) {
                 : html`
                     <div class="space-y-1 text-[11px] text-slate-400">
                       <div class="font-medium">
-                        ${p?.difficulty || "?"} ·
-                        ${p?.lang?.name || p?.language || "?"}
+                        ${p?.difficulty || "?"} · ${p?.lang?.name || p?.language || "?"}
                       </div>
                       <div class="text-slate-500">${fmtDate(p?.timestamp)}</div>
                       ${p?.aiReview
-                        ? html`<div class="text-emerald-500/80 text-[10px]">
-                            ✓ AI review
-                          </div>`
+                        ? html`<div class="text-emerald-500/80 text-[10px]">✓ AI review</div>`
                         : ""}
                     </div>
                   `}
@@ -294,27 +258,20 @@ function DiffApproachStep({ conflict, choice, onChoose }) {
 
       ${expanded
         ? html`
-            <div
-              class="grid grid-cols-2 gap-1 rounded-xl overflow-hidden border border-white/10"
-            >
+            <div class="grid grid-cols-2 gap-1 rounded-xl overflow-hidden border border-white/10">
               ${["local", "remote"].map((side) => {
                 const isLocal = side === "local";
-                const highlighted = isLocal
-                  ? localHighlighted
-                  : remoteHighlighted;
+                const highlighted = isLocal ? localHighlighted : remoteHighlighted;
                 const lang = isLocal ? localLang : remoteLang;
                 return html`
                   <div class="flex flex-col min-w-0">
                     <div
                       class="px-3 py-1.5 bg-black/40 flex items-center justify-between border-b border-white/5"
                     >
-                      <span
-                        class="text-[10px] uppercase tracking-wide text-slate-500 font-bold"
+                      <span class="text-[10px] uppercase tracking-wide text-slate-500 font-bold"
                         >${side}</span
                       >
-                      <span class="text-[10px] font-mono text-cyan-500/60"
-                        >${lang}</span
-                      >
+                      <span class="text-[10px] font-mono text-cyan-500/60">${lang}</span>
                     </div>
                     <pre
                       class="text-[11px] leading-relaxed overflow-auto bg-black/30 p-3 whitespace-pre font-mono m-0 max-h-52"
@@ -368,22 +325,15 @@ export function ConflictResolutionModal({
       return a._type === "diff-approach" ? -1 : 1; // diff-approach first
     });
 
-  const [choices, setChoices] = useState(() =>
-    new Array(classified.length).fill(null),
-  );
+  const [choices, setChoices] = useState(() => new Array(classified.length).fill(null));
   const [cursor, setCursor] = useState(0);
 
   const current = classified[cursor] || null;
   const currentChoice = choices[cursor] ?? null;
   const resolvedCount = choices.filter((c) => c !== null).length;
-  const allResolved =
-    classified.length === 0 || resolvedCount === classified.length;
-  const sameCodeCount = classified.filter(
-    (c) => c._type === "same-code",
-  ).length;
-  const diffApproachCount = classified.filter(
-    (c) => c._type === "diff-approach",
-  ).length;
+  const allResolved = classified.length === 0 || resolvedCount === classified.length;
+  const sameCodeCount = classified.filter((c) => c._type === "same-code").length;
+  const diffApproachCount = classified.filter((c) => c._type === "diff-approach").length;
 
   const choose = useCallback(
     (side) => {
@@ -424,11 +374,7 @@ export function ConflictResolutionModal({
       if (ch === "both") {
         resolved.push(c.local);
         const remoteId =
-          (c.remote.id || c.remote.titleSlug || "r") +
-          "-alt-" +
-          Date.now() +
-          "-" +
-          i;
+          (c.remote.id || c.remote.titleSlug || "r") + "-alt-" + Date.now() + "-" + i;
         resolved.push({ ...c.remote, id: remoteId });
       } else if (ch === "remote") {
         resolved.push(c.remote);
@@ -469,35 +415,23 @@ export function ConflictResolutionModal({
               <p
                 class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
               >
-                <span
-                  >${classified.length}
-                  conflict${classified.length !== 1 ? "s" : ""}</span
-                >
+                <span>${classified.length} conflict${classified.length !== 1 ? "s" : ""}</span>
                 <span>·</span>
                 <span
-                  class="${resolvedCount === classified.length &&
-                  classified.length > 0
+                  class="${resolvedCount === classified.length && classified.length > 0
                     ? "text-emerald-400"
                     : "text-slate-400"}"
                   >${resolvedCount} resolved</span
                 >
                 ${diffApproachCount > 0
                   ? html`<span>·</span
-                      ><span class="text-amber-400"
-                        >${diffApproachCount} need review</span
-                      >`
+                      ><span class="text-amber-400">${diffApproachCount} need review</span>`
                   : ""}
                 ${sameCodeCount > 0
-                  ? html`<span>·</span
-                      ><span class="text-slate-400"
-                        >${sameCodeCount} auto</span
-                      >`
+                  ? html`<span>·</span><span class="text-slate-400">${sameCodeCount} auto</span>`
                   : ""}
                 ${remoteOnly.length > 0
-                  ? html`<span>·</span
-                      ><span class="text-slate-400"
-                        >${remoteOnly.length} new</span
-                      >`
+                  ? html`<span>·</span><span class="text-slate-400">${remoteOnly.length} new</span>`
                   : ""}
               </p>
             </div>
@@ -529,14 +463,11 @@ export function ConflictResolutionModal({
               <div
                 class="h-full bg-cyan-500 rounded-full transition-all duration-300"
                 style=${{
-                  width: classified.length
-                    ? `${(resolvedCount / classified.length) * 100}%`
-                    : "0%",
+                  width: classified.length ? `${(resolvedCount / classified.length) * 100}%` : "0%",
                 }}
               ></div>
             </div>
-            <span
-              class="text-[11px] text-slate-500 shrink-0 font-mono tabular-nums"
+            <span class="text-[11px] text-slate-500 shrink-0 font-mono tabular-nums"
               >${cursor + 1} / ${classified.length}</span
             >
           </div>
@@ -550,8 +481,7 @@ export function ConflictResolutionModal({
                         key=${i}
                         onClick=${() => setCursor(i)}
                         title=${c.local?.title || `Conflict ${i + 1}`}
-                        class="w-2 h-2 rounded-full transition-all ${i ===
-                        cursor
+                        class="w-2 h-2 rounded-full transition-all ${i === cursor
                           ? "bg-cyan-400 scale-[1.4]"
                           : choices[i] === "both"
                             ? "bg-violet-400/70"
@@ -572,16 +502,10 @@ export function ConflictResolutionModal({
         <div class="flex-1 overflow-y-auto px-5 py-4 min-h-0">
           ${classified.length === 0
             ? html`
-                <div
-                  class="flex flex-col items-center justify-center py-16 gap-3 text-center"
-                >
+                <div class="flex flex-col items-center justify-center py-16 gap-3 text-center">
                   <span class="text-3xl">✅</span>
-                  <p class="text-slate-300 text-sm font-medium">
-                    No conflicts to resolve
-                  </p>
-                  <p class="text-slate-500 text-xs max-w-xs">
-                    All problems are already in sync.
-                  </p>
+                  <p class="text-slate-300 text-sm font-medium">No conflicts to resolve</p>
+                  <p class="text-slate-500 text-xs max-w-xs">All problems are already in sync.</p>
                 </div>
               `
             : html`
@@ -646,9 +570,7 @@ export function ConflictResolutionModal({
                     onClick=${handleNext}
                     class="text-xs px-3 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white transition-colors"
                   >
-                    ${cursor < classified.length - 1
-                      ? "Next →"
-                      : "Review unresolved →"}
+                    ${cursor < classified.length - 1 ? "Next →" : "Review unresolved →"}
                   </button>
                 `
               : ""}

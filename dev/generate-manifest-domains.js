@@ -15,11 +15,7 @@ function readJson(rel) {
 }
 
 function writeJson(rel, obj) {
-  writeFileSync(
-    resolve(root, rel),
-    JSON.stringify(obj, null, 4) + "\n",
-    "utf8",
-  );
+  writeFileSync(resolve(root, rel), JSON.stringify(obj, null, 4) + "\n", "utf8");
 }
 
 // Platform domains — add new platforms here when adding a handler
@@ -40,9 +36,7 @@ const FIXED_HOST_PERMISSIONS = [
   "http://localhost:11434/*",
 ];
 
-const allHostPermissions = [
-  ...new Set([...PLATFORM_DOMAINS, ...FIXED_HOST_PERMISSIONS]),
-];
+const allHostPermissions = [...new Set([...PLATFORM_DOMAINS, ...FIXED_HOST_PERMISSIONS])];
 
 for (const rel of ["src/manifest-chromium.json", "src/manifest-firefox.json"]) {
   const m = readJson(rel);

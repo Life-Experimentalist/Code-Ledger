@@ -79,9 +79,7 @@ function _inject(parent, editor, { showCopy, showAI, onAIClick }) {
   }
 
   if (showAI && onAIClick) {
-    container.appendChild(
-      _makeBtn("cl-cf-ai", "✦ AI Review", () => onAIClick()),
-    );
+    container.appendChild(_makeBtn("cl-cf-ai", "✦ AI Review", () => onAIClick()));
   }
 
   parent.insertBefore(container, editor);

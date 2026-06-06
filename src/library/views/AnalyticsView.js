@@ -4,12 +4,7 @@
  */
 
 import { h } from "../../vendor/preact-bundle.js";
-import {
-  useMemo,
-  useState,
-  useEffect,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { useMemo, useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -23,10 +18,7 @@ import { CONSTANTS } from "../../core/constants.js";
 
 import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
-import {
-  loadUserDifficultyMap,
-  mapDifficulty,
-} from "../../core/difficulty-map.js";
+import { loadUserDifficultyMap, mapDifficulty } from "../../core/difficulty-map.js";
 
 // Curated Blind 75 / NeetCode 150 — covers all major topics with real LeetCode slugs
 const BLIND75 = [
@@ -481,8 +473,7 @@ export function AnalyticsView({ problems, onNavigate }) {
 
       const tags = Array.isArray(p.tags) ? p.tags : [];
       tags.forEach((t) => {
-        if (!s.topics[t])
-          s.topics[t] = { easy: 0, medium: 0, hard: 0, total: 0 };
+        if (!s.topics[t]) s.topics[t] = { easy: 0, medium: 0, hard: 0, total: 0 };
         s.topics[t].total++;
         if (cat === "Easy") s.topics[t].easy++;
         else if (cat === "Medium") s.topics[t].medium++;
@@ -504,12 +495,7 @@ export function AnalyticsView({ problems, onNavigate }) {
 
       let lang = p.lang?.name || p.language || "Unknown";
       // Sanitise legacy entries where the slug (ext) is stored without a name
-      if (
-        !lang ||
-        lang === "undefined" ||
-        lang === "null" ||
-        lang === "Solution"
-      ) {
+      if (!lang || lang === "undefined" || lang === "null" || lang === "Solution") {
         lang = p.lang?.ext ? p.lang.ext.toUpperCase() : "Unknown";
       }
       lang = normalizeLang(lang);
@@ -564,10 +550,7 @@ export function AnalyticsView({ problems, onNavigate }) {
 
     // Best day of week
     if (s.total > 0) {
-      const maxDow = s.dayOfWeek.reduce(
-        (best, cnt, i) => (cnt > s.dayOfWeek[best] ? i : best),
-        0,
-      );
+      const maxDow = s.dayOfWeek.reduce((best, cnt, i) => (cnt > s.dayOfWeek[best] ? i : best), 0);
       s.bestDay = { name: DOW_NAMES[maxDow], count: s.dayOfWeek[maxDow] };
     }
 
@@ -637,11 +620,7 @@ export function AnalyticsView({ problems, onNavigate }) {
 
   const handleTopicClick = useCallback(
     (topic) => {
-      openDrilldown(
-        topic,
-        (p) => (p.tags || []).includes(topic) || p.topic === topic,
-        "topic",
-      );
+      openDrilldown(topic, (p) => (p.tags || []).includes(topic) || p.topic === topic, "topic");
     },
     [openDrilldown],
   );
@@ -661,20 +640,17 @@ export function AnalyticsView({ problems, onNavigate }) {
     } else if (section === "language") {
       openDrilldown(
         sectionFilter,
-        (p) =>
-          normalizeLang(p.lang?.name || p.language || "") === sectionFilter,
+        (p) => normalizeLang(p.lang?.name || p.language || "") === sectionFilter,
       );
     } else if (section === "platform") {
       openDrilldown(
         sectionFilter,
-        (p) =>
-          (PLATFORM_META[p.platform]?.name || p.platform) === sectionFilter,
+        (p) => (PLATFORM_META[p.platform]?.name || p.platform) === sectionFilter,
       );
     } else if (section === "topic") {
       openDrilldown(
         sectionFilter,
-        (p) =>
-          (p.tags || []).includes(sectionFilter) || p.topic === sectionFilter,
+        (p) => (p.tags || []).includes(sectionFilter) || p.topic === sectionFilter,
       );
     }
   }, [problems?.length, userMap]);
@@ -682,16 +658,10 @@ export function AnalyticsView({ problems, onNavigate }) {
   const chartData = useMemo(() => {
     const sortedTopics = Object.entries(stats.topics).sort(
       (a, b) =>
-        b[1].hard * 5 +
-        b[1].medium * 3 +
-        b[1].easy -
-        (a[1].hard * 5 + a[1].medium * 3 + a[1].easy),
+        b[1].hard * 5 + b[1].medium * 3 + b[1].easy - (a[1].hard * 5 + a[1].medium * 3 + a[1].easy),
     );
     const tpLabels = sortedTopics.slice(0, 8).map((t) => t[0]);
-    const maxTopicTotal = Math.max(
-      1,
-      ...Object.values(stats.topics).map((t) => t.total),
-    );
+    const maxTopicTotal = Math.max(1, ...Object.values(stats.topics).map((t) => t.total));
 
     return {
       topicRadar: {
@@ -700,10 +670,7 @@ export function AnalyticsView({ problems, onNavigate }) {
           {
             label: "Depth (%)",
             data: tpLabels.map((t) =>
-              Math.min(
-                100,
-                (stats.topics[t].total / Math.max(1, maxTopicTotal)) * 100,
-              ),
+              Math.min(100, (stats.topics[t].total / Math.max(1, maxTopicTotal)) * 100),
             ),
             backgroundColor: "rgba(6, 182, 212, 0.2)",
             borderColor: "rgba(6, 182, 212, 1)",
@@ -713,9 +680,7 @@ export function AnalyticsView({ problems, onNavigate }) {
       },
       difficultyDonut: {
         labels:
-          stats.unknown > 0
-            ? ["Easy", "Medium", "Hard", "Unknown"]
-            : ["Easy", "Medium", "Hard"],
+          stats.unknown > 0 ? ["Easy", "Medium", "Hard", "Unknown"] : ["Easy", "Medium", "Hard"],
         datasets: [
           {
             data:
@@ -731,9 +696,7 @@ export function AnalyticsView({ problems, onNavigate }) {
         ],
       },
       platformBar: {
-        labels: Object.keys(stats.platforms).map(
-          (p) => PLATFORM_META[p]?.name || p,
-        ),
+        labels: Object.keys(stats.platforms).map((p) => PLATFORM_META[p]?.name || p),
         datasets: [
           {
             label: "Problems",
@@ -781,9 +744,7 @@ export function AnalyticsView({ problems, onNavigate }) {
         labels: Object.keys(stats.months).map((m) => {
           const [yr, mo] = m.split("-");
           const d = new Date(parseInt(yr), parseInt(mo) - 1, 1);
-          return (
-            d.toLocaleString("default", { month: "short" }) + " '" + yr.slice(2)
-          );
+          return d.toLocaleString("default", { month: "short" }) + " '" + yr.slice(2);
         }),
         datasets: [
           {
@@ -803,9 +764,7 @@ export function AnalyticsView({ problems, onNavigate }) {
             label: "Solves",
             data: stats.dayOfWeek,
             backgroundColor: stats.dayOfWeek.map((cnt) =>
-              cnt === Math.max(...stats.dayOfWeek) && cnt > 0
-                ? "#06b6d4"
-                : "rgba(6,182,212,0.3)",
+              cnt === Math.max(...stats.dayOfWeek) && cnt > 0 ? "#06b6d4" : "rgba(6,182,212,0.3)",
             ),
             borderRadius: 4,
           },
@@ -824,19 +783,12 @@ export function AnalyticsView({ problems, onNavigate }) {
     const solvedSlugs = new Set(
       problems
         .filter((p) => p.platform === "leetcode" || !p.platform)
-        .map((p) =>
-          (p.titleSlug || p.title || "")
-            .toLowerCase()
-            .replace(/[^a-z0-9-]/g, "-"),
-        ),
+        .map((p) => (p.titleSlug || p.title || "").toLowerCase().replace(/[^a-z0-9-]/g, "-")),
     );
-    const solvedTitles = new Set(
-      problems.map((p) => (p.title || "").toLowerCase()),
-    );
+    const solvedTitles = new Set(problems.map((p) => (p.title || "").toLowerCase()));
 
     let available = BLIND75.filter(
-      (p) =>
-        !solvedSlugs.has(p.slug) && !solvedTitles.has(p.title.toLowerCase()),
+      (p) => !solvedSlugs.has(p.slug) && !solvedTitles.has(p.title.toLowerCase()),
     );
 
     // Sort: favor topics the user is already practicing (higher mastery = more to work on)
@@ -846,10 +798,7 @@ export function AnalyticsView({ problems, onNavigate }) {
       if (bMastery !== aMastery) return bMastery - aMastery;
       // Within same mastery, harder first if user does hard, easier if user does easy
       const hardRatio = stats.hard / (stats.total || 1);
-      const diffOrder =
-        hardRatio > 0.25
-          ? ["Hard", "Medium", "Easy"]
-          : ["Easy", "Medium", "Hard"];
+      const diffOrder = hardRatio > 0.25 ? ["Hard", "Medium", "Easy"] : ["Easy", "Medium", "Hard"];
       return diffOrder.indexOf(a.diff) - diffOrder.indexOf(b.diff);
     });
 
@@ -891,8 +840,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                 const h = Math.floor(stats.avgSolveSeconds / 3600);
                 const m = Math.floor((stats.avgSolveSeconds % 3600) / 60);
                 const s2 = stats.avgSolveSeconds % 60;
-                const val =
-                  h > 0 ? `${h}h${m}m` : m > 0 ? `${m}m${s2}s` : `${s2}s`;
+                const val = h > 0 ? `${h}h${m}m` : m > 0 ? `${m}m${s2}s` : `${s2}s`;
                 return {
                   label: "Avg Solve Time",
                   value: val,
@@ -925,12 +873,8 @@ export function AnalyticsView({ problems, onNavigate }) {
               <span class="text-[10px] uppercase tracking-widest text-slate-500"
                 >${card.label}</span
               >
-              <span class="text-2xl font-bold" style=${{ color: card.color }}
-                >${card.value}</span
-              >
-              <span class="text-[10px] text-slate-500 truncate"
-                >${card.sub}</span
-              >
+              <span class="text-2xl font-bold" style=${{ color: card.color }}>${card.value}</span>
+              <span class="text-[10px] text-slate-500 truncate">${card.sub}</span>
             </div>
           `,
         )}
@@ -953,37 +897,26 @@ export function AnalyticsView({ problems, onNavigate }) {
                     color: "#94a3b8",
                     bg: "rgba(148,163,184,0.10)",
                   };
-                  const pct = (n) =>
-                    counts.total ? Math.round((n / counts.total) * 100) : 0;
+                  const pct = (n) => (counts.total ? Math.round((n / counts.total) * 100) : 0);
                   return html`
                     <div
                       class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 cursor-pointer hover:border-white/15 transition-colors"
                       onClick=${() => handlePlatformClick(meta.name)}
                     >
                       <div class="flex items-center justify-between">
-                        <span
-                          class="text-sm font-semibold"
-                          style=${{ color: meta.color }}
+                        <span class="text-sm font-semibold" style=${{ color: meta.color }}
                           >${meta.name}</span
                         >
-                        <span class="text-lg font-bold text-white"
-                          >${counts.total}</span
-                        >
+                        <span class="text-lg font-bold text-white">${counts.total}</span>
                       </div>
                       <div class="flex gap-3 text-[11px]">
-                        <span class="text-emerald-400"
-                          >${counts.easy}E (${pct(counts.easy)}%)</span
-                        >
+                        <span class="text-emerald-400">${counts.easy}E (${pct(counts.easy)}%)</span>
                         <span class="text-amber-400"
                           >${counts.medium}M (${pct(counts.medium)}%)</span
                         >
-                        <span class="text-rose-400"
-                          >${counts.hard}H (${pct(counts.hard)}%)</span
-                        >
+                        <span class="text-rose-400">${counts.hard}H (${pct(counts.hard)}%)</span>
                       </div>
-                      <div
-                        class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden flex"
-                      >
+                      <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
                         <div
                           class="h-full bg-emerald-500"
                           style=${{
@@ -1022,9 +955,7 @@ export function AnalyticsView({ problems, onNavigate }) {
           <div
             class="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(6,182,212,0.05),transparent)] pointer-events-none"
           ></div>
-          <h3
-            class="text-xs font-bold text-slate-400 uppercase tracking-widest z-10"
-          >
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest z-10">
             Difficulty Split
           </h3>
           <div class="relative z-10" style="height:180px">
@@ -1055,9 +986,7 @@ export function AnalyticsView({ problems, onNavigate }) {
               style="padding-bottom:36px"
             >
               <span class="text-2xl font-bold text-white">${stats.total}</span>
-              <span class="text-[10px] text-slate-500 uppercase tracking-wider"
-                >Solved</span
-              >
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider">Solved</span>
             </div>
           </div>
         </div>
@@ -1065,12 +994,8 @@ export function AnalyticsView({ problems, onNavigate }) {
 
       <!-- Charts row -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div
-          class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72"
-        >
-          <h3
-            class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2"
-          >
+        <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
             Topic Depth
           </h3>
           <div class="flex-1 min-h-0">
@@ -1104,9 +1029,7 @@ export function AnalyticsView({ problems, onNavigate }) {
         <div
           class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col lg:col-span-2 h-72"
         >
-          <h3
-            class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2"
-          >
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
             Solve Velocity (12 Weeks)
           </h3>
           <div class="flex-1 min-h-0">
@@ -1133,14 +1056,8 @@ export function AnalyticsView({ problems, onNavigate }) {
           </div>
         </div>
 
-        <div
-          class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72"
-        >
-          <h3
-            class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2"
-          >
-            Languages
-          </h3>
+        <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Languages</h3>
           <div class="flex-1 min-h-0">
             <${ChartWrapper}
               type="pie"
@@ -1169,9 +1086,7 @@ export function AnalyticsView({ problems, onNavigate }) {
         <div
           class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col lg:col-span-2 h-72"
         >
-          <h3
-            class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2"
-          >
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
             Monthly Activity (12 Months)
           </h3>
           <div class="flex-1 min-h-0">
@@ -1196,19 +1111,13 @@ export function AnalyticsView({ problems, onNavigate }) {
           </div>
         </div>
 
-        <div
-          class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72"
-        >
+        <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72">
           <div class="flex items-center justify-between mb-2">
-            <h3
-              class="text-xs font-bold text-slate-400 uppercase tracking-widest"
-            >
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
               Activity by Day
             </h3>
             ${stats.bestDay.count > 0
-              ? html`<span class="text-[10px] text-cyan-400"
-                  >Peak: ${stats.bestDay.name}</span
-                >`
+              ? html`<span class="text-[10px] text-cyan-400">Peak: ${stats.bestDay.name}</span>`
               : ""}
           </div>
           <div class="flex-1 min-h-0">
@@ -1238,9 +1147,7 @@ export function AnalyticsView({ problems, onNavigate }) {
       <!-- Topic grid + Unsolved Next -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 flex flex-col gap-4">
-          <h3 class="text-sm font-bold text-white tracking-wide">
-            Topic Breakdown
-          </h3>
+          <h3 class="text-sm font-bold text-white tracking-wide">Topic Breakdown</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             ${topTopics.map(([topic, counts]) => {
               const barPct = Math.round((counts.total / maxTopicCount) * 100);
@@ -1258,9 +1165,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                       >${counts.total} solved</span
                     >
                   </div>
-                  <div
-                    class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden flex"
-                  >
+                  <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
                     <div
                       class="h-full bg-emerald-500 transition-all"
                       style=${{
@@ -1282,18 +1187,12 @@ export function AnalyticsView({ problems, onNavigate }) {
                   </div>
                   <div class="flex gap-3 mt-1.5 text-[10px] text-slate-600">
                     ${counts.easy
-                      ? html`<span class="text-emerald-700"
-                          >${counts.easy}E</span
-                        >`
+                      ? html`<span class="text-emerald-700">${counts.easy}E</span>`
                       : ""}
                     ${counts.medium
-                      ? html`<span class="text-amber-700"
-                          >${counts.medium}M</span
-                        >`
+                      ? html`<span class="text-amber-700">${counts.medium}M</span>`
                       : ""}
-                    ${counts.hard
-                      ? html`<span class="text-rose-700">${counts.hard}H</span>`
-                      : ""}
+                    ${counts.hard ? html`<span class="text-rose-700">${counts.hard}H</span>` : ""}
                   </div>
                 </div>
               `;
@@ -1303,9 +1202,7 @@ export function AnalyticsView({ problems, onNavigate }) {
 
         <!-- Unsolved Next (Blind 75-based) -->
         <div class="flex flex-col gap-4">
-          <h3 class="text-sm font-bold text-white tracking-wide">
-            Up Next (Blind 75)
-          </h3>
+          <h3 class="text-sm font-bold text-white tracking-wide">Up Next (Blind 75)</h3>
           <div
             class="p-5 bg-gradient-to-b from-[#101018] to-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 h-full"
           >
@@ -1319,9 +1216,7 @@ export function AnalyticsView({ problems, onNavigate }) {
               : unsolvedNext.map(
                   (rec) => html`
                     <a
-                      href=${CONSTANTS.PLATFORMS.leetcode.problemsBase +
-                      rec.slug +
-                      "/"}
+                      href=${CONSTANTS.PLATFORMS.leetcode.problemsBase + rec.slug + "/"}
                       target="_blank"
                       rel="noreferrer"
                       class="p-3 bg-white/[0.02] border border-white/5 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all rounded-lg flex items-center justify-between group"
@@ -1331,9 +1226,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                           class="text-sm font-medium text-slate-300 group-hover:text-cyan-400 truncate"
                           >${rec.title}</span
                         >
-                        <span class="text-[10px] text-slate-500 mt-0.5"
-                          >${rec.topic}</span
-                        >
+                        <span class="text-[10px] text-slate-500 mt-0.5">${rec.topic}</span>
                       </div>
                       <span
                         class="text-xs px-2 py-0.5 rounded-full border ${diffColor(
@@ -1376,9 +1269,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                   class="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0"
                 >
                   <div class="flex flex-col">
-                    <span class="text-sm font-bold text-white"
-                      >${drilldown.label}</span
-                    >
+                    <span class="text-sm font-bold text-white">${drilldown.label}</span>
                     <span class="text-[11px] text-slate-500"
                       >${drilldown.problems.length}
                       problem${drilldown.problems.length !== 1 ? "s" : ""}</span
@@ -1419,9 +1310,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                     </button>
                   </div>
                 </div>
-                <div
-                  class="overflow-y-auto flex-1 px-3 py-3 flex flex-col gap-1.5"
-                >
+                <div class="overflow-y-auto flex-1 px-3 py-3 flex flex-col gap-1.5">
                   ${drilldown.problems.length === 0
                     ? html`<p class="text-slate-500 text-sm text-center py-8">
                         No problems found.
@@ -1451,11 +1340,8 @@ export function AnalyticsView({ problems, onNavigate }) {
                                 });
                               }}
                             >
-                              <div
-                                class="flex items-center justify-between gap-2"
-                              >
-                                <span
-                                  class="text-sm text-slate-200 leading-snug truncate"
+                              <div class="flex items-center justify-between gap-2">
+                                <span class="text-sm text-slate-200 leading-snug truncate"
                                   >${p.title || p.titleSlug}</span
                                 >
                                 <span class="text-[11px] ${diffCls} shrink-0"
@@ -1466,9 +1352,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                                 class="flex items-center gap-2 mt-0.5 text-[10px] text-slate-600"
                               >
                                 <span>${p.platform || ""}</span>
-                                ${p.lang?.name
-                                  ? html`<span>· ${p.lang.name}</span>`
-                                  : ""}
+                                ${p.lang?.name ? html`<span>· ${p.lang.name}</span>` : ""}
                               </div>
                             </button>
                           `;

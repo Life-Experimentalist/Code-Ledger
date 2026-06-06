@@ -3,10 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export async function fetchClaudeModels(
-  apiKey,
-  endpoint = "https://api.anthropic.com/v1",
-) {
+export async function fetchClaudeModels(apiKey, endpoint = "https://api.anthropic.com/v1") {
   // Anthropic API expects strict headers and cross-origin resource sharing from extensions requires bg-script proxy or exact headers.
   const res = await fetch(`${endpoint}/models`, {
     headers: {

@@ -47,10 +47,7 @@ export class CanonicalMap {
       const res = await fetch(url);
       this._map = this._normalizeEntries(await res.json());
     } catch (err) {
-      if (
-        typeof window !== "undefined" &&
-        window.location.protocol.startsWith("http")
-      ) {
+      if (typeof window !== "undefined" && window.location.protocol.startsWith("http")) {
         const res = await fetch("/data/canonical-map.json");
         this._map = this._normalizeEntries(await res.json());
       } else {

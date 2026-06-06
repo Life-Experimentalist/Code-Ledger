@@ -15,16 +15,13 @@ const dbg = createDebugger("DeepSeekModelFetcher");
  */
 export async function fetchAvailableModels(apiKey) {
   try {
-    const res = await fetch(
-      `${CONSTANTS.AI_PROVIDERS.deepseek.endpoint}/models`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
+    const res = await fetch(`${CONSTANTS.AI_PROVIDERS.deepseek.endpoint}/models`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
-    );
+    });
 
     if (!res.ok) {
       throw new Error(`Failed to fetch DeepSeek models: ${res.status}`);

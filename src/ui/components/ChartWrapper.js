@@ -17,13 +17,7 @@ const dbg = createDebugger("ChartWrapper");
  * onElementClick(label, value) — called when user clicks a chart segment/bar.
  * label = data label string, value = numeric data point.
  */
-export function ChartWrapper({
-  type,
-  data,
-  options,
-  className,
-  onElementClick,
-}) {
+export function ChartWrapper({ type, data, options, className, onElementClick }) {
   const canvasRef = useRef(null);
   const chartInstance = useRef(null);
   const onClickRef = useRef(onElementClick);
@@ -86,10 +80,7 @@ export function ChartWrapper({
 
   return html`
     <div class="relative w-full h-full ${className || ""}">
-      <canvas
-        ref=${canvasRef}
-        style=${onElementClick ? "cursor:pointer" : ""}
-      ></canvas>
+      <canvas ref=${canvasRef} style=${onElementClick ? "cursor:pointer" : ""}></canvas>
     </div>
   `;
 }

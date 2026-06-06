@@ -69,8 +69,7 @@ class HandlerRegistry {
           label: "Enable Git Sync",
           type: "toggle",
           default: true,
-          description:
-            "Automatically commit solved problems to your repository.",
+          description: "Automatically commit solved problems to your repository.",
         },
         {
           key: "autoReview",
@@ -84,16 +83,14 @@ class HandlerRegistry {
           label: "Solve Notifications",
           type: "toggle",
           default: true,
-          description:
-            "Show a browser notification when a problem is committed.",
+          description: "Show a browser notification when a problem is committed.",
         },
         {
           key: "autoSync",
           label: "Sync on Startup",
           type: "toggle",
           default: true,
-          description:
-            "Re-sync your repository index when the extension loads.",
+          description: "Re-sync your repository index when the extension loads.",
         },
         {
           key: "telemetryOptIn",
@@ -132,8 +129,7 @@ class HandlerRegistry {
           label: "Global AI Model (optional)",
           type: "text",
           default: "",
-          description:
-            "Optional model name to use across providers that support a global model.",
+          description: "Optional model name to use across providers that support a global model.",
         },
         {
           key: "aiCopyable",
@@ -168,8 +164,7 @@ class HandlerRegistry {
           default: CONSTANTS.COMMIT_MESSAGE_TEMPLATE,
           advanced: true,
           placeholder: "[{topic}] {title} — {difficulty} | {language}",
-          description:
-            "Variables: {title}, {topic}, {difficulty}, {language}, {platform}.",
+          description: "Variables: {title}, {topic}, {difficulty}, {language}, {platform}.",
         },
         {
           key: "debugMode",

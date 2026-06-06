@@ -37,9 +37,7 @@ async function pasteWithoutIndent() {
   }
   if (!text) return;
 
-  const inputArea = document.querySelector(
-    ".monaco-editor .inputarea.monaco-mouse-cursor-text",
-  );
+  const inputArea = document.querySelector(".monaco-editor .inputarea.monaco-mouse-cursor-text");
   if (inputArea) {
     inputArea.focus();
     if (document.execCommand("insertText", false, text)) return;
@@ -65,10 +63,7 @@ function toolbarFromAnchor(anchor) {
   let el = anchor.parentElement;
   for (let i = 0; i < 5 && el; i++, el = el.parentElement) {
     const buttonCount = el.querySelectorAll("button").length;
-    if (
-      buttonCount >= 2 &&
-      /flex|items-center|justify-between|gap-/.test(el.className || "")
-    ) {
+    if (buttonCount >= 2 && /flex|items-center|justify-between|gap-/.test(el.className || "")) {
       return el;
     }
   }
@@ -88,15 +83,9 @@ function findEditorToolbar() {
     document.querySelector(
       "div.flex.h-8.items-center.justify-between > div.flex.h-full.items-center.gap-1",
     ),
-    document.querySelector(
-      "div.flex.h-8.items-center.justify-between > div:last-child",
-    ),
-    document.querySelector(
-      "[class*='editor-header'] div.flex.items-center.gap-1",
-    ),
-    document.querySelector(
-      "[class*='editor-panel'] div.flex.h-8 > div:last-child",
-    ),
+    document.querySelector("div.flex.h-8.items-center.justify-between > div:last-child"),
+    document.querySelector("[class*='editor-header'] div.flex.items-center.gap-1"),
+    document.querySelector("[class*='editor-panel'] div.flex.h-8 > div:last-child"),
     toolbarFromAnchor(submit),
     toolbarFromAnchor(monaco),
     (() => {
@@ -112,9 +101,7 @@ function findEditorToolbar() {
 
   return (
     candidates.find((el) => el.querySelectorAll("button").length > 0) ||
-    candidates.find((el) =>
-      /flex|items-center|justify-between|gap-/.test(el.className || ""),
-    ) ||
+    candidates.find((el) => /flex|items-center|justify-between|gap-/.test(el.className || "")) ||
     candidates[0] ||
     null
   );
@@ -315,11 +302,7 @@ export function injectQoL(opts = {}) {
     if (showAI && onAIClick && !document.getElementById("cl-ai-toolbar-btn")) {
       const pasteEl = document.getElementById("cl-code-paste");
       const copyEl = document.getElementById("cl-code-copy");
-      const ref = pasteEl
-        ? pasteEl.nextSibling
-        : copyEl
-          ? copyEl.nextSibling
-          : toolbar.firstChild;
+      const ref = pasteEl ? pasteEl.nextSibling : copyEl ? copyEl.nextSibling : toolbar.firstChild;
       toolbar.insertBefore(makeAIBtn(onAIClick), ref);
     }
     // Remove buttons that were disabled after being injected

@@ -15,11 +15,7 @@ async function getFirstKeyForProvider(providerId) {
   return list.length ? list[0].trim() : null;
 }
 
-export async function fetchModelsForProvider(
-  providerId,
-  endpointOverride,
-  options = {},
-) {
+export async function fetchModelsForProvider(providerId, endpointOverride, options = {}) {
   dbg.log(`fetchModelsForProvider(): ${providerId}`);
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return [];
@@ -27,16 +23,10 @@ export async function fetchModelsForProvider(
   const throwOnError = !!options.throwOnError;
 
   const epFor = (useModelsEndpoint = false) => {
-    const baseOverride = endpointOverride
-      ? String(endpointOverride).replace(/\/$/, "")
-      : null;
+    const baseOverride = endpointOverride ? String(endpointOverride).replace(/\/$/, "") : null;
     const me = provider.modelsEndpoint;
     if (useModelsEndpoint && me) {
-      if (
-        baseOverride &&
-        provider.endpoint &&
-        me.startsWith(provider.endpoint)
-      ) {
+      if (baseOverride && provider.endpoint && me.startsWith(provider.endpoint)) {
         return baseOverride + me.substring(provider.endpoint.length);
       }
       return me.replace(/\/$/, "");
@@ -52,8 +42,7 @@ export async function fetchModelsForProvider(
       const me = provider.modelsEndpoint;
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
-          ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          ? endpointOverride.replace(/\/$/, "") + me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       // Use header `x-goog-api-key` for Google Gemini model listing when possible.
@@ -61,9 +50,7 @@ export async function fetchModelsForProvider(
       if (!res.ok) return [];
       const data = await res.json();
       const geminiModels = (data.models || [])
-        .filter((m) =>
-          m.supportedGenerationMethods?.includes("generateContent"),
-        )
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
         .map((m) => ({
           id: m.name.replace("models/", ""),
           label: `${provider.name}: ${m.displayName || m.name.replace("models/", "")}`,
@@ -78,8 +65,7 @@ export async function fetchModelsForProvider(
       const me = provider.modelsEndpoint;
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
-          ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          ? endpointOverride.replace(/\/$/, "") + me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       const res = await fetch(ep, {
@@ -104,8 +90,7 @@ export async function fetchModelsForProvider(
       const me = provider.modelsEndpoint;
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
-          ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          ? endpointOverride.replace(/\/$/, "") + me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       try {
@@ -137,8 +122,7 @@ export async function fetchModelsForProvider(
       const me = provider.modelsEndpoint;
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
-          ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          ? endpointOverride.replace(/\/$/, "") + me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/tags`;
       try {
@@ -166,8 +150,7 @@ export async function fetchModelsForProvider(
       const me = provider.modelsEndpoint;
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
-          ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          ? endpointOverride.replace(/\/$/, "") + me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       try {
@@ -194,8 +177,7 @@ export async function fetchModelsForProvider(
       const me = provider.modelsEndpoint;
       const ep = me
         ? endpointOverride && me.startsWith(provider.endpoint)
-          ? endpointOverride.replace(/\/$/, "") +
-            me.substring(provider.endpoint.length)
+          ? endpointOverride.replace(/\/$/, "") + me.substring(provider.endpoint.length)
           : me.replace(/\/$/, "")
         : `${epFor()}/models`;
       try {
@@ -229,9 +211,7 @@ export async function fetchModelsForProvider(
 }
 
 export async function fetchAIModels() {
-  dbg.log(
-    `fetchAIModels(): fetching from ${Object.keys(CONSTANTS.AI_PROVIDERS).length} providers`,
-  );
+  dbg.log(`fetchAIModels(): fetching from ${Object.keys(CONSTANTS.AI_PROVIDERS).length} providers`);
   const out = [];
   for (const pid of Object.keys(CONSTANTS.AI_PROVIDERS)) {
     try {
@@ -248,17 +228,11 @@ export async function fetchAIModels() {
 export async function testAIKey(providerId, key, endpointOverride = "") {
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return { ok: false, error: "Unknown provider" };
-  const baseOverride = endpointOverride
-    ? String(endpointOverride).replace(/\/$/, "")
-    : "";
+  const baseOverride = endpointOverride ? String(endpointOverride).replace(/\/$/, "") : "";
   const endpointForModels = () => {
     const me = provider.modelsEndpoint;
     if (me) {
-      if (
-        baseOverride &&
-        provider.endpoint &&
-        me.startsWith(provider.endpoint)
-      ) {
+      if (baseOverride && provider.endpoint && me.startsWith(provider.endpoint)) {
         return baseOverride + me.substring(provider.endpoint.length);
       }
       return me.replace(/\/$/, "");
@@ -363,9 +337,7 @@ export async function testProviderEndpoint(providerId, endpointOverride) {
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return { ok: false, error: "Unknown provider" };
 
-  const baseOverride = endpointOverride
-    ? String(endpointOverride).replace(/\/$/, "")
-    : null;
+  const baseOverride = endpointOverride ? String(endpointOverride).replace(/\/$/, "") : null;
   const me = provider.modelsEndpoint;
   const ep = me
     ? baseOverride && provider.endpoint && me.startsWith(provider.endpoint)

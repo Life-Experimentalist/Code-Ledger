@@ -38,14 +38,7 @@ async function save(data) {
 }
 
 /** Record a problem being solved. */
-export async function recordSolve({
-  slug,
-  platform,
-  difficulty,
-  lang,
-  elapsedSeconds,
-  tags,
-}) {
+export async function recordSolve({ slug, platform, difficulty, lang, elapsedSeconds, tags }) {
   dbg.log(`recordSolve(): entering for ${platform}::${slug}`);
   if (!(await isEnabled())) {
     dbg.log(`recordSolve(): disabled, skipping`);
@@ -75,15 +68,8 @@ export async function recordSolve({
 }
 
 /** Record a chat interaction (user sent a message). */
-export async function recordChatInteraction({
-  slug,
-  platform,
-  mode,
-  commandsUsed,
-}) {
-  dbg.log(
-    `recordChatInteraction(): entering for ${platform}::${slug}, mode=${mode}`,
-  );
+export async function recordChatInteraction({ slug, platform, mode, commandsUsed }) {
+  dbg.log(`recordChatInteraction(): entering for ${platform}::${slug}, mode=${mode}`);
   if (!(await isEnabled())) {
     dbg.log(`recordChatInteraction(): disabled, skipping`);
     return;
@@ -103,9 +89,7 @@ export async function recordChatInteraction({
 
 /** Record a hint being viewed for a problem. */
 export async function recordHintView({ slug, platform, hintIndex }) {
-  dbg.log(
-    `recordHintView(): entering for ${platform}::${slug}, hintIndex=${hintIndex}`,
-  );
+  dbg.log(`recordHintView(): entering for ${platform}::${slug}, hintIndex=${hintIndex}`);
   if (!(await isEnabled())) {
     dbg.log(`recordHintView(): disabled, skipping`);
     return;
@@ -135,12 +119,7 @@ export async function getChatStats() {
  * Record an AI review being generated for a problem.
  * Tracks which providers were used and how thorough reviews are over time.
  */
-export async function recordAIReview({
-  slug,
-  platform,
-  providerId,
-  reviewLength,
-}) {
+export async function recordAIReview({ slug, platform, providerId, reviewLength }) {
   dbg.log(`recordAIReview(): entering for ${platform}::${slug}`);
   if (!(await isEnabled())) {
     dbg.log(`recordAIReview(): disabled, skipping`);
@@ -167,12 +146,7 @@ export async function recordAIReview({
  * `weakAreas` is a string[] of short issue labels (e.g. "edge case", "O(n²)").
  * `summary` is the first ~200 chars of the review.
  */
-export async function recordAIInsights({
-  slug,
-  platform,
-  weakAreas = [],
-  summary = "",
-}) {
+export async function recordAIInsights({ slug, platform, weakAreas = [], summary = "" }) {
   dbg.log(`recordAIInsights(): entering for ${platform}::${slug}`);
   if (!(await isEnabled())) return;
   const bank = await load();

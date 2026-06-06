@@ -51,8 +51,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
   const missingCount = problems.filter((p) => {
     if (ignoredMetadataIds.has(p.id)) return false; // Exclude ignored
     const noTags = !p.tags || p.tags.length === 0;
-    const noDifficulty =
-      !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
+    const noDifficulty = !p.difficulty || !["Easy", "Medium", "Hard"].includes(p.difficulty);
     return noTags || noDifficulty;
   }).length;
 
@@ -66,15 +65,11 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
           reject(new Error("Extension not available"));
           return;
         }
-        chrome.runtime.sendMessage(
-          { type: "REFRESH_METADATA", problems },
-          (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp);
-            else reject(new Error(resp?.error || "Refresh failed"));
-          },
-        );
+        chrome.runtime.sendMessage({ type: "REFRESH_METADATA", problems }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Refresh failed"));
+        });
       });
       setRefreshMsg(`Queued ${missingCount} problem(s) for refresh`);
     } catch (e) {
@@ -88,14 +83,9 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
     try {
       if (typeof chrome !== "undefined" && chrome.storage?.local?.remove) {
         await new Promise((res) =>
-          chrome.storage.local.remove(
-            ["cl.committed.submissions", "cl.committed.sluglangs"],
-            res,
-          ),
+          chrome.storage.local.remove(["cl.committed.submissions", "cl.committed.sluglangs"], res),
         );
-        setCommitCacheClearedMsg(
-          "Commit cache cleared — re-open LeetCode to re-commit.",
-        );
+        setCommitCacheClearedMsg("Commit cache cleared — re-open LeetCode to re-commit.");
       } else {
         setCommitCacheClearedMsg("Not available outside extension context.");
       }
@@ -118,8 +108,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
       if (typeof chrome !== "undefined" && chrome.storage?.local?.clear) {
         await new Promise((res, rej) =>
           chrome.storage.local.clear(() => {
-            if (chrome.runtime.lastError)
-              rej(new Error(chrome.runtime.lastError.message));
+            if (chrome.runtime.lastError) rej(new Error(chrome.runtime.lastError.message));
             else res();
           }),
         );
@@ -140,15 +129,11 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
       if (typeof chrome === "undefined" || !chrome.runtime?.id)
         throw new Error("Extension not available");
       const res = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: "SYNC_SETTINGS_TO_GITHUB" },
-          (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp);
-            else reject(new Error(resp?.error || "Sync failed"));
-          },
-        );
+        chrome.runtime.sendMessage({ type: "SYNC_SETTINGS_TO_GITHUB" }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Sync failed"));
+        });
       });
       setSettingsSyncMsg(`✓ Settings synced to .codeledger/config.json`);
       setTimeout(() => setSettingsSyncMsg(""), 4000);
@@ -167,15 +152,11 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
       if (typeof chrome === "undefined" || !chrome.runtime?.id)
         throw new Error("Extension not available");
       const res = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: "SYNC_SETTINGS_FROM_GITHUB" },
-          (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp);
-            else reject(new Error(resp?.error || "Sync failed"));
-          },
-        );
+        chrome.runtime.sendMessage({ type: "SYNC_SETTINGS_FROM_GITHUB" }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Sync failed"));
+        });
       });
       setSettingsSyncMsg(`✓ Settings updated from repository`);
       setTimeout(() => setSettingsSyncMsg(""), 4000);
@@ -187,16 +168,13 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
   };
 
   function ToggleRow({ settingKey, label, desc, defaultOn = false }) {
-    const isOn =
-      settings?.[settingKey] !== undefined ? !!settings[settingKey] : defaultOn;
+    const isOn = settings?.[settingKey] !== undefined ? !!settings[settingKey] : defaultOn;
     return html`
       <div class="flex items-start gap-3">
         <button
           onClick=${() => onSettingsChange(settingKey, !isOn)}
           class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-            ${isOn
-            ? "bg-cyan-500/30 border-cyan-500/40"
-            : "bg-white/5 border-white/10"}"
+            ${isOn ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
         >
           <span
             class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
@@ -219,8 +197,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
         problems=${problems}
         onClose=${() => setShowMissingModal(false)}
       />`}
-      ${showDedupQueue &&
-      html`<${DedupReviewQueue} onClose=${() => setShowDedupQueue(false)} />`}
+      ${showDedupQueue && html`<${DedupReviewQueue} onClose=${() => setShowDedupQueue(false)} />`}
       <div>
         <h2 class="text-base font-semibold text-white mb-1">Advanced</h2>
         <p class="text-xs text-slate-500 mb-4">
@@ -230,9 +207,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
 
       <!-- Tracking & privacy -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
           Tracking & Privacy
         </h3>
         <${ToggleRow}
@@ -251,11 +226,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
 
       <!-- Developer -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
-          Developer
-        </h3>
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Developer</h3>
         <${ToggleRow}
           settingKey="debugMode"
           label="Debug mode"
@@ -289,16 +260,11 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
               if (typeof chrome === "undefined" || !chrome.runtime?.id)
                 throw new Error("Extension not available");
               const res = await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage(
-                  { type: "FORCE_REBUILD_REPO" },
-                  (resp) => {
-                    if (chrome.runtime.lastError)
-                      reject(new Error(chrome.runtime.lastError.message));
-                    else if (resp?.ok) resolve(resp);
-                    else
-                      reject(new Error(resp?.error || "Force rebuild failed"));
-                  },
-                );
+                chrome.runtime.sendMessage({ type: "FORCE_REBUILD_REPO" }, (resp) => {
+                  if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                  else if (resp?.ok) resolve(resp);
+                  else reject(new Error(resp?.error || "Force rebuild failed"));
+                });
               });
               setForceMsg(
                 `Force rebuild complete — committed ${res.committed || 0} problems, deleted ${res.deleted || 0} files.`,
@@ -317,9 +283,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
         </button>
         ${forceMsg
           ? html`<p
-              class="text-xs ${forceMsg.includes("failed")
-                ? "text-rose-400"
-                : "text-emerald-400"}"
+              class="text-xs ${forceMsg.includes("failed") ? "text-rose-400" : "text-emerald-400"}"
             >
               ${forceMsg}
             </p>`
@@ -328,9 +292,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
 
       <!-- Metadata refresh -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
           Metadata Refresh
         </h3>
         <p class="text-[11px] text-slate-500">
@@ -360,9 +322,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
         ${refreshMsg &&
         html`
           <p
-            class="text-xs ${refreshMsg.includes("Failed")
-              ? "text-rose-400"
-              : "text-emerald-400"}"
+            class="text-xs ${refreshMsg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}"
           >
             ${refreshMsg}
           </p>
@@ -370,19 +330,12 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
       </div>
 
       <!-- Settings Sync -->
-      <div
-        class="p-4 rounded-xl border border-cyan-500/20 bg-cyan-950/10 space-y-3"
-      >
-        <h3 class="text-xs font-medium text-cyan-400 uppercase tracking-widest">
-          Settings Sync
-        </h3>
+      <div class="p-4 rounded-xl border border-cyan-500/20 bg-cyan-950/10 space-y-3">
+        <h3 class="text-xs font-medium text-cyan-400 uppercase tracking-widest">Settings Sync</h3>
         <p class="text-[11px] text-slate-500">
           Sync portable settings to/from your GitHub repository in
-          <code class="text-[10px] bg-black/20 px-1 rounded"
-            >.codeledger/config.json</code
-          >
-          for cross-device access. Authentication tokens and API keys are never
-          synced.
+          <code class="text-[10px] bg-black/20 px-1 rounded">.codeledger/config.json</code>
+          for cross-device access. Authentication tokens and API keys are never synced.
         </p>
         <div class="flex items-center gap-3">
           <button
@@ -408,16 +361,12 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
                 if (typeof chrome === "undefined" || !chrome.runtime?.id)
                   throw new Error("Extension not available");
                 const res = await new Promise((resolve, reject) => {
-                  chrome.runtime.sendMessage(
-                    { type: "FORCE_COMMIT_SETTINGS" },
-                    (resp) => {
-                      if (chrome.runtime.lastError)
-                        reject(new Error(chrome.runtime.lastError.message));
-                      else if (resp?.ok) resolve(resp);
-                      else
-                        reject(new Error(resp?.error || "Force commit failed"));
-                    },
-                  );
+                  chrome.runtime.sendMessage({ type: "FORCE_COMMIT_SETTINGS" }, (resp) => {
+                    if (chrome.runtime.lastError)
+                      reject(new Error(chrome.runtime.lastError.message));
+                    else if (resp?.ok) resolve(resp);
+                    else reject(new Error(resp?.error || "Force commit failed"));
+                  });
                 });
                 setSettingsSyncMsg(`✓ Force commit complete`);
                 setTimeout(() => setSettingsSyncMsg(""), 4000);
@@ -447,15 +396,10 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
 
       <!-- Commit cache -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
-        <h3
-          class="text-xs font-medium text-slate-400 uppercase tracking-widest"
-        >
-          Commit Cache
-        </h3>
+        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Commit Cache</h3>
         <p class="text-[11px] text-slate-500">
-          CodeLedger tracks which problems have already been committed to avoid
-          duplicates. If you deleted your repository and want to re-commit
-          existing solutions, clear the cache.
+          CodeLedger tracks which problems have already been committed to avoid duplicates. If you
+          deleted your repository and want to re-commit existing solutions, clear the cache.
         </p>
         <button
           onClick=${clearCommitCache}
@@ -464,21 +408,15 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
           Clear commit cache
         </button>
         ${commitCacheClearedMsg &&
-        html`
-          <p class="text-xs text-emerald-400">${commitCacheClearedMsg}</p>
-        `}
+        html` <p class="text-xs text-emerald-400">${commitCacheClearedMsg}</p> `}
       </div>
 
       <!-- Factory reset -->
-      <div
-        class="p-4 rounded-xl border border-rose-500/15 bg-rose-950/10 space-y-3"
-      >
-        <h3 class="text-xs font-medium text-rose-400 uppercase tracking-widest">
-          Danger Zone
-        </h3>
+      <div class="p-4 rounded-xl border border-rose-500/15 bg-rose-950/10 space-y-3">
+        <h3 class="text-xs font-medium text-rose-400 uppercase tracking-widest">Danger Zone</h3>
         <p class="text-[11px] text-slate-500">
-          Factory reset erases all local data: problems, settings, auth tokens,
-          and commit history. Your GitHub repository is not affected.
+          Factory reset erases all local data: problems, settings, auth tokens, and commit history.
+          Your GitHub repository is not affected.
         </p>
         <button
           onClick=${handleFactoryReset}
@@ -489,11 +427,7 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
         </button>
         ${resetMsg &&
         html`
-          <p
-            class="text-xs ${resetMsg.includes("failed")
-              ? "text-rose-400"
-              : "text-emerald-400"}"
-          >
+          <p class="text-xs ${resetMsg.includes("failed") ? "text-rose-400" : "text-emerald-400"}">
             ${resetMsg}
           </p>
         `}

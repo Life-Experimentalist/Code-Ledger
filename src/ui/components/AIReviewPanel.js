@@ -41,9 +41,7 @@ function QueueStatusCard({
   if (total === 0) return "";
 
   const nextRunIn =
-    queueStatus.nextRunInMs != null
-      ? formatDuration(queueStatus.nextRunInMs)
-      : null;
+    queueStatus.nextRunInMs != null ? formatDuration(queueStatus.nextRunInMs) : null;
   const pausedIn =
     queueStatus.isPaused && queueStatus.pausedUntil
       ? formatDuration(queueStatus.pausedUntil - Date.now())
@@ -62,14 +60,10 @@ function QueueStatusCard({
           : `Next auto review in ${nextRunIn}`;
 
   return html`
-    <div
-      class="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 space-y-3"
-    >
+    <div class="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 space-y-3">
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
-          <p
-            class="text-xs font-semibold uppercase tracking-widest text-cyan-300"
-          >
+          <p class="text-xs font-semibold uppercase tracking-widest text-cyan-300">
             AI Review Queue
           </p>
           <p class="mt-1 text-sm text-slate-200">${nextLabel}</p>
@@ -77,9 +71,7 @@ function QueueStatusCard({
         <div class="flex items-center gap-2 shrink-0">
           <button
             onClick=${onRunQueueNow}
-            disabled=${runQueueBusy ||
-            (pending === 0 && processing === 0) ||
-            !onRunQueueNow}
+            disabled=${runQueueBusy || (pending === 0 && processing === 0) || !onRunQueueNow}
             class="px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest border transition-colors ${runQueueBusy ||
             (pending === 0 && processing === 0) ||
             !onRunQueueNow
@@ -137,9 +129,7 @@ function QueueStatusCard({
             </span>`
           : ""}
       </div>
-      ${queueError
-        ? html`<p class="text-xs text-rose-400">${queueError}</p>`
-        : ""}
+      ${queueError ? html`<p class="text-xs text-rose-400">${queueError}</p>` : ""}
     </div>
   `;
 }

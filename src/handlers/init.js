@@ -30,11 +30,7 @@ import { OpenRouterHandler } from "./ai/openrouter/index.js";
 
 export function initializeHandlers() {
   dbg.log(`initializeHandlers(): starting handler registration...`);
-  const platforms = [
-    new LeetCodeHandler(),
-    new GeeksForGeeksHandler(),
-    new CodeforcesHandler(),
-  ];
+  const platforms = [new LeetCodeHandler(), new GeeksForGeeksHandler(), new CodeforcesHandler()];
   platforms.forEach((h) => {
     registry.registerPlatform(h.id, h);
     if (typeof h.getSettingsSchema === "function")
@@ -42,11 +38,7 @@ export function initializeHandlers() {
     dbg.log(`initializeHandlers(): ✓ platform ${h.id} registered`);
   });
 
-  const gits = [
-    new GitHubHandler(),
-    new GitLabHandler(),
-    new BitbucketHandler(),
-  ];
+  const gits = [new GitHubHandler(), new GitLabHandler(), new BitbucketHandler()];
   gits.forEach((h) => {
     registry.registerGitProvider(h.id, h);
     if (typeof h.getSettingsSchema === "function")

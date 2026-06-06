@@ -18,12 +18,7 @@ const dbg = createDebugger("CanonicalView");
  *  5. Issues with ≥ VOTES_REQUIRED (5) 👍 are shown as "ready to merge".
  */
 
-import {
-  h,
-  useState,
-  useEffect,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -42,8 +37,7 @@ const PLATFORM_LABEL = {
   codeforces: "Codeforces",
 };
 const PLATFORM_FAVICON = {
-  leetcode:
-    "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+  leetcode: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
   geeksforgeeks: `${CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl}/favicon.ico`,
   codeforces: `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/favicon.ico`,
 };
@@ -134,11 +128,7 @@ function PlatformBadge({ platform }) {
 function ThumbsBar({ count, required }) {
   const pct = Math.min(100, Math.round((count / required) * 100));
   const color =
-    count >= required
-      ? "#22c55e"
-      : count >= Math.ceil(required / 2)
-        ? "#f59e0b"
-        : "#64748b";
+    count >= required ? "#22c55e" : count >= Math.ceil(required / 2) ? "#f59e0b" : "#64748b";
   return html`
     <div class="flex items-center gap-2">
       <div class="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
@@ -188,9 +178,7 @@ export function CanonicalView({ problems }) {
   const [editingEntry, setEditingEntry] = useState(null); // null = new, object = editing
   const [localTitle, setLocalTitle] = useState("");
   const [localTopic, setLocalTopic] = useState("arrays");
-  const [localAliases, setLocalAliases] = useState([
-    { platform: "leetcode", slug: "" },
-  ]);
+  const [localAliases, setLocalAliases] = useState([{ platform: "leetcode", slug: "" }]);
   const [localSaving, setLocalSaving] = useState(false);
   const [voting, setVoting] = useState({}); // issueNumber → bool
   const [votedSet, setVotedSet] = useState(new Set());
@@ -214,11 +202,7 @@ export function CanonicalView({ problems }) {
       setEditingEntry(entry);
       setLocalTitle(entry.canonicalTitle || "");
       setLocalTopic(entry.topic || "arrays");
-      setLocalAliases(
-        entry.aliases?.length
-          ? entry.aliases
-          : [{ platform: "leetcode", slug: "" }],
-      );
+      setLocalAliases(entry.aliases?.length ? entry.aliases : [{ platform: "leetcode", slug: "" }]);
     } else {
       setEditingEntry(null);
       setLocalTitle("");
@@ -262,18 +246,14 @@ export function CanonicalView({ problems }) {
 
   async function deleteLocalEntry(canonicalId) {
     await Storage.deleteLocalCanonicalEntry(canonicalId);
-    setLocalEntries((prev) =>
-      prev.filter((e) => e.canonicalId !== canonicalId),
-    );
+    setLocalEntries((prev) => prev.filter((e) => e.canonicalId !== canonicalId));
   }
 
   // ── Fetch canonical map ─────────────────────────────────────────────
   useEffect(() => {
     setMapLoading(true);
     fetch(CONSTANTS.URLS.CANONICAL_MAP_RAW, { cache: "default" })
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)),
-      )
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
       .then((data) => {
         setCanonicalMap(data);
         setMapLoading(false);
@@ -359,9 +339,7 @@ export function CanonicalView({ problems }) {
       (e) =>
         e.canonicalTitle?.toLowerCase() === canonTitle.trim().toLowerCase() ||
         validAliases.some((a) =>
-          e.aliases?.some(
-            (ea) => ea.platform === a.platform && ea.slug === a.slug.trim(),
-          ),
+          e.aliases?.some((ea) => ea.platform === a.platform && ea.slug === a.slug.trim()),
         ),
     );
     if (existing) {
@@ -387,10 +365,7 @@ export function CanonicalView({ problems }) {
     };
 
     const aliasLines = validAliases
-      .map(
-        (a) =>
-          `- **${PLATFORM_LABEL[a.platform] || a.platform}**: \`${a.slug.trim()}\``,
-      )
+      .map((a) => `- **${PLATFORM_LABEL[a.platform] || a.platform}**: \`${a.slug.trim()}\``)
       .join("\n");
     const body = `## Canonical Problem Mapping Request
 
@@ -414,19 +389,15 @@ ${aliasLines}
 *This issue was submitted via CodeLedger library. It needs ${VOTES_REQUIRED} 👍 reactions to be merged into the canonical map.*`;
 
     try {
-      const created = await ghFetch(
-        `/repos/${CANONICAL_REPO}/issues`,
-        githubToken,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: `[Canonical] ${canonTitle.trim()} (${validAliases.map((a) => a.platform).join(" ↔ ")})`,
-            body,
-            labels: [ISSUE_LABEL],
-          }),
-        },
-      );
+      const created = await ghFetch(`/repos/${CANONICAL_REPO}/issues`, githubToken, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `[Canonical] ${canonTitle.trim()} (${validAliases.map((a) => a.platform).join(" ↔ ")})`,
+          body,
+          labels: [ISSUE_LABEL],
+        }),
+      });
       setSubmitResult({
         ok: true,
         msg: `Issue #${created.number} created!`,
@@ -455,15 +426,11 @@ ${aliasLines}
     if (votedSet.has(issueNumber)) return;
     setVoting((v) => ({ ...v, [issueNumber]: true }));
     try {
-      await ghFetch(
-        `/repos/${CANONICAL_REPO}/issues/${issueNumber}/reactions`,
-        githubToken,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: "+1" }),
-        },
-      );
+      await ghFetch(`/repos/${CANONICAL_REPO}/issues/${issueNumber}/reactions`, githubToken, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "+1" }),
+      });
       setVotedSet((s) => new Set([...s, issueNumber]));
       setIssues((prev) =>
         prev.map((iss) =>
@@ -490,21 +457,17 @@ ${aliasLines}
     <div class="flex flex-col gap-8 w-full">
       <!-- ── Header ── -->
       <div class="flex flex-col gap-1">
-        <h2 class="text-lg font-semibold text-white">
-          Cross-Platform Problem Linking
-        </h2>
+        <h2 class="text-lg font-semibold text-white">Cross-Platform Problem Linking</h2>
         <p class="text-sm text-slate-400">
-          Link equivalent problems across LeetCode, GeeksForGeeks, and
-          Codeforces. Mappings with ${VOTES_REQUIRED}+ 👍 are merged into the
-          canonical map.
+          Link equivalent problems across LeetCode, GeeksForGeeks, and Codeforces. Mappings with
+          ${VOTES_REQUIRED}+ 👍 are merged into the canonical map.
         </p>
         ${!githubToken
           ? html`
               <div
                 class="mt-2 flex items-center gap-2 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2"
               >
-                ⚠️ Connect GitHub in <strong>Settings</strong> to submit
-                requests and vote.
+                ⚠️ Connect GitHub in <strong>Settings</strong> to submit requests and vote.
               </div>
             `
           : html`
@@ -515,12 +478,8 @@ ${aliasLines}
       </div>
 
       <!-- ── Search existing canonical map ── -->
-      <div
-        class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4"
-      >
-        <h3 class="text-sm font-bold text-white uppercase tracking-widest">
-          Search Canonical Map
-        </h3>
+      <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4">
+        <h3 class="text-sm font-bold text-white uppercase tracking-widest">Search Canonical Map</h3>
         <div class="flex gap-2">
           <input
             value=${searchQuery}
@@ -543,14 +502,8 @@ ${aliasLines}
             : ""}
         </div>
 
-        ${mapLoading
-          ? html`<p class="text-[11px] text-slate-500">
-              Loading canonical map…
-            </p>`
-          : ""}
-        ${mapError
-          ? html`<p class="text-[11px] text-rose-400">Error: ${mapError}</p>`
-          : ""}
+        ${mapLoading ? html`<p class="text-[11px] text-slate-500">Loading canonical map…</p>` : ""}
+        ${mapError ? html`<p class="text-[11px] text-rose-400">Error: ${mapError}</p>` : ""}
         ${searchResults !== null
           ? html`
               <div class="flex flex-col gap-2 max-h-64 overflow-y-auto">
@@ -559,9 +512,7 @@ ${aliasLines}
                       <div
                         class="flex flex-col gap-2 p-4 bg-amber-500/5 border border-amber-500/15 rounded-xl text-center"
                       >
-                        <p class="text-sm text-amber-300">
-                          No mapping found for "${searchQuery}".
-                        </p>
+                        <p class="text-sm text-amber-300">No mapping found for "${searchQuery}".</p>
                         <button
                           onClick=${() => {
                             setFormOpen(true);
@@ -591,10 +542,7 @@ ${aliasLines}
                             ${(entry.aliases || []).map(
                               (a) => html`
                                 <${PlatformBadge} platform=${a.platform} />
-                                <span
-                                  class="text-[10px] font-mono text-slate-500"
-                                  >${a.slug}</span
-                                >
+                                <span class="text-[10px] font-mono text-slate-500">${a.slug}</span>
                               `,
                             )}
                           </div>
@@ -620,21 +568,17 @@ ${aliasLines}
           : !mapLoading && !mapError && !searchQuery
             ? html`
                 <p class="text-[11px] text-slate-600">
-                  ${canonicalMap?.entries?.length ?? 0} canonical entries
-                  loaded. Search to find a mapping.
+                  ${canonicalMap?.entries?.length ?? 0} canonical entries loaded. Search to find a
+                  mapping.
                 </p>
               `
             : ""}
       </div>
 
       <!-- ── Submit new mapping ── -->
-      <div
-        class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4"
-      >
+      <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-bold text-white uppercase tracking-widest">
-            Submit New Mapping
-          </h3>
+          <h3 class="text-sm font-bold text-white uppercase tracking-widest">Submit New Mapping</h3>
           <button
             onClick=${() => setFormOpen(!formOpen)}
             class="text-xs px-3 py-1.5 rounded-lg border transition-colors ${formOpen
@@ -667,13 +611,10 @@ ${aliasLines}
           : ""}
         ${formOpen
           ? html`
-              <div
-                class="flex flex-col gap-4 p-4 bg-white/3 border border-white/5 rounded-xl"
-              >
+              <div class="flex flex-col gap-4 p-4 bg-white/3 border border-white/5 rounded-xl">
                 <!-- Canonical title -->
                 <div class="flex flex-col gap-1.5">
-                  <label
-                    class="text-[11px] uppercase tracking-wider text-slate-500"
+                  <label class="text-[11px] uppercase tracking-wider text-slate-500"
                     >Canonical Title *</label
                   >
                   <input
@@ -683,17 +624,13 @@ ${aliasLines}
                     class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-600"
                   />
                   <p class="text-[10px] text-slate-600">
-                    A platform-agnostic name for the problem (e.g. "Two Sum",
-                    not "LeetCode #1").
+                    A platform-agnostic name for the problem (e.g. "Two Sum", not "LeetCode #1").
                   </p>
                 </div>
 
                 <!-- Topic -->
                 <div class="flex flex-col gap-1.5">
-                  <label
-                    class="text-[11px] uppercase tracking-wider text-slate-500"
-                    >Topic *</label
-                  >
+                  <label class="text-[11px] uppercase tracking-wider text-slate-500">Topic *</label>
                   <select
                     value=${canonTopic}
                     onChange=${(e) => setCanonTopic(e.target.value)}
@@ -705,8 +642,7 @@ ${aliasLines}
 
                 <!-- Platform aliases -->
                 <div class="flex flex-col gap-2">
-                  <label
-                    class="text-[11px] uppercase tracking-wider text-slate-500"
+                  <label class="text-[11px] uppercase tracking-wider text-slate-500"
                     >Platform Slugs * (min 2)</label
                   >
                   ${aliases.map(
@@ -725,10 +661,7 @@ ${aliasLines}
                           class="px-2 py-1.5 bg-black border border-white/10 rounded-lg text-xs text-white w-36 shrink-0"
                         >
                           ${PLATFORMS.map(
-                            (p) =>
-                              html`<option value=${p}>
-                                ${PLATFORM_LABEL[p]}
-                              </option>`,
+                            (p) => html`<option value=${p}>${PLATFORM_LABEL[p]}</option>`,
                           )}
                         </select>
                         <div class="flex items-center gap-1.5 flex-1">
@@ -761,8 +694,7 @@ ${aliasLines}
                         ${aliases.length > 2
                           ? html`
                               <button
-                                onClick=${() =>
-                                  setAliases(aliases.filter((_, j) => j !== i))}
+                                onClick=${() => setAliases(aliases.filter((_, j) => j !== i))}
                                 class="text-slate-600 hover:text-rose-400 text-xs px-1"
                               >
                                 ✕
@@ -805,15 +737,12 @@ ${aliasLines}
       </div>
 
       <!-- ── Pending canonical requests (GitHub Issues) ── -->
-      <div
-        class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4"
-      >
+      <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4">
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-bold text-white uppercase tracking-widest">
             Pending Requests
             ${issues.length
-              ? html`<span
-                  class="ml-2 text-[10px] font-normal text-slate-500 normal-case"
+              ? html`<span class="ml-2 text-[10px] font-normal text-slate-500 normal-case"
                   >${issues.length} open</span
                 >`
               : ""}
@@ -826,12 +755,8 @@ ${aliasLines}
           </button>
         </div>
 
-        ${issuesLoading
-          ? html`<p class="text-[11px] text-slate-500">Loading issues…</p>`
-          : ""}
-        ${issuesError
-          ? html`<p class="text-[11px] text-rose-400">Error: ${issuesError}</p>`
-          : ""}
+        ${issuesLoading ? html`<p class="text-[11px] text-slate-500">Loading issues…</p>` : ""}
+        ${issuesError ? html`<p class="text-[11px] text-rose-400">Error: ${issuesError}</p>` : ""}
         ${!issuesLoading && !issuesError && issues.length === 0
           ? html`
               <p class="text-[11px] text-slate-600 italic">
@@ -854,13 +779,10 @@ ${aliasLines}
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-white leading-snug">${issue.title}</p>
                   <p class="text-[10px] text-slate-500 mt-0.5">
-                    #${issue.number} · opened by
-                    ${issue.user?.login || "unknown"} ·
+                    #${issue.number} · opened by ${issue.user?.login || "unknown"} ·
                     ${new Date(issue.created_at).toLocaleDateString()}
                     ${ready
-                      ? html` <span class="text-emerald-400 font-medium"
-                          >· Ready to merge ✓</span
-                        >`
+                      ? html` <span class="text-emerald-400 font-medium">· Ready to merge ✓</span>`
                       : ""}
                   </p>
                 </div>
@@ -907,17 +829,13 @@ ${aliasLines}
       </div>
 
       <!-- ── Local canonical entries ── -->
-      <div
-        class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4"
-      >
+      <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4">
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-sm font-bold text-white uppercase tracking-widest">
-              My Local Entries
-            </h3>
+            <h3 class="text-sm font-bold text-white uppercase tracking-widest">My Local Entries</h3>
             <p class="text-[11px] text-slate-500 mt-0.5">
-              Personal canonical links stored locally — used immediately without
-              waiting for CDN merges. Useful for new platforms.
+              Personal canonical links stored locally — used immediately without waiting for CDN
+              merges. Useful for new platforms.
             </p>
           </div>
           <button
@@ -933,14 +851,11 @@ ${aliasLines}
               <div
                 class="border border-white/10 rounded-xl p-4 flex flex-col gap-3 bg-white/[0.02]"
               >
-                <h4
-                  class="text-xs font-semibold text-slate-300 uppercase tracking-wide"
-                >
+                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide">
                   ${editingEntry ? "Edit Entry" : "New Local Entry"}
                 </h4>
                 <div class="flex flex-col gap-1">
-                  <label
-                    class="text-[10px] uppercase tracking-wider text-slate-500"
+                  <label class="text-[10px] uppercase tracking-wider text-slate-500"
                     >Canonical Title</label
                   >
                   <input
@@ -952,10 +867,7 @@ ${aliasLines}
                   />
                 </div>
                 <div class="flex flex-col gap-1">
-                  <label
-                    class="text-[10px] uppercase tracking-wider text-slate-500"
-                    >Topic</label
-                  >
+                  <label class="text-[10px] uppercase tracking-wider text-slate-500">Topic</label>
                   <select
                     value=${localTopic}
                     onChange=${(e) => setLocalTopic(e.target.value)}
@@ -965,8 +877,7 @@ ${aliasLines}
                   </select>
                 </div>
                 <div class="flex flex-col gap-2">
-                  <label
-                    class="text-[10px] uppercase tracking-wider text-slate-500"
+                  <label class="text-[10px] uppercase tracking-wider text-slate-500"
                     >Platform Aliases</label
                   >
                   ${localAliases.map(
@@ -985,10 +896,7 @@ ${aliasLines}
                           class="w-36 px-2 py-1.5 bg-black border border-white/10 rounded text-sm text-white focus:outline-none"
                         >
                           ${PLATFORMS.map(
-                            (p) =>
-                              html`<option value=${p}>
-                                ${PLATFORM_LABEL[p] || p}
-                              </option>`,
+                            (p) => html`<option value=${p}>${PLATFORM_LABEL[p] || p}</option>`,
                           )}
                         </select>
                         <input
@@ -1005,9 +913,7 @@ ${aliasLines}
                         ${localAliases.length > 1
                           ? html`<button
                               onClick=${() =>
-                                setLocalAliases(
-                                  localAliases.filter((_, j) => j !== ai),
-                                )}
+                                setLocalAliases(localAliases.filter((_, j) => j !== ai))}
                               class="text-slate-600 hover:text-rose-400 text-xs px-1"
                             >
                               ✕
@@ -1019,10 +925,7 @@ ${aliasLines}
                   ${localAliases.length < 4
                     ? html`<button
                         onClick=${() =>
-                          setLocalAliases([
-                            ...localAliases,
-                            { platform: "leetcode", slug: "" },
-                          ])}
+                          setLocalAliases([...localAliases, { platform: "leetcode", slug: "" }])}
                         class="self-start text-[10px] text-slate-500 hover:text-slate-300 border border-white/10 rounded px-2 py-1 transition-colors"
                       >
                         + Add platform
@@ -1038,11 +941,7 @@ ${aliasLines}
                       ? "bg-white/5 text-slate-600 cursor-not-allowed"
                       : "bg-cyan-500 text-black hover:bg-cyan-400"}"
                   >
-                    ${localSaving
-                      ? "Saving…"
-                      : editingEntry
-                        ? "Update"
-                        : "Save Entry"}
+                    ${localSaving ? "Saving…" : editingEntry ? "Update" : "Save Entry"}
                   </button>
                   <button
                     onClick=${() => {
@@ -1068,9 +967,7 @@ ${aliasLines}
               class="border border-white/5 rounded-xl p-3 flex items-start justify-between gap-3 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
             >
               <div class="flex-1 min-w-0">
-                <p class="text-sm text-slate-200 font-medium">
-                  ${entry.canonicalTitle}
-                </p>
+                <p class="text-sm text-slate-200 font-medium">${entry.canonicalTitle}</p>
                 <p class="text-[10px] text-slate-600 mt-0.5">
                   ${entry.canonicalId} · ${entry.topic}
                 </p>

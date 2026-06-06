@@ -18,9 +18,7 @@ export const COMMIT_TYPES = {
   INIT: "init",
 };
 
-const TYPE_MAP = Object.fromEntries(
-  Object.values(COMMIT_TYPES).map((v) => [v, v]),
-);
+const TYPE_MAP = Object.fromEntries(Object.values(COMMIT_TYPES).map((v) => [v, v]));
 
 /** Normalise a string like "comprehensive-update" → COMMIT_TYPES value. */
 export function resolveCommitType(str) {

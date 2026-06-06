@@ -109,11 +109,10 @@ export async function forceCommitSettingsNow() {
         message: "No pending settings to commit",
       };
 
-    const repo = (
-      settings.github_repo ||
-      settings.gitRepo ||
-      CONSTANTS.DEFAULT_REPO_NAME
-    ).replace(/\s+/g, "-");
+    const repo = (settings.github_repo || settings.gitRepo || CONSTANTS.DEFAULT_REPO_NAME).replace(
+      /\s+/g,
+      "-",
+    );
 
     await git.commit(
       [cfg],

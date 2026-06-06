@@ -59,12 +59,7 @@ async function _tx(mode, fn) {
  * @param {object} entry - { topic, content, tags?, type? }
  * @returns {Promise<string>} id of created entry
  */
-export async function saveInsight({
-  topic,
-  content,
-  tags = [],
-  type = "insight",
-}) {
+export async function saveInsight({ topic, content, tags = [], type = "insight" }) {
   const id = `kb-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const item = {
     id,
@@ -113,9 +108,7 @@ export async function getInsights(topic = null, limit = 50) {
       req = store.getAll();
     }
     req.onsuccess = () => {
-      const items = (req.result || [])
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, limit);
+      const items = (req.result || []).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
       db.close();
       resolve(items);
     };
@@ -196,11 +189,7 @@ export async function importInsights(items) {
  */
 export async function buildKnowledgeJson() {
   const items = await getAllInsights();
-  return JSON.stringify(
-    { updatedAt: new Date().toISOString(), entries: items },
-    null,
-    2,
-  );
+  return JSON.stringify({ updatedAt: new Date().toISOString(), entries: items }, null, 2);
 }
 
 /**

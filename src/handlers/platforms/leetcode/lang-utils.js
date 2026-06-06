@@ -110,7 +110,6 @@ export function resolveLang(rawLang) {
     };
   }
   const slug = lowName.replace(/\s+/g, "");
-  const verbose =
-    rawLang.verboseName || LANG_VERBOSE[slug] || rawLang.name || slug;
+  const verbose = rawLang.verboseName || LANG_VERBOSE[slug] || rawLang.name || slug;
   return { verbose, slug, ext: langExt(slug) };
 }

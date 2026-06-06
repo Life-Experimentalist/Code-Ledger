@@ -24,9 +24,7 @@ export function detectPage(pathname) {
 
   // Modern LeetCode URL: /problems/{slug}/submissions/{id}
   // Must be checked before the generic problem match so the submission ID isn't lost.
-  const problemSubmissionMatch = clean.match(
-    /^\/problems\/([^/]+)\/submissions\/(\d+)/,
-  );
+  const problemSubmissionMatch = clean.match(/^\/problems\/([^/]+)\/submissions\/(\d+)/);
   if (problemSubmissionMatch) {
     return {
       type: PAGE_TYPES.SUBMISSION,
@@ -36,9 +34,7 @@ export function detectPage(pathname) {
   }
 
   // Submission list: /problems/{slug}/submissions/ (no numeric ID)
-  const submissionListMatch = clean.match(
-    /^\/problems\/([^/]+)\/submissions\/?$/,
-  );
+  const submissionListMatch = clean.match(/^\/problems\/([^/]+)\/submissions\/?$/);
   if (submissionListMatch) {
     return {
       type: PAGE_TYPES.SUBMISSION_LIST,
@@ -68,8 +64,7 @@ export function detectPage(pathname) {
   if (clean === "" || clean === "/") return { type: PAGE_TYPES.HOME };
 
   const profileMatch = clean.match(/^\/(u\/)?([^/]+)\/?$/);
-  if (profileMatch)
-    return { type: PAGE_TYPES.PROFILE, username: profileMatch[2] };
+  if (profileMatch) return { type: PAGE_TYPES.PROFILE, username: profileMatch[2] };
 
   return { type: PAGE_TYPES.UNKNOWN };
 }

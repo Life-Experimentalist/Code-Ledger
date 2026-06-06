@@ -11,8 +11,7 @@
  */
 
 function normalizeLang(problem = {}) {
-  const lang =
-    problem?.lang?.name || problem?.lang?.slug || problem?.lang?.ext || "";
+  const lang = problem?.lang?.name || problem?.lang?.slug || problem?.lang?.ext || "";
   return String(lang).toLowerCase().trim();
 }
 
@@ -25,9 +24,7 @@ function syncCommitKey(problem = {}) {
 
 function previewDiff(localProblems = [], remoteProblems = []) {
   const remoteByKey = new Map(
-    remoteProblems
-      .map((p) => [syncCommitKey(p), p])
-      .filter(([key]) => Boolean(key)),
+    remoteProblems.map((p) => [syncCommitKey(p), p]).filter(([key]) => Boolean(key)),
   );
 
   const conflicts = [];
@@ -82,14 +79,8 @@ function run() {
 
   const result = previewDiff(local, remote);
 
-  assert(
-    result.pendingConflicts === 0,
-    `expected 0 conflicts, got ${result.pendingConflicts}`,
-  );
-  assert(
-    result.pendingRemoteOnly === 1,
-    `expected 1 remoteOnly, got ${result.pendingRemoteOnly}`,
-  );
+  assert(result.pendingConflicts === 0, `expected 0 conflicts, got ${result.pendingConflicts}`);
+  assert(result.pendingRemoteOnly === 1, `expected 1 remoteOnly, got ${result.pendingRemoteOnly}`);
   assert(
     normalizeLang(result.remoteOnly[0]) === "javascript",
     "expected JavaScript variant (not in remote) to appear in sync queue",

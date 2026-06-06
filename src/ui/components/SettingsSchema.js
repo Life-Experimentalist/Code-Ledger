@@ -4,12 +4,7 @@
  */
 
 import { h } from "../../vendor/preact-bundle.js";
-import {
-  useEffect,
-  useCallback,
-  useState,
-  useRef,
-} from "../../vendor/preact-bundle.js";
+import { useEffect, useCallback, useState, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -17,11 +12,7 @@ import { createDebugger } from "../../lib/debug.js";
 
 const dbg = createDebugger("SettingsSchema");
 
-import {
-  testAIKey,
-  testProviderEndpoint,
-  fetchModelsForProvider,
-} from "../../core/model-fetch.js";
+import { testAIKey, testProviderEndpoint, fetchModelsForProvider } from "../../core/model-fetch.js";
 import { Storage } from "../../core/storage.js";
 import { ModelSelector } from "./ModelSelector.js";
 import { CONSTANTS } from "../../core/constants.js";
@@ -39,10 +30,7 @@ import { FEATURE_STATUS, FEATURE_STATUS_META } from "../../core/constants.js";
 // ── Backup / Restore helpers (rendered at bottom of git tab) ──────────────────
 
 async function _exportData() {
-  const [problems, settings] = await Promise.all([
-    Storage.getAllProblems(),
-    Storage.getSettings(),
-  ]);
+  const [problems, settings] = await Promise.all([Storage.getAllProblems(), Storage.getSettings()]);
   const payload = {
     version: 1,
     exportedAt: new Date().toISOString(),
@@ -78,9 +66,7 @@ function MigrationPanel() {
   async function _sendMsg(type, extra = {}) {
     return new Promise((resolve) => {
       try {
-        chrome.runtime.sendMessage({ type, ...extra }, (res) =>
-          resolve(res || {}),
-        );
+        chrome.runtime.sendMessage({ type, ...extra }, (res) => resolve(res || {}));
       } catch {
         resolve({ ok: false, error: "Extension context unavailable." });
       }
@@ -146,12 +132,10 @@ function MigrationPanel() {
 
   return html`
     <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5">
-      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">
-        Repo Migration
-      </h3>
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Repo Migration</h3>
       <p class="text-[11px] text-slate-500 mb-4">
-        Migrate your GitHub repo to the current file layout, or do a full
-        rebuild if things are broken.
+        Migrate your GitHub repo to the current file layout, or do a full rebuild if things are
+        broken.
       </p>
       <div class="flex flex-wrap gap-3 items-center">
         <button
@@ -178,8 +162,7 @@ function MigrationPanel() {
       </div>
       ${status
         ? html`<p
-            class="mt-3 text-xs ${status.includes("failed") ||
-            status.includes("Failed")
+            class="mt-3 text-xs ${status.includes("failed") || status.includes("Failed")
               ? "text-rose-400"
               : "text-emerald-400"}"
           >
@@ -225,12 +208,9 @@ function BackupRestorePanel() {
 
   return html`
     <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5">
-      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">
-        Backup & Restore
-      </h3>
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Backup & Restore</h3>
       <p class="text-[11px] text-slate-500 mb-4">
-        Export all solved problems and settings to a JSON file, or restore from
-        a previous backup.
+        Export all solved problems and settings to a JSON file, or restore from a previous backup.
       </p>
       <div class="flex flex-wrap gap-3 items-center">
         <button
@@ -257,9 +237,7 @@ function BackupRestorePanel() {
       </div>
       ${status
         ? html`<p
-            class="mt-3 text-xs ${status.includes("failed")
-              ? "text-rose-400"
-              : "text-emerald-400"}"
+            class="mt-3 text-xs ${status.includes("failed") ? "text-rose-400" : "text-emerald-400"}"
           >
             ${status}
           </p>`
@@ -300,9 +278,7 @@ function LeetCodeImportPanel({ username }) {
       for (const sub of submissions) {
         const slug = (sub.lang || "").toLowerCase().replace(/\s+/g, "");
         const problemId = `${sub.titleSlug}::${slug || "unknown"}`;
-        const existing = await Storage.getProblem?.(problemId).catch(
-          () => null,
-        );
+        const existing = await Storage.getProblem?.(problemId).catch(() => null);
         if (existing) continue;
         await Storage.saveProblem({
           id: problemId,
@@ -316,9 +292,9 @@ function LeetCodeImportPanel({ username }) {
           code: "",
           url: CONSTANTS.PLATFORMS.leetcode.problemsBase + sub.titleSlug + "/",
         });
-        await Storage.markPendingProblemKey(
-          `${sub.titleSlug}::${slug || "unknown"}`,
-        ).catch(() => {});
+        await Storage.markPendingProblemKey(`${sub.titleSlug}::${slug || "unknown"}`).catch(
+          () => {},
+        );
         imported++;
       }
       setStatus(
@@ -330,9 +306,7 @@ function LeetCodeImportPanel({ username }) {
               " (of " +
               submissions.length +
               " recent solves). Reload to see them."
-          : "No new problems to import (" +
-              submissions.length +
-              " recent solves already tracked).",
+          : "No new problems to import (" + submissions.length + " recent solves already tracked).",
       );
     } catch (e) {
       setStatus("Import failed: " + e.message);
@@ -342,22 +316,17 @@ function LeetCodeImportPanel({ username }) {
   };
 
   return html`
-    <div
-      class="mt-4 p-4 bg-orange-950/20 rounded-xl border border-orange-500/15"
-    >
+    <div class="mt-4 p-4 bg-orange-950/20 rounded-xl border border-orange-500/15">
       <p class="text-[11px] text-slate-400 mb-3">
-        Import your last 20 accepted submissions from LeetCode's public API. For
-        full history, visit your profile page on LeetCode and use the in-page
-        import button.
+        Import your last 20 accepted submissions from LeetCode's public API. For full history, visit
+        your profile page on LeetCode and use the in-page import button.
       </p>
       <div class="flex items-center gap-3 flex-wrap">
         ${username
           ? html`<span class="text-xs text-slate-400"
               >Username: <strong class="text-white">${username}</strong></span
             >`
-          : html`<span class="text-xs text-slate-500 italic"
-              >Set username above to enable</span
-            >`}
+          : html`<span class="text-xs text-slate-500 italic">Set username above to enable</span>`}
         <button
           onClick=${doImport}
           disabled=${busy || !username}
@@ -368,8 +337,7 @@ function LeetCodeImportPanel({ username }) {
       </div>
       ${status
         ? html`<p
-            class="mt-2 text-xs ${status.includes("failed") ||
-            status.includes("Error")
+            class="mt-2 text-xs ${status.includes("failed") || status.includes("Error")
               ? "text-rose-400"
               : status.includes("No new")
                 ? "text-slate-400"
@@ -397,8 +365,7 @@ function parseKeys(raw) {
 
 function maskKey(k) {
   const s = String(k || "");
-  if (s.length <= 8)
-    return `${"*".repeat(Math.max(0, s.length - 2))}${s.slice(-2)}`;
+  if (s.length <= 8) return `${"*".repeat(Math.max(0, s.length - 2))}${s.slice(-2)}`;
   return `${s.slice(0, 4)}...${s.slice(-4)}`;
 }
 
@@ -420,15 +387,11 @@ function MaintenancePanel({ problems, onRefreshMissing }) {
           reject(new Error("Extension not available"));
           return;
         }
-        chrome.runtime.sendMessage(
-          { type: "REFRESH_METADATA", problems },
-          (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp);
-            else reject(new Error(resp?.error || "Refresh failed"));
-          },
-        );
+        chrome.runtime.sendMessage({ type: "REFRESH_METADATA", problems }, (resp) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (resp?.ok) resolve(resp);
+          else reject(new Error(resp?.error || "Refresh failed"));
+        });
       });
       setStatus(
         `Queued ${result.queued || missingMetadataCount} problem(s) for background refresh.`,
@@ -442,12 +405,10 @@ function MaintenancePanel({ problems, onRefreshMissing }) {
 
   return html`
     <div class="mt-4 p-4 bg-blue-950/20 rounded-xl border border-blue-500/15">
-      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">
-        Maintenance
-      </h3>
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-1">Maintenance</h3>
       <p class="text-[11px] text-slate-500 mb-4">
-        Refresh missing problem metadata (tags, difficulty, description) in the
-        background, one problem at a time.
+        Refresh missing problem metadata (tags, difficulty, description) in the background, one
+        problem at a time.
       </p>
       <div class="flex items-center gap-3 flex-wrap">
         <button
@@ -460,15 +421,12 @@ function MaintenancePanel({ problems, onRefreshMissing }) {
             : `Refresh ${missingMetadataCount} problem${missingMetadataCount !== 1 ? "s" : ""}`}
         </button>
         ${!missingMetadataCount
-          ? html`<span class="text-xs text-slate-500"
-              >All problems have metadata!</span
-            >`
+          ? html`<span class="text-xs text-slate-500">All problems have metadata!</span>`
           : ""}
       </div>
       ${status
         ? html`<p
-            class="mt-3 text-xs ${status.includes("failed") ||
-            status.includes("Failed")
+            class="mt-3 text-xs ${status.includes("failed") || status.includes("Failed")
               ? "text-rose-400"
               : "text-emerald-400"}"
           >
@@ -657,9 +615,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     const all = await Storage.getAIKeys();
     const existing = Array.isArray(all[providerId]) ? all[providerId] : [];
     const incoming = parseKeys(rawVal);
-    const merged = [...existing, ...incoming]
-      .map((k) => String(k || "").trim())
-      .filter(Boolean);
+    const merged = [...existing, ...incoming].map((k) => String(k || "").trim()).filter(Boolean);
     all[providerId] = [...new Set(merged)];
     await Storage.setAIKeys(all);
     setSavedAIKeys(all);
@@ -693,12 +649,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     }
   };
 
-  const handleTestKey = async (
-    providerId,
-    keyVal,
-    resultKey,
-    endpointOverride = "",
-  ) => {
+  const handleTestKey = async (providerId, keyVal, resultKey, endpointOverride = "") => {
     if (!providerId) return;
     const key = String(keyVal || "").trim();
     if (!key) {
@@ -884,8 +835,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     try {
       const result = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode }, (resp) => {
-          if (chrome.runtime.lastError)
-            reject(new Error(chrome.runtime.lastError.message));
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp);
           else reject(new Error(resp?.error || "Sync failed"));
         });
@@ -911,8 +861,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     }
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ type: "SYNC_PREVIEW" }, (resp) => {
-        if (chrome.runtime.lastError)
-          reject(new Error(chrome.runtime.lastError.message));
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
         else if (resp?.ok) resolve(resp);
         else reject(new Error(resp?.error || "Sync preview failed"));
       });
@@ -927,8 +876,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       chrome.runtime.sendMessage(
         { type: "SYNC_APPLY_IMPORT", problems: resolvedProblems || [] },
         (resp) => {
-          if (chrome.runtime.lastError)
-            reject(new Error(chrome.runtime.lastError.message));
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp);
           else reject(new Error(resp?.error || "Sync apply failed"));
         },
@@ -977,8 +925,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
 
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
-    if (values?.aiProvider === providerId || values?.aiSecondary === providerId)
-      return true;
+    if (values?.aiProvider === providerId || values?.aiSecondary === providerId) return true;
     return values?.[`${providerId}_enabled`] === true;
   };
 
@@ -1019,9 +966,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       <div class="flex flex-col gap-1 w-2/3 pr-4">
         <span class="text-sm font-medium text-slate-300">${f.label}</span>
         ${f.description
-          ? html`<span class="text-[10px] text-slate-500 leading-tight"
-              >${f.description}</span
-            >`
+          ? html`<span class="text-[10px] text-slate-500 leading-tight">${f.description}</span>`
           : ""}
       </div>
 
@@ -1070,19 +1015,13 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                             )}
                       class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                     >
-                      ${testing[f.key]
-                        ? "Testing..."
-                        : isEndpoint
-                          ? "Check"
-                          : "Test"}
+                      ${testing[f.key] ? "Testing..." : isEndpoint ? "Check" : "Test"}
                     </button>
                   `;
                 })()}
               </div>
               ${testResults[f.key]
-                ? html`<div class="text-[11px] mt-1 text-slate-400">
-                    ${testResults[f.key]}
-                  </div>`
+                ? html`<div class="text-[11px] mt-1 text-slate-400">${testResults[f.key]}</div>`
                 : ""}
             `
           : ""}
@@ -1098,12 +1037,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                     ? html`<option disabled value="">No options</option>`
                     : ""}
                   ${f.options
-                    ? f.options.map(
-                        (opt) =>
-                          html`<option value=${opt.value}>
-                            ${opt.label}
-                          </option>`,
-                      )
+                    ? f.options.map((opt) => html`<option value=${opt.value}>${opt.label}</option>`)
                     : ""}
                 </select>
               </div>
@@ -1119,9 +1053,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                           title="Connected"
                           class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
                         ></span>
-                        <span class="text-xs text-emerald-400 font-medium"
-                          >Connected</span
-                        >
+                        <span class="text-xs text-emerald-400 font-medium">Connected</span>
                         <button
                           onClick=${() => handleOAuth(f.provider, f.key)}
                           class="px-3 py-1.5 bg-[#24292e] hover:bg-[#2f363d] text-white text-xs font-medium border border-white/10 rounded-lg transition-colors"
@@ -1150,17 +1082,12 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                       ${(() => {
                         const savedRepo = values["github_repo"];
                         const owner =
-                          values["github_owner"]?.trim() ||
-                          values["github_username"] ||
-                          "";
+                          values["github_owner"]?.trim() || values["github_username"] || "";
                         const repoUrl =
-                          savedRepo && owner
-                            ? `https://github.com/${owner}/${savedRepo}`
-                            : null;
+                          savedRepo && owner ? `https://github.com/${owner}/${savedRepo}` : null;
                         const isSyncing = repoSyncing[f.provider];
                         const syncMsg = repoSyncStatus[f.provider];
-                        const isExtension =
-                          typeof chrome !== "undefined" && !!chrome.runtime?.id;
+                        const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
 
                         if (savedRepo) {
                           // ── Repository configured ──────────────────────
@@ -1169,9 +1096,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                               <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-[11px] text-emerald-400">
                                   ${owner
-                                    ? html`<span class="text-slate-400"
-                                        >${owner}/</span
-                                      >`
+                                    ? html`<span class="text-slate-400">${owner}/</span>`
                                     : ""}<strong>${savedRepo}</strong>
                                 </span>
                                 ${repoUrl
@@ -1186,8 +1111,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                                 ${isExtension
                                   ? html`
                                       <button
-                                        onClick=${() =>
-                                          handleResyncAll(f.provider)}
+                                        onClick=${() => handleResyncAll(f.provider)}
                                         disabled=${isSyncing}
                                         class="px-2.5 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
                                         title="Push all locally-saved problems to your GitHub repo — commits any that are missing from the repo"
@@ -1214,8 +1138,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                                 ${onSetupRepo
                                   ? html`
                                       <button
-                                        onClick=${() =>
-                                          onSetupRepo(values[f.key], owner)}
+                                        onClick=${() => onSetupRepo(values[f.key], owner)}
                                         class="text-[10px] text-slate-500 hover:text-slate-300 underline ml-auto transition-colors"
                                       >
                                         Change repo
@@ -1225,9 +1148,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                               </div>
                               ${syncMsg
                                 ? html`<p
-                                    class="text-[10px] ${syncMsg.includes(
-                                      "failed",
-                                    ) || syncMsg.includes("Failed")
+                                    class="text-[10px] ${syncMsg.includes("failed") ||
+                                    syncMsg.includes("Failed")
                                       ? "text-rose-400"
                                       : "text-emerald-400"}"
                                   >
@@ -1247,22 +1169,19 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                               Repository not configured
                             </p>
                             <p class="text-[10px] text-slate-500">
-                              Set up a repository to automatically commit your
-                              solutions to GitHub.
+                              Set up a repository to automatically commit your solutions to GitHub.
                             </p>
                             ${onSetupRepo
                               ? html`
                                   <button
-                                    onClick=${() =>
-                                      onSetupRepo(values[f.key], owner)}
+                                    onClick=${() => onSetupRepo(values[f.key], owner)}
                                     class="self-start px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors"
                                   >
                                     Set up repository →
                                   </button>
                                 `
                               : html`<p class="text-[10px] text-amber-400">
-                                  Open the Library page to set up your
-                                  repository.
+                                  Open the Library page to set up your repository.
                                 </p>`}
                           </div>
                         `;
@@ -1277,9 +1196,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   `;
 
   const renderSection = (section) => {
-    const allFields = (section.fields || []).filter((f) =>
-      shouldRenderField(section, f),
-    );
+    const allFields = (section.fields || []).filter((f) => shouldRenderField(section, f));
     if (!allFields.length) return "";
 
     const normalFields = allFields.filter((f) => !f.advanced);
@@ -1295,8 +1212,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       : true;
 
     const status =
-      section.status ||
-      (section.underConstruction ? FEATURE_STATUS.UNDER_CONSTRUCTION : "");
+      section.status || (section.underConstruction ? FEATURE_STATUS.UNDER_CONSTRUCTION : "");
     const statusMeta = FEATURE_STATUS_META[status];
 
     return html`
@@ -1335,17 +1251,15 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
             : ""}
         </div>
 
-        ${section.id === "github" &&
-        values?.["github_token"] &&
-        !values?.["github_repo"]
+        ${section.id === "github" && values?.["github_token"] && !values?.["github_repo"]
           ? html`
               <div
                 class="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300"
               >
                 <span class="text-base shrink-0">⚠️</span>
                 <div class="flex-1">
-                  <strong>Setup incomplete</strong> — GitHub is connected but no
-                  repository is linked.
+                  <strong>Setup incomplete</strong> — GitHub is connected but no repository is
+                  linked.
                 </div>
                 <button
                   onClick=${() => onSetupRepo?.()}
@@ -1356,9 +1270,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               </div>
             `
           : ""}
-        ${section.id === "github" &&
-        values?.["github_token"] &&
-        values?.["github_repo"]
+        ${section.id === "github" && values?.["github_token"] && values?.["github_repo"]
           ? html`
               <div class="flex items-center gap-2 text-[11px] text-emerald-400">
                 <span>✓</span>
@@ -1371,15 +1283,13 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               <div
                 class="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2"
               >
-                ⚠️ ${CONSTANTS.GIT_PROVIDERS[section.id]?.name || section.id}
-                support is in testing — do not use in production yet.
+                ⚠️ ${CONSTANTS.GIT_PROVIDERS[section.id]?.name || section.id} support is in testing
+                — do not use in production yet.
               </div>
             `
           : ""}
 
-        <div class="space-y-4">
-          ${normalFields.map((f) => renderStandardField(section, f))}
-        </div>
+        <div class="space-y-4">${normalFields.map((f) => renderStandardField(section, f))}</div>
 
         ${advancedFields.length
           ? html`
@@ -1393,9 +1303,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                   class="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
                 >
                   <svg
-                    class="w-3 h-3 transition-transform ${showAdv
-                      ? "rotate-90"
-                      : ""}"
+                    class="w-3 h-3 transition-transform ${showAdv ? "rotate-90" : ""}"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -1406,12 +1314,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                   Advanced
                 </button>
                 ${showAdv
-                  ? html`<div
-                      class="mt-3 space-y-4 pl-1 border-l border-white/5"
-                    >
-                      ${advancedFields.map((f) =>
-                        renderStandardField(section, f),
-                      )}
+                  ? html`<div class="mt-3 space-y-4 pl-1 border-l border-white/5">
+                      ${advancedFields.map((f) => renderStandardField(section, f))}
                       ${section.id === "leetcode"
                         ? html`<${LeetCodeImportPanel}
                             username=${values?.leetcode_username || ""}
@@ -1429,17 +1333,13 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const renderAIRouting = () => {
     const primaryProvider = values.aiProvider || "";
     const secondaryProvider = values.aiSecondary || "";
-    const selectableProviders = Object.keys(
-      CONSTANTS.AI_PROVIDERS || {},
-    ).filter((pid) => isProviderEffectivelyEnabled(pid));
+    const selectableProviders = Object.keys(CONSTANTS.AI_PROVIDERS || {}).filter((pid) =>
+      isProviderEffectivelyEnabled(pid),
+    );
 
     return html`
-      <div
-        class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4"
-      >
-        <h3 class="text-sm font-bold text-white uppercase tracking-widest">
-          AI Routing
-        </h3>
+      <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col gap-4">
+        <h3 class="text-sm font-bold text-white uppercase tracking-widest">AI Routing</h3>
         <div class="flex items-center justify-end">
           <button
             onClick=${() => setShowAdvancedProviders((v) => !v)}
@@ -1452,13 +1352,9 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
         </div>
 
         <div class="space-y-4">
-          <div
-            class="flex items-center justify-between py-3 border-b border-white/5"
-          >
+          <div class="flex items-center justify-between py-3 border-b border-white/5">
             <div class="flex flex-col gap-1 w-2/3 pr-4">
-              <span class="text-sm font-medium text-slate-300"
-                >Enable AI Review</span
-              >
+              <span class="text-sm font-medium text-slate-300">Enable AI Review</span>
               <span class="text-[10px] text-slate-500 leading-tight"
                 >Automatically analyze code using AI upon completion.</span
               >
@@ -1478,13 +1374,9 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
             </div>
           </div>
 
-          <div
-            class="flex items-start justify-between py-3 border-b border-white/5"
-          >
+          <div class="flex items-start justify-between py-3 border-b border-white/5">
             <div class="flex flex-col gap-1 w-2/3 pr-4">
-              <span class="text-sm font-medium text-slate-300"
-                >Primary AI Provider</span
-              >
+              <span class="text-sm font-medium text-slate-300">Primary AI Provider</span>
               <span class="text-[10px] text-slate-500 leading-tight"
                 >Preferred AI provider to use for automated reviews.</span
               >
@@ -1499,9 +1391,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                   <option value="">None</option>
                   ${selectableProviders.map(
                     (pid) =>
-                      html`<option value=${pid}>
-                        ${CONSTANTS.AI_PROVIDERS[pid].name}
-                      </option>`,
+                      html`<option value=${pid}>${CONSTANTS.AI_PROVIDERS[pid].name}</option>`,
                   )}
                 </select>
 
@@ -1512,30 +1402,23 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                       selectedModel=${values.aiPrimaryModel || ""}
                       onSelect=${(v) => onChange("aiPrimaryModel", v)}
                       endpoint=${values[`${primaryProvider}_endpoint`] || ""}
-                      providerEnabled=${isProviderEffectivelyEnabled(
-                        primaryProvider,
-                      )}
-                      onToggleEnabled=${(val) =>
-                        onChange(`${primaryProvider}_enabled`, val)}
+                      providerEnabled=${isProviderEffectivelyEnabled(primaryProvider)}
+                      onToggleEnabled=${(val) => onChange(`${primaryProvider}_enabled`, val)}
                     />`
                   : ""}
               </div>
             </div>
           </div>
 
-          <div
-            class="flex items-start justify-between py-3 border-b border-white/5"
-          >
+          <div class="flex items-start justify-between py-3 border-b border-white/5">
             <div class="flex flex-col gap-1 w-2/3 pr-4">
-              <span class="text-sm font-medium text-slate-300"
-                >Secondary AI Provider</span
-              >
+              <span class="text-sm font-medium text-slate-300">Secondary AI Provider</span>
               <span class="text-[10px] text-slate-500 leading-tight"
                 >Fallback provider to be used if the primary fails.</span
               >
               <span class="text-[10px] text-cyan-500/80 leading-tight"
-                >You can choose the same provider as primary when the fallback
-                model is different.</span
+                >You can choose the same provider as primary when the fallback model is
+                different.</span
               >
             </div>
             <div class="w-1/3 flex flex-col items-end gap-2">
@@ -1548,9 +1431,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                   <option value="">None</option>
                   ${selectableProviders.map(
                     (pid) =>
-                      html`<option value=${pid}>
-                        ${CONSTANTS.AI_PROVIDERS[pid].name}
-                      </option>`,
+                      html`<option value=${pid}>${CONSTANTS.AI_PROVIDERS[pid].name}</option>`,
                   )}
                 </select>
 
@@ -1561,11 +1442,8 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                       selectedModel=${values.aiSecondaryModel || ""}
                       onSelect=${(v) => onChange("aiSecondaryModel", v)}
                       endpoint=${values[`${secondaryProvider}_endpoint`] || ""}
-                      providerEnabled=${isProviderEffectivelyEnabled(
-                        secondaryProvider,
-                      )}
-                      onToggleEnabled=${(val) =>
-                        onChange(`${secondaryProvider}_enabled`, val)}
+                      providerEnabled=${isProviderEffectivelyEnabled(secondaryProvider)}
+                      onToggleEnabled=${(val) => onChange(`${secondaryProvider}_enabled`, val)}
                     />`
                   : ""}
               </div>
@@ -1589,16 +1467,11 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
           const strategyField = `${pid}_keyStrategy`;
           const rawKeys = values[keyField] || "";
           const keyList = parseKeys(rawKeys);
-          const savedKeys = Array.isArray(savedAIKeys[pid])
-            ? savedAIKeys[pid]
-            : [];
+          const savedKeys = Array.isArray(savedAIKeys[pid]) ? savedAIKeys[pid] : [];
           const endpoint = values[endpointField] || p.endpoint || "";
           const providerEnabled =
-            typeof values[enabledField] === "undefined"
-              ? true
-              : !!values[enabledField];
-          const isPinned =
-            values?.aiProvider === pid || values?.aiSecondary === pid;
+            typeof values[enabledField] === "undefined" ? true : !!values[enabledField];
+          const isPinned = values?.aiProvider === pid || values?.aiSecondary === pid;
 
           return html`
             <div
@@ -1608,11 +1481,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
             >
               <div class="flex items-center justify-between">
                 <div>
-                  <h3
-                    class="text-sm font-bold text-white uppercase tracking-widest"
-                  >
-                    ${p.name}
-                  </h3>
+                  <h3 class="text-sm font-bold text-white uppercase tracking-widest">${p.name}</h3>
                   <p class="text-[10px] text-slate-500 mt-1">
                     Provider configuration and key management.
                   </p>
@@ -1633,46 +1502,35 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               ${isPinned
                 ? html`<p class="text-[11px] text-amber-400">
                     This provider is active as
-                    ${values?.aiProvider === pid
-                      ? " primary "
-                      : " secondary "}and
-                    cannot be disabled.
+                    ${values?.aiProvider === pid ? " primary " : " secondary "}and cannot be
+                    disabled.
                   </p>`
                 : ""}
               ${p.keyRequired
                 ? html`
                     <div class="space-y-3">
-                      <label
-                        class="text-xs uppercase tracking-wider text-slate-400"
+                      <label class="text-xs uppercase tracking-wider text-slate-400"
                         >API Keys</label
                       >
                       <textarea
                         value=${rawKeys}
-                        onInput=${(e) =>
-                          handleProviderKeysChange(
-                            pid,
-                            keyField,
-                            e.target.value,
-                          )}
+                        onInput=${(e) => handleProviderKeysChange(pid, keyField, e.target.value)}
                         placeholder="Enter keys separated by commas or new lines"
                         class="w-full min-h-[90px] px-3 py-2 bg-black border border-white/10 rounded text-sm text-white"
                       ></textarea>
                       <div class="flex items-center justify-between">
                         <span class="text-[11px] text-slate-500"
-                          >${savedKeys.length} saved • ${keyList.length}
-                          draft</span
+                          >${savedKeys.length} saved • ${keyList.length} draft</span
                         >
                         <div class="flex items-center gap-2">
                           <button
-                            onClick=${() =>
-                              handleSaveAllKeys(pid, keyField, rawKeys)}
+                            onClick=${() => handleSaveAllKeys(pid, keyField, rawKeys)}
                             class="px-3 py-1.5 bg-[#0f766e]/30 hover:bg-[#0f766e]/45 text-xs text-cyan-100 rounded"
                           >
                             Save Keys
                           </button>
                           <button
-                            onClick=${() =>
-                              handleTestAllKeys(pid, rawKeys, keyField)}
+                            onClick=${() => handleTestAllKeys(pid, rawKeys, keyField)}
                             class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                           >
                             Test All
@@ -1692,32 +1550,21 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                               key=${`${pid}-${idx}`}
                               class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
                             >
-                              <span class="text-xs text-slate-300 font-mono"
-                                >${maskKey(k)}</span
-                              >
+                              <span class="text-xs text-slate-300 font-mono">${maskKey(k)}</span>
                               <div class="flex items-center gap-2">
                                 <button
                                   onClick=${() =>
-                                    handleTestKey(
-                                      pid,
-                                      k,
-                                      `${keyField}:${idx}`,
-                                      endpoint,
-                                    )}
+                                    handleTestKey(pid, k, `${keyField}:${idx}`, endpoint)}
                                   class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                                 >
-                                  ${testing[`${keyField}:${idx}`]
-                                    ? "Testing..."
-                                    : "Test"}
+                                  ${testing[`${keyField}:${idx}`] ? "Testing..." : "Test"}
                                 </button>
                                 ${(() => {
                                   const r = testResults[`${keyField}:${idx}`];
                                   if (!r) return "";
                                   const ok = r === "OK";
                                   return html`<span
-                                    class="text-[11px] ${ok
-                                      ? "text-emerald-400"
-                                      : "text-rose-400"}"
+                                    class="text-[11px] ${ok ? "text-emerald-400" : "text-rose-400"}"
                                     >${r}</span
                                   >`;
                                 })()}
@@ -1735,12 +1582,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                         return hasFailed
                           ? html`
                               <button
-                                onClick=${() =>
-                                  handleRemoveFailedKeys(
-                                    pid,
-                                    keyField,
-                                    rawKeys,
-                                  )}
+                                onClick=${() => handleRemoveFailedKeys(pid, keyField, rawKeys)}
                                 class="self-start px-3 py-1.5 bg-rose-600/15 hover:bg-rose-600/30 border border-rose-500/30 text-rose-400 text-xs rounded transition-colors"
                               >
                                 Remove failed keys
@@ -1750,21 +1592,16 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                       })()}
 
                       <div class="flex items-center gap-2">
-                        <label
-                          class="text-xs uppercase tracking-wider text-slate-400 min-w-[98px]"
+                        <label class="text-xs uppercase tracking-wider text-slate-400 min-w-[98px]"
                           >Key Strategy</label
                         >
                         <select
                           class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
                           value=${values[strategyField] || "round-robin"}
-                          onChange=${(e) =>
-                            onChange(strategyField, e.target.value)}
+                          onChange=${(e) => onChange(strategyField, e.target.value)}
                         >
                           ${KEY_STRATEGY_OPTIONS.map(
-                            (opt) =>
-                              html`<option value=${opt.value}>
-                                ${opt.label}
-                              </option>`,
+                            (opt) => html`<option value=${opt.value}>${opt.label}</option>`,
                           )}
                         </select>
                       </div>
@@ -1775,21 +1612,16 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                   </div>`}
               ${showAdvancedProviders
                 ? html`<div class="space-y-2">
-                    <label
-                      class="text-xs uppercase tracking-wider text-slate-400"
-                      >Endpoint</label
-                    >
+                    <label class="text-xs uppercase tracking-wider text-slate-400">Endpoint</label>
                     <div class="flex items-center gap-2">
                       <input
                         type="text"
                         value=${endpoint}
-                        onChange=${(e) =>
-                          onChange(endpointField, e.target.value)}
+                        onChange=${(e) => onChange(endpointField, e.target.value)}
                         class="px-3 py-1.5 bg-black border border-white/10 rounded text-sm text-white w-full"
                       />
                       <button
-                        onClick=${() =>
-                          handleTestEndpoint(pid, endpoint, endpointField)}
+                        onClick=${() => handleTestEndpoint(pid, endpoint, endpointField)}
                         class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
                       >
                         ${testing[endpointField] ? "Checking..." : "Check"}
@@ -1844,21 +1676,12 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     const allPlatformKeys = [...registeredPlatforms, "default"];
 
     return html`
-      <div
-        class="p-6 bg-[#0a0a0f] rounded-2xl border border-amber-500/30 flex flex-col gap-4"
-      >
-        <h3 class="text-sm font-bold text-white uppercase tracking-widest">
-          AI Review Prompts
-        </h3>
-        <div
-          class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-3"
-        >
-          Warning: changing prompts can reduce review quality. Restore with
-          "Reset to defaults".
+      <div class="p-6 bg-[#0a0a0f] rounded-2xl border border-amber-500/30 flex flex-col gap-4">
+        <h3 class="text-sm font-bold text-white uppercase tracking-widest">AI Review Prompts</h3>
+        <div class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-3">
+          Warning: changing prompts can reduce review quality. Restore with "Reset to defaults".
         </div>
-        <div
-          class="text-[11px] text-slate-400 bg-black/30 border border-white/5 rounded px-3 py-2"
-        >
+        <div class="text-[11px] text-slate-400 bg-black/30 border border-white/5 rounded px-3 py-2">
           Template variables:${" "}
           <code class="text-cyan-400">{"{title}"}</code>,${" "}
           <code class="text-cyan-400">{"{difficulty}"}</code>,${" "}
@@ -1903,9 +1726,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
             Reset to defaults
           </button>
         </div>
-        ${promptStatus
-          ? html`<div class="text-[11px] text-slate-400">${promptStatus}</div>`
-          : ""}
+        ${promptStatus ? html`<div class="text-[11px] text-slate-400">${promptStatus}</div>` : ""}
       </div>
     `;
   };
@@ -1936,16 +1757,10 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
           : html`
               <div class="space-y-6">
                 ${standardSections.map((section) => renderSection(section))}
-                ${activeTab === "git"
-                  ? html`<${BackupRestorePanel} /><${MirrorsPanel} />`
-                  : ""}
+                ${activeTab === "git" ? html`<${BackupRestorePanel} /><${MirrorsPanel} />` : ""}
                 ${activeTab === "git" ? html`<${MigrationPanel} />` : ""}
-                ${activeTab === "git"
-                  ? html`<${MaintenancePanel} problems=${problems} />`
-                  : ""}
-                ${activeTab === "general"
-                  ? html`<${DifficultyMapPanel} />`
-                  : ""}
+                ${activeTab === "git" ? html`<${MaintenancePanel} problems=${problems} />` : ""}
+                ${activeTab === "general" ? html`<${DifficultyMapPanel} />` : ""}
               </div>
             `}
       ${syncConfirm
@@ -1958,9 +1773,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                 class="bg-[#0d1117] border border-white/10 rounded-2xl p-6 w-80 shadow-2xl flex flex-col gap-4"
                 onClick=${(e) => e.stopPropagation()}
               >
-                <h3 class="text-sm font-bold text-white">
-                  Sync ${syncConfirm.count} problems
-                </h3>
+                <h3 class="text-sm font-bold text-white">Sync ${syncConfirm.count} problems</h3>
                 <p class="text-[11px] text-slate-400">
                   How would you like to commit them to GitHub?
                 </p>
@@ -1975,13 +1788,10 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                   >
                     <div class="font-semibold mb-0.5">
                       Single commit
-                      <span class="text-cyan-500/60 font-normal"
-                        >(recommended)</span
-                      >
+                      <span class="text-cyan-500/60 font-normal">(recommended)</span>
                     </div>
                     <div class="text-[10px] text-slate-500">
-                      All problems in one atomic commit — avoids GitHub API rate
-                      limits.
+                      All problems in one atomic commit — avoids GitHub API rate limits.
                     </div>
                   </button>
                   <button
@@ -1994,8 +1804,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                   >
                     <div class="font-semibold mb-0.5">Individual commits</div>
                     <div class="text-[10px] text-slate-500">
-                      One backdated commit per problem — slower, may hit rate
-                      limits.
+                      One backdated commit per problem — slower, may hit rate limits.
                     </div>
                   </button>
                 </div>

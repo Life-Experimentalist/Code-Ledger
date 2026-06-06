@@ -3,9 +3,7 @@ import { exec, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
-const WATCH_DIRS = process.argv.slice(2).length
-  ? process.argv.slice(2)
-  : ["src", "worker"];
+const WATCH_DIRS = process.argv.slice(2).length ? process.argv.slice(2) : ["src", "worker"];
 const debounceMs = 300;
 let timer = null;
 let lastFile = null;

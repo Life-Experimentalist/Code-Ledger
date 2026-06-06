@@ -3,12 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  initDebug,
-  coreDebug,
-  setDebug,
-  createDebugger,
-} from "../lib/debug.js";
+import { initDebug, coreDebug, setDebug, createDebugger } from "../lib/debug.js";
 import { registry } from "../core/handler-registry.js";
 import { eventBus } from "../core/event-bus.js";
 import { Storage } from "../core/storage.js";
@@ -17,10 +12,7 @@ import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
 import { buildConversationSystemPrompt } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
-import {
-  handleRefreshMetadata,
-  completeRefreshMetadata,
-} from "./refresh-metadata-handler.js";
+import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
 import { triggerCodeRecovery } from "./code-recovery-handler.js";
 import {
   buildProblemFiles,
@@ -31,11 +23,7 @@ import {
 } from "../core/path-builder.js";
 import { canonicalMapper } from "../core/canonical-mapper.js";
 import { getChatsByProblem } from "../core/ai-chat-storage.js";
-import {
-  buildCommitMessage,
-  COMMIT_TYPES,
-  resolveCommitType,
-} from "../core/commit-messages.js";
+import { buildCommitMessage, COMMIT_TYPES, resolveCommitType } from "../core/commit-messages.js";
 import {
   migrateRepo,
   resetRepo,
@@ -72,10 +60,7 @@ import {
   forceCommitSettingsNow,
 } from "../core/settings-auto-commit.js";
 import { initMCPConfig, shouldUseToolsForAI } from "../core/mcp-config.js";
-import {
-  buildSkillsSystemPrompt,
-  getAutoToolIds,
-} from "../core/ai/skills-registry.js";
+import { buildSkillsSystemPrompt, getAutoToolIds } from "../core/ai/skills-registry.js";
 import { buildKnowledgeContext } from "../core/memory/knowledge-bank.js";
 import {
   maybeCommitRollingBackup,
@@ -87,11 +72,7 @@ import {
   findDuplicatesForProblem,
   compareSolutions as compareSolutionsForDedup,
 } from "../core/ai-deduplication.js";
-import {
-  recordAIReview,
-  getProblemStats,
-  recordAIInsights,
-} from "../core/behavior-bank.js";
+import { recordAIReview, getProblemStats, recordAIInsights } from "../core/behavior-bank.js";
 
 let _syncAlarmBound = false;
 let _reviewQueueAlarmBound = false;
@@ -101,9 +82,7 @@ let _activeSyncPort = null;
 // ── Snail Mode State Management ────────────────────────────────────────────
 async function getSnailModeState() {
   try {
-    const data = await chrome.storage.local.get(
-      CONSTANTS.SNAIL_MODE.STORAGE_KEY,
-    );
+    const data = await chrome.storage.local.get(CONSTANTS.SNAIL_MODE.STORAGE_KEY);
     return (
       data[CONSTANTS.SNAIL_MODE.STORAGE_KEY] || {
         lastBatch: 0,
@@ -146,9 +125,7 @@ async function getAIReviewQueueStatus() {
   ]);
   const now = Date.now();
   const batchIntervalMs = snailSettings.snailMode_batchIntervalHours
-    ? Math.round(
-        Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000,
-      )
+    ? Math.round(Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000)
     : CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS;
   const intervalAt = state.lastBatch ? state.lastBatch + batchIntervalMs : now;
   const pausedAt = state.isPaused && state.pausedUntil ? state.pausedUntil : 0;
@@ -191,9 +168,7 @@ async function init() {
   await applyFirstRunDefaults();
 
   // Migrate existing problem IDs to platform-scoped format (lc/gfg/cf prefix).
-  migrateProblemIds().catch((e) =>
-    dbg.error(`init(): migrateProblemIds failed:`, e),
-  );
+  migrateProblemIds().catch((e) => dbg.error(`init(): migrateProblemIds failed:`, e));
 
   // Register handlers
   dbg.log(`init(): registering handlers...`);
@@ -215,9 +190,7 @@ async function init() {
       const updates = { lastKnownVersion: curVer };
       if (lastVer && lastVer !== curVer) updates.extensionUpdated = true;
       await Storage.setSettings({ ...settings, ...updates });
-      dbg.log(
-        `init(): extension updated: ${lastVer || "first run"} → ${curVer}`,
-      );
+      dbg.log(`init(): extension updated: ${lastVer || "first run"} → ${curVer}`);
     }
   } catch (e) {
     dbg.warn(`init(): version check failed:`, e.message);
@@ -245,18 +218,14 @@ async function init() {
 
       chrome.alarms.onAlarm.addListener((alarm) => {
         if (alarm?.name === CONSTANTS.ALARM_NAMES.SYNC) {
-          SyncEngine.performSync().catch((e) =>
-            dbg.warn("periodic sync failed:", e.message),
-          );
+          SyncEngine.performSync().catch((e) => dbg.warn("periodic sync failed:", e.message));
         } else if (alarm?.name === "AI_REVIEW_QUEUE") {
           processAIReviewQueue().catch((e) =>
             dbg.warn("AI review queue processing failed:", e.message),
           );
         } else if (alarm?.name === "MAINTENANCE_COMMIT") {
           (async () => {
-            const pendingMap = await Storage.getPendingProblemKeys().catch(
-              () => ({}),
-            );
+            const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
             if (Object.keys(pendingMap || {}).length > 0) {
               dbg.log(
                 `MAINTENANCE_COMMIT: ${Object.keys(pendingMap).length} pending key(s), running bulk commit`,
@@ -267,9 +236,7 @@ async function init() {
             }
           })().catch(() => {});
         } else if (alarm?.name === "BULK_IMPORT_RESUME") {
-          dbg.log(
-            "BULK_IMPORT_RESUME: resuming interrupted bulk import after delay",
-          );
+          dbg.log("BULK_IMPORT_RESUME: resuming interrupted bulk import after delay");
           handleResyncAll("individual", "feat").catch((e) =>
             dbg.warn("BULK_IMPORT_RESUME: resume failed:", e.message),
           );
@@ -283,9 +250,7 @@ async function init() {
   // Resume an interrupted bulk import (browser was closed mid-commit).
   // Wait 45 seconds on startup to let the browser stabilize before heavy API work.
   (async () => {
-    const res = await browserStorage.local
-      .get(_BULK_IMPORT_KEY)
-      .catch(() => ({}));
+    const res = await browserStorage.local.get(_BULK_IMPORT_KEY).catch(() => ({}));
     const pending = res?.[_BULK_IMPORT_KEY];
     if (pending?.startedAt) {
       const ageMs = Date.now() - pending.startedAt;
@@ -344,10 +309,7 @@ async function applyFirstRunDefaults() {
     );
   } catch (e) {
     // Non-fatal — defaults will apply via UI
-    dbg.warn(
-      `applyFirstRunDefaults(): ✗ caught error (non-fatal):`,
-      e?.message,
-    );
+    dbg.warn(`applyFirstRunDefaults(): ✗ caught error (non-fatal):`, e?.message);
   }
 }
 
@@ -363,11 +325,7 @@ function getProblemCommitKey(problem = {}) {
   if (!id) return "";
 
   const lang =
-    problem.lang?.name ||
-    problem.lang?.slug ||
-    problem.lang?.ext ||
-    problem.language ||
-    "";
+    problem.lang?.name || problem.lang?.slug || problem.lang?.ext || problem.language || "";
   const normLang = String(lang).toLowerCase().trim();
 
   return normLang ? `${id}::${normLang}` : id;
@@ -396,10 +354,7 @@ function getProblemFiles(problem = {}, settings = {}) {
     const slug = problem.id || problem.titleSlug || "unknown";
     const root = CONSTANTS.PROBLEMS_DIR_DEFAULT.replace(/\/+$/, "");
     const dir = canonical?.canonicalId || slug;
-    const verbose = (lang.verbose || lang.name || "Solution").replace(
-      /\s+/g,
-      "_",
-    );
+    const verbose = (lang.verbose || lang.name || "Solution").replace(/\s+/g, "_");
     const ext = lang.ext || "txt";
     const filePath = canonical?.canonicalId
       ? `${root}/${dir}/${problem.platform}/${verbose}.${ext}`
@@ -412,9 +367,7 @@ function getProblemFiles(problem = {}, settings = {}) {
 function _stableJSON(value) {
   if (value == null) return "";
   if (Array.isArray(value))
-    return JSON.stringify(
-      value.map((v) => (typeof v === "string" ? v.trim() : v)),
-    );
+    return JSON.stringify(value.map((v) => (typeof v === "string" ? v.trim() : v)));
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -424,16 +377,7 @@ function _isProblemDrifted(local, remote) {
   // Compare only stable metadata fields. `files` is regenerated from `code` on
   // every commit so it always differs; `canonical` is enriched client-side and
   // never persisted to index.json. Including either causes false-positive drift.
-  const keys = [
-    "title",
-    "difficulty",
-    "code",
-    "tags",
-    "lang",
-    "aiReview",
-    "notes",
-    "methodTitle",
-  ];
+  const keys = ["title", "difficulty", "code", "tags", "lang", "aiReview", "notes", "methodTitle"];
   return keys.some((k) => _stableJSON(local?.[k]) !== _stableJSON(remote?.[k]));
 }
 
@@ -474,16 +418,14 @@ function _buildBehaviorContext(stats) {
   if (Array.isArray(stats.solves) && stats.solves.length > 1) {
     lines.push(`User has solved this problem ${stats.solves.length} times.`);
     const avg = Math.round(
-      stats.solves.reduce((s, x) => s + (x.elapsedSeconds || 0), 0) /
-        stats.solves.length,
+      stats.solves.reduce((s, x) => s + (x.elapsedSeconds || 0), 0) / stats.solves.length,
     );
     if (avg > 0) lines.push(`Average solve time: ${Math.round(avg / 60)} min.`);
   } else if (Array.isArray(stats.solves) && stats.solves.length === 1) {
     const t = stats.solves[0].elapsedSeconds;
     if (t > 0) lines.push(`Solve time: ${Math.round(t / 60)} min.`);
   }
-  if (stats.hintViews > 0)
-    lines.push(`Viewed hints ${stats.hintViews} time(s).`);
+  if (stats.hintViews > 0) lines.push(`Viewed hints ${stats.hintViews} time(s).`);
   if (Array.isArray(stats.aiInsights) && stats.aiInsights.length) {
     const latest = stats.aiInsights[stats.aiInsights.length - 1];
     if (Array.isArray(latest?.weakAreas) && latest.weakAreas.length) {
@@ -497,14 +439,12 @@ function _extractWeakAreas(reviewText = "") {
   const text = reviewText.toLowerCase();
   const found = [];
   if (/edge case/i.test(text)) found.push("edge cases");
-  if (/o\(n[²2]\)|quadratic|nested loop/i.test(text))
-    found.push("O(n²) complexity");
+  if (/o\(n[²2]\)|quadratic|nested loop/i.test(text)) found.push("O(n²) complexity");
   if (/overflow|int overflow/i.test(text)) found.push("integer overflow");
   if (/off.by.one/i.test(text)) found.push("off-by-one");
   if (/null|undefined|empty input/i.test(text)) found.push("null/empty input");
   if (/memory|space complexity/i.test(text)) found.push("space complexity");
-  if (/time complexity|could be faster/i.test(text))
-    found.push("time complexity");
+  if (/time complexity|could be faster/i.test(text)) found.push("time complexity");
   return found;
 }
 
@@ -512,9 +452,7 @@ async function generateAIReview(problem = {}, settings = null) {
   dbg.log(`generateAIReview(): starting for ${problem.titleSlug || "unknown"}`);
   const currentSettings = settings || (await Storage.getSettings());
   const providers = _buildAIReviewProviders(currentSettings);
-  dbg.log(
-    `generateAIReview(): ${providers.length} provider(s) in fallback chain`,
-  );
+  dbg.log(`generateAIReview(): ${providers.length} provider(s) in fallback chain`);
 
   // Inject behavior bank context so the AI is aware of solve history / past struggles
   const behaviorStats = await getProblemStats(
@@ -523,9 +461,7 @@ async function generateAIReview(problem = {}, settings = null) {
   ).catch(() => null);
   const behaviorContext = _buildBehaviorContext(behaviorStats);
   if (behaviorContext)
-    dbg.log(
-      `generateAIReview(): injecting behavior context: ${behaviorContext}`,
-    );
+    dbg.log(`generateAIReview(): injecting behavior context: ${behaviorContext}`);
 
   let inferredTags = null;
   let hasRateLimitErrors = false;
@@ -534,13 +470,9 @@ async function generateAIReview(problem = {}, settings = null) {
   for (let idx = 0; idx < providers.length; idx++) {
     const provider = providers[idx];
     const providerId = provider.id;
-    dbg.log(
-      `generateAIReview(): attempt ${idx + 1}/${providers.length} — provider=${providerId}`,
-    );
+    dbg.log(`generateAIReview(): attempt ${idx + 1}/${providers.length} — provider=${providerId}`);
     if (currentSettings[`${providerId}_enabled`] === false) {
-      dbg.log(
-        `generateAIReview(): ✗ ${providerId} disabled in settings, skipping`,
-      );
+      dbg.log(`generateAIReview(): ✗ ${providerId} disabled in settings, skipping`);
       continue;
     }
 
@@ -556,9 +488,7 @@ async function generateAIReview(problem = {}, settings = null) {
     // chain has a chance to run if the first provider stalls.
     const TIMEOUT_MS = 30000;
     try {
-      dbg.log(
-        `generateAIReview(): calling ${providerId} with ${TIMEOUT_MS}ms timeout`,
-      );
+      dbg.log(`generateAIReview(): calling ${providerId} with ${TIMEOUT_MS}ms timeout`);
       let review = await Promise.race([
         ai.review(problem.code, {
           ...problem,
@@ -571,15 +501,11 @@ async function generateAIReview(problem = {}, settings = null) {
       ]);
 
       if (!review || String(review).trim() === "") {
-        dbg.warn(
-          `generateAIReview(): ✗ ${providerId} returned empty review, trying next provider`,
-        );
+        dbg.warn(`generateAIReview(): ✗ ${providerId} returned empty review, trying next provider`);
         continue;
       }
 
-      dbg.log(
-        `generateAIReview(): ✓ success via ${providerId} (${String(review).length} chars)`,
-      );
+      dbg.log(`generateAIReview(): ✓ success via ${providerId} (${String(review).length} chars)`);
 
       // Parse AI-inferred tags if the problem had none
       if (review && (!problem.tags || problem.tags.length === 0)) {
@@ -610,14 +536,9 @@ async function generateAIReview(problem = {}, settings = null) {
     } catch (err) {
       const errMsg = String(err?.message || "").toLowerCase();
       if (errMsg.includes("timeout")) {
-        dbg.warn(
-          `generateAIReview(): ✗ ${providerId} timed out (${TIMEOUT_MS}ms)`,
-        );
+        dbg.warn(`generateAIReview(): ✗ ${providerId} timed out (${TIMEOUT_MS}ms)`);
       } else {
-        dbg.error(
-          `generateAIReview(): ✗ ${providerId} failed:`,
-          err?.message || err,
-        );
+        dbg.error(`generateAIReview(): ✗ ${providerId} failed:`, err?.message || err);
       }
       if (/rate.?limit|429|503|quota|too many requests/i.test(errMsg)) {
         hasRateLimitErrors = true;
@@ -625,9 +546,7 @@ async function generateAIReview(problem = {}, settings = null) {
     }
   }
 
-  dbg.error(
-    `generateAIReview(): ✗ all providers exhausted for ${problem.titleSlug || "unknown"}`,
-  );
+  dbg.error(`generateAIReview(): ✗ all providers exhausted for ${problem.titleSlug || "unknown"}`);
 
   if (hasRateLimitErrors) {
     throw new Error(
@@ -648,11 +567,8 @@ async function generateAIReview(problem = {}, settings = null) {
 
 async function commitUpdatedProblem(problem, settings) {
   const currentSettings = settings || (await Storage.getSettings());
-  const gitEnabled =
-    currentSettings.gitEnabled !== false && currentSettings.gitEnabled !== 0;
-  dbg.log(
-    `commitUpdatedProblem(): ${problem.titleSlug || "unknown"}, git_enabled=${gitEnabled}`,
-  );
+  const gitEnabled = currentSettings.gitEnabled !== false && currentSettings.gitEnabled !== 0;
+  dbg.log(`commitUpdatedProblem(): ${problem.titleSlug || "unknown"}, git_enabled=${gitEnabled}`);
   if (!gitEnabled) {
     dbg.log(`commitUpdatedProblem(): git disabled, returning skipped`);
     return { committed: 0, skipped: true };
@@ -711,12 +627,9 @@ async function commitUpdatedProblem(problem, settings) {
     dbg.log(`commitUpdatedProblem(): ✓ commit succeeded`);
     _maybeGenerateAISummary(currentSettings).catch(() => {});
     // Rolling backup — fire-and-forget, errors logged internally
-    const _git = registry.getGitProvider(
-      currentSettings.gitProvider || "github",
-    );
+    const _git = registry.getGitProvider(currentSettings.gitProvider || "github");
     if (_git) {
-      const _owner =
-        currentSettings.github_owner || currentSettings.github_username || "";
+      const _owner = currentSettings.github_owner || currentSettings.github_username || "";
       if (_owner) {
         maybeCommitRollingBackup(_owner, repoName, _git).catch(() => {});
       }
@@ -740,18 +653,12 @@ async function commitUpdatedProblem(problem, settings) {
  */
 async function _broadcastAuthExpired() {
   await Storage.setAuthToken("github", "").catch(() => {});
-  dbg.warn(
-    "_broadcastAuthExpired(): OAuth token rejected — cleared, notifying tabs",
-  );
+  dbg.warn("_broadcastAuthExpired(): OAuth token rejected — cleared, notifying tabs");
   chrome.tabs.query({}, (allTabs) => {
     for (const tab of allTabs || []) {
-      chrome.tabs.sendMessage(
-        tab.id,
-        { type: "GITHUB_REAUTH_REQUIRED" },
-        () => {
-          void chrome.runtime.lastError;
-        },
-      );
+      chrome.tabs.sendMessage(tab.id, { type: "GITHUB_REAUTH_REQUIRED" }, () => {
+        void chrome.runtime.lastError;
+      });
     }
   });
   chrome.runtime.sendMessage({ type: "GITHUB_REAUTH_REQUIRED" }, () => {
@@ -771,9 +678,7 @@ function _normalizeGitTarget(target) {
 }
 
 function _getDefaultPrimaryTarget(settings = {}) {
-  const repo = (settings.github_repo || settings.gitRepo || "")
-    .replace(/\s+/g, "-")
-    .trim();
+  const repo = (settings.github_repo || settings.gitRepo || "").replace(/\s+/g, "-").trim();
   if (!repo) return null;
   return _normalizeGitTarget({
     provider: settings.gitProvider || "github",
@@ -801,13 +706,7 @@ function _getOrderedTargets(settings = {}) {
   return ordered;
 }
 
-async function _commitWithFailover(
-  files,
-  message,
-  repoName,
-  commitOpts,
-  settings,
-) {
+async function _commitWithFailover(files, message, repoName, commitOpts, settings) {
   const targets = _getOrderedTargets(settings);
   dbg.log(`_commitWithFailover(): resolved ${targets.length} target(s)`);
   if (!targets.length) {
@@ -840,9 +739,7 @@ async function _commitWithFailover(
       });
 
       const active = settings.git_active_primary;
-      const currentKey = active
-        ? _targetKey(_normalizeGitTarget(active) || {})
-        : "";
+      const currentKey = active ? _targetKey(_normalizeGitTarget(active) || {}) : "";
       const wonKey = _targetKey(target);
       if (currentKey !== wonKey) {
         await Storage.setSettings({
@@ -871,8 +768,7 @@ async function _commitWithFailover(
 async function _resolveGitHubContext(settings = null) {
   const s = settings || (await Storage.getSettings());
   const target =
-    _getOrderedTargets(s).find((t) => t.provider === "github") ||
-    _getDefaultPrimaryTarget(s);
+    _getOrderedTargets(s).find((t) => t.provider === "github") || _getDefaultPrimaryTarget(s);
   if (!target || target.provider !== "github") {
     throw new Error("No GitHub repository configured");
   }
@@ -926,15 +822,9 @@ async function handleSolved(data) {
     if (mode && mode !== "off" && mode !== false) {
       const forever = mode === "forever" || mode === true;
       const expiry = settings.incognitoExpiry ?? 0;
-      const active = forever
-        ? true
-        : expiry === -1
-          ? true
-          : expiry > 0 && Date.now() < expiry;
+      const active = forever ? true : expiry === -1 ? true : expiry > 0 && Date.now() < expiry;
       if (active) {
-        dbg.log(
-          `handleSolved(): incognito mode active, discarding ${data.titleSlug}`,
-        );
+        dbg.log(`handleSolved(): incognito mode active, discarding ${data.titleSlug}`);
         return;
       }
       // Timer expired — auto-reset to off
@@ -951,9 +841,9 @@ async function handleSolved(data) {
   const submissionCommitKey = data.submissionId
     ? `submission:${data.platform || "unknown"}:${data.submissionId}`
     : `submission:${data.platform || "unknown"}:${titleSlug}:${langName}:${data.timestamp || data.id || Date.now()}`;
-  const alreadyCommitted = await Storage.isSubmissionCommitted(
-    submissionCommitKey,
-  ).catch(() => false);
+  const alreadyCommitted = await Storage.isSubmissionCommitted(submissionCommitKey).catch(
+    () => false,
+  );
   dbg.log(
     `handleSolved(): tracking - platform=${data.platform}, slug=${titleSlug}, lang=${langName}, already_committed=${alreadyCommitted}`,
   );
@@ -962,9 +852,7 @@ async function handleSolved(data) {
   if (data.skipCommit) {
     const existing = await Storage.getProblem(data.id).catch(() => null);
     if (existing?.manuallyEdited) {
-      dbg.log(
-        `handleSolved(): skipping import overwrite (manually edited) ${titleSlug}`,
-      );
+      dbg.log(`handleSolved(): skipping import overwrite (manually edited) ${titleSlug}`);
       return;
     }
   }
@@ -997,8 +885,7 @@ async function handleSolved(data) {
   }
   // Decide whether to run AI review:
   // - global `autoReview` setting AND per-submission flag set by the platform handler
-  const shouldAutoReview =
-    settings.autoReview !== false && data._requestAIReview === true;
+  const shouldAutoReview = settings.autoReview !== false && data._requestAIReview === true;
   if (shouldAutoReview) {
     try {
       const { review, providerId } = await generateAIReview(data, settings);
@@ -1019,10 +906,7 @@ async function handleSolved(data) {
           await Storage.saveProblem(data);
         }
       } catch (dupErr) {
-        dbg.error(
-          `handleSolved(): duplicate detection failed:`,
-          dupErr?.message || dupErr,
-        );
+        dbg.error(`handleSolved(): duplicate detection failed:`, dupErr?.message || dupErr);
       }
     }
   }
@@ -1030,11 +914,7 @@ async function handleSolved(data) {
   // 3c. Auto-merge deduplication: check for same-language solutions and queue for review if similar
   try {
     const existingProblem = await Storage.getProblem(data.id).catch(() => null);
-    if (
-      existingProblem &&
-      existingProblem.solutions &&
-      Array.isArray(existingProblem.solutions)
-    ) {
+    if (existingProblem && existingProblem.solutions && Array.isArray(existingProblem.solutions)) {
       const sameLang = existingProblem.solutions.filter(
         (s) => s.lang === data.lang?.name || s.lang === data.lang?.slug,
       );
@@ -1042,9 +922,7 @@ async function handleSolved(data) {
         const groups = await findDuplicatesForProblem(
           {
             ...existingProblem,
-            solutions: sameLang.concat([
-              { code: data.code, lang: data.lang?.name },
-            ]),
+            solutions: sameLang.concat([{ code: data.code, lang: data.lang?.name }]),
           },
           settings.aiProvider || "gemini",
         );
@@ -1059,10 +937,7 @@ async function handleSolved(data) {
       }
     }
   } catch (err) {
-    dbg.warn(
-      `handleSolved(): auto-merge dedup failed (non-blocking):`,
-      err?.message || err,
-    );
+    dbg.warn(`handleSolved(): auto-merge dedup failed (non-blocking):`, err?.message || err);
   }
 
   // 4. Git Commit — only auto-commit first time per (slug, language)
@@ -1084,13 +959,9 @@ async function handleSolved(data) {
     );
   }
   if (gitEnabled && (forceCommit || !alreadyCommitted)) {
-    dbg.log(
-      `handleSolved(): starting auto-commit - type=${forceCommit ? "UPDATE" : "SOLVED"}`,
-    );
+    dbg.log(`handleSolved(): starting auto-commit - type=${forceCommit ? "UPDATE" : "SOLVED"}`);
     try {
-      const pendingMap = await Storage.getPendingProblemKeys().catch(
-        () => ({}),
-      );
+      const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
       const pendingKeys = new Set(Object.keys(pendingMap || {}));
       const allProblems = await Storage.getAllProblems().catch(() => []);
       const pendingProblems = allProblems.filter((p) => {
@@ -1109,12 +980,7 @@ async function handleSolved(data) {
         // Include user notes as a markdown file when present
         try {
           if (p.notes && typeof p.notes === "string" && p.notes.trim()) {
-            const base = problemBase(
-              p.id || p.titleSlug,
-              p.canonical,
-              settings,
-              p.platform,
-            );
+            const base = problemBase(p.id || p.titleSlug, p.canonical, settings, p.platform);
             const notesPath = `${base}/notes.md`;
             if (!seenPaths.has(notesPath)) {
               seenPaths.add(notesPath);
@@ -1132,12 +998,7 @@ async function handleSolved(data) {
           const slug = p.titleSlug || p.id || "";
           if (slug) {
             const chats = await getChatsByProblem(slug).catch(() => []);
-            const base = problemBase(
-              p.id || p.titleSlug,
-              p.canonical,
-              settings,
-              p.platform,
-            );
+            const base = problemBase(p.id || p.titleSlug, p.canonical, settings, p.platform);
             if (Array.isArray(chats) && chats.length) {
               for (const chat of chats) {
                 const chatPath = `${base}/ai-chats/chat-${chat.id}.json`;
@@ -1190,9 +1051,7 @@ async function handleSolved(data) {
       }
 
       const pendingCount = pendingProblems.length || 1;
-      const commitType = forceCommit
-        ? COMMIT_TYPES.UPDATE
-        : COMMIT_TYPES.SOLVED;
+      const commitType = forceCommit ? COMMIT_TYPES.UPDATE : COMMIT_TYPES.SOLVED;
       const commitMsg =
         pendingCount > 1
           ? buildCommitMessage(COMMIT_TYPES.CHORE, {
@@ -1202,9 +1061,7 @@ async function handleSolved(data) {
       dbg.log(
         `handleSolved(): commit prep - pending=${pendingCount}, type=${commitType}, files=${filesToCommit.length}`,
       );
-      const commitOpts = data.timestamp
-        ? { date: new Date(data.timestamp) }
-        : {};
+      const commitOpts = data.timestamp ? { date: new Date(data.timestamp) } : {};
       const primaryResult = await _commitWithFailover(
         filesToCommit,
         commitMsg,
@@ -1212,15 +1069,9 @@ async function handleSolved(data) {
         commitOpts,
         settings,
       );
-      await Storage.markSubmissionCommitted(submissionCommitKey).catch(
-        () => {},
-      );
-      await Storage.markSlugLangCommitted(data.id || titleSlug, langName).catch(
-        () => {},
-      );
-      const clearedKeys = pendingProblems
-        .map((p) => getProblemCommitKey(p))
-        .filter(Boolean);
+      await Storage.markSubmissionCommitted(submissionCommitKey).catch(() => {});
+      await Storage.markSlugLangCommitted(data.id || titleSlug, langName).catch(() => {});
+      const clearedKeys = pendingProblems.map((p) => getProblemCommitKey(p)).filter(Boolean);
       await Storage.clearPendingProblemKeys(clearedKeys).catch(() => {});
 
       // Record committed paths per-problem so future resyncs can detect
@@ -1228,9 +1079,7 @@ async function handleSolved(data) {
       for (const p of pendingProblems) {
         const paths = getProblemFiles(p, settings).map((f) => f.path);
         if (paths.length > 0) {
-          await Storage.saveProblem({ ...p, _committedPaths: paths }).catch(
-            () => {},
-          );
+          await Storage.saveProblem({ ...p, _committedPaths: paths }).catch(() => {});
         }
       }
 
@@ -1255,10 +1104,7 @@ async function handleSolved(data) {
       // Scheduled backup on solve (if enabled)
       if (settings.schedBackupOnSolve) {
         const allP = await Storage.getAllProblems().catch(() => []);
-        Storage.addScheduledBackup(
-          { problems: allP, settings },
-          "on-solve",
-        ).catch(() => {});
+        Storage.addScheduledBackup({ problems: allP, settings }, "on-solve").catch(() => {});
       }
 
       // Fire-and-forget: rename files to canonical paths if needed
@@ -1273,10 +1119,7 @@ async function handleSolved(data) {
         primaryResult.target ? _targetKey(primaryResult.target) : "",
       );
     } catch (err) {
-      dbg.error(
-        `handleSolved(): ✗ git commit failed for ${titleSlug}:`,
-        err?.message || err,
-      );
+      dbg.error(`handleSolved(): ✗ git commit failed for ${titleSlug}:`, err?.message || err);
       dbg.error(`handleSolved(): error details:`, err);
     }
   }
@@ -1289,13 +1132,7 @@ async function handleSolved(data) {
  * Each mirror entry: { provider: "github"|"gitlab", repo: string, owner?: string }
  * Failures are logged but never thrown — mirrors are best-effort.
  */
-async function pushToMirrors(
-  files,
-  message,
-  commitOpts,
-  settings,
-  skipTargetKey = "",
-) {
+async function pushToMirrors(files, message, commitOpts, settings, skipTargetKey = "") {
   const mirrors = settings.git_mirrors;
   if (!Array.isArray(mirrors) || mirrors.length === 0) return;
   await Promise.allSettled(
@@ -1303,12 +1140,7 @@ async function pushToMirrors(
       if (!mirror?.repo) return;
       if (mirror.enabled === false) return;
       const normalized = _normalizeGitTarget(mirror);
-      if (
-        normalized &&
-        skipTargetKey &&
-        _targetKey(normalized) === skipTargetKey
-      )
-        return;
+      if (normalized && skipTargetKey && _targetKey(normalized) === skipTargetKey) return;
       const handler = registry.getGitProvider(mirror.provider || "github");
       if (!handler) return;
       try {
@@ -1316,9 +1148,7 @@ async function pushToMirrors(
           ...commitOpts,
           ownerOverride: mirror.owner || undefined,
         });
-        dbg.log(
-          `pushToMirrors(): ✓ mirror commit OK - ${mirror.provider}/${mirror.repo}`,
-        );
+        dbg.log(`pushToMirrors(): ✓ mirror commit OK - ${mirror.provider}/${mirror.repo}`);
       } catch (e) {
         dbg.warn(
           `pushToMirrors(): ✗ mirror commit failed - ${mirror.provider}/${mirror.repo}:`,
@@ -1345,10 +1175,7 @@ async function performPendingRenames() {
 
   const userRes = await git.getCurrentUser().catch(() => null);
   const owner = settings.github_owner?.trim() || userRes?.login;
-  const repo = (settings.github_repo || settings.gitRepo || "").replace(
-    /\s+/g,
-    "-",
-  );
+  const repo = (settings.github_repo || settings.gitRepo || "").replace(/\s+/g, "-");
   if (!owner || !repo) return;
 
   const filesToAdd = [];
@@ -1356,26 +1183,19 @@ async function performPendingRenames() {
 
   for (const r of renames) {
     try {
-      const tree = await git.apiFetch(
-        `/repos/${owner}/${repo}/git/trees/main?recursive=1`,
-      );
+      const tree = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`);
       const relevant = (tree.tree || []).filter(
         (f) => f.type === "blob" && f.path.startsWith(r.oldBase + "/"),
       );
       for (const f of relevant) {
         const newPath = f.path.replace(r.oldBase, r.newBase);
-        const blob = await git.apiFetch(
-          `/repos/${owner}/${repo}/git/blobs/${f.sha}`,
-        );
+        const blob = await git.apiFetch(`/repos/${owner}/${repo}/git/blobs/${f.sha}`);
         const content = atob((blob.content || "").replace(/\n/g, ""));
         filesToAdd.push({ path: newPath, content });
         pathsToDelete.push(f.path);
       }
     } catch (e) {
-      dbg.warn(
-        `performPendingRenames(): preflight failed for ${r.oldBase}:`,
-        e.message,
-      );
+      dbg.warn(`performPendingRenames(): preflight failed for ${r.oldBase}:`, e.message);
     }
   }
 
@@ -1475,9 +1295,7 @@ async function buildIndexJson() {
     commitsSinceLastSummary: settings._commitsSinceLastSummary || 0,
   };
 
-  dbg.log(
-    `buildIndexJson(): ✓ stats=easy:${stats.easy} med:${stats.medium} hard:${stats.hard}`,
-  );
+  dbg.log(`buildIndexJson(): ✓ stats=easy:${stats.easy} med:${stats.medium} hard:${stats.hard}`);
   return JSON.stringify(
     {
       updatedAt: new Date().toISOString(),
@@ -1503,9 +1321,7 @@ async function _maybeGenerateAISummary(settings) {
       });
       return;
     }
-    dbg.log(
-      `_maybeGenerateAISummary(): ${count} commits since last summary — generating...`,
-    );
+    dbg.log(`_maybeGenerateAISummary(): ${count} commits since last summary — generating...`);
     const problems = await Storage.getAllProblems();
     const total = problems.length;
     const byDiff = { Easy: 0, Medium: 0, Hard: 0 };
@@ -1526,9 +1342,7 @@ async function _maybeGenerateAISummary(settings) {
       settings,
     );
     if (review) {
-      dbg.log(
-        `_maybeGenerateAISummary(): ✓ summary generated via ${providerId}`,
-      );
+      dbg.log(`_maybeGenerateAISummary(): ✓ summary generated via ${providerId}`);
       await Storage.setSettings({
         ...settings,
         _aiSummary: review,
@@ -1551,16 +1365,11 @@ async function handleResyncCount() {
     const raw = atob((indexRes.content || "").replace(/\n/g, ""));
     const index = JSON.parse(raw);
     remoteProblems.push(...(index.problems || []));
-    dbg.log(
-      `handleResyncCount(): fetched ${remoteProblems.length} remote problem(s)`,
-    );
+    dbg.log(`handleResyncCount(): fetched ${remoteProblems.length} remote problem(s)`);
   } catch (e) {
     if (e?.status !== 404) {
       // Auth/network/rate-limit failure — don't show a misleading count
-      dbg.warn(
-        `handleResyncCount(): remote index unreachable (${e?.status}):`,
-        e?.message,
-      );
+      dbg.warn(`handleResyncCount(): remote index unreachable (${e?.status}):`, e?.message);
       return { count: null };
     }
     // 404 = empty repo / no index.json yet — treat as zero remote problems
@@ -1592,9 +1401,7 @@ async function handleResyncCount() {
     // If in remote, check if it's drifted
     return _isProblemDrifted(p, remote);
   });
-  dbg.log(
-    `handleResyncCount(): ✓ counted ${missing.length} missing problem(s)`,
-  );
+  dbg.log(`handleResyncCount(): ✓ counted ${missing.length} missing problem(s)`);
   return { count: missing.length };
 }
 
@@ -1607,9 +1414,7 @@ const _BULK_IMPORT_KEY = "cl-bulk-import-pending";
 
 async function handleResyncAll(mode = "bulk", commitType = "chore") {
   if (_resyncInProgress) {
-    dbg.warn(
-      "handleResyncAll(): already in progress — skipping duplicate call",
-    );
+    dbg.warn("handleResyncAll(): already in progress — skipping duplicate call");
     return { committed: 0, skipped: true };
   }
   _resyncInProgress = true;
@@ -1649,16 +1454,13 @@ function _inferCommittedPaths(problem, remoteFileTree) {
   const cleanPid = platformId(platform, rawId);
 
   // Raw platformId as actually stored (may retain ::submissionId suffix)
-  const code =
-    CONSTANTS.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
+  const code = CONSTANTS.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
   const rawPid = rawId.startsWith(`${code}-`) ? rawId : `${code}-${rawId}`;
 
   const prefixes = [`${PROBLEMS_ROOT}/${cleanPid}/`];
   if (rawPid !== cleanPid) prefixes.push(`${PROBLEMS_ROOT}/${rawPid}/`);
   if (problem.canonical?.canonicalId) {
-    prefixes.push(
-      `${PROBLEMS_ROOT}/${problem.canonical.canonicalId}/${platform}/`,
-    );
+    prefixes.push(`${PROBLEMS_ROOT}/${problem.canonical.canonicalId}/${platform}/`);
   }
 
   return remoteFileTree
@@ -1674,20 +1476,14 @@ function _pathSetsMatch(oldPaths, newPaths) {
 }
 
 async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
-  dbg.log(
-    `handleResyncAll(): starting - mode=${mode}, commitType=${commitType}`,
-  );
-  const { settings, git, token, owner, repoName } =
-    await _resolveGitHubContext();
+  dbg.log(`handleResyncAll(): starting - mode=${mode}, commitType=${commitType}`);
+  const { settings, git, token, owner, repoName } = await _resolveGitHubContext();
 
   // Pre-load canonical map so resolve() is available synchronously for path building
   await canonicalMapper
     .loadMap()
     .catch((e) =>
-      dbg.warn(
-        "handleResyncAll(): canonical map load failed (non-blocking):",
-        e?.message,
-      ),
+      dbg.warn("handleResyncAll(): canonical map load failed (non-blocking):", e?.message),
     );
 
   // ── Phase 0: Fetch remote state ───────────────────────────────────────────
@@ -1702,27 +1498,18 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       const key = getProblemCommitKey(p);
       if (key) remoteByCommitKey.set(key, p);
     });
-    dbg.log(
-      `handleResyncAll(): fetched ${remoteByCommitKey.size} existing remote problem(s)`,
-    );
+    dbg.log(`handleResyncAll(): fetched ${remoteByCommitKey.size} existing remote problem(s)`);
   } catch (e) {
-    dbg.warn(
-      `handleResyncAll(): repo doesn't exist or no index.json yet:`,
-      e?.message,
-    );
+    dbg.warn(`handleResyncAll(): repo doesn't exist or no index.json yet:`, e?.message);
   }
 
   // Fetch HEAD SHA so we can load the full recursive file tree (for inferring old paths)
   try {
-    const ref = await git.apiFetch(
-      `/repos/${owner}/${repoName}/git/ref/heads/main`,
-    );
+    const ref = await git.apiFetch(`/repos/${owner}/${repoName}/git/ref/heads/main`);
     headSha = ref?.object?.sha || null;
   } catch (_) {
     try {
-      const ref = await git.apiFetch(
-        `/repos/${owner}/${repoName}/git/ref/heads/master`,
-      );
+      const ref = await git.apiFetch(`/repos/${owner}/${repoName}/git/ref/heads/master`);
       headSha = ref?.object?.sha || null;
     } catch (_2) {
       /* new or inaccessible repo */
@@ -1739,14 +1526,9 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       remoteFileTree = (treeRes?.tree || []).filter(
         (f) => f.type === "blob" && f.path.startsWith(`${PROBLEMS_ROOT}/`),
       );
-      dbg.log(
-        `handleResyncAll(): remote tree has ${remoteFileTree.length} problem blob(s)`,
-      );
+      dbg.log(`handleResyncAll(): remote tree has ${remoteFileTree.length} problem blob(s)`);
     } catch (e) {
-      dbg.warn(
-        "handleResyncAll(): remote tree fetch failed (non-blocking):",
-        e?.message,
-      );
+      dbg.warn("handleResyncAll(): remote tree fetch failed (non-blocking):", e?.message);
     }
   }
 
@@ -1761,10 +1543,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
   for (let p of allProblems) {
     // Enrich with canonical data before path computation
     if (!p.canonical) {
-      const resolved = canonicalMapper.resolve(
-        p.platform || "",
-        p.titleSlug || p.id || "",
-      );
+      const resolved = canonicalMapper.resolve(p.platform || "", p.titleSlug || p.id || "");
       if (resolved) p = { ...p, canonical: resolved };
     }
 
@@ -1776,12 +1555,9 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     const remoteEntry = remoteByCommitKey.get(key);
 
     // Determine old committed paths: prefer stored _committedPaths, then infer from remote tree
-    const storedOldPaths = Array.isArray(p._committedPaths)
-      ? p._committedPaths
-      : null;
+    const storedOldPaths = Array.isArray(p._committedPaths) ? p._committedPaths : null;
     const inferredOldPaths = _inferCommittedPaths(p, remoteFileTree);
-    const oldPaths =
-      storedOldPaths || (inferredOldPaths.length > 0 ? inferredOldPaths : null);
+    const oldPaths = storedOldPaths || (inferredOldPaths.length > 0 ? inferredOldPaths : null);
 
     const hasRemote = !!remoteEntry || inferredOldPaths.length > 0;
     const pathsDrifted = oldPaths ? !_pathSetsMatch(oldPaths, newPaths) : false;
@@ -1827,10 +1603,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       content: await buildSyncPayload(),
     });
   } catch (e) {
-    dbg.warn(
-      "handleResyncAll(): sync.json build failed (non-fatal):",
-      e?.message,
-    );
+    dbg.warn("handleResyncAll(): sync.json build failed (non-fatal):", e?.message);
   }
   try {
     const bank = await Storage.getBehaviorBank();
@@ -1839,10 +1612,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       content: JSON.stringify(bank || {}, null, 2),
     });
   } catch (e) {
-    dbg.warn(
-      "handleResyncAll(): behaviour-bank.json build failed (non-fatal):",
-      e?.message,
-    );
+    dbg.warn("handleResyncAll(): behaviour-bank.json build failed (non-fatal):", e?.message);
   }
   try {
     const roadmaps = await Storage.getRoadmaps();
@@ -1851,10 +1621,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       content: JSON.stringify(roadmaps || [], null, 2),
     });
   } catch (e) {
-    dbg.warn(
-      "handleResyncAll(): roadmaps.json build failed (non-fatal):",
-      e?.message,
-    );
+    dbg.warn("handleResyncAll(): roadmaps.json build failed (non-fatal):", e?.message);
   }
 
   // infra opts that trigger README + index.html generation via buildInfraFiles()
@@ -1888,9 +1655,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
 
   if (newProblems.length > 0) {
     if (mode === "individual") {
-      dbg.log(
-        `handleResyncAll(): Phase A — ${newProblems.length} individual backdated commit(s)`,
-      );
+      dbg.log(`handleResyncAll(): Phase A — ${newProblems.length} individual backdated commit(s)`);
       const alreadyRemote = Array.from(remoteByCommitKey.values());
       const sessionCommitted = [];
 
@@ -1898,12 +1663,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         .map((p) => ({
           problem: p,
           files: getProblemFiles(p, settings),
-          message:
-            "[" +
-            (p.topic || "Untagged") +
-            "] " +
-            (p.title || p.titleSlug) +
-            " solved",
+          message: "[" + (p.topic || "Untagged") + "] " + (p.title || p.titleSlug) + " solved",
           date: p.timestamp
             ? new Date(p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000)
             : new Date(),
@@ -1921,11 +1681,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         if (isLast && phaseAIsLast) {
           entry.files.push(...infraBundle);
         } else if (isCheckpoint) {
-          const committedSoFar = [
-            ...alreadyRemote,
-            ...sessionCommitted,
-            entry.problem,
-          ];
+          const committedSoFar = [...alreadyRemote, ...sessionCommitted, entry.problem];
           entry.files.push({
             path: "index.json",
             content: _buildIndexJsonFromList(committedSoFar, settings),
@@ -1974,13 +1730,10 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         }).catch(() => {});
       }
     } else {
-      dbg.log(
-        `handleResyncAll(): Phase A — bulk commit with ${newProblems.length} problem(s)`,
-      );
+      dbg.log(`handleResyncAll(): Phase A — bulk commit with ${newProblems.length} problem(s)`);
       const filesToCommit = [];
       for (const problem of newProblems) {
-        for (const f of getProblemFiles(problem, settings))
-          filesToCommit.push(f);
+        for (const f of getProblemFiles(problem, settings)) filesToCommit.push(f);
         try {
           if (problem.notes?.trim()) {
             const base = problemBase(
@@ -2016,9 +1769,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       }
       // Bundle infra into the bulk commit if Phase B won't run (bulk commit is last)
       if (phaseAIsLast) filesToCommit.push(...infraBundle);
-      dbg.log(
-        `handleResyncAll(): Phase A prepared ${filesToCommit.length} file(s)`,
-      );
+      dbg.log(`handleResyncAll(): Phase A prepared ${filesToCommit.length} file(s)`);
       const bulkResult = await _commitWithFailover(
         filesToCommit,
         buildCommitMessage(resolveCommitType(commitType), {
@@ -2026,9 +1777,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
           platform: "LeetCode",
         }),
         repoName,
-        phaseAIsLast
-          ? { date: new Date(), ...withInfra }
-          : { date: new Date(), skipInfra: true },
+        phaseAIsLast ? { date: new Date(), ...withInfra } : { date: new Date(), skipInfra: true },
         settings,
       );
       lastCommitSha = bulkResult?.newSha || null;
@@ -2112,10 +1861,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
   }
 
   // ── Post-commit bookkeeping ───────────────────────────────────────────────
-  const allChanged = [
-    ...newProblems,
-    ...maintenanceItems.map((m) => m.problem),
-  ];
+  const allChanged = [...newProblems, ...maintenanceItems.map((m) => m.problem)];
   for (const p of allChanged) {
     await Storage.markSlugLangCommitted(
       p.titleSlug,
@@ -2128,8 +1874,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
 
   // Mirror
   const mirrorFiles = [];
-  for (const p of allChanged)
-    for (const f of getProblemFiles(p, settings)) mirrorFiles.push(f);
+  for (const p of allChanged) for (const f of getProblemFiles(p, settings)) mirrorFiles.push(f);
   mirrorFiles.push({ path: "index.json", content: await buildIndexJson() });
   const activeTarget = _normalizeGitTarget(
     (await Storage.getSettings().catch(() => settings)).git_active_primary ||
@@ -2175,25 +1920,18 @@ async function handleBulkImport(problems = []) {
     // Sub-group by language slug
     const byLang = {};
     for (const p of slugGroup) {
-      const langSlug = (
-        p.lang?.slug ||
-        p.lang?.name ||
-        "unknown"
-      ).toLowerCase();
+      const langSlug = (p.lang?.slug || p.lang?.name || "unknown").toLowerCase();
       (byLang[langSlug] ??= []).push(p);
     }
 
     for (const langGroup of Object.values(byLang)) {
       if (langGroup.length === 1) {
-        const existing = await Storage.getProblem(langGroup[0].id).catch(
-          () => null,
-        );
+        const existing = await Storage.getProblem(langGroup[0].id).catch(() => null);
         if (existing?.manuallyEdited) continue;
         await Storage.saveProblem(langGroup[0]).catch(() => {});
         // Only commit if code actually changed — avoid re-committing unchanged data on repeated imports
         const isNew =
-          !existing ||
-          normalizeCode(existing.code) !== normalizeCode(langGroup[0].code);
+          !existing || normalizeCode(existing.code) !== normalizeCode(langGroup[0].code);
         if (isNew) {
           const key = getProblemCommitKey(langGroup[0]);
           if (key) pendingKeys.push(key);
@@ -2206,9 +1944,7 @@ async function handleBulkImport(problems = []) {
       const primary = langGroup[0];
       const rest = langGroup.slice(1);
 
-      const existingPrimary = await Storage.getProblem(primary.id).catch(
-        () => null,
-      );
+      const existingPrimary = await Storage.getProblem(primary.id).catch(() => null);
       if (existingPrimary?.manuallyEdited) continue;
 
       const primaryNorm = normalizeCode(primary.code);
@@ -2278,8 +2014,7 @@ async function handleBulkImport(problems = []) {
     if (!p.tags?.length || !["Easy", "Medium", "Hard"].includes(p.difficulty)) {
       await Storage.markForMetadataRefresh?.(p.id).catch(() => {});
       if (!p.tags?.length) missingTags++;
-      if (!["Easy", "Medium", "Hard"].includes(p.difficulty))
-        missingDifficulty++;
+      if (!["Easy", "Medium", "Hard"].includes(p.difficulty)) missingDifficulty++;
     }
   }
 
@@ -2335,17 +2070,13 @@ async function handleAIChat(messages, context = {}) {
       `My ${context.lang.name} solution:\n\`\`\`${context.lang.name}\n${context.code.slice(0, 3000)}\n\`\`\``,
     );
   else if (context.code)
-    contextParts.push(
-      `My solution:\n\`\`\`\n${context.code.slice(0, 3000)}\n\`\`\``,
-    );
-  if (context.aiReview)
-    contextParts.push(`Prior AI review:\n${context.aiReview.slice(0, 1000)}`);
+    contextParts.push(`My solution:\n\`\`\`\n${context.code.slice(0, 3000)}\n\`\`\``);
+  if (context.aiReview) contextParts.push(`Prior AI review:\n${context.aiReview.slice(0, 1000)}`);
 
   dbg.log(`handleAIChat(): prepared ${contextParts.length} context part(s)`);
 
   const lastUserMsg =
-    (messages || []).filter((m) => m?.role === "user").slice(-1)[0]?.content ||
-    "";
+    (messages || []).filter((m) => m?.role === "user").slice(-1)[0]?.content || "";
   const skillsCtx = {
     text: lastUserMsg,
     justSolved: !!context.justSolved,
@@ -2358,9 +2089,7 @@ async function handleAIChat(messages, context = {}) {
 
   const baseSystemPrompt = buildConversationSystemPrompt(context);
   const systemPrompt =
-    (skillsPrefix || "") +
-    (knowledgeCtx ? knowledgeCtx + "\n\n" : "") +
-    baseSystemPrompt;
+    (skillsPrefix || "") + (knowledgeCtx ? knowledgeCtx + "\n\n" : "") + baseSystemPrompt;
   dbg.log(
     `handleAIChat(): systemPrompt built (${systemPrompt.length} chars, skills=${!!skillsPrefix}, kb=${!!knowledgeCtx})`,
   );
@@ -2369,10 +2098,7 @@ async function handleAIChat(messages, context = {}) {
   for (const message of messages || []) {
     if (message?.role === "user") {
       // eslint-disable-next-line no-await-in-loop
-      const expanded = await expandChatVariables(
-        message.content || "",
-        context,
-      );
+      const expanded = await expandChatVariables(message.content || "", context);
       expandedMessages.push({ ...message, content: expanded });
     } else {
       expandedMessages.push(message);
@@ -2428,9 +2154,7 @@ async function handleAIChat(messages, context = {}) {
       continue;
     }
     try {
-      dbg.log(
-        `handleAIChat(): attempt ${idx + 1}/${providers.length} - calling ${provider.id}...`,
-      );
+      dbg.log(`handleAIChat(): attempt ${idx + 1}/${providers.length} - calling ${provider.id}...`);
       const response = await ai.chat(messagesWithContext, {
         ...context,
         aiModelOverride: provider.model,
@@ -2463,9 +2187,7 @@ async function handleAIChat(messages, context = {}) {
     }
   }
 
-  throw new Error(
-    "No AI providers available or configured. Add an API key in Settings → AI.",
-  );
+  throw new Error("No AI providers available or configured. Add an API key in Settings → AI.");
 }
 
 async function handleRegenerateAIReview(problem = {}) {
@@ -2473,9 +2195,7 @@ async function handleRegenerateAIReview(problem = {}) {
     `handleRegenerateAIReview(): starting for ${problem.titleSlug || problem.id || "unknown"}`,
   );
   if (!problem) throw new Error("Missing problem data");
-  const slug = String(
-    problem.titleSlug || problem.slug || problem.id || "",
-  ).trim();
+  const slug = String(problem.titleSlug || problem.slug || problem.id || "").trim();
   if (!slug) throw new Error("Missing problem identifier");
   if (!problem.code) throw new Error("Problem code is required for AI review");
 
@@ -2509,11 +2229,8 @@ async function handleRegenerateAIReview(problem = {}) {
   // Mark as pending for maintenance batch commit instead of committing immediately.
   // The MAINTENANCE_COMMIT alarm batches all AI reviews + metadata into one atomic commit.
   const pendingKey = getProblemCommitKey(updated);
-  if (pendingKey)
-    await Storage.markPendingProblemKeys([pendingKey]).catch(() => {});
-  dbg.log(
-    `handleRegenerateAIReview(): marked pending (${pendingKey}) for maintenance batch`,
-  );
+  if (pendingKey) await Storage.markPendingProblemKeys([pendingKey]).catch(() => {});
+  dbg.log(`handleRegenerateAIReview(): marked pending (${pendingKey}) for maintenance batch`);
   return {
     problem: updated,
     review,
@@ -2528,9 +2245,7 @@ async function handleRegenerateAIReview(problem = {}) {
  * @returns {Promise<{queued: number, skipped: number}>}
  */
 async function handleQueueAllAIReviews(missingOnly = false) {
-  dbg.log(
-    `handleQueueAllAIReviews(): starting (missingOnly=${missingOnly})...`,
-  );
+  dbg.log(`handleQueueAllAIReviews(): starting (missingOnly=${missingOnly})...`);
   // Clear stale done/failed entries so they don't inflate queue counts and
   // don't block re-queuing problems that already had entries.
   await clearCompletedReviews().catch(() => {});
@@ -2568,9 +2283,7 @@ async function handleQueueAllAIReviews(missingOnly = false) {
     }
   }
 
-  dbg.log(
-    `handleQueueAllAIReviews(): queued=${queued} skipped(dedup)=${skipped}`,
-  );
+  dbg.log(`handleQueueAllAIReviews(): queued=${queued} skipped(dedup)=${skipped}`);
   // Kick the processor immediately rather than waiting for the next alarm tick
   if (queued > 0) processAIReviewQueue().catch(() => {});
   return { queued, skipped };
@@ -2598,28 +2311,14 @@ async function processAIReviewQueue(options = {}) {
     // Resolve batch size and interval from user settings (with CONSTANTS fallback)
     const BATCH_SIZE = Math.max(
       1,
-      Math.min(
-        20,
-        Number(snailSettings.snailMode_batchSize) ||
-          CONSTANTS.SNAIL_MODE.BATCH_SIZE,
-      ),
+      Math.min(20, Number(snailSettings.snailMode_batchSize) || CONSTANTS.SNAIL_MODE.BATCH_SIZE),
     );
-    const BATCH_INTERVAL_MS = Math.max(
-      1,
-      Number(snailSettings.snailMode_batchIntervalHours) || 0,
-    )
-      ? Math.round(
-          Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000,
-        )
+    const BATCH_INTERVAL_MS = Math.max(1, Number(snailSettings.snailMode_batchIntervalHours) || 0)
+      ? Math.round(Number(snailSettings.snailMode_batchIntervalHours) * 60 * 60 * 1000)
       : CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS;
 
     // Check if snail mode is paused
-    if (
-      !force &&
-      state.isPaused &&
-      state.pausedUntil &&
-      now < state.pausedUntil
-    ) {
+    if (!force && state.isPaused && state.pausedUntil && now < state.pausedUntil) {
       const remainingMins = Math.round((state.pausedUntil - now) / 60000);
       dbg.log(
         `[CodeLedger:SnailMode] ⏸ Paused for ${remainingMins} more minutes (${state.consecutiveErrors} errors)`,
@@ -2630,9 +2329,7 @@ async function processAIReviewQueue(options = {}) {
     // Check if enough time has passed since last batch
     const timeSinceLastBatch = now - state.lastBatch;
     if (!force && timeSinceLastBatch < BATCH_INTERVAL_MS) {
-      const nextBatchInMins = Math.round(
-        (BATCH_INTERVAL_MS - timeSinceLastBatch) / 60000,
-      );
+      const nextBatchInMins = Math.round((BATCH_INTERVAL_MS - timeSinceLastBatch) / 60000);
       dbg.log(
         `[CodeLedger:SnailMode] ⏱ Next batch in ~${nextBatchInMins} min (processed: ${state.totalProcessed}, errors: ${state.totalErrors})`,
       );
@@ -2685,10 +2382,7 @@ async function processAIReviewQueue(options = {}) {
               ext: problem.lang?.ext,
             },
           };
-          const { review, providerId } = await generateAIReview(
-            reviewProblem,
-            settings,
-          );
+          const { review, providerId } = await generateAIReview(reviewProblem, settings);
           const updatedMethods = [...problem.methods];
           updatedMethods[methodIdx] = {
             ...updatedMethods[methodIdx],
@@ -2698,8 +2392,7 @@ async function processAIReviewQueue(options = {}) {
           await Storage.saveProblem(updatedProblem);
 
           const pKey = getProblemCommitKey(problem);
-          if (pKey)
-            await Storage.markPendingProblemKeys([pKey]).catch(() => {});
+          if (pKey) await Storage.markPendingProblemKeys([pKey]).catch(() => {});
           await markDone(item.id);
 
           recordAIReview({
@@ -2709,20 +2402,14 @@ async function processAIReviewQueue(options = {}) {
             reviewLength: review?.length || 0,
           }).catch(() => {});
 
-          dbg.log(
-            `[CodeLedger:SnailMode] ✓ Method review done: ${problemId} via ${providerId}`,
-          );
-          await new Promise((resolve) =>
-            setTimeout(resolve, REVIEW_RATE_LIMIT_MS),
-          );
+          dbg.log(`[CodeLedger:SnailMode] ✓ Method review done: ${problemId} via ${providerId}`);
+          await new Promise((resolve) => setTimeout(resolve, REVIEW_RATE_LIMIT_MS));
         } else {
           // Standard problem-level review
           let problem = await Storage.getProblem(problemId);
           if (!problem) {
             await markDone(item.id);
-            dbg.warn(
-              `[CodeLedger:SnailMode] ✗ Problem review for ${problemId} — not found`,
-            );
+            dbg.warn(`[CodeLedger:SnailMode] ✗ Problem review for ${problemId} — not found`);
             batchProcessed++;
             item = await getNextPendingReview();
             continue;
@@ -2730,15 +2417,10 @@ async function processAIReviewQueue(options = {}) {
 
           if (!problem.code) {
             if (problem.platform === "leetcode" && problem.titleSlug) {
-              dbg.log(
-                `[CodeLedger:SnailMode] 🔄 Attempting code recovery for ${problemId}`,
-              );
+              dbg.log(`[CodeLedger:SnailMode] 🔄 Attempting code recovery for ${problemId}`);
               const recovery = await triggerCodeRecovery(problem);
               if (!recovery.ok) {
-                await markFailedWithRetry(
-                  item.id,
-                  `Code recovery failed: ${recovery.error}`,
-                );
+                await markFailedWithRetry(item.id, `Code recovery failed: ${recovery.error}`);
                 dbg.warn(
                   `[CodeLedger:SnailMode] ✗ Recovery failed for ${problemId}: ${recovery.error}`,
                 );
@@ -2749,23 +2431,15 @@ async function processAIReviewQueue(options = {}) {
               }
               problem = await Storage.getProblem(problemId);
               if (!problem?.code) {
-                await markFailedWithRetry(
-                  item.id,
-                  "Code recovery succeeded but code still empty",
-                );
+                await markFailedWithRetry(item.id, "Code recovery succeeded but code still empty");
                 batchErrors++;
                 batchProcessed++;
                 item = await getNextPendingReview();
                 continue;
               }
-              dbg.log(
-                `[CodeLedger:SnailMode] ✓ Code recovery succeeded for ${problemId}`,
-              );
+              dbg.log(`[CodeLedger:SnailMode] ✓ Code recovery succeeded for ${problemId}`);
             } else {
-              await markFailedWithRetry(
-                item.id,
-                "No code and automatic recovery not supported",
-              );
+              await markFailedWithRetry(item.id, "No code and automatic recovery not supported");
               dbg.warn(
                 `[CodeLedger:SnailMode] ✗ No code for ${problemId} (platform: ${problem.platform})`,
               );
@@ -2781,10 +2455,7 @@ async function processAIReviewQueue(options = {}) {
             `[CodeLedger:SnailMode] 📝 Processing problem ${batchProcessed + 1}/${BATCH_SIZE}: ${problem.titleSlug || problemId}`,
           );
 
-          const { review, providerId, inferredTags } = await generateAIReview(
-            problem,
-            settings,
-          );
+          const { review, providerId, inferredTags } = await generateAIReview(problem, settings);
           const base = inferredTags
             ? { ...problem, tags: inferredTags, topic: inferredTags[0] }
             : problem;
@@ -2807,22 +2478,16 @@ async function processAIReviewQueue(options = {}) {
           dbg.log(
             `[CodeLedger:SnailMode] ✓ Problem review done: ${updated.titleSlug || problemId} via ${providerId}`,
           );
-          await new Promise((resolve) =>
-            setTimeout(resolve, REVIEW_RATE_LIMIT_MS),
-          );
+          await new Promise((resolve) => setTimeout(resolve, REVIEW_RATE_LIMIT_MS));
         }
 
         batchProcessed++;
       } catch (e) {
-        dbg.error(
-          `[CodeLedger:SnailMode] ✗ Error processing ${problemId}: ${e?.message}`,
-        );
+        dbg.error(`[CodeLedger:SnailMode] ✗ Error processing ${problemId}: ${e?.message}`);
         batchErrors++;
         const willRetry = await markFailedWithRetry(item.id, e.message);
         if (!willRetry) {
-          dbg.error(
-            `[CodeLedger:SnailMode] ✗ Max retries exceeded for ${problemId}`,
-          );
+          dbg.error(`[CodeLedger:SnailMode] ✗ Max retries exceeded for ${problemId}`);
         } else {
           dbg.warn(`[CodeLedger:SnailMode] ⚠ Will retry ${problemId}`);
         }
@@ -2837,8 +2502,7 @@ async function processAIReviewQueue(options = {}) {
     newState.lastBatch = now;
     newState.totalProcessed += batchProcessed;
     newState.totalErrors += batchErrors;
-    newState.consecutiveErrors =
-      batchErrors > 0 ? state.consecutiveErrors + 1 : 0;
+    newState.consecutiveErrors = batchErrors > 0 ? state.consecutiveErrors + 1 : 0;
 
     // Pause if too many consecutive errors
     if (
@@ -2913,15 +2577,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const result = await handleQueueAllAIReviews(false);
-        dbg.log(
-          `onMessage(QUEUE_ALL_AI_REVIEWS): result=${JSON.stringify(result)}`,
-        );
+        dbg.log(`onMessage(QUEUE_ALL_AI_REVIEWS): result=${JSON.stringify(result)}`);
         sendResponse({ ok: true, ...result });
       } catch (err) {
-        dbg.error(
-          `onMessage(QUEUE_ALL_AI_REVIEWS): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(QUEUE_ALL_AI_REVIEWS): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -2931,15 +2590,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const result = await handleQueueAllAIReviews(true);
-        dbg.log(
-          `onMessage(QUEUE_MISSING_AI_REVIEWS): result=${JSON.stringify(result)}`,
-        );
+        dbg.log(`onMessage(QUEUE_MISSING_AI_REVIEWS): result=${JSON.stringify(result)}`);
         sendResponse({ ok: true, ...result });
       } catch (err) {
-        dbg.error(
-          `onMessage(QUEUE_MISSING_AI_REVIEWS): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(QUEUE_MISSING_AI_REVIEWS): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -2952,10 +2606,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await processAIReviewQueue({ force });
         sendResponse({ ok: true, force });
       } catch (err) {
-        dbg.error(
-          `onMessage(PROCESS_REVIEW_QUEUE): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(PROCESS_REVIEW_QUEUE): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -2967,10 +2618,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await processAIReviewQueue({ force: true });
         sendResponse({ ok: true, force: true });
       } catch (err) {
-        dbg.error(
-          `onMessage(PROCESS_REVIEW_QUEUE_NOW): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(PROCESS_REVIEW_QUEUE_NOW): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -2983,10 +2631,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         dbg.log(`onMessage(CANCEL_AI_REVIEW_QUEUE): cancelled=${cancelled}`);
         sendResponse({ ok: true, cancelled });
       } catch (err) {
-        dbg.error(
-          `onMessage(CANCEL_AI_REVIEW_QUEUE): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(CANCEL_AI_REVIEW_QUEUE): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -3009,15 +2654,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const status = await getAIReviewQueueStatus();
-        dbg.log(
-          `onMessage(GET_AI_REVIEW_QUEUE_STATUS): status=${JSON.stringify(status)}`,
-        );
+        dbg.log(`onMessage(GET_AI_REVIEW_QUEUE_STATUS): status=${JSON.stringify(status)}`);
         sendResponse({ ok: true, ...status });
       } catch (err) {
-        dbg.error(
-          `onMessage(GET_AI_REVIEW_QUEUE_STATUS): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(GET_AI_REVIEW_QUEUE_STATUS): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -3073,9 +2713,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         const items = await getAllQueueItems(null);
         const matching = (items || []).filter(
-          (it) =>
-            it.problemId === problemId ||
-            it.problemId?.startsWith(problemId + "::"),
+          (it) => it.problemId === problemId || it.problemId?.startsWith(problemId + "::"),
         );
         let removed = 0;
         for (const it of matching) {
@@ -3087,10 +2725,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         );
         sendResponse({ ok: true, removed });
       } catch (err) {
-        dbg.error(
-          `onMessage(REMOVE_QUEUE_ITEMS_BY_PROBLEM): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(REMOVE_QUEUE_ITEMS_BY_PROBLEM): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -3101,15 +2736,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         dbg.log(`onMessage(SYNC_SETTINGS_TO_GITHUB): starting...`);
         const result = await syncSettingsToGitHub();
-        dbg.log(
-          `onMessage(SYNC_SETTINGS_TO_GITHUB): result=${JSON.stringify(result)}`,
-        );
+        dbg.log(`onMessage(SYNC_SETTINGS_TO_GITHUB): result=${JSON.stringify(result)}`);
         sendResponse({ ok: true, ...result });
       } catch (err) {
-        dbg.error(
-          `onMessage(SYNC_SETTINGS_TO_GITHUB): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(SYNC_SETTINGS_TO_GITHUB): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -3120,15 +2750,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         dbg.log(`onMessage(SYNC_SETTINGS_FROM_GITHUB): starting...`);
         const result = await syncSettingsFromGitHub();
-        dbg.log(
-          `onMessage(SYNC_SETTINGS_FROM_GITHUB): result=${JSON.stringify(result)}`,
-        );
+        dbg.log(`onMessage(SYNC_SETTINGS_FROM_GITHUB): result=${JSON.stringify(result)}`);
         sendResponse({ ok: true, ...result });
       } catch (err) {
-        dbg.error(
-          `onMessage(SYNC_SETTINGS_FROM_GITHUB): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(SYNC_SETTINGS_FROM_GITHUB): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -3179,12 +2804,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         // 2. Check key infra files
-        const INFRA_FILES = [
-          "index.json",
-          "README.md",
-          "index.html",
-          ".codeledger/config.json",
-        ];
+        const INFRA_FILES = ["index.json", "README.md", "index.html", ".codeledger/config.json"];
         checks.infraStatus = {};
         await Promise.all(
           INFRA_FILES.map(async (f) => {
@@ -3196,22 +2816,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
           }),
         );
-        checks.infraOk = Object.values(checks.infraStatus).every(
-          (v) => v === "ok",
-        );
+        checks.infraOk = Object.values(checks.infraStatus).every((v) => v === "ok");
 
         // 3. Old-layout path detection — look for topics/* or problems/* top-level dirs
         try {
-          const rootListing = await getContents(owner, repo, "", token).catch(
-            () => [],
-          );
-          const rootNames = Array.isArray(rootListing)
-            ? rootListing.map((f) => f.name)
-            : [];
+          const rootListing = await getContents(owner, repo, "", token).catch(() => []);
+          const rootNames = Array.isArray(rootListing) ? rootListing.map((f) => f.name) : [];
           checks.hasOldTopicsDir = rootNames.includes("topics");
           checks.hasOldProblemsDir = rootNames.includes("problems");
-          checks.hasOldLayout =
-            checks.hasOldTopicsDir || checks.hasOldProblemsDir;
+          checks.hasOldLayout = checks.hasOldTopicsDir || checks.hasOldProblemsDir;
         } catch (e) {
           checks.hasOldLayout = false;
         }
@@ -3223,21 +2836,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // 5. Committed count (from index.json)
         try {
           const indexFile = await getContents(owner, repo, "index.json", token);
-          const indexRaw = indexFile?.content
-            ? atob(indexFile.content.replace(/\n/g, ""))
-            : "{}";
+          const indexRaw = indexFile?.content ? atob(indexFile.content.replace(/\n/g, "")) : "{}";
           const index = JSON.parse(indexRaw);
-          checks.committedProblemCount = Array.isArray(index.problems)
-            ? index.problems.length
-            : 0;
+          checks.committedProblemCount = Array.isArray(index.problems) ? index.problems.length : 0;
           checks.indexLayoutVersion = index.layoutVersion || 1;
         } catch (e) {
           checks.committedProblemCount = null;
           checks.indexLayoutVersion = null;
         }
 
-        checks.uncommittedCount =
-          checks.localProblemCount - (checks.committedProblemCount || 0);
+        checks.uncommittedCount = checks.localProblemCount - (checks.committedProblemCount || 0);
 
         dbg.log(`onMessage(REPO_DIAGNOSTICS): complete`, checks);
         sendResponse({ ok: true, checks });
@@ -3277,19 +2885,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         const mode = msg.mode || "bulk";
         const commitType = msg.commitType || "chore";
-        dbg.log(
-          `onMessage(CODELEDGER_RUN_MIGRATIONS): mode=${mode}, commitType=${commitType}`,
-        );
+        dbg.log(`onMessage(CODELEDGER_RUN_MIGRATIONS): mode=${mode}, commitType=${commitType}`);
         const result = await handleResyncAll(mode, commitType);
-        dbg.log(
-          `onMessage(CODELEDGER_RUN_MIGRATIONS): result=${JSON.stringify(result)}`,
-        );
+        dbg.log(`onMessage(CODELEDGER_RUN_MIGRATIONS): result=${JSON.stringify(result)}`);
         sendResponse({ ok: true, result });
       } catch (err) {
-        dbg.error(
-          `onMessage(CODELEDGER_RUN_MIGRATIONS): failed:`,
-          err?.message || err,
-        );
+        dbg.error(`onMessage(CODELEDGER_RUN_MIGRATIONS): failed:`, err?.message || err);
         sendResponse({ ok: false, error: err?.message || String(err) });
       }
     })();
@@ -3329,9 +2930,7 @@ try {
     }
 
     if (msg && msg.type === "REFRESH_INFRA") {
-      dbg.log(
-        "onMessage(REFRESH_INFRA): refreshing index.json + README + index.html...",
-      );
+      dbg.log("onMessage(REFRESH_INFRA): refreshing index.json + README + index.html...");
       (async () => {
         try {
           const { settings, repoName } = await _resolveGitHubContext();
@@ -3409,8 +3008,7 @@ try {
             stats: {
               total: allProblems.length,
               easy: allProblems.filter((p) => p.difficulty === "Easy").length,
-              medium: allProblems.filter((p) => p.difficulty === "Medium")
-                .length,
+              medium: allProblems.filter((p) => p.difficulty === "Medium").length,
               hard: allProblems.filter((p) => p.difficulty === "Hard").length,
             },
           };
@@ -3432,8 +3030,8 @@ try {
           );
           // Also push to all enabled mirrors
           const activeTarget = _normalizeGitTarget(
-            (await Storage.getSettings().catch(() => settings))
-              .git_active_primary || _getDefaultPrimaryTarget(settings),
+            (await Storage.getSettings().catch(() => settings)).git_active_primary ||
+              _getDefaultPrimaryTarget(settings),
           );
           await pushToMirrors(
             backupFiles,
@@ -3441,9 +3039,7 @@ try {
             {},
             settings,
             activeTarget ? _targetKey(activeTarget) : "",
-          ).catch((e) =>
-            dbg.warn("BACKUP_TO_REPO: mirror push failed:", e?.message),
-          );
+          ).catch((e) => dbg.warn("BACKUP_TO_REPO: mirror push failed:", e?.message));
           dbg.log("onMessage(BACKUP_TO_REPO): ✓ backup committed");
           sendResponse({ ok: true });
         } catch (e) {
@@ -3476,9 +3072,7 @@ try {
       );
       handleSyncApplyImport(msg.problems || [])
         .then((result) => {
-          dbg.log(
-            `onMessage(SYNC_APPLY_IMPORT): result=${JSON.stringify(result)}`,
-          );
+          dbg.log(`onMessage(SYNC_APPLY_IMPORT): result=${JSON.stringify(result)}`);
           sendResponse({ ok: true, ...result });
         })
         .catch((e) => {
@@ -3520,9 +3114,7 @@ try {
       dbg.log(`onMessage(FORCE_REBUILD_REPO): rebuilding repo...`);
       forceRebuildRepo()
         .then((result) => {
-          dbg.log(
-            `onMessage(FORCE_REBUILD_REPO): result=${JSON.stringify(result)}`,
-          );
+          dbg.log(`onMessage(FORCE_REBUILD_REPO): result=${JSON.stringify(result)}`);
           sendResponse({ ok: true, ...result });
         })
         .catch((e) => {
@@ -3536,9 +3128,7 @@ try {
       dbg.log(`onMessage(FORCE_COMMIT_SETTINGS): forcing settings commit...`);
       forceCommitSettingsNow()
         .then((result) => {
-          dbg.log(
-            `onMessage(FORCE_COMMIT_SETTINGS): result=${JSON.stringify(result)}`,
-          );
+          dbg.log(`onMessage(FORCE_COMMIT_SETTINGS): result=${JSON.stringify(result)}`);
           sendResponse({ ok: true, ...result });
         })
         .catch((e) => {
@@ -3563,9 +3153,7 @@ try {
     }
 
     if (msg && msg.type === "BULK_IMPORT") {
-      dbg.log(
-        `onMessage(BULK_IMPORT): importing ${(msg.problems || []).length} problem(s)...`,
-      );
+      dbg.log(`onMessage(BULK_IMPORT): importing ${(msg.problems || []).length} problem(s)...`);
       handleBulkImport(msg.problems || [])
         .then((result) => {
           dbg.log(`onMessage(BULK_IMPORT): result=${JSON.stringify(result)}`);
@@ -3584,9 +3172,7 @@ try {
       );
       handleRefreshMetadata(msg.problems || [])
         .then((result) => {
-          dbg.log(
-            `onMessage(REFRESH_METADATA): result=${JSON.stringify(result)}`,
-          );
+          dbg.log(`onMessage(REFRESH_METADATA): result=${JSON.stringify(result)}`);
           sendResponse({ ok: true, ...result });
         })
         .catch((e) => {
@@ -3597,26 +3183,18 @@ try {
     }
 
     if (msg && msg.type === "REFRESH_METADATA_DONE") {
-      dbg.log(
-        `onMessage(REFRESH_METADATA_DONE): completing metadata refresh...`,
-      );
+      dbg.log(`onMessage(REFRESH_METADATA_DONE): completing metadata refresh...`);
       const result = completeRefreshMetadata(_sender?.tab?.id);
-      dbg.log(
-        `onMessage(REFRESH_METADATA_DONE): completed=${result.completed}`,
-      );
+      dbg.log(`onMessage(REFRESH_METADATA_DONE): completed=${result.completed}`);
       sendResponse({ ok: true, ...result });
       return true;
     }
 
     if (msg && msg.type === "AI_CHAT") {
-      dbg.log(
-        `onMessage(AI_CHAT): chat with ${(msg.messages || []).length} message(s)...`,
-      );
+      dbg.log(`onMessage(AI_CHAT): chat with ${(msg.messages || []).length} message(s)...`);
       handleAIChat(msg.messages || [], msg.context || {})
         .then((response) => {
-          dbg.log(
-            `onMessage(AI_CHAT): response (${String(response || "").length} chars)`,
-          );
+          dbg.log(`onMessage(AI_CHAT): response (${String(response || "").length} chars)`);
           sendResponse({ ok: true, response });
         })
         .catch((e) => {
@@ -3632,9 +3210,7 @@ try {
       );
       handleRegenerateAIReview(msg.problem || msg.data || {})
         .then((result) => {
-          dbg.log(
-            `onMessage(REGENERATE_AI_REVIEW): result=${JSON.stringify(result)}`,
-          );
+          dbg.log(`onMessage(REGENERATE_AI_REVIEW): result=${JSON.stringify(result)}`);
           sendResponse({ ok: true, ...result });
         })
         .catch((e) => {
@@ -3707,10 +3283,7 @@ try {
             sendResponse({ ok: false, error: "Not configured" });
             return;
           }
-          const keep = Math.max(
-            1,
-            parseInt(settings.githubBackupKeep || "10", 10),
-          );
+          const keep = Math.max(1, parseInt(settings.githubBackupKeep || "10", 10));
           await commitBackupToGitHub(owner, repo, git, keep);
           sendResponse({ ok: true });
         } catch (e) {
@@ -3738,12 +3311,7 @@ try {
             sendResponse({ ok: false, error: "Not configured" });
             return;
           }
-          const snapshot = await fetchBackupSnapshot(
-            owner,
-            repo,
-            msg.filePath,
-            git,
-          );
+          const snapshot = await fetchBackupSnapshot(owner, repo, msg.filePath, git);
           if (!snapshot?.problems) {
             sendResponse({ ok: false, error: "Invalid snapshot" });
             return;
@@ -3790,18 +3358,14 @@ try {
     }
 
     if (msg && msg.type === "OPEN_LIBRARY") {
-      dbg.log(
-        `onMessage(OPEN_LIBRARY): opening library tab (${msg.tab || "solutions"})...`,
-      );
+      dbg.log(`onMessage(OPEN_LIBRARY): opening library tab (${msg.tab || "solutions"})...`);
       try {
         const tab = msg.tab || "solutions";
         const params = new URLSearchParams({ tab });
         if (msg.chatSlug) params.set("chatSlug", String(msg.chatSlug));
         if (msg.chatPrompt) params.set("chatPrompt", String(msg.chatPrompt));
         chrome.tabs.create({
-          url: chrome.runtime.getURL(
-            `library/library.html?${params.toString()}`,
-          ),
+          url: chrome.runtime.getURL(`library/library.html?${params.toString()}`),
         });
         dbg.log(`onMessage(OPEN_LIBRARY): tab created`);
       } catch (_) {}
@@ -3810,9 +3374,7 @@ try {
     }
 
     if (msg && msg.type === "GENERATE_ROADMAP") {
-      dbg.log(
-        `onMessage(GENERATE_ROADMAP): generating for level=${msg.level}, goal=${msg.goal}`,
-      );
+      dbg.log(`onMessage(GENERATE_ROADMAP): generating for level=${msg.level}, goal=${msg.goal}`);
       (async () => {
         try {
           const settings = await Storage.getSettings();
@@ -3869,9 +3431,7 @@ Include 5-8 milestones. Build progressively. subtopics must be lowercase-hyphena
             try {
               const raw = await Promise.race([
                 ai.review(prompt, { _rawPrompt: true }),
-                new Promise((_, rej) =>
-                  setTimeout(() => rej(new Error("timeout")), 45000),
-                ),
+                new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000)),
               ]);
               // Strip any markdown fences if the model added them
               const cleaned = String(raw || "")
@@ -3880,10 +3440,7 @@ Include 5-8 milestones. Build progressively. subtopics must be lowercase-hyphena
               roadmapData = JSON.parse(cleaned);
               break;
             } catch (e) {
-              dbg.warn(
-                `GENERATE_ROADMAP: provider ${provider.id} failed:`,
-                e?.message,
-              );
+              dbg.warn(`GENERATE_ROADMAP: provider ${provider.id} failed:`, e?.message);
             }
           }
           if (!roadmapData) {
@@ -3910,10 +3467,7 @@ Include 5-8 milestones. Build progressively. subtopics must be lowercase-hyphena
           dbg.log(`onMessage(OPEN_POPUP): via chrome.action.openPopup`);
           return;
         }
-        if (
-          chrome.browserAction &&
-          typeof chrome.browserAction.openPopup === "function"
-        ) {
+        if (chrome.browserAction && typeof chrome.browserAction.openPopup === "function") {
           chrome.browserAction.openPopup();
           dbg.log(`onMessage(OPEN_POPUP): via chrome.browserAction.openPopup`);
           return;

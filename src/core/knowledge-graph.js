@@ -68,9 +68,7 @@ function blendColors(colorsArr) {
 }
 
 export function buildKnowledgeGraph(problems) {
-  dbg.log(
-    `buildKnowledgeGraph(): building from ${(problems || []).length} problems`,
-  );
+  dbg.log(`buildKnowledgeGraph(): building from ${(problems || []).length} problems`);
   const nodes = new Map(); // id → node
   const edges = []; // { source, target, type }
   const topicColorMap = new Map();
@@ -78,10 +76,7 @@ export function buildKnowledgeGraph(problems) {
 
   function topicColor(topic) {
     if (!topicColorMap.has(topic)) {
-      topicColorMap.set(
-        topic,
-        TOPIC_COLORS[topicColorIdx++ % TOPIC_COLORS.length],
-      );
+      topicColorMap.set(topic, TOPIC_COLORS[topicColorIdx++ % TOPIC_COLORS.length]);
     }
     return topicColorMap.get(topic);
   }
@@ -113,10 +108,7 @@ export function buildKnowledgeGraph(problems) {
     const id = `problem:${p.platform}:${p.titleSlug || p.id}`;
 
     // Use ALL tags for topic edges — this is the key fix (was only using first tag)
-    const allTopics =
-      Array.isArray(p.tags) && p.tags.length > 0
-        ? p.tags
-        : [p.topic || "Untagged"];
+    const allTopics = Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : [p.topic || "Untagged"];
     const primaryTopic = allTopics[0];
 
     // Determine node color: difficulty-based, but blended if solved on multiple platforms
@@ -189,8 +181,7 @@ export function buildKnowledgeGraph(problems) {
             platforms: [],
             tags: simTopics,
           });
-          if (!slugToIds.has(sim.titleSlug))
-            slugToIds.set(sim.titleSlug, new Set());
+          if (!slugToIds.has(sim.titleSlug)) slugToIds.set(sim.titleSlug, new Set());
           slugToIds.get(sim.titleSlug).add(simId);
           for (const t of simTopics) {
             const tid = ensureTopic(t);
@@ -211,12 +202,8 @@ export function buildKnowledgeGraph(problems) {
   for (const [, idSet] of slugToIds) {
     if (idSet.size <= 1) continue;
     const ids = [...idSet];
-    const allPlatforms = ids
-      .map((id) => nodes.get(id)?.platform)
-      .filter(Boolean);
-    const blended = blendColors(
-      allPlatforms.map((pl) => PLATFORM_COLOR[pl] || "#64748b"),
-    );
+    const allPlatforms = ids.map((id) => nodes.get(id)?.platform).filter(Boolean);
+    const blended = blendColors(allPlatforms.map((pl) => PLATFORM_COLOR[pl] || "#64748b"));
 
     for (const id of ids) {
       const node = nodes.get(id);

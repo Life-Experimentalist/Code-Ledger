@@ -95,8 +95,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 (i) =>
                   `<li style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)"><strong>${i.title || i.id}</strong> <span style="color:#94a3b8">${i.platform || ""} ${i.language ? "• " + i.language : ""}</span></li>`,
               )
-              .join("") ||
-            '<li style="padding:8px;color:#94a3b8">No problems found locally.</li>';
+              .join("") || '<li style="padding:8px;color:#94a3b8">No problems found locally.</li>';
           document.querySelector("main").innerHTML =
             `<h3 style="color:#fff">Local Library</h3><ul style="list-style:none;padding:0;margin-top:12px">${list}</ul>`;
         };

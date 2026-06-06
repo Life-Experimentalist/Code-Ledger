@@ -6,6 +6,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.4] — 2026-06-06
+
+### Fixed
+
+- **Manifest: `web_accessible_resources` missing UI modules** — `ui/floating-ai.js`, `ui/floating-timer.js`, and `ui/components/AIMarkdownRenderer.js` are loaded from web page context (platform handler → content script dynamic import chain) and must be declared web-accessible. They were incorrectly omitted in the v1.4.3 permission tightening pass, which would have broken the floating AI panel and timer overlay on all platforms.
+- **CI: release workflow read deleted `src/manifest.json`** — Manifest version validation step now reads `src/manifest-chromium.json` (the split-manifest source introduced in v1.4.3).
+
+### Changed
+
+- **Manifest permissions tightened** — Removed unused `scripting`, `webRequest`, and `tabs` permissions (none are called in the codebase). Removed `https://bitbucket.org/api/*` host permission (Bitbucket handler is `UNDER_CONSTRUCTION`). `web_accessible_resources` matches narrowed from `<all_urls>` to only the three DSA platform domains plus the landing page.
+- **Landing page** — Hero badge and "What's new" section updated to v1.4.3; footer now links to `/privacy`, `/terms`, and `/support`. Chrome Web Store URL in `config.json` now includes the full extension ID.
+- **Prettier standardised** — All `src/**/*.js`, `dev/**/*.js`, and `worker/src/**/*.js` formatted with Prettier (printWidth 100, double quotes, trailing commas). `format` and `format:check` scripts added; `format:check` runs in CI on every release tag.
+
+### Added
+
+- **Landing pages: Privacy, Terms, Support** — `/privacy.html`, `/terms.html`, `/support.html` served from the Cloudflare Worker, matching the site dark theme. Each includes a consistent footer with links to all three pages.
+- **CI: Chrome Web Store auto-publish** — `.github/workflows/publish-chrome.yml` triggers on `release: published` (after the GitHub Release is created), downloads the chromium zip from release assets, and publishes via the Chrome Web Store API. Requires `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN` repository secrets. Edge and Firefox AMO publish workflows are stub stubs to be added once those listings are live.
+
+---
+
 ## [1.4.3] — 2026-06-05
 
 ### Fixed

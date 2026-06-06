@@ -12,10 +12,9 @@ export async function fetchGeminiModels(apiKey) {
   if (_cache) return _cache;
   dbg.log("Fetching Gemini models from API");
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-    { headers: { "Content-Type": "application/json" } },
-  );
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+    headers: { "Content-Type": "application/json" },
+  });
   if (!res.ok) throw new Error(`Gemini models fetch failed: ${res.status}`);
 
   const { models } = await res.json();

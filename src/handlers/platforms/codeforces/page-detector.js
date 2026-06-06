@@ -30,9 +30,7 @@ export const PAGE_TYPES = {
 
 export function detectPage(pathname) {
   // /contest/{id}/problem/{letter}  — check before /contest/{id}/my
-  const contestProblem = pathname.match(
-    /\/contest\/(\d+)\/problem\/([A-Za-z0-9]+)/,
-  );
+  const contestProblem = pathname.match(/\/contest\/(\d+)\/problem\/([A-Za-z0-9]+)/);
   if (contestProblem) {
     const [, contestId, letter] = contestProblem;
     dbg.log(`Contest problem: contestId=${contestId} letter=${letter}`);
@@ -59,9 +57,7 @@ export function detectPage(pathname) {
   }
 
   // /problemset/problem/{contestId}/{letter}
-  const problemset = pathname.match(
-    /\/problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/,
-  );
+  const problemset = pathname.match(/\/problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/);
   if (problemset) {
     const [, contestId, letter] = problemset;
     dbg.log(`Problemset problem: contestId=${contestId} letter=${letter}`);

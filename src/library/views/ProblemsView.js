@@ -32,17 +32,14 @@ const PLATFORMS = [
     color: CONSTANTS.PLATFORMS.leetcode.color,
     bg: "rgba(255,161,22,0.08)",
     border: "rgba(255,161,22,0.25)",
-    favicon:
-      "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
   },
   {
     id: "geeksforgeeks",
     name: "GeeksForGeeks",
     url: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + "explore",
     profileUrl: (s) =>
-      s?.gfg_username
-        ? `https://auth.geeksforgeeks.org/user/${s.gfg_username}/`
-        : null,
+      s?.gfg_username ? `https://auth.geeksforgeeks.org/user/${s.gfg_username}/` : null,
     color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
     bg: "rgba(47,141,70,0.08)",
     border: "rgba(47,141,70,0.25)",
@@ -53,9 +50,7 @@ const PLATFORMS = [
     name: "Codeforces",
     url: CONSTANTS.PLATFORMS.codeforces.problemsetUrl,
     profileUrl: (s) =>
-      s?.cf_username
-        ? `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/profile/${s.cf_username}`
-        : null,
+      s?.cf_username ? `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/profile/${s.cf_username}` : null,
     color: CONSTANTS.PLATFORMS.codeforces.color,
     bg: "rgba(31,138,203,0.08)",
     border: "rgba(31,138,203,0.25)",
@@ -84,19 +79,11 @@ export function ProblemsView({
   onOpenGraphProblem,
   onNavigate,
 }) {
-  const [filterDifficulty, setFilterDifficulty] = useState(
-    getQueryParam("difficulty", "All"),
-  );
-  const [filterPlatform, setFilterPlatform] = useState(
-    getQueryParam("platform", "All"),
-  );
-  const [filterLanguage, setFilterLanguage] = useState(
-    getQueryParam("language", "All"),
-  );
+  const [filterDifficulty, setFilterDifficulty] = useState(getQueryParam("difficulty", "All"));
+  const [filterPlatform, setFilterPlatform] = useState(getQueryParam("platform", "All"));
+  const [filterLanguage, setFilterLanguage] = useState(getQueryParam("language", "All"));
   const [filterTag, setFilterTag] = useState(getQueryParam("tag", "All"));
-  const [filterAIReview, setFilterAIReview] = useState(
-    getQueryParam("aiReview", "All"),
-  );
+  const [filterAIReview, setFilterAIReview] = useState(getQueryParam("aiReview", "All"));
   const [query, setQuery] = useState(searchQuery || getQueryParam("q", ""));
   const [sortBy, setSortBy] = useState(getQueryParam("sort", "newest"));
   const [selectedProblem, setSelectedProblem] = useState(null);
@@ -158,9 +145,7 @@ export function ProblemsView({
   useEffect(() => {
     const problemId = getQueryParam("problem");
     if (problemId && problems.length > 0) {
-      const found = problems.find(
-        (p) => p.id === problemId || p.titleSlug === problemId,
-      );
+      const found = problems.find((p) => p.id === problemId || p.titleSlug === problemId);
       if (found) setSelectedProblem(found);
     }
   }, [problems.length]);
@@ -181,9 +166,7 @@ export function ProblemsView({
 
   useEffect(() => {
     if (!selectedIds.size) return;
-    const existing = new Set(
-      (problems || []).map((p) => getProblemKey(p)).filter(Boolean),
-    );
+    const existing = new Set((problems || []).map((p) => getProblemKey(p)).filter(Boolean));
     setSelectedIds((prev) => {
       const next = new Set();
       prev.forEach((id) => {
@@ -202,14 +185,7 @@ export function ProblemsView({
       aiReview: filterAIReview !== "All" ? filterAIReview : null,
       sort: sortBy !== "newest" ? sortBy : null,
     });
-  }, [
-    filterDifficulty,
-    filterPlatform,
-    filterLanguage,
-    filterTag,
-    filterAIReview,
-    sortBy,
-  ]);
+  }, [filterDifficulty, filterPlatform, filterLanguage, filterTag, filterAIReview, sortBy]);
 
   function tokenizeSearch(value) {
     const raw = String(value || "").trim();
@@ -227,10 +203,8 @@ export function ProblemsView({
     for (const token of tokenizeSearch(value).map((t) => t.toLowerCase())) {
       if (token.startsWith("tag:")) spec.tags.push(token.slice(4));
       else if (token.startsWith("topic:")) spec.tags.push(token.slice(6));
-      else if (token.startsWith("platform:"))
-        spec.platforms.push(token.slice(9));
-      else if (token.startsWith("difficulty:"))
-        spec.difficulties.push(token.slice(11));
+      else if (token.startsWith("platform:")) spec.platforms.push(token.slice(9));
+      else if (token.startsWith("difficulty:")) spec.difficulties.push(token.slice(11));
       else spec.free.push(token);
     }
     return spec;
@@ -250,10 +224,7 @@ export function ProblemsView({
       const lang = p.lang?.name || p.language;
       if (lang) set.add(lang);
     });
-    return [
-      "All",
-      ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b))),
-    ];
+    return ["All", ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b)))];
   }, [problems]);
 
   const tagOptions = useMemo(() => {
@@ -262,48 +233,32 @@ export function ProblemsView({
       (p.tags || []).forEach((t) => t && set.add(t));
       if (p.topic) set.add(p.topic);
     });
-    return [
-      "All",
-      ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b))),
-    ];
+    return ["All", ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b)))];
   }, [problems]);
 
   const filtered = useMemo(() => {
     let out = problems || [];
-    if (filterDifficulty !== "All")
-      out = out.filter((p) => p.difficulty === filterDifficulty);
-    if (filterPlatform !== "All")
-      out = out.filter((p) => p.platform === filterPlatform);
+    if (filterDifficulty !== "All") out = out.filter((p) => p.difficulty === filterDifficulty);
+    if (filterPlatform !== "All") out = out.filter((p) => p.platform === filterPlatform);
     if (filterLanguage !== "All")
-      out = out.filter(
-        (p) => (p.lang?.name || p.language || "") === filterLanguage,
-      );
+      out = out.filter((p) => (p.lang?.name || p.language || "") === filterLanguage);
     if (filterTag !== "All")
-      out = out.filter(
-        (p) => (p.tags || []).includes(filterTag) || p.topic === filterTag,
-      );
+      out = out.filter((p) => (p.tags || []).includes(filterTag) || p.topic === filterTag);
     if (filterAIReview === "With Review") out = out.filter((p) => !!p.aiReview);
-    if (filterAIReview === "Without Review")
-      out = out.filter((p) => !p.aiReview);
+    if (filterAIReview === "Without Review") out = out.filter((p) => !p.aiReview);
     if (query && String(query).trim()) {
       const structured = buildSearchSpec(query);
 
       out = out.filter((p) => {
         const title = String(p.title || "").toLowerCase();
         const platform = String(p.platform || "").toLowerCase();
-        const tags = Array.isArray(p.tags)
-          ? p.tags.map((t) => String(t || "").toLowerCase())
-          : [];
+        const tags = Array.isArray(p.tags) ? p.tags.map((t) => String(t || "").toLowerCase()) : [];
         const topic = String(p.topic || "").toLowerCase();
         const lang = String(p.lang?.name || p.language || "").toLowerCase();
         const review = String(p.aiReview || "").toLowerCase();
         const code = String(p.code || "").toLowerCase();
-        const statement = String(
-          p.problemStatement || p.description || "",
-        ).toLowerCase();
-        const hints = Array.isArray(p.hints)
-          ? p.hints.join(" ").toLowerCase()
-          : "";
+        const statement = String(p.problemStatement || p.description || "").toLowerCase();
+        const hints = Array.isArray(p.hints) ? p.hints.join(" ").toLowerCase() : "";
         const similar = Array.isArray(p.similar)
           ? p.similar
               .map((s) => s?.title || s?.titleSlug || "")
@@ -326,15 +281,10 @@ export function ProblemsView({
           return false;
         if (
           structured.tags.length &&
-          !structured.tags.every(
-            (tag) => tags.some((t) => t.includes(tag)) || topic.includes(tag),
-          )
+          !structured.tags.every((tag) => tags.some((t) => t.includes(tag)) || topic.includes(tag))
         )
           return false;
-        if (
-          structured.free.length &&
-          !structured.free.every((term) => haystack.includes(term))
-        )
+        if (structured.free.length && !structured.free.every((term) => haystack.includes(term)))
           return false;
         return true;
       });
@@ -349,16 +299,10 @@ export function ProblemsView({
         arr.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
         break;
       case "diff-asc":
-        arr.sort(
-          (a, b) =>
-            (DIFF_ORDER[a.difficulty] ?? 3) - (DIFF_ORDER[b.difficulty] ?? 3),
-        );
+        arr.sort((a, b) => (DIFF_ORDER[a.difficulty] ?? 3) - (DIFF_ORDER[b.difficulty] ?? 3));
         break;
       case "diff-desc":
-        arr.sort(
-          (a, b) =>
-            (DIFF_ORDER[b.difficulty] ?? 3) - (DIFF_ORDER[a.difficulty] ?? 3),
-        );
+        arr.sort((a, b) => (DIFF_ORDER[b.difficulty] ?? 3) - (DIFF_ORDER[a.difficulty] ?? 3));
         break;
       case "title":
         arr.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
@@ -371,11 +315,7 @@ export function ProblemsView({
         );
         break;
       case "last-modified":
-        arr.sort(
-          (a, b) =>
-            (b.updatedAt || b.timestamp || 0) -
-            (a.updatedAt || a.timestamp || 0),
-        );
+        arr.sort((a, b) => (b.updatedAt || b.timestamp || 0) - (a.updatedAt || a.timestamp || 0));
         break;
       case "tags":
         arr.sort(
@@ -402,12 +342,9 @@ export function ProblemsView({
     const slug = encodeURIComponent(problem.titleSlug);
     const suffix = `?codeledger_fetch=1&cl_fetch_id=${slug}`;
     const base = {
-      leetcode:
-        CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/",
-      geeksforgeeks:
-        CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + problem.titleSlug,
-      codeforces:
-        CONSTANTS.PLATFORMS.codeforces.problemsBase + problem.titleSlug,
+      leetcode: CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/",
+      geeksforgeeks: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + problem.titleSlug,
+      codeforces: CONSTANTS.PLATFORMS.codeforces.problemsBase + problem.titleSlug,
     }[problem.platform];
     return base ? base + suffix : null;
   };
@@ -435,14 +372,10 @@ export function ProblemsView({
   };
 
   const selectAllFiltered = () => {
-    setSelectedIds(
-      new Set(filtered.map((p) => getProblemKey(p)).filter(Boolean)),
-    );
+    setSelectedIds(new Set(filtered.map((p) => getProblemKey(p)).filter(Boolean)));
   };
 
-  const selectedProblems = (problems || []).filter((p) =>
-    selectedIds.has(getProblemKey(p)),
-  );
+  const selectedProblems = (problems || []).filter((p) => selectedIds.has(getProblemKey(p)));
 
   const bulkDeleteSelected = async () => {
     if (!selectedProblems.length || bulkBusy) return;
@@ -491,16 +424,10 @@ export function ProblemsView({
         };
         await Storage.saveProblem(updated);
         const slug = String(updated.titleSlug || updated.id || "").trim();
-        const lang =
-          updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
+        const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
         const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
-        const pendingKey = slug
-          ? normLang
-            ? `${slug}::${normLang}`
-            : slug
-          : "";
-        if (pendingKey)
-          await Storage.markPendingProblemKey(pendingKey).catch(() => {});
+        const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+        if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => {});
         onProblemUpdate?.(updated);
       }
       setBulkStatus(`Updated tags for ${selectedProblems.length} problem(s).`);
@@ -533,8 +460,7 @@ export function ProblemsView({
   return html`
     <div class="flex flex-col gap-6 w-full">
       <!-- AI Review queue status banner -->
-      ${isExtension &&
-      (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg)
+      ${isExtension && (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg)
         ? html`
             <div
               class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs"
@@ -559,17 +485,13 @@ export function ProblemsView({
                         ${queueStats?.pending || 0}
                         queued${queueStats?.failed > 0
                           ? html` ·
-                              <span class="text-rose-400"
-                                >${queueStats.failed} failed</span
-                              >`
+                              <span class="text-rose-400">${queueStats.failed} failed</span>`
                           : ""}</span
                       >
                     `
                   : ""}
                 ${reviewQueueMsg
-                  ? html`<span class="text-emerald-400"
-                      >${reviewQueueMsg}</span
-                    >`
+                  ? html`<span class="text-emerald-400">${reviewQueueMsg}</span>`
                   : ""}
               </button>
               <div class="flex items-center gap-2">
@@ -590,20 +512,15 @@ export function ProblemsView({
             </div>
           `
         : isExtension &&
-            ((problems || []).filter((p) => !p.aiReview).length > 0 ||
-              queueStats?.failed > 0)
+            ((problems || []).filter((p) => !p.aiReview).length > 0 || queueStats?.failed > 0)
           ? html`
               <div
                 class="flex items-center justify-between gap-3 px-4 py-2 rounded-xl bg-white/3 border border-white/5 text-xs"
               >
                 <span class="text-slate-500">
-                  ${(problems || []).filter((p) => !p.aiReview).length} problems
-                  missing AI review
+                  ${(problems || []).filter((p) => !p.aiReview).length} problems missing AI review
                   ${queueStats?.failed > 0
-                    ? html`·
-                        <span class="text-rose-400"
-                          >${queueStats.failed} failed</span
-                        >`
+                    ? html`· <span class="text-rose-400">${queueStats.failed} failed</span>`
                     : ""}
                 </span>
                 <div class="flex items-center gap-2">
@@ -714,16 +631,13 @@ export function ProblemsView({
       </div>
 
       <!-- Filter bar -->
-      <div
-        class="flex flex-col bg-[#0a0a0f] p-4 rounded-xl border border-white/5 gap-3"
-      >
+      <div class="flex flex-col bg-[#0a0a0f] p-4 rounded-xl border border-white/5 gap-3">
         <div class="flex gap-2 flex-wrap">
           ${["All", "Easy", "Medium", "Hard"].map(
             (d) => html`
               <button
                 onClick=${() => setFilterDifficulty(d)}
-                class="px-3 py-1 text-xs rounded transition-colors ${filterDifficulty ===
-                d
+                class="px-3 py-1 text-xs rounded transition-colors ${filterDifficulty === d
                   ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
                   : "bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10"}"
               >
@@ -738,9 +652,7 @@ export function ProblemsView({
             onChange=${(e) => setSortBy(e.target.value)}
             class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
           >
-            ${SORT_OPTIONS.map(
-              (o) => html`<option value=${o.value}>${o.label}</option>`,
-            )}
+            ${SORT_OPTIONS.map((o) => html`<option value=${o.value}>${o.label}</option>`)}
           </select>
           <input
             value=${query}
@@ -754,10 +666,7 @@ export function ProblemsView({
             class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
           >
             ${languageOptions.map(
-              (o) =>
-                html`<option value=${o}>
-                  ${o === "All" ? "All Languages" : o}
-                </option>`,
+              (o) => html`<option value=${o}>${o === "All" ? "All Languages" : o}</option>`,
             )}
           </select>
           <select
@@ -766,10 +675,7 @@ export function ProblemsView({
             class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
           >
             ${tagOptions.map(
-              (o) =>
-                html`<option value=${o}>
-                  ${o === "All" ? "All Tags" : o}
-                </option>`,
+              (o) => html`<option value=${o}>${o === "All" ? "All Tags" : o}</option>`,
             )}
           </select>
           <select
@@ -812,13 +718,9 @@ export function ProblemsView({
 
       ${selectionMode
         ? html`
-            <div
-              class="flex flex-col gap-2 bg-[#0a0a0f] p-3 rounded-xl border border-cyan-500/20"
-            >
+            <div class="flex flex-col gap-2 bg-[#0a0a0f] p-3 rounded-xl border border-cyan-500/20">
               <div class="flex items-center justify-between gap-2 flex-wrap">
-                <span class="text-xs text-cyan-300"
-                  >${selectedIds.size} selected</span
-                >
+                <span class="text-xs text-cyan-300">${selectedIds.size} selected</span>
                 <div class="flex items-center gap-2 flex-wrap">
                   <button
                     onClick=${selectAllFiltered}
@@ -863,9 +765,7 @@ export function ProblemsView({
                   Apply tags
                 </button>
                 ${bulkStatus
-                  ? html`<span class="text-[11px] text-slate-400"
-                      >${bulkStatus}</span
-                    >`
+                  ? html`<span class="text-[11px] text-slate-400">${bulkStatus}</span>`
                   : ""}
               </div>
             </div>
@@ -917,9 +817,7 @@ export function ProblemsView({
             <${ProblemCard}
               key=${p.id || p.titleSlug}
               problem=${p}
-              onSelect=${selectionMode
-                ? () => toggleSelect(p)
-                : handleSelectProblem}
+              onSelect=${selectionMode ? () => toggleSelect(p) : handleSelectProblem}
               onRefresh=${refreshProblemData}
               selectionMode=${selectionMode}
               selected=${selectedIds.has(getProblemKey(p))}

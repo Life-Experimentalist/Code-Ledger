@@ -28,20 +28,8 @@ const NAV_ITEMS = [
   { id: "advanced", emoji: "⚙️", label: "Advanced" },
 ];
 
-export function SettingsPageView({
-  settings,
-  onSettingsChange,
-  onSetupRepo,
-  onConnect,
-}) {
-  const VALID_PANELS = new Set([
-    "general",
-    "ai",
-    "git",
-    "platforms",
-    "backups",
-    "advanced",
-  ]);
+export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onConnect }) {
+  const VALID_PANELS = new Set(["general", "ai", "git", "platforms", "backups", "advanced"]);
   const initPanel = getQueryParam("settingsTab", "general");
   const [activePanel, setActivePanel] = useState(
     VALID_PANELS.has(initPanel) ? initPanel : "general",
@@ -70,9 +58,7 @@ export function SettingsPageView({
   return html`
     <div class="flex flex-col h-full min-h-0 gap-0">
       <!-- Horizontal tab bar -->
-      <div
-        class="flex items-center gap-1 px-1 border-b border-white/5 shrink-0 overflow-x-auto"
-      >
+      <div class="flex items-center gap-1 px-1 border-b border-white/5 shrink-0 overflow-x-auto">
         ${NAV_ITEMS.map(
           ({ id, emoji, label }) => html`
             <button

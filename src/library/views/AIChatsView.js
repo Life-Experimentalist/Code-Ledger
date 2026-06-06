@@ -3,13 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  h,
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useMemo, useCallback } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -60,12 +54,7 @@ function formatTime(ts) {
 function normalizeProblem(problem = {}) {
   return {
     slug: problem.titleSlug || problem.slug || problem.id || "",
-    title:
-      problem.title ||
-      problem.titleSlug ||
-      problem.slug ||
-      problem.id ||
-      "Problem",
+    title: problem.title || problem.titleSlug || problem.slug || problem.id || "Problem",
     platform: problem.platform || "leetcode",
     url: problem.url || problem.problemURL || "",
     tags: Array.isArray(problem.tags) ? problem.tags : [],
@@ -76,11 +65,7 @@ function normalizeProblem(problem = {}) {
   };
 }
 
-export function AIChatsView({
-  copyableEnabled = false,
-  problems = [],
-  settings = {},
-}) {
+export function AIChatsView({ copyableEnabled = false, problems = [], settings = {} }) {
   const [chats, setChats] = useState([]);
   const [activeTab, setActiveTab] = useState("by-problem");
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,13 +174,10 @@ export function AIChatsView({
     if (!prefillChatSlug || chats.length === 0) return;
     const matched = chats.find(
       (chat) =>
-        String(chat.problemSlug || "").toLowerCase() ===
-          prefillChatSlug.toLowerCase() ||
+        String(chat.problemSlug || "").toLowerCase() === prefillChatSlug.toLowerCase() ||
         (Array.isArray(chat.attachedProblemSlugs) &&
           chat.attachedProblemSlugs.some(
-            (slug) =>
-              String(slug || "").toLowerCase() ===
-              prefillChatSlug.toLowerCase(),
+            (slug) => String(slug || "").toLowerCase() === prefillChatSlug.toLowerCase(),
           )),
     );
     if (matched) setSelectedChat(matched);
@@ -205,14 +187,11 @@ export function AIChatsView({
     const byProblem = {};
     const byDate = {};
     for (const chat of chats) {
-      const slug =
-        chat.problemSlug || chat.attachedProblemSlugs?.[0] || "General";
+      const slug = chat.problemSlug || chat.attachedProblemSlugs?.[0] || "General";
       if (!byProblem[slug]) byProblem[slug] = [];
       byProblem[slug].push(chat);
 
-      const dateKey = new Date(
-        chat.createdAt || Date.now(),
-      ).toLocaleDateString();
+      const dateKey = new Date(chat.createdAt || Date.now()).toLocaleDateString();
       if (!byDate[dateKey]) byDate[dateKey] = [];
       byDate[dateKey].push(chat);
     }
@@ -234,12 +213,7 @@ export function AIChatsView({
     if (!q) return list.slice(0, 30);
     return list
       .filter((problem) =>
-        [
-          problem.title,
-          problem.slug,
-          problem.platform,
-          ...(problem.tags || []),
-        ].some((value) =>
+        [problem.title, problem.slug, problem.platform, ...(problem.tags || [])].some((value) =>
           String(value || "")
             .toLowerCase()
             .includes(q),
@@ -325,8 +299,7 @@ export function AIChatsView({
             context,
           },
           (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (resp?.ok) resolve(resp.response);
             else reject(new Error(resp?.error || "AI request failed"));
           },
@@ -383,9 +356,7 @@ export function AIChatsView({
 
     const primaryAttachment =
       selectedChat.attachedProblems?.[0] ||
-      (selectedChat.problemSlug
-        ? problemIndex.get(selectedChat.problemSlug)
-        : null) ||
+      (selectedChat.problemSlug ? problemIndex.get(selectedChat.problemSlug) : null) ||
       null;
 
     const modePrefix = PROMPT_MODE_PREFIXES[promptMode] || "";
@@ -402,12 +373,11 @@ export function AIChatsView({
       content: text,
       timestamp: Date.now(),
     };
-    const baseMessages = Array.isArray(selectedChat.messages)
-      ? selectedChat.messages
-      : [];
-    const outboundMessages = [...baseMessages, userMessage].map(
-      ({ role, content }) => ({ role, content }),
-    );
+    const baseMessages = Array.isArray(selectedChat.messages) ? selectedChat.messages : [];
+    const outboundMessages = [...baseMessages, userMessage].map(({ role, content }) => ({
+      role,
+      content,
+    }));
 
     setReplyPending(true);
     setReplyError("");
@@ -417,13 +387,9 @@ export function AIChatsView({
         surface: "library-chat",
         problem: primaryAttachment,
         text,
-        title:
-          primaryAttachment?.title ||
-          selectedChat.problemTitle ||
-          "AI Study Chat",
+        title: primaryAttachment?.title || selectedChat.problemTitle || "AI Study Chat",
         difficulty: primaryAttachment?.difficulty || "",
-        platform:
-          primaryAttachment?.platform || selectedChat.platform || "library",
+        platform: primaryAttachment?.platform || selectedChat.platform || "library",
         code: primaryAttachment?.code || "",
         lang: primaryAttachment?.lang || "",
         problemStatement: primaryAttachment?.statement || "",
@@ -454,8 +420,7 @@ export function AIChatsView({
             context,
           },
           (resp) => {
-            if (chrome.runtime.lastError)
-              reject(new Error(chrome.runtime.lastError.message));
+            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (resp?.ok) resolve(resp.response);
             else reject(new Error(resp?.error || "AI request failed"));
           },
@@ -473,10 +438,7 @@ export function AIChatsView({
       ];
 
       const nextMeta = {
-        problemTitle:
-          selectedChat.problemTitle ||
-          primaryAttachment?.title ||
-          "AI Study Chat",
+        problemTitle: selectedChat.problemTitle || primaryAttachment?.title || "AI Study Chat",
         problemTags: selectedChat.problemTags || primaryAttachment?.tags || [],
         attachedProblemSlugs: selectedChat.attachedProblemSlugs || [],
         attachedProblems:
@@ -495,9 +457,7 @@ export function AIChatsView({
         requestType: context.requestType || selectedChat.requestType || "",
         usedCommands: context.usedCommands || selectedChat.usedCommands || [],
         requestTemplate: selectedChat.requestTemplate || text,
-        summary:
-          selectedChat.summary ||
-          (selectedChat.messages?.[0]?.content || "").slice(0, 120),
+        summary: selectedChat.summary || (selectedChat.messages?.[0]?.content || "").slice(0, 120),
       };
 
       await updateAIChat(selectedChat.id, nextMessages, nextMeta);
@@ -508,9 +468,7 @@ export function AIChatsView({
         updatedAt: Date.now(),
       };
       setSelectedChat(updatedChat);
-      setChats((prev) =>
-        prev.map((chat) => (chat.id === updatedChat.id ? updatedChat : chat)),
-      );
+      setChats((prev) => prev.map((chat) => (chat.id === updatedChat.id ? updatedChat : chat)));
       setReplyText("");
     } catch (e) {
       setReplyError(e.message || String(e));
@@ -522,9 +480,7 @@ export function AIChatsView({
   const groupByDate = (list) => {
     const byDate = {};
     list.forEach((chat) => {
-      const dateKey = new Date(
-        chat.createdAt || Date.now(),
-      ).toLocaleDateString();
+      const dateKey = new Date(chat.createdAt || Date.now()).toLocaleDateString();
       if (!byDate[dateKey]) byDate[dateKey] = [];
       byDate[dateKey].push(chat);
     });
@@ -543,8 +499,7 @@ export function AIChatsView({
         <div>
           <h2 class="text-lg font-bold text-white">AI Conversations</h2>
           <p class="text-xs text-slate-400">
-            ${stats.totalChats} chat${stats.totalChats === 1 ? "" : "s"} •
-            ${stats.uniqueProblems}
+            ${stats.totalChats} chat${stats.totalChats === 1 ? "" : "s"} • ${stats.uniqueProblems}
             problem${stats.uniqueProblems === 1 ? "" : "s"}
           </p>
         </div>
@@ -563,12 +518,10 @@ export function AIChatsView({
             >
               <div class="flex items-center justify-between gap-2">
                 <div>
-                  <h3 class="text-sm font-semibold text-white">
-                    Start a new chat
-                  </h3>
+                  <h3 class="text-sm font-semibold text-white">Start a new chat</h3>
                   <p class="text-xs text-slate-500">
-                    Attach one or more problems, then ask for a solution,
-                    explanation, optimization, or review.
+                    Attach one or more problems, then ask for a solution, explanation, optimization,
+                    or review.
                   </p>
                 </div>
                 <button
@@ -581,8 +534,7 @@ export function AIChatsView({
 
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
                 <div class="flex flex-col gap-2 min-h-0">
-                  <label
-                    class="text-[10px] uppercase tracking-[0.2em] text-slate-500"
+                  <label class="text-[10px] uppercase tracking-[0.2em] text-slate-500"
                     >Attach problems</label
                   >
                   <input
@@ -592,13 +544,9 @@ export function AIChatsView({
                     placeholder="Search by title, tag, or platform"
                     class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-100 placeholder-slate-500"
                   />
-                  <div
-                    class="flex flex-wrap gap-2 max-h-56 overflow-y-auto pr-1"
-                  >
+                  <div class="flex flex-wrap gap-2 max-h-56 overflow-y-auto pr-1">
                     ${visibleProblems.map((problem) => {
-                      const active = selectedAttachments.some(
-                        (item) => item.slug === problem.slug,
-                      );
+                      const active = selectedAttachments.some((item) => item.slug === problem.slug);
                       return html`
                         <button
                           type="button"
@@ -607,9 +555,7 @@ export function AIChatsView({
                             ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-100"
                             : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"}"
                         >
-                          <div class="text-sm font-medium truncate max-w-56">
-                            ${problem.title}
-                          </div>
+                          <div class="text-sm font-medium truncate max-w-56">${problem.title}</div>
                           <div class="text-[10px] text-slate-500 mt-1 truncate">
                             ${problem.platform}${problem.tags?.length
                               ? ` • ${problem.tags.slice(0, 2).join(", ")}`
@@ -623,16 +569,12 @@ export function AIChatsView({
 
                 <div class="flex flex-col gap-3 min-h-0">
                   <div class="flex items-center justify-between">
-                    <label
-                      class="text-[10px] uppercase tracking-[0.2em] text-slate-500"
+                    <label class="text-[10px] uppercase tracking-[0.2em] text-slate-500"
                       >Your message</label
                     >
                     <${ModelStatusBar} settings=${settings} />
                   </div>
-                  <${AIPromptModeSelector}
-                    mode=${promptMode}
-                    onChange=${setPromptMode}
-                  />
+                  <${AIPromptModeSelector} mode=${promptMode} onChange=${setPromptMode} />
                   <${MultiLineAIChatInput}
                     value=${composeText}
                     onChange=${setComposeText}
@@ -652,9 +594,7 @@ export function AIChatsView({
                       `,
                     )}
                   </div>
-                  ${composeError
-                    ? html`<p class="text-xs text-rose-400">${composeError}</p>`
-                    : ""}
+                  ${composeError ? html`<p class="text-xs text-rose-400">${composeError}</p>` : ""}
                   <div class="flex justify-end gap-2">
                     <button
                       onClick=${() => setComposeOpen(false)}
@@ -686,8 +626,7 @@ export function AIChatsView({
         />
         <button
           onClick=${() => setActiveTab("by-problem")}
-          class="px-3 py-2 rounded-lg border text-sm ${activeTab ===
-          "by-problem"
+          class="px-3 py-2 rounded-lg border text-sm ${activeTab === "by-problem"
             ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
             : "border-white/10 text-slate-400"}"
         >
@@ -729,9 +668,7 @@ export function AIChatsView({
                             ? "bg-slate-700"
                             : ""}"
                         >
-                          <div class="text-xs text-slate-300">
-                            ${formatTime(chat.createdAt)}
-                          </div>
+                          <div class="text-xs text-slate-300">${formatTime(chat.createdAt)}</div>
                           <div class="text-xs text-slate-400 mt-1 truncate">
                             ${chat.summary ||
                             chat.messages?.[0]?.content?.substring(0, 60) ||
@@ -747,9 +684,7 @@ export function AIChatsView({
                             : ""}
                           <div class="text-[10px] text-slate-500 mt-1">
                             ${(chat.messages || []).length}
-                            message${(chat.messages || []).length === 1
-                              ? ""
-                              : "s"}
+                            message${(chat.messages || []).length === 1 ? "" : "s"}
                           </div>
                         </button>
                       `,
@@ -778,12 +713,8 @@ export function AIChatsView({
                             ? "bg-slate-700"
                             : ""}"
                         >
-                          <div
-                            class="text-xs font-medium text-slate-200 truncate"
-                          >
-                            ${chat.problemTitle ||
-                            chat.problemSlug ||
-                            "AI Chat"}
+                          <div class="text-xs font-medium text-slate-200 truncate">
+                            ${chat.problemTitle || chat.problemSlug || "AI Chat"}
                           </div>
                           <div class="text-xs text-slate-400 mt-1 truncate">
                             ${chat.summary ||
@@ -800,9 +731,7 @@ export function AIChatsView({
                             : ""}
                           <div class="text-[10px] text-slate-500 mt-1">
                             ${(chat.messages || []).length}
-                            message${(chat.messages || []).length === 1
-                              ? ""
-                              : "s"}
+                            message${(chat.messages || []).length === 1 ? "" : "s"}
                           </div>
                         </button>
                       `,
@@ -811,9 +740,7 @@ export function AIChatsView({
                 `,
               )}
           ${!chats.length
-            ? html`<div class="p-4 text-sm text-slate-500 text-center">
-                No conversations yet
-              </div>`
+            ? html`<div class="p-4 text-sm text-slate-500 text-center">No conversations yet</div>`
             : ""}
         </div>
 
@@ -828,9 +755,7 @@ export function AIChatsView({
                   >
                     <div>
                       <h3 class="font-semibold text-slate-100">
-                        ${selectedChat.problemTitle ||
-                        selectedChat.problemSlug ||
-                        "AI Chat"}
+                        ${selectedChat.problemTitle || selectedChat.problemSlug || "AI Chat"}
                       </h3>
                       ${selectedChat.problemURL
                         ? html`<a
@@ -922,20 +847,12 @@ export function AIChatsView({
                     ${(selectedChat.messages || []).map(
                       (msg) => html`
                         <div class="flex gap-2">
-                          <div
-                            class="text-xs font-medium text-slate-400 w-12 mt-1"
-                          >
-                            ${msg.role === "user"
-                              ? "You"
-                              : msg.role === "system"
-                                ? "System"
-                                : "AI"}
+                          <div class="text-xs font-medium text-slate-400 w-12 mt-1">
+                            ${msg.role === "user" ? "You" : msg.role === "system" ? "System" : "AI"}
                           </div>
                           <div class="flex-1 bg-slate-800 rounded-lg p-3">
                             ${msg.role === "user"
-                              ? html`<div
-                                  class="text-sm text-slate-100 whitespace-pre-wrap"
-                                >
+                              ? html`<div class="text-sm text-slate-100 whitespace-pre-wrap">
                                   ${msg.content}
                                 </div>`
                               : html`<${AIMarkdownRenderer}
@@ -943,9 +860,7 @@ export function AIChatsView({
                                   copyableEnabled=${copyableEnabled}
                                 />`}
                             <div class="text-[10px] text-slate-600 mt-2">
-                              ${formatTime(
-                                msg.timestamp || selectedChat.createdAt,
-                              )}
+                              ${formatTime(msg.timestamp || selectedChat.createdAt)}
                             </div>
                           </div>
                         </div>
@@ -953,14 +868,9 @@ export function AIChatsView({
                     )}
                   </div>
 
-                  <div
-                    class="border-t border-slate-700 pt-3 flex flex-col gap-2"
-                  >
+                  <div class="border-t border-slate-700 pt-3 flex flex-col gap-2">
                     <div class="flex items-center justify-between gap-2">
-                      <${AIPromptModeSelector}
-                        mode=${promptMode}
-                        onChange=${setPromptMode}
-                      />
+                      <${AIPromptModeSelector} mode=${promptMode} onChange=${setPromptMode} />
                       <${ModelStatusBar} settings=${settings} />
                     </div>
                     <${MultiLineAIChatInput}
@@ -974,9 +884,7 @@ export function AIChatsView({
                     />
                     <div class="flex items-center justify-between gap-2">
                       ${replyError
-                        ? html`<p class="text-xs text-rose-400">
-                            ${replyError}
-                          </p>`
+                        ? html`<p class="text-xs text-rose-400">${replyError}</p>`
                         : html`<span class="text-[11px] text-slate-500"
                             >Continue this chat in-place.</span
                           >`}
@@ -991,9 +899,7 @@ export function AIChatsView({
                   </div>
                 </div>
               `
-            : html`<div
-                class="flex items-center justify-center h-full text-slate-500"
-              >
+            : html`<div class="flex items-center justify-center h-full text-slate-500">
                 Select a conversation to view
               </div>`}
         </div>

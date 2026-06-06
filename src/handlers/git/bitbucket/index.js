@@ -9,8 +9,7 @@ import { createDebugger } from "../../../lib/debug.js";
 
 const dbg = createDebugger("BitbucketHandler");
 
-export const BITBUCKET_FEATURE_STATUS =
-  CONSTANTS.FEATURE_STATUS.UNDER_CONSTRUCTION;
+export const BITBUCKET_FEATURE_STATUS = CONSTANTS.FEATURE_STATUS.UNDER_CONSTRUCTION;
 
 export class BitbucketHandler extends BaseGitHandler {
   constructor() {

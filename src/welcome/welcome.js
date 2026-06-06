@@ -52,8 +52,7 @@ const PLATFORMS = [
     name: "LeetCode",
     url: CONSTANTS.PLATFORMS.leetcode.baseUrl + "/",
     color: CONSTANTS.PLATFORMS.leetcode.color,
-    favicon:
-      "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
+    favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
   },
   {
     name: "GeeksForGeeks",
@@ -137,17 +136,14 @@ function WelcomeApp() {
   const openSettings = () => {
     if (chrome?.runtime?.id)
       chrome.tabs.create({
-        url:
-          chrome.runtime.getURL("library/library.html") +
-          "?tab=settings&settingsTab=git",
+        url: chrome.runtime.getURL("library/library.html") + "?tab=settings&settingsTab=git",
       });
   };
 
   const repoUrl = (() => {
     const repo = settings.github_repo || settings.gitRepo;
     if (!repo) return null;
-    const owner =
-      settings.github_owner?.trim() || settings.github_username || gitUser;
+    const owner = settings.github_owner?.trim() || settings.github_username || gitUser;
     return owner ? `https://github.com/${owner}/${repo}` : null;
   })();
 
@@ -161,23 +157,18 @@ function WelcomeApp() {
   };
 
   const stepAction = (stepId) => {
-    if (stepId === "github")
-      return { label: "Connect GitHub →", onClick: openSettings };
-    if (stepId === "repo")
-      return { label: "Set up repository →", onClick: openSetupWizard };
+    if (stepId === "github") return { label: "Connect GitHub →", onClick: openSettings };
+    if (stepId === "repo") return { label: "Set up repository →", onClick: openSetupWizard };
     if (stepId === "solve")
       return {
         label: "Start solving →",
-        onClick: () =>
-          window.open(CONSTANTS.PLATFORMS.leetcode.baseUrl + "/", "_blank"),
+        onClick: () => window.open(CONSTANTS.PLATFORMS.leetcode.baseUrl + "/", "_blank"),
       };
     return null;
   };
 
   return html`
-    <div
-      class="min-h-screen bg-[#050508] flex flex-col items-center px-4 py-16"
-    >
+    <div class="min-h-screen bg-[#050508] flex flex-col items-center px-4 py-16">
       <!-- Hero -->
       <div class="flex flex-col items-center mb-10 gap-4">
         <img
@@ -189,9 +180,7 @@ function WelcomeApp() {
           <h1 class="text-4xl font-bold tracking-tight text-white">
             Welcome to <span class="text-cyan-400">CodeLedger</span>
           </h1>
-          <p class="mt-2 text-slate-400 text-base">
-            Your DSA journey, automatically committed.
-          </p>
+          <p class="mt-2 text-slate-400 text-base">Your DSA journey, automatically committed.</p>
           ${gitUser
             ? html`
                 <div
@@ -200,9 +189,7 @@ function WelcomeApp() {
                   <div
                     class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]"
                   ></div>
-                  <span class="text-xs text-emerald-400 font-mono"
-                    >Connected as ${gitUser}</span
-                  >
+                  <span class="text-xs text-emerald-400 font-mono">Connected as ${gitUser}</span>
                 </div>
               `
             : ""}
@@ -213,15 +200,11 @@ function WelcomeApp() {
       <div class="w-full max-w-lg">
         <!-- Checklist header -->
         <div class="flex items-center justify-between mb-3">
-          <h2
-            class="text-sm font-semibold text-slate-400 uppercase tracking-widest"
-          >
+          <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest">
             Setup checklist
           </h2>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-cyan-400 font-mono"
-              >${doneCount} / ${STEPS.length}</span
-            >
+            <span class="text-xs text-cyan-400 font-mono">${doneCount} / ${STEPS.length}</span>
             <button
               onClick=${() => setRefreshKey((k) => k + 1)}
               title="Refresh status"
@@ -260,12 +243,7 @@ function WelcomeApp() {
                     : "bg-white/5 text-slate-600"}"
                 >
                   ${done
-                    ? html`<svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
+                    ? html`<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                         <path
                           d="M1 6l3.5 3.5L11 2.5"
                           stroke="currentColor"
@@ -274,17 +252,12 @@ function WelcomeApp() {
                           stroke-linejoin="round"
                         />
                       </svg>`
-                    : html`<span
-                        class="w-2 h-2 rounded-full bg-current block"
-                      ></span>`}
+                    : html`<span class="w-2 h-2 rounded-full bg-current block"></span>`}
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="text-sm">${step.icon}</span>
-                    <span
-                      class="text-sm font-medium ${done
-                        ? "text-white"
-                        : "text-slate-400"}"
+                    <span class="text-sm font-medium ${done ? "text-white" : "text-slate-400"}"
                       >${step.label}</span
                     >
                   </div>
@@ -312,12 +285,9 @@ function WelcomeApp() {
             class="mb-8 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-center"
           >
             <div class="text-2xl mb-1">🎉</div>
-            <p class="text-sm text-emerald-400 font-semibold">
-              You're all set!
-            </p>
+            <p class="text-sm text-emerald-400 font-semibold">You're all set!</p>
             <p class="text-xs text-slate-500 mt-1">
-              Start solving — every accepted submission is automatically
-              committed to GitHub.
+              Start solving — every accepted submission is automatically committed to GitHub.
             </p>
           </div>
         `}
@@ -354,9 +324,7 @@ function WelcomeApp() {
         </div>
 
         <!-- Start solving -->
-        <h2
-          class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4"
-        >
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4">
           Start solving
         </h2>
         <div class="grid grid-cols-3 gap-3">
@@ -376,8 +344,7 @@ function WelcomeApp() {
                     e.target.style.display = "none";
                   }}
                 />
-                <span
-                  class="text-xs text-slate-400 group-hover:text-white transition-colors"
+                <span class="text-xs text-slate-400 group-hover:text-white transition-colors"
                   >${p.name}</span
                 >
               </a>
@@ -388,9 +355,8 @@ function WelcomeApp() {
 
       <!-- Footer -->
       <p class="mt-16 text-[11px] text-slate-700 text-center max-w-sm">
-        This page can be reopened from the extension popup at any time. Your
-        data is stored locally and synced to your own GitHub — never shared with
-        third parties.
+        This page can be reopened from the extension popup at any time. Your data is stored locally
+        and synced to your own GitHub — never shared with third parties.
       </p>
     </div>
   `;

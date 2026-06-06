@@ -36,9 +36,7 @@ export function ProviderBadge({ providerId, type = "ai", size = "md" }) {
       ]}"
     >
       <span
-        class="w-1.5 h-1.5 rounded-full ${type === "ai"
-          ? "bg-indigo-400"
-          : "bg-emerald-400"}"
+        class="w-1.5 h-1.5 rounded-full ${type === "ai" ? "bg-indigo-400" : "bg-emerald-400"}"
       ></span>
       ${provider.name}
     </span>

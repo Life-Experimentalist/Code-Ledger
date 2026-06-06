@@ -47,11 +47,7 @@ function* walkDir(dir) {
       if (!["node_modules", "dist", ".git"].includes(file)) {
         yield* walkDir(fullPath);
       }
-    } else if (
-      file.endsWith(".js") ||
-      file.endsWith(".ts") ||
-      file.endsWith(".html")
-    ) {
+    } else if (file.endsWith(".js") || file.endsWith(".ts") || file.endsWith(".html")) {
       yield fullPath;
     }
   }
@@ -103,9 +99,7 @@ for (const filePath of walkDir(srcDir)) {
 
 if (unsafeIssues === 0) {
   console.log("✅ No problematic '/' paths found!\n");
-  console.log(
-    "Note: All import/from statements use correct relative paths (../ or ./)",
-  );
+  console.log("Note: All import/from statements use correct relative paths (../ or ./)");
 } else {
   console.log(`⚠️  Found ${unsafeIssues} potentially problematic path(s):\n`);
 
@@ -125,9 +119,7 @@ if (unsafeIssues === 0) {
 }
 
 if (totalIssues > unsafeIssues) {
-  console.log(
-    `ℹ️  Found ${totalIssues - unsafeIssues} additional safe path(s) (HTTP/API calls)\n`,
-  );
+  console.log(`ℹ️  Found ${totalIssues - unsafeIssues} additional safe path(s) (HTTP/API calls)\n`);
 }
 
 console.log("Quick Fix Guide:");
@@ -135,6 +127,4 @@ console.log("================");
 console.log('1. Replace: from "/<path>" → from "./<path>"');
 console.log('2. Replace: import("/<path>") → import("./<path>")');
 console.log('3. HTTP paths like "/api/..." are safe and should NOT be changed');
-console.log(
-  '4. Manifest paths like "handlers/..." are extension paths and are safe\n',
-);
+console.log('4. Manifest paths like "handlers/..." are extension paths and are safe\n');

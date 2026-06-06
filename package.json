@@ -1,6 +1,6 @@
 {
   "name": "codeledger",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "displayName": "CodeLedger",
   "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
   "author": "VKrishna04",
@@ -50,14 +50,15 @@
     "package:chrome": "node dev/v2/cli.js publish",
     "package:firefox": "node dev/v2/cli.js publish",
     "publish": "node dev/v2/cli.js publish",
-    "format": "npx prettier --write \"src/**/*.js\" \"worker/public/assets/**/*.js\"",
+    "format": "npx prettier --write \"src/**/*.js\" \"dev/**/*.js\" \"worker/src/**/*.js\" \"worker/public/assets/**/*.js\"",
     "release": "node dev/v2/cli.js release",
     "test:sync-regression": "node dev/test-sync-regression.js",
     "lint": "tsc --noEmit",
     "sync:manifests": "node dev/sync-manifests.js",
     "domains:update": "node dev/generate-manifest-domains.js",
     "validate:openapi": "node dev/validate-openapi.js",
-    "deploy:worker": "cd worker && npx wrangler pages deploy public"
+    "deploy:worker": "cd worker && npx wrangler pages deploy public",
+    "format:check": "npx prettier --check \"src/**/*.js\" \"dev/**/*.js\" \"worker/src/**/*.js\" \"worker/public/assets/**/*.js\""
   },
   "dependencies": {
     "@google/genai": "^1.31.0",

@@ -30,26 +30,17 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-app.options(
-  "*",
-  (c) => new Response(null, { status: 204, headers: CORS_HEADERS }),
-);
+app.options("*", (c) => new Response(null, { status: 204, headers: CORS_HEADERS }));
 
 /* ── Env helper ───────────────────────────────────────────────────── */
 
 function env(c, key) {
   const aliases = {
     GH_CLIENT_ID: ["CODELEDGER_GH_APP_CLIENT_ID", "GITHUB_CLIENT_ID"],
-    GH_CLIENT_SECRET: [
-      "CODELEDGER_GH_APP_CLIENT_SECRET",
-      "GITHUB_CLIENT_SECRET",
-    ],
+    GH_CLIENT_SECRET: ["CODELEDGER_GH_APP_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"],
     GH_APP_KEY: ["CODELEDGER_GH_APP_PRIVATE_KEY", "GITHUB_APP_PRIVATE_KEY"],
     GH_APP_ID: ["CODELEDGER_GH_APP_ID", "GITHUB_APP_ID"],
-    GH_WEBHOOK_SECRET: [
-      "CODELEDGER_GH_APP_WEBHOOK_SECRET",
-      "GITHUB_APP_WEBHOOK_SECRET",
-    ],
+    GH_WEBHOOK_SECRET: ["CODELEDGER_GH_APP_WEBHOOK_SECRET", "GITHUB_APP_WEBHOOK_SECRET"],
   };
   const names = aliases[key] || [key];
   for (const name of names) {
@@ -88,8 +79,7 @@ function pemToArrayBuffer(pem) {
 
   // Wrap PKCS#1 in a PKCS#8 ASN.1 envelope
   const rsaOid = new Uint8Array([
-    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01,
-    0x01, 0x05, 0x00,
+    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00,
   ]);
   const encLen = (n) =>
     n < 128
@@ -139,11 +129,7 @@ async function createAppJWT(c) {
     exp: now + 600,
     iss: Number(appId),
   })}`;
-  const sig = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(payload),
-  );
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(payload));
   return `${payload}.${base64UrlEncode(new Uint8Array(sig))}`;
 }
 
@@ -206,16 +192,13 @@ app.post("/api/app/installations/:id/access_tokens", async (c) => {
   const id = c.req.param("id");
   try {
     const jwt = await createAppJWT(c);
-    const res = await fetch(
-      `https://api.github.com/app/installations/${id}/access_tokens`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-          Accept: "application/vnd.github+json",
-        },
+    const res = await fetch(`https://api.github.com/app/installations/${id}/access_tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: "application/vnd.github+json",
       },
-    );
+    });
     return c.json(await res.json(), res.status, CORS_HEADERS);
   } catch (e) {
     return c.json({ error: e.message }, 500, CORS_HEADERS);
@@ -230,10 +213,7 @@ app.get("/api/auth/:provider", (c) => {
   if (provider === "github") {
     const clientId = env(c, "GH_CLIENT_ID");
     if (!clientId)
-      return c.text(
-        "GitHub OAuth not configured — set CODELEDGER_GH_APP_CLIENT_ID",
-        400,
-      );
+      return c.text("GitHub OAuth not configured — set CODELEDGER_GH_APP_CLIENT_ID", 400);
     const redirectUri = `${origin}/api/auth/github/callback`;
     // Scopes needed:
     // - repo: Create repos, push commits, manage Pages
@@ -243,11 +223,7 @@ app.get("/api/auth/:provider", (c) => {
     return c.redirect(url);
   }
 
-  return c.json(
-    { error: `Unsupported provider: ${provider}` },
-    404,
-    CORS_HEADERS,
-  );
+  return c.json({ error: `Unsupported provider: ${provider}` }, 404, CORS_HEADERS);
 });
 
 // GitHub OAuth callback
@@ -261,17 +237,13 @@ app.get("/api/auth/github/callback", async (c) => {
   }
 
   if (!code) {
-    return c.html(
-      authCallbackHtml("github", "", "No code received from GitHub"),
-    );
+    return c.html(authCallbackHtml("github", "", "No code received from GitHub"));
   }
 
   const clientId = env(c, "GH_CLIENT_ID");
   const clientSecret = env(c, "GH_CLIENT_SECRET");
   if (!clientId || !clientSecret) {
-    return c.html(
-      authCallbackHtml("github", "", "OAuth not configured on server"),
-    );
+    return c.html(authCallbackHtml("github", "", "OAuth not configured on server"));
   }
 
   try {

@@ -41,9 +41,7 @@ export async function migrateProblemIds() {
   const problems = await Storage.getAllProblems();
   const toMigrate = problems.filter((p) => !ALREADY_MIGRATED.test(p.id || ""));
   if (toMigrate.length === 0) {
-    dbg.log(
-      `migrateProblemIds(): all ${problems.length} record(s) already migrated`,
-    );
+    dbg.log(`migrateProblemIds(): all ${problems.length} record(s) already migrated`);
     return;
   }
 
@@ -58,9 +56,7 @@ export async function migrateProblemIds() {
     const titleSlug = rawId.includes("::") ? rawId.split("::")[0] : rawId;
     const platform = p.platform || "unknown";
     const newId = CONSTANTS.makeProblemId(platform, titleSlug);
-    dbg.log(
-      `migrateProblemIds(): rekey ${rawId} → ${newId} (platform=${platform})`,
-    );
+    dbg.log(`migrateProblemIds(): rekey ${rawId} → ${newId} (platform=${platform})`);
     const existing = byNewId.get(newId);
     if (!existing || (p.timestamp || 0) > (existing.timestamp || 0)) {
       byNewId.set(newId, { ...p, id: newId, titleSlug });
@@ -89,21 +85,15 @@ export async function migrateProblemIds() {
       const rawSlug = parts[0];
       const lang = parts.slice(1).join("::");
       if (!rawSlug) continue;
-      const migrated = [...byNewId.values()].find(
-        (p) => p.titleSlug === rawSlug,
-      );
+      const migrated = [...byNewId.values()].find((p) => p.titleSlug === rawSlug);
       const newKey = migrated ? `${migrated.id}::${lang}` : k;
       newMap[newKey] = v;
     }
     await Storage._setRaw(SLUG_LANG_KEY, newMap).catch(() => {});
-    dbg.log(
-      `migrateProblemIds(): rekeyed ${Object.keys(newMap).length} slug-lang entries`,
-    );
+    dbg.log(`migrateProblemIds(): rekeyed ${Object.keys(newMap).length} slug-lang entries`);
   }
 
-  dbg.log(
-    `migrateProblemIds(): ✓ complete — ${byNewId.size} record(s) rekeyed`,
-  );
+  dbg.log(`migrateProblemIds(): ✓ complete — ${byNewId.size} record(s) rekeyed`);
 }
 
 async function _getGitContext() {
@@ -114,10 +104,7 @@ async function _getGitContext() {
   if (!token) throw new Error("Not authenticated with GitHub");
   const userRes = await git.apiFetch("/user", token);
   const owner = settings.github_owner?.trim() || userRes.login;
-  const repo = (settings.github_repo || settings.gitRepo || "").replace(
-    /\s+/g,
-    "-",
-  );
+  const repo = (settings.github_repo || settings.gitRepo || "").replace(/\s+/g, "-");
   dbg.log(
     `_getGitContext: owner=${owner} repo=${repo} provider=${settings.gitProvider || "github"}`,
   );
@@ -132,10 +119,7 @@ async function _getGitContext() {
 export async function detectRepoLayoutVersion() {
   try {
     const { git, token, owner, repo } = await _getGitContext();
-    const res = await git.apiFetch(
-      `/repos/${owner}/${repo}/contents/index.json`,
-      token,
-    );
+    const res = await git.apiFetch(`/repos/${owner}/${repo}/contents/index.json`, token);
     const raw = atob((res.content || "").replace(/\n/g, ""));
     const index = JSON.parse(raw);
     return index.layoutVersion ?? 1;
@@ -157,29 +141,18 @@ export async function migrateRepo() {
   const { settings, git, token, owner, repo } = await _getGitContext();
 
   // 1. Full repo tree
-  dbg.log(
-    `migrateRepo(): fetching complete repo tree from ${owner}/${repo}...`,
-  );
-  const treeRes = await git.apiFetch(
-    `/repos/${owner}/${repo}/git/trees/main?recursive=1`,
-    token,
-  );
+  dbg.log(`migrateRepo(): fetching complete repo tree from ${owner}/${repo}...`);
+  const treeRes = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`, token);
   const blobs = (treeRes.tree || []).filter((f) => f.type === "blob");
   dbg.log(`migrateRepo(): found ${blobs.length} total blob(s)`);
 
   // 2. Old-layout file paths to delete
-  const oldPaths = blobs
-    .filter((f) => OLD_LAYOUT_RE.test(f.path))
-    .map((f) => f.path);
-  dbg.log(
-    `migrateRepo(): identified ${oldPaths.length} old-layout file(s) to delete`,
-  );
+  const oldPaths = blobs.filter((f) => OLD_LAYOUT_RE.test(f.path)).map((f) => f.path);
+  dbg.log(`migrateRepo(): identified ${oldPaths.length} old-layout file(s) to delete`);
 
   // 3. Build complete new-layout file set from stored problems
   const problems = await Storage.getAllProblems();
-  dbg.log(
-    `migrateRepo(): building new-layout files for ${problems.length} problem(s)...`,
-  );
+  dbg.log(`migrateRepo(): building new-layout files for ${problems.length} problem(s)...`);
   const newFiles = [];
 
   for (const p of problems) {
@@ -187,13 +160,7 @@ export async function migrateRepo() {
     const canonical = p.canonical || null;
     const lang = p.lang || { ext: "txt" };
     newFiles.push({
-      path: solutionPath(
-        p.id || p.titleSlug,
-        p.platform || "unknown",
-        lang,
-        canonical,
-        settings,
-      ),
+      path: solutionPath(p.id || p.titleSlug, p.platform || "unknown", lang, canonical, settings),
       content: p.code,
     });
     if (p.readmeContent) {
@@ -236,9 +203,7 @@ export async function migrateRepo() {
     ...settings,
     repoLayoutVersion: LAYOUT_VERSION,
   });
-  dbg.log(
-    `migrateRepo(): ✓ complete — ${newFiles.length} files added, ${oldPaths.length} deleted`,
-  );
+  dbg.log(`migrateRepo(): ✓ complete — ${newFiles.length} files added, ${oldPaths.length} deleted`);
   return { migrated: newFiles.length, deleted: oldPaths.length };
 }
 
@@ -251,10 +216,7 @@ export async function resetRepo() {
   const { settings, git, token, owner, repo } = await _getGitContext();
 
   // 1. All existing repo blobs
-  const treeRes = await git.apiFetch(
-    `/repos/${owner}/${repo}/git/trees/main?recursive=1`,
-    token,
-  );
+  const treeRes = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`, token);
   const existingPaths = new Set(
     (treeRes.tree || []).filter((f) => f.type === "blob").map((f) => f.path),
   );
@@ -292,14 +254,8 @@ export async function resetRepo() {
   desiredFiles.set("index.json", _buildIndexJson(problems));
 
   // 3. Stray files: in repo but not in desired set and not infra
-  const INFRA = new Set([
-    "index.html",
-    "README.md",
-    ".github/workflows/deploy-pages.yml",
-  ]);
-  const strayPaths = [...existingPaths].filter(
-    (p) => !desiredFiles.has(p) && !INFRA.has(p),
-  );
+  const INFRA = new Set(["index.html", "README.md", ".github/workflows/deploy-pages.yml"]);
+  const strayPaths = [...existingPaths].filter((p) => !desiredFiles.has(p) && !INFRA.has(p));
 
   const filesToCommit = [...desiredFiles.entries()].map(([path, content]) => ({
     path,
@@ -345,11 +301,7 @@ export async function forceRebuildRepo() {
   );
 
   // Leave infrastructure files alone
-  const INFRA = new Set([
-    "index.html",
-    "README.md",
-    ".github/workflows/deploy-pages.yml",
-  ]);
+  const INFRA = new Set(["index.html", "README.md", ".github/workflows/deploy-pages.yml"]);
   const deletable = [...existingPaths].filter((p) => !INFRA.has(p));
 
   if (deletable.length > 0) {

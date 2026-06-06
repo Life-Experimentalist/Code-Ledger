@@ -54,8 +54,7 @@ export function buildSettingsHref({
   if (settingsTab) params.set("settingsTab", settingsTab);
   if (settingsSection) params.set("settingsSection", settingsSection);
   if (settingsProvider) params.set("settingsProvider", settingsProvider);
-  if (settingsAdvanced)
-    params.set("settingsAdvanced", String(settingsAdvanced));
+  if (settingsAdvanced) params.set("settingsAdvanced", String(settingsAdvanced));
   if (q) params.set("q", q);
   return `${window.location.pathname}?${params.toString()}`;
 }

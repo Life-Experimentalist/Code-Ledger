@@ -49,8 +49,7 @@ export class GitHubHandler extends BaseGitHandler {
           type: "oauth",
           provider: "github",
           default: "",
-          description:
-            'Authenticate with GitHub to sync code. Requires "repo" scope.',
+          description: 'Authenticate with GitHub to sync code. Requires "repo" scope.',
         },
         {
           key: "github_repo",
@@ -64,8 +63,7 @@ export class GitHubHandler extends BaseGitHandler {
           label: "Organization / Owner (optional)",
           type: "text",
           default: "",
-          description:
-            "Leave blank for your personal account. Set to an org login for org repos.",
+          description: "Leave blank for your personal account. Set to an org login for org repos.",
           advanced: true,
         },
         {
@@ -91,8 +89,7 @@ export class GitHubHandler extends BaseGitHandler {
           label: "Extra repository tags",
           type: "text",
           default: "",
-          description:
-            "Optional comma-separated tags to add to GitHub repo topics.",
+          description: "Optional comma-separated tags to add to GitHub repo topics.",
           advanced: true,
           placeholder: "arrays, dynamic-programming, competitive-programming",
         },
@@ -101,21 +98,18 @@ export class GitHubHandler extends BaseGitHandler {
           label: "Include optional co-author trailer",
           type: "toggle",
           default: true,
-          description:
-            "Append a Co-authored-by trailer to commits (opt out any time).",
+          description: "Append a Co-authored-by trailer to commits (opt out any time).",
           advanced: true,
         },
         {
           key: "github_coauthor_trailer",
           label: "Co-author trailer",
           type: "text",
-          default:
-            "Co-authored-by: VKrishna04 <75069043+VKrishna04@users.noreply.github.com>",
+          default: "Co-authored-by: VKrishna04 <75069043+VKrishna04@users.noreply.github.com>",
           description:
             "Full trailer line to append to commit messages. Example: Co-authored-by: Name <email>",
           advanced: true,
-          placeholder:
-            "Co-authored-by: VKrishna04 <75069043+VKrishna04@users.noreply.github.com>",
+          placeholder: "Co-authored-by: VKrishna04 <75069043+VKrishna04@users.noreply.github.com>",
         },
       ],
     };
@@ -195,19 +189,13 @@ export class GitHubHandler extends BaseGitHandler {
     const settings = await Storage.getSettings();
     const userRes = await api.getCurrentUser(token);
 
-    const owner =
-      opts.ownerOverride?.trim() ||
-      settings["github_owner"]?.trim() ||
-      userRes.login;
-    const name = (
-      repoName ||
-      settings["github_repo"] ||
-      CONSTANTS.DEFAULT_REPO_NAME
-    ).replace(/\s+/g, "-");
-
-    dbg.log(
-      `commit(): ${files?.length || 0} file(s) → ${owner}/${name} (${BRANCH})`,
+    const owner = opts.ownerOverride?.trim() || settings["github_owner"]?.trim() || userRes.login;
+    const name = (repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME).replace(
+      /\s+/g,
+      "-",
     );
+
+    dbg.log(`commit(): ${files?.length || 0} file(s) → ${owner}/${name} (${BRANCH})`);
 
     // ── Resolve branch HEAD (create repo if missing) ──────────────────────
     let latestSha;
@@ -218,9 +206,7 @@ export class GitHubHandler extends BaseGitHandler {
       // This prevents 422 "not a fast-forward" during sequential individual
       // commits where GitHub's ref propagation hasn't caught up yet.
       latestSha = opts.knownParentSha;
-      dbg.log(
-        `commit(): using caller-provided parent ${latestSha.slice(0, 7)}`,
-      );
+      dbg.log(`commit(): using caller-provided parent ${latestSha.slice(0, 7)}`);
     } else {
       try {
         const ref = await api.getRepoRef(owner, name, BRANCH, token);
@@ -261,19 +247,11 @@ export class GitHubHandler extends BaseGitHandler {
         opts.indexMetaOverride ?? null,
       );
       treeItems.push(...infra);
-      dbg.log(
-        `commit(): +${infra.length} infra file(s) (isNewRepo=${isNewRepo})`,
-      );
+      dbg.log(`commit(): +${infra.length} infra file(s) (isNewRepo=${isNewRepo})`);
     }
 
     // ── Create tree → commit → update ref ────────────────────────────────
-    const treeRes = await api.createTree(
-      owner,
-      name,
-      treeItems,
-      baseTreeSha,
-      token,
-    );
+    const treeRes = await api.createTree(owner, name, treeItems, baseTreeSha, token);
     dbg.log(`commit(): tree ${treeRes.sha.slice(0, 7)}`);
 
     const commitMsg = this._withOptionalCoAuthor(message, settings);
@@ -288,37 +266,21 @@ export class GitHubHandler extends BaseGitHandler {
     let commitRes;
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      const payload = buildCommitPayload(
-        commitMsg,
-        currentTreeSha,
-        parentSha,
-        opts,
-        userRes,
-      );
+      const payload = buildCommitPayload(commitMsg, currentTreeSha, parentSha, opts, userRes);
       commitRes = await api.createCommit(owner, name, payload, token);
-      dbg.log(
-        `commit(): commit ${commitRes.sha.slice(0, 7)} (attempt ${attempt + 1})`,
-      );
+      dbg.log(`commit(): commit ${commitRes.sha.slice(0, 7)} (attempt ${attempt + 1})`);
 
       try {
         await api.updateRef(owner, name, BRANCH, commitRes.sha, token);
         break; // success
       } catch (refErr) {
         if (refErr.status !== 422 || attempt === 2) throw refErr;
-        dbg.warn(
-          `commit(): 422 non-fast-forward (attempt ${attempt + 1}) — refreshing ref`,
-        );
+        dbg.warn(`commit(): 422 non-fast-forward (attempt ${attempt + 1}) — refreshing ref`);
         await _sleep(500 * (attempt + 1)); // 500ms, then 1000ms
         const freshRef = await api.getRepoRef(owner, name, BRANCH, token);
         parentSha = freshRef.object.sha;
         const freshCommit = await api.getCommit(owner, name, parentSha, token);
-        const retryTree = await api.createTree(
-          owner,
-          name,
-          treeItems,
-          freshCommit.tree.sha,
-          token,
-        );
+        const retryTree = await api.createTree(owner, name, treeItems, freshCommit.tree.sha, token);
         currentTreeSha = retryTree.sha;
       }
     }
@@ -330,9 +292,7 @@ export class GitHubHandler extends BaseGitHandler {
       api
         .enablePages(owner, name, BRANCH, token)
         .then(() => dbg.log(`commit(): GitHub Pages enabled`))
-        .catch((e) =>
-          dbg.warn(`commit(): Pages enable failed (non-fatal):`, e.message),
-        );
+        .catch((e) => dbg.warn(`commit(): Pages enable failed (non-fatal):`, e.message));
     }
 
     return commitRes.sha;
@@ -350,9 +310,7 @@ export class GitHubHandler extends BaseGitHandler {
   async commitHistorical(commits) {
     if (!commits?.length) return;
 
-    const sorted = [...commits].sort(
-      (a, b) => new Date(a.date) - new Date(b.date),
-    );
+    const sorted = [...commits].sort((a, b) => new Date(a.date) - new Date(b.date));
 
     for (const entry of sorted) {
       await this.commit(entry.files, entry.message, entry.repoName, {
@@ -378,12 +336,7 @@ export class GitHubHandler extends BaseGitHandler {
       CONSTANTS.DEFAULT_REPO_NAME
     ).replace(/\s+/g, "-");
 
-    await api.setRepositoryTopics(
-      owner,
-      name,
-      resolveRepoTopics(settings),
-      token,
-    );
+    await api.setRepositoryTopics(owner, name, resolveRepoTopics(settings), token);
     dbg.log(`ensureRepoTopics(): updated topics for ${owner}/${name}`);
   }
 
@@ -403,12 +356,7 @@ export class GitHubHandler extends BaseGitHandler {
       token,
     );
 
-    await api.setRepositoryTopics(
-      owner,
-      name,
-      resolveRepoTopics(settings),
-      token,
-    );
+    await api.setRepositoryTopics(owner, name, resolveRepoTopics(settings), token);
     dbg.log(`_configureRepo(): ✓ ${owner}/${name} configured`);
   }
 }

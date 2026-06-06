@@ -142,13 +142,10 @@ async function fetchAllSubmissions(page) {
       return r.ok ? r.json() : null;
     });
     const list = res?.data?.recentAcSubmissionList;
-    if (list?.length)
-      return list.map((s) => ({ ...s, status_display: "Accepted" }));
+    if (list?.length) return list.map((s) => ({ ...s, status_display: "Accepted" }));
   } catch (_) {}
 
-  throw new Error(
-    "Unable to fetch submissions from LeetCode — make sure you are logged in.",
-  );
+  throw new Error("Unable to fetch submissions from LeetCode — make sure you are logged in.");
 }
 
 async function gql(page, query, variables) {
@@ -194,10 +191,11 @@ async function ensureRepo(octokit, owner, repoName) {
 
 async function getHeadSha(octokit, owner, repoName, branch) {
   try {
-    const ref = await octokit.request(
-      "GET /repos/{owner}/{repo}/git/ref/heads/{branch}",
-      { owner, repo: repoName, branch },
-    );
+    const ref = await octokit.request("GET /repos/{owner}/{repo}/git/ref/heads/{branch}", {
+      owner,
+      repo: repoName,
+      branch,
+    });
     return { commitSha: ref.data.object.sha, isNew: false };
   } catch {
     // Empty repo — no branch yet. Create an initial empty commit.
@@ -210,20 +208,15 @@ async function getHeadSha(octokit, owner, repoName, branch) {
     const tree = await octokit.request("POST /repos/{owner}/{repo}/git/trees", {
       owner,
       repo: repoName,
-      tree: [
-        { path: ".gitkeep", mode: "100644", type: "blob", sha: blob.data.sha },
-      ],
+      tree: [{ path: ".gitkeep", mode: "100644", type: "blob", sha: blob.data.sha }],
     });
-    const commit = await octokit.request(
-      "POST /repos/{owner}/{repo}/git/commits",
-      {
-        owner,
-        repo: repoName,
-        message: "chore: initial commit",
-        tree: tree.data.sha,
-        parents: [],
-      },
-    );
+    const commit = await octokit.request("POST /repos/{owner}/{repo}/git/commits", {
+      owner,
+      repo: repoName,
+      message: "chore: initial commit",
+      tree: tree.data.sha,
+      parents: [],
+    });
     await octokit.request("POST /repos/{owner}/{repo}/git/refs", {
       owner,
       repo: repoName,
@@ -234,20 +227,13 @@ async function getHeadSha(octokit, owner, repoName, branch) {
   }
 }
 
-async function atomicCommit(
-  octokit,
-  owner,
-  repoName,
-  branch,
-  files,
-  message,
-  parentSha,
-) {
+async function atomicCommit(octokit, owner, repoName, branch, files, message, parentSha) {
   // Get current tree SHA from the parent commit
-  const parentCommit = await octokit.request(
-    "GET /repos/{owner}/{repo}/git/commits/{commit_sha}",
-    { owner, repo: repoName, commit_sha: parentSha },
-  );
+  const parentCommit = await octokit.request("GET /repos/{owner}/{repo}/git/commits/{commit_sha}", {
+    owner,
+    repo: repoName,
+    commit_sha: parentSha,
+  });
   const baseTreeSha = parentCommit.data.tree.sha;
 
   const treeItems = files.map((f) => ({
@@ -257,21 +243,20 @@ async function atomicCommit(
     content: f.content,
   }));
 
-  const treeRes = await octokit.request(
-    "POST /repos/{owner}/{repo}/git/trees",
-    { owner, repo: repoName, base_tree: baseTreeSha, tree: treeItems },
-  );
+  const treeRes = await octokit.request("POST /repos/{owner}/{repo}/git/trees", {
+    owner,
+    repo: repoName,
+    base_tree: baseTreeSha,
+    tree: treeItems,
+  });
 
-  const commitRes = await octokit.request(
-    "POST /repos/{owner}/{repo}/git/commits",
-    {
-      owner,
-      repo: repoName,
-      message,
-      tree: treeRes.data.sha,
-      parents: [parentSha],
-    },
-  );
+  const commitRes = await octokit.request("POST /repos/{owner}/{repo}/git/commits", {
+    owner,
+    repo: repoName,
+    message,
+    tree: treeRes.data.sha,
+    parents: [parentSha],
+  });
 
   await octokit.request("PATCH /repos/{owner}/{repo}/git/refs/heads/{branch}", {
     owner,
@@ -489,25 +474,16 @@ async function run() {
   const authedLogin = authUser.data.login;
 
   if (owner !== authedLogin) {
-    console.error(
-      `Token owner is ${authedLogin} but --repo owner is ${owner}. Aborting.`,
-    );
+    console.error(`Token owner is ${authedLogin} but --repo owner is ${owner}. Aborting.`);
     process.exit(1);
   }
 
   await ensureRepo(octokit, owner, repoName);
 
   const branch = "main";
-  const { commitSha: headSha } = await getHeadSha(
-    octokit,
-    owner,
-    repoName,
-    branch,
-  );
+  const { commitSha: headSha } = await getHeadSha(octokit, owner, repoName, branch);
 
-  console.log(
-    `\nCommitting ${files.length} files to ${owner}/${repoName}@${branch}...`,
-  );
+  console.log(`\nCommitting ${files.length} files to ${owner}/${repoName}@${branch}...`);
   const newSha = await atomicCommit(
     octokit,
     owner,

@@ -11,8 +11,7 @@ function run(cmd, args, name) {
 
 console.log("Running initial build...");
 const b = spawnSync("npm", ["run", "build"], { stdio: "inherit", shell: true });
-if (b.status !== 0)
-  console.warn("Initial build failed (non-zero exit); continuing anyway");
+if (b.status !== 0) console.warn("Initial build failed (non-zero exit); continuing anyway");
 
 console.log("Starting watcher and dev server...");
 const watcher = run("node", ["dev/watch.js"], "watcher");

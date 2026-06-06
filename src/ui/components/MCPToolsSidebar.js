@@ -16,24 +16,14 @@ import { createDebugger } from "../../lib/debug.js";
 
 const dbg = createDebugger("MCPToolsSidebar");
 
-export function MCPToolsSidebar({
-  onToolResult,
-  selectedTool,
-  onToolSelect,
-  compact = false,
-}) {
+export function MCPToolsSidebar({ onToolResult, selectedTool, onToolSelect, compact = false }) {
   const [expanded, setExpanded] = useState(selectedTool ? true : false);
   const [executing, setExecuting] = useState(false);
   const [result, setResult] = useState(null);
   const [activeTab, setActiveTab] = useState(selectedTool || "overview");
 
   const categoryMap = {
-    Context: [
-      "query-problems",
-      "get-problem-stats",
-      "find-similar-problems",
-      "get-user-profile",
-    ],
+    Context: ["query-problems", "get-problem-stats", "find-similar-problems", "get-user-profile"],
     Suggestions: ["get-next-suggestion"],
     Analysis: ["analyze-code-quality", "get-trend-analysis"],
   };
@@ -94,12 +84,8 @@ export function MCPToolsSidebar({
             `}
             ${res.profile.weakTopics.length > 0 &&
             html`
-              <div
-                class="p-2 bg-amber-950/20 border border-amber-500/20 rounded"
-              >
-                <p class="font-medium text-amber-300 mb-1">
-                  Weak Topics (opportunities):
-                </p>
+              <div class="p-2 bg-amber-950/20 border border-amber-500/20 rounded">
+                <p class="font-medium text-amber-300 mb-1">Weak Topics (opportunities):</p>
                 ${res.profile.weakTopics.map(
                   (t) => html`
                     <p class="text-slate-400">
@@ -124,8 +110,7 @@ export function MCPToolsSidebar({
                   .map(
                     (t) => html`
                       <p class="text-slate-400">
-                        <span class="font-mono">${t.topic}</span>: ${t.count}
-                        problems
+                        <span class="font-mono">${t.topic}</span>: ${t.count} problems
                       </p>
                     `,
                   )}
@@ -141,9 +126,7 @@ export function MCPToolsSidebar({
                 <p class="text-slate-400 text-[10px]">
                   ${res.suggested.platform} • ${res.suggested.difficulty}
                 </p>
-                <p class="text-slate-500 text-[10px] mt-1">
-                  ${res.suggested.rationale}
-                </p>
+                <p class="text-slate-500 text-[10px] mt-1">${res.suggested.rationale}</p>
               </div>
             `}
           </div>
@@ -155,9 +138,7 @@ export function MCPToolsSidebar({
             <div class="p-2 bg-white/5 rounded">
               <p class="font-medium text-slate-300">Period: ${res.period}</p>
               <p class="text-slate-400">Total Solves: ${res.totalSolves}</p>
-              <p class="text-slate-400">
-                Avg time: ${formatTime(res.averageTimePerSolve)}
-              </p>
+              <p class="text-slate-400">Avg time: ${formatTime(res.averageTimePerSolve)}</p>
             </div>
             ${Object.keys(res.platforms).length > 0 &&
             html`
@@ -165,9 +146,7 @@ export function MCPToolsSidebar({
                 <p class="font-medium text-slate-300 mb-1">By Platform:</p>
                 ${Object.entries(res.platforms).map(
                   ([name, count]) => html`
-                    <p class="text-slate-400">
-                      <span class="font-mono">${name}</span>: ${count}
-                    </p>
+                    <p class="text-slate-400"><span class="font-mono">${name}</span>: ${count}</p>
                   `,
                 )}
               </div>
@@ -194,8 +173,7 @@ export function MCPToolsSidebar({
                         <strong>${p.title}</strong>
                       </p>
                       <p class="text-[10px] text-slate-400">
-                        ${p.platform} • ${p.difficulty} (similarity:
-                        ${p.similarity})
+                        ${p.platform} • ${p.difficulty} (similarity: ${p.similarity})
                       </p>
                     </div>
                   `,
@@ -208,9 +186,7 @@ export function MCPToolsSidebar({
       case "query-problems":
         return html`
           <div class="text-xs">
-            <p class="font-medium text-slate-300 mb-2">
-              Found ${res.count} problems
-            </p>
+            <p class="font-medium text-slate-300 mb-2">Found ${res.count} problems</p>
             <div class="space-y-1 max-h-[200px] overflow-y-auto">
               ${res.problems.slice(0, 5).map(
                 (p) => html`
@@ -221,20 +197,14 @@ export function MCPToolsSidebar({
                 `,
               )}
               ${res.problems.length > 5 &&
-              html`
-                <p class="text-slate-500 text-[10px] mt-2">
-                  ... and ${res.count - 5} more
-                </p>
-              `}
+              html` <p class="text-slate-500 text-[10px] mt-2">... and ${res.count - 5} more</p> `}
             </div>
           </div>
         `;
 
       default:
         return html`
-          <pre
-            class="text-xs bg-black/30 p-2 rounded overflow-auto max-h-[300px]"
-          >
+          <pre class="text-xs bg-black/30 p-2 rounded overflow-auto max-h-[300px]">
 ${JSON.stringify(res, null, 2)}
           </pre
           >
@@ -249,13 +219,7 @@ ${JSON.stringify(res, null, 2)}
         title="MCP Tools"
         class="p-2 rounded hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-        >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <circle cx="12" cy="5" r="1.5" />
           <circle cx="19" cy="12" r="1.5" />
           <circle cx="12" cy="19" r="1.5" />
@@ -272,14 +236,9 @@ ${JSON.stringify(res, null, 2)}
         <div
           class="fixed bottom-4 right-4 w-96 bg-[#0a0a0f] border border-white/5 rounded-lg shadow-lg z-50"
         >
-          <div
-            class="p-4 border-b border-white/5 flex items-center justify-between"
-          >
+          <div class="p-4 border-b border-white/5 flex items-center justify-between">
             <h3 class="text-sm font-medium text-white">MCP Tools</h3>
-            <button
-              onClick=${() => setExpanded(false)}
-              class="text-slate-400 hover:text-slate-200"
-            >
+            <button onClick=${() => setExpanded(false)} class="text-slate-400 hover:text-slate-200">
               ✕
             </button>
           </div>
@@ -287,9 +246,7 @@ ${JSON.stringify(res, null, 2)}
             ${Object.entries(categoryMap).map(
               ([category, toolIds]) => html`
                 <div>
-                  <p class="text-xs font-medium text-slate-400 mb-1">
-                    ${category}
-                  </p>
+                  <p class="text-xs font-medium text-slate-400 mb-1">${category}</p>
                   ${toolIds.map((id) => {
                     const tool = MCP_TOOLS.find((t) => t.id === id);
                     return html`
@@ -298,8 +255,7 @@ ${JSON.stringify(res, null, 2)}
                         disabled=${executing}
                         class="w-full text-left px-2 py-1.5 text-xs rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors disabled:opacity-50"
                       >
-                        ${executing && activeTab === id ? "⏳" : "→"}
-                        ${tool.name}
+                        ${executing && activeTab === id ? "⏳" : "→"} ${tool.name}
                       </button>
                     `;
                   })}
@@ -323,22 +279,16 @@ ${JSON.stringify(res, null, 2)}
     <div class="flex flex-col h-full border-l border-white/5 bg-white/1">
       <div class="p-4 border-b border-white/5 shrink-0">
         <h3 class="text-sm font-medium text-white mb-2">MCP Tools</h3>
-        <p class="text-xs text-slate-400">
-          Powerful context and analysis tools
-        </p>
+        <p class="text-xs text-slate-400">Powerful context and analysis tools</p>
       </div>
 
       <div class="flex-1 overflow-hidden flex flex-col">
         <!-- Tool list -->
-        <div
-          class="flex-1 overflow-y-auto p-4 space-y-3 border-b border-white/5"
-        >
+        <div class="flex-1 overflow-y-auto p-4 space-y-3 border-b border-white/5">
           ${Object.entries(categoryMap).map(
             ([category, toolIds]) => html`
               <div>
-                <p class="text-xs font-medium text-slate-400 uppercase mb-2">
-                  ${category}
-                </p>
+                <p class="text-xs font-medium text-slate-400 uppercase mb-2">${category}</p>
                 <div class="space-y-1">
                   ${toolIds.map((id) => {
                     const tool = MCP_TOOLS.find((t) => t.id === id);
@@ -359,9 +309,7 @@ ${JSON.stringify(res, null, 2)}
                           activeTab === id &&
                           html`<span class="text-[10px]">⏳</span>`}
                         </div>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                          ${tool.description}
-                        </p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">${tool.description}</p>
                       </button>
                     `;
                   })}

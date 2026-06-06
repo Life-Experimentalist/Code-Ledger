@@ -61,9 +61,7 @@ export async function extractAceCode() {
 export function extractCodeMirrorCode() {
   const cm = document.querySelector(".CodeMirror-code");
   if (cm) {
-    return [...cm.querySelectorAll(".CodeMirror-line")]
-      .map((l) => l.textContent)
-      .join("\n");
+    return [...cm.querySelectorAll(".CodeMirror-line")].map((l) => l.textContent).join("\n");
   }
   return "";
 }

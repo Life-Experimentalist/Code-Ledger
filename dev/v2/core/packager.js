@@ -12,25 +12,15 @@ export class Packager {
     this.logger.step("Package Chromium extension");
 
     const manifest = JSON.parse(
-      readFileSync(
-        resolve(this.ctx.rootDir, "src", "manifest-chromium.json"),
-        "utf8",
-      ),
+      readFileSync(resolve(this.ctx.rootDir, "src", "manifest-chromium.json"), "utf8"),
     );
     manifest.version = this.ctx.version;
 
-    const tmpManifest = resolve(
-      this.ctx.releaseVersionDir,
-      "_manifest_chromium_tmp.json",
-    );
+    const tmpManifest = resolve(this.ctx.releaseVersionDir, "_manifest_chromium_tmp.json");
     writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
 
     const zip = new AdmZip();
-    zip.addLocalFolder(
-      resolve(this.ctx.rootDir, "src"),
-      "",
-      (name) => name !== "manifest.json",
-    );
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", (name) => name !== "manifest.json");
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(
@@ -50,25 +40,15 @@ export class Packager {
     this.logger.step("Package Firefox extension");
 
     const manifest = JSON.parse(
-      readFileSync(
-        resolve(this.ctx.rootDir, "src", "manifest-firefox.json"),
-        "utf8",
-      ),
+      readFileSync(resolve(this.ctx.rootDir, "src", "manifest-firefox.json"), "utf8"),
     );
     manifest.version = this.ctx.version;
 
-    const tmpManifest = resolve(
-      this.ctx.releaseVersionDir,
-      "_manifest_ff_tmp.json",
-    );
+    const tmpManifest = resolve(this.ctx.releaseVersionDir, "_manifest_ff_tmp.json");
     writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
 
     const zip = new AdmZip();
-    zip.addLocalFolder(
-      resolve(this.ctx.rootDir, "src"),
-      "",
-      (name) => name !== "manifest.json",
-    );
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", (name) => name !== "manifest.json");
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(

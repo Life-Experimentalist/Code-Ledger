@@ -66,8 +66,7 @@ export const CONSTANTS = Object.freeze({
     edge: "https://microsoftedge.microsoft.com/addons/detail/",
     firefox: "https://addons.mozilla.org/firefox/addon/",
     github: "https://github.com/Life-Experimentalist/Code-Ledger",
-    github_releases:
-      "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
+    github_releases: "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
   },
 
   // ── External URLs ──
@@ -76,8 +75,7 @@ export const CONSTANTS = Object.freeze({
     AUTH_WORKER: "https://codeledger.vkrishna04.me/api",
     TELEMETRY: "https://counter.vkrishna04.me",
     // Primary: served from the worker (CDN-cached, versioned)
-    CANONICAL_MAP:
-      "https://codeledger.vkrishna04.me/api/data/canonical-map.json",
+    CANONICAL_MAP: "https://codeledger.vkrishna04.me/api/data/canonical-map.json",
     // Fallback: raw GitHub (used only when primary 4xx/5xx)
     CANONICAL_MAP_RAW:
       "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/data/canonical-map.json",
@@ -211,11 +209,7 @@ export const CONSTANTS = Object.freeze({
       name: "GeeksForGeeks",
       color: "#2F8D46",
       // Keep all three variants in sync with dom-selectors.js DOMAINS
-      domains: [
-        "geeksforgeeks.org",
-        "practice.geeksforgeeks.org",
-        "www.geeksforgeeks.org",
-      ],
+      domains: ["geeksforgeeks.org", "practice.geeksforgeeks.org", "www.geeksforgeeks.org"],
       baseUrl: "https://www.geeksforgeeks.org",
       problemsBase: "https://www.geeksforgeeks.org/problems/",
       practiceBase: "https://practice.geeksforgeeks.org/problems/",
@@ -251,8 +245,7 @@ export const CONSTANTS = Object.freeze({
   DEFAULT_REPO_NAME: "CodeLedger-Sync",
   REPO_BRANCH: "main",
   COMMIT_MESSAGE_TEMPLATE: "[{topic}] {title} — {difficulty} | {language}",
-  IMPORT_COMMIT_MESSAGE:
-    "chore: import {count} solutions from {platform} profile",
+  IMPORT_COMMIT_MESSAGE: "chore: import {count} solutions from {platform} profile",
   INDEX_JSON_PATH: "index.json",
   PROBLEMS_DIR_DEFAULT: "problems",
   COMMIT_TYPE: {
@@ -329,8 +322,7 @@ export const CONSTANTS = Object.freeze({
 
   /** Returns the platform-scoped unique id, e.g. "lc-two-sum". */
   makeProblemId(platform, titleSlug) {
-    const code =
-      this.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
+    const code = this.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
     return `${code}-${titleSlug}`;
   },
 

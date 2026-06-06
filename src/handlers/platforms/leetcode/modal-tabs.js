@@ -23,9 +23,7 @@ function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
   if (!problem.code) {
     return html`
       <div class="flex flex-col items-center gap-4 py-12 text-center">
-        <p class="text-slate-500 text-sm">
-          Code was not extracted for this submission.
-        </p>
+        <p class="text-slate-500 text-sm">Code was not extracted for this submission.</p>
         ${IS_EXTENSION
           ? html`
               <button
@@ -46,9 +44,7 @@ function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                       const updated = await Storage.getProblem(problem.id);
                       if (updated) onUpdate(updated);
                     } else {
-                      setRecoveryError(
-                        res?.error || "Recovery failed — no code returned",
-                      );
+                      setRecoveryError(res?.error || "Recovery failed — no code returned");
                     }
                   } catch (e) {
                     setRecoveryError(e?.message || "Recovery failed");
@@ -59,14 +55,10 @@ function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                 disabled=${recovering}
                 class="px-4 py-2 rounded-lg bg-cyan-600/15 border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-600/30 disabled:opacity-40 transition-colors"
               >
-                ${recovering
-                  ? "Recovering code…"
-                  : "Recover Code from LeetCode"}
+                ${recovering ? "Recovering code…" : "Recover Code from LeetCode"}
               </button>
               ${recoveryError
-                ? html` <p class="text-rose-400 text-xs max-w-xs">
-                      ${recoveryError}
-                    </p>
+                ? html` <p class="text-rose-400 text-xs max-w-xs">${recoveryError}</p>
                     <a
                       href=${CONSTANTS.PLATFORMS.leetcode.baseUrl}
                       target="_blank"
@@ -77,8 +69,8 @@ function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                     </a>`
                 : ""}
               <p class="text-slate-600 text-[10px] max-w-xs">
-                Opens a background LeetCode tab to fetch your latest accepted
-                submission. Make sure you are logged into LeetCode first.
+                Opens a background LeetCode tab to fetch your latest accepted submission. Make sure
+                you are logged into LeetCode first.
               </p>
             `
           : html`<p class="text-slate-600 text-xs">
@@ -88,8 +80,7 @@ function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
     `;
   }
 
-  const rawLang =
-    problem.lang?.slug || problem.lang?.name || problem.language || "";
+  const rawLang = problem.lang?.slug || problem.lang?.name || problem.language || "";
   const highlighted = highlightCode(problem.code, rawLang);
   return html`<div class="flex flex-col gap-2">
     <div class="flex justify-between items-center">
@@ -126,16 +117,10 @@ modalTabRegistry.register("leetcode", [
               ></div>
             `
           : html`
-              <div
-                class="flex flex-col items-center justify-center py-8 gap-3 text-center"
-              >
+              <div class="flex flex-col items-center justify-center py-8 gap-3 text-center">
                 <span class="text-2xl">📄</span>
-                <p class="text-slate-400 text-sm">
-                  No problem statement cached locally.
-                </p>
-                <p class="text-slate-600 text-xs">
-                  Open on LeetCode to view the full description.
-                </p>
+                <p class="text-slate-400 text-sm">No problem statement cached locally.</p>
+                <p class="text-slate-600 text-xs">Open on LeetCode to view the full description.</p>
                 <div class="flex gap-2 mt-3">
                   <a
                     href=${problemUrl}
@@ -159,11 +144,7 @@ modalTabRegistry.register("leetcode", [
         ${problem.constraints
           ? html`
               <div class="mt-3 border-t border-white/5 pt-3">
-                <p
-                  class="text-[10px] uppercase tracking-wider text-slate-600 mb-1"
-                >
-                  Constraints
-                </p>
+                <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-1">Constraints</p>
                 <pre
                   class="text-xs text-slate-400 font-mono whitespace-pre-wrap leading-relaxed bg-black/30 rounded-lg p-2 border border-white/5"
                 >
@@ -175,17 +156,12 @@ ${problem.constraints}</pre
         ${problem.similar?.length
           ? html`
               <div class="mt-3 border-t border-white/5 pt-3">
-                <p
-                  class="text-[10px] uppercase tracking-wider text-slate-600 mb-2"
-                >
+                <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-2">
                   Similar Problems
                 </p>
                 <div class="flex flex-col gap-1">
                   ${problem.similar.slice(0, 5).map((s) => {
-                    const sUrl =
-                      CONSTANTS.PLATFORMS.leetcode.problemsBase +
-                      s.titleSlug +
-                      "/";
+                    const sUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
                     const sDiffClass =
                       {
                         Easy: "text-emerald-400",
@@ -198,8 +174,7 @@ ${problem.constraints}</pre
                       rel="noopener"
                       class="flex items-center justify-between py-1 px-2 rounded hover:bg-white/5 transition-colors no-underline group"
                     >
-                      <span
-                        class="text-xs text-slate-300 group-hover:text-cyan-300"
+                      <span class="text-xs text-slate-300 group-hover:text-cyan-300"
                         >${s.title || s.titleSlug}</span
                       >
                       <span class="text-[10px] ${sDiffClass} ml-2 shrink-0"
@@ -214,11 +189,7 @@ ${problem.constraints}</pre
         ${problem.hints?.length
           ? html`
               <div class="mt-3 border-t border-white/5 pt-3">
-                <p
-                  class="text-[10px] uppercase tracking-wider text-slate-600 mb-2"
-                >
-                  Hints
-                </p>
+                <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-2">Hints</p>
                 ${problem.hints.map(
                   (h, i) => html`
                     <details class="mb-1 group">
@@ -227,11 +198,7 @@ ${problem.constraints}</pre
                       >
                         Hint ${i + 1}
                       </summary>
-                      <p
-                        class="text-xs text-slate-400 mt-1 pl-3 border-l border-white/10"
-                      >
-                        ${h}
-                      </p>
+                      <p class="text-xs text-slate-400 mt-1 pl-3 border-l border-white/10">${h}</p>
                     </details>
                   `,
                 )}
@@ -294,8 +261,7 @@ ${problem.constraints}</pre
     render(problem, { html }) {
       return html` <div class="flex flex-col gap-2">
         ${(problem.similar || []).map((s) => {
-          const sUrl =
-            CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
+          const sUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
           const sDiffClass =
             {
               Easy: "text-emerald-400",
@@ -308,12 +274,8 @@ ${problem.constraints}</pre
             rel="noopener"
             class="flex items-center justify-between p-3 bg-white/3 border border-white/5 rounded-xl hover:border-cyan-500/20 hover:bg-white/5 transition-colors no-underline"
           >
-            <span class="text-sm text-slate-200"
-              >${s.title || s.titleSlug}</span
-            >
-            <span class="text-xs ${sDiffClass} shrink-0 ml-2"
-              >${s.difficulty || ""}</span
-            >
+            <span class="text-sm text-slate-200">${s.title || s.titleSlug}</span>
+            <span class="text-xs ${sDiffClass} shrink-0 ml-2">${s.difficulty || ""}</span>
           </a>`;
         })}
       </div>`;
@@ -343,9 +305,7 @@ ${problem.constraints}</pre
             },
           ) {
             return html` <div class="flex flex-col gap-3 h-full">
-              <div
-                class="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0 max-h-[340px]"
-              >
+              <div class="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0 max-h-[340px]">
                 ${chatMessages.length === 0
                   ? html`
                       <div
@@ -355,9 +315,7 @@ ${problem.constraints}</pre
                         <p class="text-slate-400 text-sm">
                           Ask anything about this problem or your solution.
                         </p>
-                        <p class="text-slate-600 text-xs">
-                          Uses your configured AI provider.
-                        </p>
+                        <p class="text-slate-600 text-xs">Uses your configured AI provider.</p>
                       </div>
                     `
                   : chatMessages.map(
@@ -394,19 +352,13 @@ ${problem.constraints}</pre
                 ${chatPending
                   ? html`
                       <div class="flex items-start gap-2">
-                        <div
-                          class="px-3 py-2 bg-white/5 border border-white/10 rounded-xl"
-                        >
-                          <span class="text-xs text-slate-500 animate-pulse"
-                            >Thinking…</span
-                          >
+                        <div class="px-3 py-2 bg-white/5 border border-white/10 rounded-xl">
+                          <span class="text-xs text-slate-500 animate-pulse">Thinking…</span>
                         </div>
                       </div>
                     `
                   : ""}
-                ${chatError
-                  ? html`<p class="text-xs text-rose-400 px-1">${chatError}</p>`
-                  : ""}
+                ${chatError ? html`<p class="text-xs text-rose-400 px-1">${chatError}</p>` : ""}
               </div>
               <div class="shrink-0 flex flex-col gap-2">
                 <div class="flex justify-end">

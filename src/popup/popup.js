@@ -10,10 +10,7 @@ const html = htm.bind(h);
 import { Storage } from "../core/storage.js";
 import { tabs, runtime } from "../lib/browser-compat.js";
 import { createDebugger } from "../lib/debug.js";
-import {
-  applyThemeFromStorage,
-  setupThemeListener,
-} from "../core/theme-engine.js";
+import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
 
 const dbg = createDebugger("PopupApp");
 
@@ -63,9 +60,7 @@ function PopupApp() {
   };
 
   const searchLibrary = (q) => {
-    const url = runtime.getURL(
-      `library/library.html?tab=search&q=${encodeURIComponent(q)}`,
-    );
+    const url = runtime.getURL(`library/library.html?tab=search&q=${encodeURIComponent(q)}`);
     try {
       tabs.create({ url });
     } catch {
@@ -85,21 +80,15 @@ function PopupApp() {
       </div>
 
       <div class="grid grid-cols-3 gap-2 mb-4">
-        <div
-          class="bg-white/5 border border-white/5 rounded p-2 flex flex-col items-center"
-        >
+        <div class="bg-white/5 border border-white/5 rounded p-2 flex flex-col items-center">
           <span class="text-emerald-400 font-bold">${stats.easy}</span>
           <span class="text-[10px] text-slate-500 uppercase">Easy</span>
         </div>
-        <div
-          class="bg-white/5 border border-white/5 rounded p-2 flex flex-col items-center"
-        >
+        <div class="bg-white/5 border border-white/5 rounded p-2 flex flex-col items-center">
           <span class="text-amber-400 font-bold">${stats.medium}</span>
           <span class="text-[10px] text-slate-500 uppercase">Med</span>
         </div>
-        <div
-          class="bg-white/5 border border-white/5 rounded p-2 flex flex-col items-center"
-        >
+        <div class="bg-white/5 border border-white/5 rounded p-2 flex flex-col items-center">
           <span class="text-rose-400 font-bold">${stats.hard}</span>
           <span class="text-[10px] text-slate-500 uppercase">Hard</span>
         </div>
@@ -115,10 +104,7 @@ function PopupApp() {
           <div class="mt-2 flex gap-2">
             <button
               class="flex-1 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-xs font-bold uppercase tracking-widest"
-              onClick=${() =>
-                searchLibrary(
-                  document.getElementById("popup-search").value || "",
-                )}
+              onClick=${() => searchLibrary(document.getElementById("popup-search").value || "")}
             >
               Search
             </button>
@@ -130,9 +116,7 @@ function PopupApp() {
             </button>
           </div>
         </div>
-        <h2 class="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
-          Recent Solves
-        </h2>
+        <h2 class="text-[10px] uppercase tracking-widest text-slate-500 mb-2">Recent Solves</h2>
         ${recent.length === 0
           ? html`
               <div
@@ -154,9 +138,7 @@ function PopupApp() {
                         >
                           ${p.title}
                         </p>
-                        <p
-                          class="text-[9px] text-slate-500 uppercase hidden sm:block"
-                        >
+                        <p class="text-[9px] text-slate-500 uppercase hidden sm:block">
                           ${p.platform} • ${p.difficulty}
                         </p>
                       </div>
@@ -180,8 +162,7 @@ function PopupApp() {
               <span class="text-amber-400 text-base leading-none">⚠</span>
               <div class="flex-1 min-w-0">
                 <p class="text-[11px] font-medium text-amber-300">
-                  ${pendingConflicts}
-                  conflict${pendingConflicts !== 1 ? "s" : ""} need review
+                  ${pendingConflicts} conflict${pendingConflicts !== 1 ? "s" : ""} need review
                 </p>
                 <p class="text-[10px] text-amber-500/80 truncate">
                   Go to Settings → Git to resolve
@@ -212,16 +193,12 @@ function PopupApp() {
         </button>
       </div>
 
-      <div
-        class="mt-auto pt-4 border-t border-white/5 flex gap-2 items-center justify-between"
-      >
+      <div class="mt-auto pt-4 border-t border-white/5 flex gap-2 items-center justify-between">
         <div class="flex items-center gap-1.5">
           <div
             class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]"
           ></div>
-          <span class="text-[9px] uppercase tracking-widest text-emerald-500/70"
-            >Ready</span
-          >
+          <span class="text-[9px] uppercase tracking-widest text-emerald-500/70">Ready</span>
         </div>
         <span class="text-[9px] text-slate-600">${stats.total} tracked</span>
       </div>

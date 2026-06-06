@@ -16,10 +16,7 @@ import { Storage } from "../../core/storage.js";
 // ── helpers ────────────────────────────────────────────────────────────────
 
 async function exportData() {
-  const [problems, settings] = await Promise.all([
-    Storage.getAllProblems(),
-    Storage.getSettings(),
-  ]);
+  const [problems, settings] = await Promise.all([Storage.getAllProblems(), Storage.getSettings()]);
   return { problems: problems || [], settings: settings || {} };
 }
 
@@ -118,10 +115,7 @@ function ManualBackups({ settings }) {
 
   const download = async (b) => {
     try {
-      await downloadJSON(
-        b.data,
-        b.name.replace(/\s+/g, "-").toLowerCase() || "manual",
-      );
+      await downloadJSON(b.data, b.name.replace(/\s+/g, "-").toLowerCase() || "manual");
     } catch (e) {
       flash("Download failed: " + e.message, true);
     }
@@ -184,21 +178,13 @@ function ManualBackups({ settings }) {
       </div>
 
       ${msg &&
-      html`<p
-        class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}"
-      >
-        ${msg.text}
-      </p>`}
+      html`<p class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}">${msg.text}</p>`}
 
       <!-- Backup list -->
       ${backups.length === 0
-        ? html`<p class="text-xs text-slate-600 italic">
-            No manual backups yet.
-          </p>`
+        ? html`<p class="text-xs text-slate-600 italic">No manual backups yet.</p>`
         : html`
-            <div
-              class="divide-y divide-white/5 rounded-xl border border-white/8 overflow-hidden"
-            >
+            <div class="divide-y divide-white/5 rounded-xl border border-white/8 overflow-hidden">
               ${backups.map(
                 (b) => html`
                   <div
@@ -206,12 +192,10 @@ function ManualBackups({ settings }) {
                     class="flex items-center gap-3 px-3 py-2.5 bg-white/[0.02] hover:bg-white/[0.04]"
                   >
                     <div class="flex-1 min-w-0">
-                      <p class="text-xs text-slate-200 truncate">
-                        ${b.name || "Backup"}
-                      </p>
+                      <p class="text-xs text-slate-200 truncate">${b.name || "Backup"}</p>
                       <p class="text-[11px] text-slate-500">
-                        ${fmtTime(b.ts)} · ${(b.data?.problems || []).length}
-                        problems · ${fmtSize(b.data)}
+                        ${fmtTime(b.ts)} · ${(b.data?.problems || []).length} problems ·
+                        ${fmtSize(b.data)}
                       </p>
                     </div>
                     <div class="flex gap-1 shrink-0">
@@ -271,9 +255,7 @@ function ScheduledBackups({ settings, onSettingsChange }) {
       const data = await exportData();
       await Storage.addScheduledBackup(data, "manual-trigger");
       setBackups(await Storage.getScheduledBackups());
-      flash(
-        `Scheduled snapshot saved — ${(data.problems || []).length} problems`,
-      );
+      flash(`Scheduled snapshot saved — ${(data.problems || []).length} problems`);
     } catch (e) {
       flash("Failed: " + e.message, true);
     } finally {
@@ -329,8 +311,8 @@ function ScheduledBackups({ settings, onSettingsChange }) {
   return html`
     <div class="space-y-3">
       <p class="text-[11px] text-slate-500">
-        Up to 5 automatic snapshots, rotated FIFO. Triggered by solve events
-        since the extension can't use fixed timers.
+        Up to 5 automatic snapshots, rotated FIFO. Triggered by solve events since the extension
+        can't use fixed timers.
       </p>
 
       <!-- Trigger settings -->
@@ -342,9 +324,7 @@ function ScheduledBackups({ settings, onSettingsChange }) {
               <button
                 onClick=${() => onSettingsChange(key, !on)}
                 class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
-                  ${on
-                  ? "bg-cyan-500/30 border-cyan-500/40"
-                  : "bg-white/5 border-white/10"}"
+                  ${on ? "bg-cyan-500/30 border-cyan-500/40" : "bg-white/5 border-white/10"}"
               >
                 <span
                   class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
@@ -369,29 +349,18 @@ function ScheduledBackups({ settings, onSettingsChange }) {
       </button>
 
       ${msg &&
-      html`<p
-        class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}"
-      >
-        ${msg.text}
-      </p>`}
+      html`<p class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}">${msg.text}</p>`}
       ${backups.length === 0
-        ? html`<p class="text-xs text-slate-600 italic">
-            No scheduled snapshots yet.
-          </p>`
+        ? html`<p class="text-xs text-slate-600 italic">No scheduled snapshots yet.</p>`
         : html`
-            <div
-              class="divide-y divide-white/5 rounded-xl border border-white/8 overflow-hidden"
-            >
+            <div class="divide-y divide-white/5 rounded-xl border border-white/8 overflow-hidden">
               ${backups.map(
                 (b) => html`
-                  <div
-                    key=${b.id}
-                    class="flex items-center gap-3 px-3 py-2.5 bg-white/[0.02]"
-                  >
+                  <div key=${b.id} class="flex items-center gap-3 px-3 py-2.5 bg-white/[0.02]">
                     <div class="flex-1 min-w-0">
                       <p class="text-[11px] text-slate-500">
-                        ${fmtTime(b.ts)} · via ${b.trigger} ·
-                        ${(b.data?.problems || []).length} problems
+                        ${fmtTime(b.ts)} · via ${b.trigger} · ${(b.data?.problems || []).length}
+                        problems
                       </p>
                     </div>
                     <div class="flex gap-1 shrink-0">
@@ -454,9 +423,7 @@ function RollingBackup() {
       const data = await exportData();
       await Storage.updateRollingBackup(data);
       await load();
-      flash(
-        `Rolling backup updated — ${(data.problems || []).length} problems`,
-      );
+      flash(`Rolling backup updated — ${(data.problems || []).length} problems`);
     } catch (e) {
       flash("Failed: " + e.message, true);
     } finally {
@@ -495,8 +462,8 @@ function RollingBackup() {
   return html`
     <div class="space-y-3">
       <p class="text-[11px] text-slate-500">
-        A single always-current snapshot updated manually or automatically
-        whenever you solve a problem. Useful as a last-resort recovery point.
+        A single always-current snapshot updated manually or automatically whenever you solve a
+        problem. Useful as a last-resort recovery point.
       </p>
 
       ${backup
@@ -505,12 +472,9 @@ function RollingBackup() {
               class="flex items-center gap-3 p-3 rounded-xl border border-white/8 bg-white/[0.02]"
             >
               <div class="flex-1">
-                <p class="text-xs text-slate-300">
-                  Last updated: ${fmtTime(backup.ts)}
-                </p>
+                <p class="text-xs text-slate-300">Last updated: ${fmtTime(backup.ts)}</p>
                 <p class="text-[11px] text-slate-500">
-                  ${(backup.data?.problems || []).length} problems ·
-                  ${fmtSize(backup.data)}
+                  ${(backup.data?.problems || []).length} problems · ${fmtSize(backup.data)}
                 </p>
               </div>
               <div class="flex gap-1">
@@ -543,11 +507,7 @@ function RollingBackup() {
       </button>
 
       ${msg &&
-      html`<p
-        class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}"
-      >
-        ${msg.text}
-      </p>`}
+      html`<p class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}">${msg.text}</p>`}
     </div>
   `;
 }
@@ -633,8 +593,7 @@ function GitHubBackups({ settings, onSettingsChange }) {
       <p class="text-[11px] text-slate-500">
         Commits full snapshots as
         <code class="text-cyan-400">backups/YYYY-MM-DD-HH-mm-ss.json</code>
-        in your GitHub repo. Keeps only the N most recent — older ones are
-        pruned automatically.
+        in your GitHub repo. Keeps only the N most recent — older ones are pruned automatically.
       </p>
 
       <!-- Toggle -->
@@ -650,9 +609,7 @@ function GitHubBackups({ settings, onSettingsChange }) {
                 class="sr-only"
               />
               <div
-                class="w-8 h-4 rounded-full transition-colors ${on
-                  ? "bg-cyan-600"
-                  : "bg-white/10"}"
+                class="w-8 h-4 rounded-full transition-colors ${on ? "bg-cyan-600" : "bg-white/10"}"
               ></div>
               <div
                 class="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${on
@@ -671,30 +628,24 @@ function GitHubBackups({ settings, onSettingsChange }) {
       <!-- Interval + keep -->
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="text-[11px] text-slate-400 block mb-1"
-            >Every N commits</label
-          >
+          <label class="text-[11px] text-slate-400 block mb-1">Every N commits</label>
           <input
             type="number"
             min="1"
             max="100"
             value=${settings?.githubBackupInterval || "10"}
-            onInput=${(e) =>
-              onSettingsChange?.("githubBackupInterval", e.target.value)}
+            onInput=${(e) => onSettingsChange?.("githubBackupInterval", e.target.value)}
             class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
           />
         </div>
         <div>
-          <label class="text-[11px] text-slate-400 block mb-1"
-            >Keep last N backups</label
-          >
+          <label class="text-[11px] text-slate-400 block mb-1">Keep last N backups</label>
           <input
             type="number"
             min="1"
             max="50"
             value=${settings?.githubBackupKeep || "10"}
-            onInput=${(e) =>
-              onSettingsChange?.("githubBackupKeep", e.target.value)}
+            onInput=${(e) => onSettingsChange?.("githubBackupKeep", e.target.value)}
             class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
           />
         </div>
@@ -721,18 +672,12 @@ function GitHubBackups({ settings, onSettingsChange }) {
         </div>
       `}
       ${msg &&
-      html`<p
-        class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}"
-      >
-        ${msg.text}
-      </p>`}
+      html`<p class="text-xs ${msg.isErr ? "text-rose-400" : "text-emerald-400"}">${msg.text}</p>`}
 
       <!-- Backup list -->
       ${backups.length > 0 &&
       html`
-        <div
-          class="divide-y divide-white/5 rounded-xl border border-white/8 overflow-hidden"
-        >
+        <div class="divide-y divide-white/5 rounded-xl border border-white/8 overflow-hidden">
           ${backups.map(
             (b) => html`
               <div
@@ -741,9 +686,7 @@ function GitHubBackups({ settings, onSettingsChange }) {
               >
                 <div class="flex-1 min-w-0">
                   <p class="text-xs text-slate-300 truncate">${b.name}</p>
-                  <p class="text-[11px] text-slate-500">
-                    ${Math.round((b.size || 0) / 1024)} KB
-                  </p>
+                  <p class="text-[11px] text-slate-500">${Math.round((b.size || 0) / 1024)} KB</p>
                 </div>
                 <button
                   onClick=${() => restore(b)}
@@ -808,19 +751,12 @@ export function PanelBackups({ settings, onSettingsChange }) {
       </div>
 
       <!-- Panel content -->
-      ${activeTab === "manual" &&
-      html`<${ManualBackups} settings=${settings} />`}
+      ${activeTab === "manual" && html`<${ManualBackups} settings=${settings} />`}
       ${activeTab === "scheduled" &&
-      html`<${ScheduledBackups}
-        settings=${settings}
-        onSettingsChange=${onSettingsChange}
-      />`}
+      html`<${ScheduledBackups} settings=${settings} onSettingsChange=${onSettingsChange} />`}
       ${activeTab === "rolling" && html`<${RollingBackup} />`}
       ${activeTab === "github" &&
-      html`<${GitHubBackups}
-        settings=${settings}
-        onSettingsChange=${onSettingsChange}
-      />`}
+      html`<${GitHubBackups} settings=${settings} onSettingsChange=${onSettingsChange} />`}
     </div>
   `;
 }

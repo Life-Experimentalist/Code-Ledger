@@ -73,48 +73,42 @@ Be concise. Max 200 words.`;
           label: "Enable tracking",
           type: "toggle",
           default: true,
-          description:
-            "Auto-detect accepted Codeforces submissions and save them to CodeLedger.",
+          description: "Auto-detect accepted Codeforces submissions and save them to CodeLedger.",
         },
         {
           key: "cf_readme",
           label: "Include problem description",
           type: "toggle",
           default: true,
-          description:
-            "Save the problem statement to README.md alongside your solution.",
+          description: "Save the problem statement to README.md alongside your solution.",
         },
         {
           key: "cf_timer",
           label: "Show solve timer",
           type: "toggle",
           default: true,
-          description:
-            "Display a floating stopwatch overlay while solving Codeforces problems.",
+          description: "Display a floating stopwatch overlay while solving Codeforces problems.",
         },
         {
           key: "cf_copy_btn",
           label: "Copy code button",
           type: "toggle",
           default: true,
-          description:
-            "Inject a copy-to-clipboard button above the Codeforces editor.",
+          description: "Inject a copy-to-clipboard button above the Codeforces editor.",
         },
         {
           key: "cf_ai_panel",
           label: "Floating AI assistant",
           type: "toggle",
           default: true,
-          description:
-            "Show a floating AI chat panel on Codeforces problem pages.",
+          description: "Show a floating AI chat panel on Codeforces problem pages.",
         },
         {
           key: "cf_handle",
           label: "Codeforces handle",
           type: "text",
           default: "",
-          description:
-            "Your Codeforces handle. Reserved for future profile import support.",
+          description: "Your Codeforces handle. Reserved for future profile import support.",
           advanced: true,
           placeholder: "e.g. tourist",
         },
@@ -199,9 +193,7 @@ Be concise. Max 200 words.`;
       const rawLang = pending?.lang || this._extractLanguage();
       const lang = resolveLang(rawLang);
       const code =
-        pending?.code ||
-        document.querySelector(SELECTORS.submission.editor)?.value ||
-        "";
+        pending?.code || document.querySelector(SELECTORS.submission.editor)?.value || "";
 
       if (!code.trim()) {
         dbg.warn("Code extraction failed, skipping commit");
@@ -221,14 +213,7 @@ Be concise. Max 200 words.`;
       sessionStorage.setItem(dedupKey, submissionId);
       clearPendingSubmission();
 
-      const files = this._buildFileSet(
-        meta,
-        code,
-        lang,
-        settings,
-        slug,
-        canonical,
-      );
+      const files = this._buildFileSet(meta, code, lang, settings, slug, canonical);
       const readmeFile = files.find((f) => f.path.endsWith("README.md"));
       const elapsedSeconds = this._timer.getElapsedSeconds();
 
@@ -266,8 +251,7 @@ Be concise. Max 200 words.`;
     const titleEl = document.querySelector(SELECTORS.problem.title);
     const rawTitle = (titleEl?.textContent || "").trim();
     // CF prepends "A. " to titles — strip the letter prefix
-    const title =
-      rawTitle.replace(/^[A-Za-z0-9]+\.\s+/, "").trim() || rawTitle || slug;
+    const title = rawTitle.replace(/^[A-Za-z0-9]+\.\s+/, "").trim() || rawTitle || slug;
 
     const rating = this._extractRating();
     const difficulty = rating ? normalizeCFRating(rating) : null;
@@ -278,12 +262,8 @@ Be concise. Max 200 words.`;
     // Runtime/memory from the first row in the inline submissions table
     const firstRow = document.querySelector("tr[data-submission-id]");
     const cells = firstRow ? [...firstRow.querySelectorAll("td")] : [];
-    const runtime = cells[4]
-      ? (cells[4].textContent || "").trim() || null
-      : null;
-    const memory = cells[5]
-      ? (cells[5].textContent || "").trim() || null
-      : null;
+    const runtime = cells[4] ? (cells[4].textContent || "").trim() || null : null;
+    const memory = cells[5] ? (cells[5].textContent || "").trim() || null : null;
 
     return {
       title,
@@ -313,15 +293,13 @@ Be concise. Max 200 words.`;
 
   _extractTags(ratingToExclude = null) {
     const tags = [];
-    document
-      .querySelectorAll(".roundbox .tag-box, .problemTags .tag-box")
-      .forEach((el) => {
-        const t = (el.textContent || "").trim();
-        if (!t) return;
-        if (ratingToExclude !== null && t === String(ratingToExclude)) return;
-        if (/^\d+$/.test(t)) return; // skip pure-numeric (ratings)
-        if (!tags.includes(t)) tags.push(t);
-      });
+    document.querySelectorAll(".roundbox .tag-box, .problemTags .tag-box").forEach((el) => {
+      const t = (el.textContent || "").trim();
+      if (!t) return;
+      if (ratingToExclude !== null && t === String(ratingToExclude)) return;
+      if (/^\d+$/.test(t)) return; // skip pure-numeric (ratings)
+      if (!tags.includes(t)) tags.push(t);
+    });
     return tags;
   }
 
@@ -348,8 +326,7 @@ Be concise. Max 200 words.`;
             label: "CF AI Assistant",
             chatPlatform: "codeforces",
             readPageMeta: () => this._readPageMeta(),
-            readEditorCode: () =>
-              document.querySelector("#editor")?.value || "",
+            readEditorCode: () => document.querySelector("#editor")?.value || "",
             readEditorLang: () => this._extractLanguage(),
             readProblemStatement: () => this._readProblemStatement(),
             readTestFailures: () => this._readTestFailures(),
@@ -393,12 +370,10 @@ Be concise. Max 200 words.`;
     // 2. Fallback: any pre/error elements on page
     try {
       const lines = [];
-      document
-        .querySelectorAll("pre, .error, [class*='error'], [class*='wrong']")
-        .forEach((el) => {
-          const t = (el.textContent || "").trim();
-          if (t && t.length > 4 && !lines.includes(t)) lines.push(t);
-        });
+      document.querySelectorAll("pre, .error, [class*='error'], [class*='wrong']").forEach((el) => {
+        const t = (el.textContent || "").trim();
+        if (t && t.length > 4 && !lines.includes(t)) lines.push(t);
+      });
       return lines.slice(0, 5).join("\n\n");
     } catch (_) {
       return "";
@@ -445,10 +420,7 @@ Be concise. Max 200 words.`;
     }
 
     if (meta.tags?.length) {
-      lines.push(
-        "",
-        `**Tags:** ${meta.tags.map((t) => `\`${t}\``).join(", ")}`,
-      );
+      lines.push("", `**Tags:** ${meta.tags.map((t) => `\`${t}\``).join(", ")}`);
     }
 
     if (meta.description) {
@@ -496,9 +468,7 @@ Be concise. Max 200 words.`;
     const rawLang = this._extractLanguage();
     const lang = resolveLang(rawLang);
 
-    const existing = await Storage.getProblem(this.makeProblemId(slug)).catch(
-      () => null,
-    );
+    const existing = await Storage.getProblem(this.makeProblemId(slug)).catch(() => null);
 
     await Storage.saveProblem({
       ...(existing || {}),
@@ -509,18 +479,15 @@ Be concise. Max 200 words.`;
       difficulty: meta.difficulty || existing?.difficulty || null,
       tags: meta.tags?.length ? meta.tags : existing?.tags || [],
       code: code || existing?.code || "",
-      lang: code
-        ? { name: lang.name, ext: lang.ext, slug: lang.slug }
-        : existing?.lang,
+      lang: code ? { name: lang.name, ext: lang.ext, slug: lang.slug } : existing?.lang,
       problemStatement: meta.description || existing?.problemStatement || null,
       timestamp: existing?.timestamp || Date.now(),
     }).catch(() => {});
 
     await new Promise((resolve) => {
       try {
-        runtime.sendMessage(
-          { type: "REFRESH_METADATA_DONE", platform: "codeforces", slug },
-          () => resolve(),
+        runtime.sendMessage({ type: "REFRESH_METADATA_DONE", platform: "codeforces", slug }, () =>
+          resolve(),
         );
       } catch (_) {
         resolve();
