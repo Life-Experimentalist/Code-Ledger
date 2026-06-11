@@ -6,6 +6,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.4] — 2026-06-11 (resubmission)
+
+### Fixed
+
+- **CWS rejection: remotely-hosted code** — Chrome Web Store rejected v1.4.4 for referencing `cdn.jsdelivr.net/chart.js` inside `handlers/git/github/pages-template.js`. Chart.js 4.5.1 UMD minified source is now bundled in `src/vendor/chart-source.js` and inlined directly into the generated GitHub Pages dashboard HTML. No remote requests are made by the extension itself.
+
+### Changed
+
+- **Build: chart-source auto-regeneration** — `dev/build.js` now detects when `src/vendor/chart-source.js` is missing or version-mismatched against `node_modules/chart.js` and regenerates it automatically. Upgrading `chart.js` in `package.json` + `npm install` + `npm run build` is sufficient; no manual vendor step required.
+
+### Removed
+
+- **Dead vendor stubs** — `src/vendor/chart.js` and `src/vendor/preact-hooks.js` were broken `// Module not found` stubs from failed esm.sh downloads; nothing imported them.
+
+---
+
 ## [1.4.4] — 2026-06-06
 
 ### Fixed
