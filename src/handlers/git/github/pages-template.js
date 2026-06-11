@@ -4,6 +4,7 @@
  */
 
 import { CONSTANTS } from "../../../core/constants.js";
+import { CHART_JS_INLINE } from "../../../vendor/chart-source.js";
 
 /**
  * Returns a self-contained HTML stats page for GitHub Pages.
@@ -46,7 +47,7 @@ export function getPagesHtml(opts = {}) {
   <meta property="og:description" content="DSA solutions committed automatically to GitHub." />
   <meta property="og:image" content="${ASSETS.social}" />
   <meta property="og:type" content="website" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>${CHART_JS_INLINE}</script>
   <style>
     :root {
       --bg: #050508; --surface: #0a0a0f; --border: rgba(255,255,255,.05);
