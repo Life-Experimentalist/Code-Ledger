@@ -30,10 +30,10 @@ async function download(url, filename) {
 async function run() {
   console.log("Downloading dependencies...");
   await download("https://esm.sh/v135/preact@10.26.0/es2022/preact.mjs", "preact.js");
-  await download("https://esm.sh/v135/preact@10.26.0/hooks/es2022/hooks.mjs", "preact-hooks.js");
   await download("https://esm.sh/v135/htm@3.1.1/es2022/htm.mjs", "htm.js");
-  await download("https://esm.sh/v135/chart.js@4.4.1/auto/es2022/auto.mjs", "chart.js");
-  console.log("Done.");
+  // chart-source.js for pages template is generated from node_modules via dev/generate-chart-vendor.js
+  // (auto-run by dev/build.js) — not downloaded from CDN
+  console.log("Done. Run 'node dev/generate-chart-vendor.js' to refresh chart-source.js if needed.");
 }
 
 run();

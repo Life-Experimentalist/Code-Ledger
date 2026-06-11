@@ -28,6 +28,21 @@ if (!SKIP_CSS) {
   execSync("npm run build:css", { stdio: "inherit", cwd: ROOT });
 }
 
+// Auto-regenerate chart-source.js if missing or outdated
+(function ensureChartSource() {
+  const chartSrcPath = path.join(ROOT, "src", "vendor", "chart-source.js");
+  const chartPkgPath = path.join(ROOT, "node_modules", "chart.js", "package.json");
+  if (!fs.existsSync(chartPkgPath)) return; // chart.js not installed, skip
+  const chartVersion = JSON.parse(fs.readFileSync(chartPkgPath, "utf8")).version;
+  const needsRegen =
+    !fs.existsSync(chartSrcPath) ||
+    !fs.readFileSync(chartSrcPath, "utf8").includes(`chart.js@${chartVersion}`);
+  if (needsRegen) {
+    console.log(`Regenerating chart-source.js for chart.js@${chartVersion}...`);
+    execSync("node dev/generate-chart-vendor.js", { stdio: "inherit", cwd: ROOT });
+  }
+})();
+
 if (fs.existsSync(DIST_DIR)) fs.rmSync(DIST_DIR, { recursive: true, force: true });
 
 function copyRecursive(src, dest) {
