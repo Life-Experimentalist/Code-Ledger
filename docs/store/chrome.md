@@ -77,7 +77,76 @@ Optional: add an AI provider key under Settings → AI for code reviews.
 
 **PRIVACY**
 
-CodeLedger never stores your code or GitHub token on external servers. The OAuth exchange happens through a Cloudflare Worker that acts as a proxy — the token is passed directly to your browser and stored only in the extension's local storage. The source code and worker are fully open-source at github.com/Life-Experimentalist/Code-Ledger.
+Your code and GitHub token are never stored on our servers. The OAuth exchange happens through a Cloudflare Worker proxy — the token is passed directly to your browser and stored only in the extension's local storage; the server does not log or retain it.
+
+The extension includes **optional, opt-in anonymous usage telemetry** (disabled by default). If you enable it in Settings → General → Anonymous Usage Stats, it sends only `{ event: "solve", platform: "leetcode", version: "x.y.z" }` to our self-hosted counter at `counter.vkrishna04.me`. No code, no tokens, no problem data, no identifiers. Full source at github.com/Life-Experimentalist/Code-Ledger.
+
+---
+
+## CWS Privacy Form — Exact Answers
+
+### Single Purpose Description
+*(paste as-is into the form)*
+
+> CodeLedger automatically detects when a user solves a DSA problem on LeetCode, GeeksForGeeks, or Codeforces and commits their solution code to a GitHub repository they own. All other features (AI review, analytics, conflict sync, knowledge graph) exist solely to enrich that single commit workflow.
+
+---
+
+### Permission Justifications
+
+**storage**
+> Stores the user's GitHub repository settings, OAuth token reference, problem cache, AI provider configuration, and sync state locally in the browser. If the user opts in to anonymous usage stats (disabled by default), a solve-event counter `{ platform, version }` is sent to `counter.vkrishna04.me`. No other data leaves the browser.
+
+**alarms**
+> Schedules periodic background sync checks (every 30 minutes) to detect when new solutions need to be pushed to the user's GitHub repository, and to throttle AI review batches to avoid API rate limits.
+
+**sidePanel**
+> Hosts the CodeLedger Library panel, which lets users browse all saved solutions, view analytics, explore the knowledge graph, and manage sync settings — all without navigating away from the current coding platform tab.
+
+**Host permissions**
+> • `*.leetcode.com`, `*.geeksforgeeks.org`, `*.codeforces.com` — content scripts detect accepted submissions and inject UI on these platforms.
+> • `api.github.com` — commits solution files to the user's own repository via the GitHub Trees API.
+> • `api.gitlab.com` — optional mirror repository target; only contacted if the user configures a GitLab mirror.
+> • `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `localhost:11434` — AI code review providers; only contacted if the user has enabled AI review and entered their own API key for that provider.
+
+---
+
+### Remote Code
+
+**No.** All JavaScript — including Preact, htm, and Chart.js — is bundled inside the extension package under `src/vendor/`. No `<script>` tags reference external URLs, no `eval()` or `new Function()` is used, and no Wasm is fetched at runtime.
+
+---
+
+### Data Usage Checkboxes
+
+| Category | Check? | Reason |
+|---|---|---|
+| Personally identifiable information | **No** | No name, address, email, or ID is collected. |
+| Health information | **No** | Not applicable. |
+| Financial and payment information | **No** | Not applicable. CodeLedger is free. |
+| Authentication information | **No** | GitHub OAuth tokens are stored only in `chrome.storage.local` on the user's device. The OAuth proxy passes the token through without logging or retaining it. |
+| Personal communications | **No** | Not applicable. |
+| Location | **No** | No IP, GPS, or region data is collected. |
+| Web history | **No** | Content scripts run only on the three configured coding platforms; no general browsing history is accessed. |
+| **User activity** | **Yes** | If the user opts in to "Anonymous Usage Stats" (off by default), a solve event `{ event: "solve", platform: "leetcode", version: "1.4.5" }` is sent to `counter.vkrishna04.me`. No clicks, scrolls, or keystrokes. Anonymous, no user identifier. |
+| Website content | **No** | Submitted code is read from the platform DOM and committed to the user's own GitHub repo only — never sent to the developer. |
+
+**Certifications — all three apply:**
+- ☑ I do not sell or transfer user data to third parties, outside of the approved use cases
+- ☑ I do not use or transfer user data for purposes that are unrelated to my item's single purpose
+- ☑ I do not use or transfer user data to determine creditworthiness or for lending purposes
+
+**Privacy policy URL:** `https://codeledger.vkrishna04.me/privacy`
+
+---
+
+## CWS Reviewer Notes
+
+**No remote code.** All JavaScript — including Preact, htm, and Chart.js — is bundled inside the extension package under `src/vendor/`. No scripts are loaded from external URLs at runtime. No `eval()` or `new Function()` is used.
+
+**Telemetry (opt-in, disabled by default).** `src/core/telemetry.js` sends `{ version, platform }` to `https://counter.vkrishna04.me` only when the user explicitly enables "Anonymous Usage Stats" in Settings → General. Default is off. No code, tokens, or user identifiers are ever included. The single call site is in `src/background/service-worker.js` (`Telemetry.track("solve", { platform })`).
+
+**OAuth flow.** GitHub OAuth uses a Cloudflare Worker (`codeledger.vkrishna04.me`) as a proxy to keep the Client Secret out of the extension. The worker exchanges the auth code for a token and posts `{ type: 'CODELEDGER_AUTH', provider: 'github', token: '...' }` back to the extension via `window.postMessage`. The token is stored in `chrome.storage.local` and sent only to `api.github.com`.
 
 ---
 

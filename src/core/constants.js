@@ -58,13 +58,13 @@ export const CONSTANTS = Object.freeze({
   DEBUG_DEFAULT: false,
   DEBUG_OVERRIDE: null, // null = use stored setting; true/false = force override (dev use)
   // Extension store IDs
-  EXTENSION_ID_CHROME: "",
-  EXTENSION_ID_FIREFOX: "",
+  EXTENSION_ID_CHROME: "dpalidbhndcbppmjgmbloffehbhfchmb",
+  EXTENSION_ID_FIREFOX: "code-ledger",
   // Precomputed store links (append the extension id to the store URL if empty)
   EXTENSION_STORE_URLS: {
-    chrome: "https://chrome.google.com/webstore/detail/",
-    edge: "https://microsoftedge.microsoft.com/addons/detail/",
-    firefox: "https://addons.mozilla.org/firefox/addon/",
+    chrome: "https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb",
+    edge: "https://microsoftedge.microsoft.com/addons/detail/codeledger/",
+    firefox: "https://addons.mozilla.org/en-US/firefox/addon/code-ledger/",
     github: "https://github.com/Life-Experimentalist/Code-Ledger",
     github_releases: "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
   },

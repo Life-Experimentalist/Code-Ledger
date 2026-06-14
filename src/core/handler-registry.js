@@ -96,9 +96,9 @@ class HandlerRegistry {
           key: "telemetryOptIn",
           label: "Anonymous Usage Stats",
           type: "toggle",
-          default: true,
+          default: false,
           description:
-            "Send anonymous solve counts to help improve CodeLedger. No code or personal data is sent.",
+            "Send anonymous solve counts (platform + version only) to help improve CodeLedger. No code, tokens, or personal data is ever sent. Off by default.",
         },
         // ── AI routing consumed by AI tab; filtered out of General view ──
         {

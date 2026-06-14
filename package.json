@@ -1,6 +1,6 @@
 {
-  "name": "codeledger",
-  "version": "1.4.4",
+  "name": "Code ledger",
+  "version": "1.4.5",
   "displayName": "CodeLedger",
   "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
   "author": "VKrishna04",
@@ -38,6 +38,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "help": "node dev/help.js",
     "dev": "node dev/run-dev.js",
     "start": "tsx server.ts",
     "build:css": "npx @tailwindcss/cli -i src/index.css -o src/ui/styles/compiled.css --minify",

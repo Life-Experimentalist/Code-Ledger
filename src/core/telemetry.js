@@ -15,7 +15,7 @@ const dbg = createDebugger("Telemetry");
 export const Telemetry = {
   async track(event, metadata = {}) {
     const { settings } = await storage.local.get("settings").catch(() => ({}));
-    const optIn = settings?.telemetryOptIn ?? true;
+    const optIn = settings?.telemetryOptIn ?? false;
     if (!optIn) return;
 
     dbg.log(`Tracking event: ${event}`, metadata);

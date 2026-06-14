@@ -47,7 +47,6 @@ This index is the canonical entry point for project documentation.
 
 ## Strategy and Product
 
-- Next phase roadmap: [reference/strategy/next-phase-roadmap.md](reference/strategy/next-phase-roadmap.md)
 - Portfolio integration: [reference/strategy/portfolio-integration.md](reference/strategy/portfolio-integration.md)
 
 ## Legacy and Transitional Notes

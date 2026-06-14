@@ -2532,7 +2532,6 @@ async function processAIReviewQueue(options = {}) {
 
 chrome.runtime.onInstalled.addListener(() => {
   init();
-  Telemetry.track("install");
 });
 
 init();
@@ -3465,11 +3464,6 @@ Include 5-8 milestones. Build progressively. subtopics must be lowercase-hyphena
         if (chrome.action && typeof chrome.action.openPopup === "function") {
           chrome.action.openPopup();
           dbg.log(`onMessage(OPEN_POPUP): via chrome.action.openPopup`);
-          return;
-        }
-        if (chrome.browserAction && typeof chrome.browserAction.openPopup === "function") {
-          chrome.browserAction.openPopup();
-          dbg.log(`onMessage(OPEN_POPUP): via chrome.browserAction.openPopup`);
           return;
         }
         // Fallback: open the popup page as a tab

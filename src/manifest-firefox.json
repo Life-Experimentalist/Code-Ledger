@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "CodeLedger",
-    "version": "1.4.4",
+    "name": "Code Ledger",
+    "version": "1.4.5",
     "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
     "author": "VKrishna04",
     "homepage_url": "https://codeledger.vkrishna04.me",
@@ -111,7 +111,13 @@
     "browser_specific_settings": {
         "gecko": {
             "id": "codeledger@vkrishna04.me",
-            "strict_min_version": "109.0"
+            "strict_min_version": "142.0",
+            "data_collection_permissions": {
+                "required": [
+                    "none"
+                ],
+                "optional": []
+            }
         }
     }
 }

@@ -69,6 +69,7 @@ export class Packager {
     const zip = new AdmZip();
     const sourceDirs = ["src", "dev", "docs", "worker"];
     const sourceFiles = [
+      "BUILD.md",
       "package.json",
       "package-lock.json",
       "tsconfig.json",

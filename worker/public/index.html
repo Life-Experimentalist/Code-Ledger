@@ -283,7 +283,7 @@
         <div id="ext-detected-badge" hidden>Extension installed and ready</div>
       </div>
 
-      <div class="hero-badge">✦ Open source · Apache 2.0 · v1.4.3</div>
+      <div class="hero-badge">✦ Open source · Apache 2.0 · v1.4.5</div>
       <h1>Your DSA journey,<br /><span>committed.</span></h1>
       <p class="tagline">
         Every accepted LeetCode, GeeksForGeeks, and Codeforces solution is
@@ -690,12 +690,15 @@
         <details class="faq-item">
           <summary>Does it upload my code to any server?</summary>
           <p>
-            No. Your code goes directly from your browser to GitHub's API. The
-            only server we run is the OAuth relay at
+            Your code goes directly from your browser to GitHub's API — never to
+            our servers. The only server we run is the OAuth relay at
             <code>codeledger.vkrishna04.me/api</code>, which exchanges your
-            GitHub auth code for an access token and immediately forgets it.
-            Your solutions, keys, and personal data never touch our
-            infrastructure.
+            GitHub auth code for an access token and immediately discards it.
+            There is one optional exception: if you enable <em>Anonymous Usage
+            Stats</em> in Settings (off by default), a solve-event counter
+            (<code>{ platform, version }</code> — no code, no tokens, no
+            identifiers) is sent to our self-hosted counter at
+            <code>counter.vkrishna04.me</code>.
           </p>
         </details>
         <details class="faq-item">

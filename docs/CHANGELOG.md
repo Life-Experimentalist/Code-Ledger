@@ -6,6 +6,24 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.5] — 2026-06-15
+
+### Fixed
+
+- **Telemetry: opt-in default was reversed** — `telemetryOptIn` defaulted to `true` in both `src/core/telemetry.js` (fallback) and `src/core/handler-registry.js` (settings schema), meaning anonymous usage data was sent to `counter.vkrishna04.me` without explicit user consent. Both now default to `false`. No data is sent until the user enables "Anonymous Usage Stats" in Settings → General.
+- **Telemetry: install-event fired before settings loaded** — `Telemetry.track("install")` in `service-worker.js` ran inside `chrome.runtime.onInstalled` before user settings could be read, bypassing the opt-in check entirely. The call has been removed; install counts are obtained from store dashboards instead.
+- **Store listings: false privacy claims** — The AMO and CWS privacy descriptions stated "no data is sent to our servers" while telemetry was active by default. All store listing docs (`firefox-amo.md`, `chrome.md`, `edge.md`) now accurately disclose the opt-in telemetry endpoint, payload, and default-off behaviour.
+- **Firefox manifest: `strict_min_version` too low** — `browser_specific_settings.gecko.strict_min_version` was `112.0` but `data_collection_permissions` requires Firefox 140 (desktop) and 142 (Android). Bumped to `142.0`.
+
+### Changed
+
+- **Telemetry setting description** — Settings UI label updated to clarify "Off by default" and that only `{ platform, version }` is sent — no code, tokens, or identifiers.
+- **Landing page FAQ** — "Does it upload my code?" answer updated to accurately mention the opt-in telemetry counter.
+- **Store links** — `config.json`, `constants.js`, and `README.md` updated with the live Chrome Web Store URL (`chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb`) and AMO URL (`addons.mozilla.org/en-US/firefox/addon/code-ledger/`).
+- **Landing page version badge** — Hero badge updated to `v1.4.5`.
+
+---
+
 ## [1.4.4] — 2026-06-11 (resubmission)
 
 ### Fixed

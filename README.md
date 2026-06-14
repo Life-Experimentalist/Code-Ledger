@@ -15,11 +15,11 @@ _Zero-click commits · AI code review · Live analytics · Knowledge graph · Bu
 
 <br/>
 
-[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members) [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Version](https://img.shields.io/badge/version-1.4.3-blueviolet?style=flat-square)](docs/archive/changelog.md)
+[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members) [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Version](https://img.shields.io/badge/version-1.4.5-blueviolet?style=flat-square)](docs/CHANGELOG.md)
 
 <br/>
 
-[![Chrome](https://img.shields.io/badge/Chrome-Install-green?style=flat-square&logo=googlechrome)](https://chrome.google.com/webstore/detail/codeledger/) [![Firefox](https://img.shields.io/badge/Firefox-Install-orange?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/codeledger/) [![Edge](https://img.shields.io/badge/Edge-Install-0078d4?style=flat-square&logo=microsoftedge)](https://microsoftedge.microsoft.com/addons/detail/codeledger/)
+[![Chrome](https://img.shields.io/badge/Chrome-Install-green?style=flat-square&logo=googlechrome)](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb) [![Firefox](https://img.shields.io/badge/Firefox-Install-orange?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/code-ledger/) [![Edge](https://img.shields.io/badge/Edge-Install-0078d4?style=flat-square&logo=microsoftedge)](https://microsoftedge.microsoft.com/addons/detail/codeledger/)
 
 <br/>
 
