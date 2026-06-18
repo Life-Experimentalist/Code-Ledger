@@ -116,10 +116,7 @@ function WelcomeApp() {
     // AI: any AI provider key is configured
     const aiKeys = await Storage.getAIKeys().catch(() => null);
     const hasAI =
-      aiKeys &&
-      Object.values(aiKeys).some((v) =>
-        Array.isArray(v) ? v.some((k) => !!k) : !!v,
-      );
+      aiKeys && Object.values(aiKeys).some((v) => (Array.isArray(v) ? v.some((k) => !!k) : !!v));
     newChecks.ai = !!hasAI || !!skipped.ai;
 
     newChecks.import = (problems || []).length > 0 || !!skipped.import;
@@ -355,8 +352,9 @@ function WelcomeApp() {
                           <button
                             onClick=${() => openTab("https://aistudio.google.com/app/apikey")}
                             class="text-cyan-400 underline decoration-dotted hover:text-cyan-300"
-                            >aistudio.google.com</button
                           >
+                            aistudio.google.com
+                          </button>
                         </p>
                       `
                     : ""}
@@ -416,9 +414,7 @@ function WelcomeApp() {
         ${!allDone &&
         requiredDone &&
         html`
-          <div
-            class="mb-8 p-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 text-center"
-          >
+          <div class="mb-8 p-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 text-center">
             <p class="text-sm text-cyan-400 font-semibold">Core setup complete ✓</p>
             <p class="text-xs text-slate-500 mt-1">
               Auto-commit is active. The optional steps above enhance your experience.

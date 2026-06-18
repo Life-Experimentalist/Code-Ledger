@@ -33,7 +33,9 @@ async function run() {
   await download("https://esm.sh/v135/htm@3.1.1/es2022/htm.mjs", "htm.js");
   // chart-source.js for pages template is generated from node_modules via dev/generate-chart-vendor.js
   // (auto-run by dev/build.js) — not downloaded from CDN
-  console.log("Done. Run 'node dev/generate-chart-vendor.js' to refresh chart-source.js if needed.");
+  console.log(
+    "Done. Run 'node dev/generate-chart-vendor.js' to refresh chart-source.js if needed.",
+  );
 }
 
 run();

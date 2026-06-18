@@ -83,42 +83,68 @@
 
   function writeAuthToken(provider, token) {
     if (!provider || !token) {
-      console.warn(`[CodeLedger:PresenceMarker] writeAuthToken(): skipped — provider=${provider}, token=${!!token}`);
+      console.warn(
+        `[CodeLedger:PresenceMarker] writeAuthToken(): skipped — provider=${provider}, token=${!!token}`,
+      );
       return;
     }
-    console.log(`[CodeLedger:PresenceMarker] writeAuthToken(): dispatching relay for ${provider} (${token.slice(0, 7)}...)`);
+    console.log(
+      `[CodeLedger:PresenceMarker] writeAuthToken(): dispatching relay for ${provider} (${token.slice(0, 7)}...)`,
+    );
 
     // Primary: sendMessage to SW — Chrome puts this in the IPC queue synchronously,
     // so delivery is guaranteed even if this popup window closes right after.
     // SW writes the token; library page detects it via chrome.storage.onChanged.
-    _rt.sendMessage({ type: "CODELEDGER_AUTH_RELAY", provider, token })
+    _rt
+      .sendMessage({ type: "CODELEDGER_AUTH_RELAY", provider, token })
       .then(() => console.log(`[CodeLedger:PresenceMarker] ✓ SW relay confirmed`))
-      .catch((e) => console.warn(`[CodeLedger:PresenceMarker] SW relay response error (message still delivered):`, e?.message));
+      .catch((e) =>
+        console.warn(
+          `[CodeLedger:PresenceMarker] SW relay response error (message still delivered):`,
+          e?.message,
+        ),
+      );
 
     // Belt-and-suspenders: also attempt direct storage write.
     // Faster when context is stable; SW relay is the guarantee when context tears down.
     if (storageApi) {
-      storageApi.local.get(AUTH_TOKENS_KEY)
+      storageApi.local
+        .get(AUTH_TOKENS_KEY)
         .then((keys) => {
           const tokens = keys[AUTH_TOKENS_KEY] || {};
           tokens[provider] = token;
           return storageApi.local.set({ [AUTH_TOKENS_KEY]: tokens });
         })
-        .then(() => console.log(`[CodeLedger:PresenceMarker] ✓ direct storage write also succeeded`))
-        .catch((e) => console.warn(`[CodeLedger:PresenceMarker] direct write skipped (SW relay covers it):`, e?.message));
+        .then(() =>
+          console.log(`[CodeLedger:PresenceMarker] ✓ direct storage write also succeeded`),
+        )
+        .catch((e) =>
+          console.warn(
+            `[CodeLedger:PresenceMarker] direct write skipped (SW relay covers it):`,
+            e?.message,
+          ),
+        );
     }
 
     // Close popup after 150 ms — both paths have been dispatched by then.
     // The deployed worker's fallback timer is a last resort if this doesn't fire.
-    setTimeout(() => { try { window.close(); } catch (_) {} }, 150);
+    setTimeout(() => {
+      try {
+        window.close();
+      } catch (_) {}
+    }, 150);
   }
 
   // Path A: DOM element (primary)
   function relayAuthFromDOM() {
-    console.log(`[CodeLedger:PresenceMarker] relayAuthFromDOM(): checking for #codeledger-auth-result`);
+    console.log(
+      `[CodeLedger:PresenceMarker] relayAuthFromDOM(): checking for #codeledger-auth-result`,
+    );
     const el = document.getElementById("codeledger-auth-result");
     if (!el) {
-      console.log(`[CodeLedger:PresenceMarker] relayAuthFromDOM(): no auth element — not the callback page`);
+      console.log(
+        `[CodeLedger:PresenceMarker] relayAuthFromDOM(): no auth element — not the callback page`,
+      );
       return;
     }
     let authData;
@@ -129,11 +155,16 @@
       return;
     }
     if (!authData || authData.type !== "CODELEDGER_AUTH") {
-      console.warn(`[CodeLedger:PresenceMarker] relayAuthFromDOM(): unexpected data shape`, authData?.type);
+      console.warn(
+        `[CodeLedger:PresenceMarker] relayAuthFromDOM(): unexpected data shape`,
+        authData?.type,
+      );
       return;
     }
     if (!authData.token) {
-      console.error(`[CodeLedger:PresenceMarker] relayAuthFromDOM(): auth element present but token missing — error=${authData.error}`);
+      console.error(
+        `[CodeLedger:PresenceMarker] relayAuthFromDOM(): auth element present but token missing — error=${authData.error}`,
+      );
       return;
     }
     console.log(
@@ -152,7 +183,9 @@
     console.log(`[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA received from background`);
     const el = document.getElementById("codeledger-auth-result");
     if (!el) {
-      console.log(`[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: no #codeledger-auth-result — not the callback page`);
+      console.log(
+        `[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: no #codeledger-auth-result — not the callback page`,
+      );
       sendResponse(null);
       return true;
     }
@@ -165,11 +198,15 @@
       return true;
     }
     if (!data?.token) {
-      console.warn(`[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: element found but no token (error=${data?.error})`);
+      console.warn(
+        `[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: element found but no token (error=${data?.error})`,
+      );
       sendResponse(null);
       return true;
     }
-    console.log(`[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: ✓ returning token for ${data.provider}`);
+    console.log(
+      `[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: ✓ returning token for ${data.provider}`,
+    );
     sendResponse({ token: data.token, provider: data.provider || "github" });
     return true;
   });
@@ -181,7 +218,9 @@
     if (event.source !== window) return;
     if (!event.data.token) return;
     if (document.getElementById("codeledger-auth-result")) {
-      console.log(`[CodeLedger:PresenceMarker] OAuth relay (postMessage): DOM path already handled, skipping`);
+      console.log(
+        `[CodeLedger:PresenceMarker] OAuth relay (postMessage): DOM path already handled, skipping`,
+      );
       return;
     }
     console.log(

@@ -156,7 +156,7 @@ function authCallbackHtml(provider, token, error = "") {
 <html><head><title>CodeLedger Auth</title>
 <style>body{font-family:system-ui,sans-serif;background:#050508;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
 </head><body>
-<div id="codeledger-auth-result" data-auth="${safeMsg.replace(/"/g, '&quot;')}" style="display:none"></div>
+<div id="codeledger-auth-result" data-auth="${safeMsg.replace(/"/g, "&quot;")}" style="display:none"></div>
 <p>${status}</p>
 <script>
 (function(){

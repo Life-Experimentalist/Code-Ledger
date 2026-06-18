@@ -81,10 +81,13 @@ function TagPills({ tags, diffWith }) {
 
 // ── Field diff row — shows one field side-by-side ────────────────────────────
 function FieldDiff({ label, local, remote, renderFn }) {
-  const render = renderFn || ((v) => html`<span class="text-slate-300 text-[11px]">${v ?? "—"}</span>`);
+  const render =
+    renderFn || ((v) => html`<span class="text-slate-300 text-[11px]">${v ?? "—"}</span>`);
   return html`
     <tr class="border-t border-white/5">
-      <td class="py-1.5 pr-2 text-[10px] text-slate-500 uppercase tracking-wide font-medium whitespace-nowrap align-top">
+      <td
+        class="py-1.5 pr-2 text-[10px] text-slate-500 uppercase tracking-wide font-medium whitespace-nowrap align-top"
+      >
         ${label}
       </td>
       <td class="py-1.5 pr-2 align-top">${render(local)}</td>
@@ -134,8 +137,14 @@ function MetaDiff({ local, remote, diffFields }) {
   if (diffFields.includes("tags")) {
     rows.push(html`
       <tr class="border-t border-white/5">
-        <td class="py-1.5 pr-2 text-[10px] text-slate-500 uppercase tracking-wide font-medium align-top">Tags</td>
-        <td class="py-1.5 pr-2 align-top"><${TagPills} tags=${local.tags} diffWith=${remote.tags} /></td>
+        <td
+          class="py-1.5 pr-2 text-[10px] text-slate-500 uppercase tracking-wide font-medium align-top"
+        >
+          Tags
+        </td>
+        <td class="py-1.5 pr-2 align-top">
+          <${TagPills} tags=${local.tags} diffWith=${remote.tags} />
+        </td>
         <td class="py-1.5 align-top"><${TagPills} tags=${remote.tags} diffWith=${local.tags} /></td>
       </tr>
     `);
@@ -158,11 +167,7 @@ function MetaDiff({ local, remote, diffFields }) {
   if (diffFields.includes("notes")) {
     const truncate = (s) => (s && s.length > 60 ? s.slice(0, 60) + "…" : s || "—");
     rows.push(html`
-      <${FieldDiff}
-        label="Notes"
-        local=${truncate(local.notes)}
-        remote=${truncate(remote.notes)}
-      />
+      <${FieldDiff} label="Notes" local=${truncate(local.notes)} remote=${truncate(remote.notes)} />
     `);
   }
 
@@ -183,11 +188,17 @@ function MetaDiff({ local, remote, diffFields }) {
         <thead>
           <tr class="bg-white/[0.03]">
             <th class="py-1.5 px-2 text-[9px] text-transparent">field</th>
-            <th class="py-1.5 px-1 text-[9px] text-slate-500 uppercase tracking-widest font-bold">Local</th>
-            <th class="py-1.5 px-1 text-[9px] text-slate-500 uppercase tracking-widest font-bold">Remote</th>
+            <th class="py-1.5 px-1 text-[9px] text-slate-500 uppercase tracking-widest font-bold">
+              Local
+            </th>
+            <th class="py-1.5 px-1 text-[9px] text-slate-500 uppercase tracking-widest font-bold">
+              Remote
+            </th>
           </tr>
         </thead>
-        <tbody class="px-2">${rows}</tbody>
+        <tbody class="px-2">
+          ${rows}
+        </tbody>
       </table>
     </div>
   `;
@@ -210,7 +221,7 @@ function VersionCard({ side, problem, isActive, isAuto, countdown, onChoose }) {
       <div class="flex items-center gap-1.5 mb-2 flex-wrap">
         <span
           class=${"text-xs font-bold uppercase tracking-widest " +
-            (isActive ? `text-${color}-400` : "text-slate-500")}
+          (isActive ? `text-${color}-400` : "text-slate-500")}
         >
           ${side}
         </span>
@@ -219,7 +230,9 @@ function VersionCard({ side, problem, isActive, isAuto, countdown, onChoose }) {
       </div>
 
       ${side === "both"
-        ? html`<p class="text-[11px] text-slate-400 leading-snug">Keep both versions as separate entries</p>`
+        ? html`<p class="text-[11px] text-slate-400 leading-snug">
+            Keep both versions as separate entries
+          </p>`
         : html`
             <div class="space-y-1">
               <div class="text-[11px] font-medium text-slate-300">
@@ -230,10 +243,14 @@ function VersionCard({ side, problem, isActive, isAuto, countdown, onChoose }) {
                 ? html`<div class="text-[10px] text-emerald-400">✓ AI review</div>`
                 : ""}
               ${Array.isArray(problem?.tags) && problem.tags.length
-                ? html`<div class="text-[10px] text-slate-500">${problem.tags.length} tag${problem.tags.length !== 1 ? "s" : ""}</div>`
+                ? html`<div class="text-[10px] text-slate-500">
+                    ${problem.tags.length} tag${problem.tags.length !== 1 ? "s" : ""}
+                  </div>`
                 : ""}
               ${problem?.runtime
-                ? html`<div class="text-[10px] text-slate-500 font-mono">${problem.runtime}${problem?.memory ? " · " + problem.memory : ""}</div>`
+                ? html`<div class="text-[10px] text-slate-500 font-mono">
+                    ${problem.runtime}${problem?.memory ? " · " + problem.memory : ""}
+                  </div>`
                 : ""}
             </div>
           `}
@@ -268,7 +285,9 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
   return html`
     <div class="flex flex-col gap-4">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-semibold">
+        <span
+          class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-semibold"
+        >
           same code
         </span>
         <span class="text-[11px] text-slate-500">Code is identical — only metadata differs</span>
@@ -276,16 +295,20 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
 
       <!-- Three-way choice -->
       <div class="grid grid-cols-3 gap-2">
-        ${sides.map((side) =>
-          html`<${VersionCard}
-            key=${side}
-            side=${side}
-            problem=${side === "both" ? null : conflict[side]}
-            isActive=${choice === side}
-            isAuto=${side === autoSide && choice === null && side !== "both"}
-            countdown=${countdown}
-            onChoose=${() => { setCountdown(8); onChoose(side); }}
-          />`
+        ${sides.map(
+          (side) =>
+            html`<${VersionCard}
+              key=${side}
+              side=${side}
+              problem=${side === "both" ? null : conflict[side]}
+              isActive=${choice === side}
+              isAuto=${side === autoSide && choice === null && side !== "both"}
+              countdown=${countdown}
+              onChoose=${() => {
+                setCountdown(8);
+                onChoose(side);
+              }}
+            />`,
         )}
       </div>
 
@@ -295,7 +318,9 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
       <!-- Countdown / resolved -->
       ${choice === null
         ? html`
-            <div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-500/8 border border-amber-500/15">
+            <div
+              class="flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-500/8 border border-amber-500/15"
+            >
               <div class="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
                 <div
                   class="h-full bg-amber-400/60 rounded-full transition-all duration-1000"
@@ -307,7 +332,9 @@ function SameCodeStep({ conflict, choice, onChoose, onNext }) {
               </span>
             </div>
           `
-        : html`<div class="text-center text-[11px] text-emerald-400/70">✓ Resolved — advancing…</div>`}
+        : html`<div class="text-center text-[11px] text-emerald-400/70">
+            ✓ Resolved — advancing…
+          </div>`}
     </div>
   `;
 }
@@ -327,7 +354,9 @@ function DiffApproachStep({ conflict, choice, onChoose }) {
   return html`
     <div class="flex flex-col gap-4">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/20 font-semibold">
+        <span
+          class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/20 font-semibold"
+        >
           different approach
         </span>
         <span class="text-[11px] text-slate-500">
@@ -337,16 +366,17 @@ function DiffApproachStep({ conflict, choice, onChoose }) {
 
       <!-- Three-way choice -->
       <div class="grid grid-cols-3 gap-2">
-        ${["local", "remote", "both"].map((side) =>
-          html`<${VersionCard}
-            key=${side}
-            side=${side}
-            problem=${side === "both" ? null : conflict[side]}
-            isActive=${choice === side}
-            isAuto=${false}
-            countdown=${0}
-            onChoose=${() => onChoose(side)}
-          />`
+        ${["local", "remote", "both"].map(
+          (side) =>
+            html`<${VersionCard}
+              key=${side}
+              side=${side}
+              problem=${side === "both" ? null : conflict[side]}
+              isActive=${choice === side}
+              isAuto=${false}
+              countdown=${0}
+              onChoose=${() => onChoose(side)}
+            />`,
         )}
       </div>
 
@@ -373,12 +403,18 @@ function DiffApproachStep({ conflict, choice, onChoose }) {
                 const p = isLocal ? local : remote;
                 return html`
                   <div class="flex flex-col min-w-0">
-                    <div class="px-3 py-1.5 bg-black/40 flex items-center justify-between border-b border-white/5">
-                      <span class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">${side}</span>
+                    <div
+                      class="px-3 py-1.5 bg-black/40 flex items-center justify-between border-b border-white/5"
+                    >
+                      <span class="text-[10px] uppercase tracking-wide text-slate-500 font-bold"
+                        >${side}</span
+                      >
                       <span class="text-[10px] font-mono text-cyan-500/60">${lang}</span>
                     </div>
                     ${p.runtime
-                      ? html`<div class="px-3 py-1 bg-black/20 text-[9px] text-slate-500 font-mono border-b border-white/5">
+                      ? html`<div
+                          class="px-3 py-1 bg-black/20 text-[9px] text-slate-500 font-mono border-b border-white/5"
+                        >
                           ${p.runtime}${p.memory ? " · " + p.memory : ""}
                           ${p.runtimePct ? html` · beats ${p.runtimePct}%` : ""}
                         </div>`
@@ -398,9 +434,10 @@ function DiffApproachStep({ conflict, choice, onChoose }) {
             </div>
           `
         : ""}
-
       ${!choice
-        ? html`<p class="text-[11px] text-amber-400/70 text-center">Select a version above to continue</p>`
+        ? html`<p class="text-[11px] text-amber-400/70 text-center">
+            Select a version above to continue
+          </p>`
         : ""}
     </div>
   `;
@@ -522,7 +559,9 @@ export function ConflictResolutionModal({
       class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
       onClick=${(e) => e.target === e.currentTarget && handleCancel()}
     >
-      <div class="bg-[#0a0a0f] border border-cyan-500/20 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div
+        class="bg-[#0a0a0f] border border-cyan-500/20 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl"
+      >
         <!-- Header -->
         <div class="px-5 py-4 border-b border-white/5 shrink-0">
           <div class="flex items-center justify-between gap-3">
@@ -530,14 +569,21 @@ export function ConflictResolutionModal({
               <h2 class="text-base font-bold text-white truncate">
                 Sync Conflicts — ${providerName}
               </h2>
-              <p class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <p
+                class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
+              >
                 <span>${classified.length} conflict${classified.length !== 1 ? "s" : ""}</span>
                 <span>·</span>
-                <span class="${resolvedCount === classified.length && classified.length > 0 ? "text-emerald-400" : "text-slate-400"}">
+                <span
+                  class="${resolvedCount === classified.length && classified.length > 0
+                    ? "text-emerald-400"
+                    : "text-slate-400"}"
+                >
                   ${resolvedCount} resolved
                 </span>
                 ${diffApproachCount > 0
-                  ? html`<span>·</span><span class="text-amber-400">${diffApproachCount} need review</span>`
+                  ? html`<span>·</span
+                      ><span class="text-amber-400">${diffApproachCount} need review</span>`
                   : ""}
                 ${sameCodeCount > 0
                   ? html`<span>·</span><span class="text-slate-400">${sameCodeCount} auto</span>`
@@ -574,7 +620,9 @@ export function ConflictResolutionModal({
             <div class="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
               <div
                 class="h-full bg-cyan-500 rounded-full transition-all duration-300"
-                style=${{ width: classified.length ? `${(resolvedCount / classified.length) * 100}%` : "0%" }}
+                style=${{
+                  width: classified.length ? `${(resolvedCount / classified.length) * 100}%` : "0%",
+                }}
               ></div>
             </div>
             <span class="text-[11px] text-slate-500 shrink-0 font-mono tabular-nums">
@@ -592,15 +640,15 @@ export function ConflictResolutionModal({
                         onClick=${() => setCursor(i)}
                         title=${c.local?.title || `Conflict ${i + 1}`}
                         class=${"w-2 h-2 rounded-full transition-all " +
-                          (i === cursor
-                            ? "bg-cyan-400 scale-[1.4]"
-                            : choices[i] === "both"
-                              ? "bg-violet-400/70"
-                              : choices[i] !== null
-                                ? "bg-emerald-500/60"
-                                : c._type === "diff-approach"
-                                  ? "bg-amber-400/50"
-                                  : "bg-white/20")}
+                        (i === cursor
+                          ? "bg-cyan-400 scale-[1.4]"
+                          : choices[i] === "both"
+                            ? "bg-violet-400/70"
+                            : choices[i] !== null
+                              ? "bg-emerald-500/60"
+                              : c._type === "diff-approach"
+                                ? "bg-amber-400/50"
+                                : "bg-white/20")}
                       ></button>
                     `,
                   )}
@@ -625,8 +673,12 @@ export function ConflictResolutionModal({
                     ${current?.local?.title || current?.local?.id || "Unknown"}
                   </h3>
                   ${current?._type === "diff-approach"
-                    ? html`<p class="text-[10px] text-amber-400/70 mt-0.5">Manual review required</p>`
-                    : html`<p class="text-[10px] text-slate-500 mt-0.5">Same code — only metadata differs</p>`}
+                    ? html`<p class="text-[10px] text-amber-400/70 mt-0.5">
+                        Manual review required
+                      </p>`
+                    : html`<p class="text-[10px] text-slate-500 mt-0.5">
+                        Same code — only metadata differs
+                      </p>`}
                 </div>
 
                 ${current?._type === "same-code"
@@ -647,7 +699,9 @@ export function ConflictResolutionModal({
         </div>
 
         <!-- Footer -->
-        <div class="px-5 py-3.5 border-t border-white/5 flex items-center justify-between shrink-0 gap-3">
+        <div
+          class="px-5 py-3.5 border-t border-white/5 flex items-center justify-between shrink-0 gap-3"
+        >
           <div class="flex items-center gap-2">
             <button
               onClick=${handleCancel}
@@ -683,9 +737,9 @@ export function ConflictResolutionModal({
               onClick=${handleApply}
               disabled=${!allResolved}
               class=${"px-4 py-2 rounded-xl text-xs font-semibold transition-colors " +
-                (allResolved
-                  ? "bg-cyan-500 text-black hover:bg-cyan-400"
-                  : "bg-white/5 text-slate-600 cursor-not-allowed")}
+              (allResolved
+                ? "bg-cyan-500 text-black hover:bg-cyan-400"
+                : "bg-white/5 text-slate-600 cursor-not-allowed")}
             >
               Apply & Import ${remoteOnly.length + classified.length}
               problem${remoteOnly.length + classified.length !== 1 ? "s" : ""}

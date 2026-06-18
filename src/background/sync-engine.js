@@ -137,7 +137,9 @@ export async function importFromRepo(owner, repo, git) {
       // Once RESYNC_ALL pushes the local version, remote will match local and this branch
       // won't fire anymore.
       if (local._conflictResolvedAt && local._conflictResolvedAt > (remote.timestamp || 0)) {
-        dbg.log(`importFromRepo(): skipping re-detection for ${local.id} — resolved locally, push pending`);
+        dbg.log(
+          `importFromRepo(): skipping re-detection for ${local.id} — resolved locally, push pending`,
+        );
         continue;
       }
       conflicts.push({ local, remote });
@@ -183,7 +185,9 @@ function _linkMultiLangSolutions(problems) {
  * @param {object[]} resolvedProblems
  */
 export async function applyImport(resolvedProblems, { fromConflictResolution = false } = {}) {
-  dbg.log(`applyImport(): saving ${resolvedProblems.length} resolved problem(s)${fromConflictResolution ? " (conflict resolution)" : ""}...`);
+  dbg.log(
+    `applyImport(): saving ${resolvedProblems.length} resolved problem(s)${fromConflictResolution ? " (conflict resolution)" : ""}...`,
+  );
 
   // Snapshot existing data before overwriting — rolling backup
   try {

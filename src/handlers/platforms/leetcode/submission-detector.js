@@ -142,7 +142,9 @@ export function onSubmitFired(handler) {
     dbg.log("Accepted detected via submit hook — waiting 1.5s for GraphQL sync");
     setTimeout(() => {
       const page = detectPage(window.location.pathname);
-      processSubmission(handler, page, false).catch((e) => dbg.error("processSubmission failed", e));
+      processSubmission(handler, page, false).catch((e) =>
+        dbg.error("processSubmission failed", e),
+      );
     }, 1500);
   }, 1000);
 }
@@ -178,7 +180,9 @@ export async function processSubmission(handler, page, isManual) {
       const lastId = sessionStorage.getItem(dedupKey);
       // Also check IDB: sessionStorage is cleared on page reload (SPA cache), so a problem
       // already committed in a prior session could otherwise be resubmitted.
-      const existingProblem = await Storage.getProblem(handler.makeProblemId(slug)).catch(() => null);
+      const existingProblem = await Storage.getProblem(handler.makeProblemId(slug)).catch(
+        () => null,
+      );
       const alreadyInDB = existingProblem && existingProblem.submissionId === String(latest.id);
       dbg.log(
         "[processSubmission] dedupKey=" +

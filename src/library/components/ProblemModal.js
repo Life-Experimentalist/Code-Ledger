@@ -968,12 +968,15 @@ export function ProblemModal({
 
                   ${methods.map(
                     (method, idx) => html`
-                      <div class="rounded-xl border overflow-hidden ${selectedMethodIdx === idx
-                        ? "border-cyan-500/40"
-                        : "border-white/10"} transition-colors">
+                      <div
+                        class="rounded-xl border overflow-hidden ${selectedMethodIdx === idx
+                          ? "border-cyan-500/40"
+                          : "border-white/10"} transition-colors"
+                      >
                         <!-- Card header -->
                         <button
-                          onClick=${() => setSelectedMethodIdx(idx === selectedMethodIdx ? -1 : idx)}
+                          onClick=${() =>
+                            setSelectedMethodIdx(idx === selectedMethodIdx ? -1 : idx)}
                           class="w-full text-left p-3 ${selectedMethodIdx === idx
                             ? "bg-cyan-500/8"
                             : "bg-white/[0.02] hover:bg-white/[0.04]"} transition-colors"
@@ -983,11 +986,15 @@ export function ProblemModal({
                               <div class="flex items-center gap-2 mb-0.5">
                                 <h4 class="font-semibold text-sm text-white">${method.title}</h4>
                                 ${method.language
-                                  ? html`<span class="text-[10px] font-mono text-cyan-400/80">${method.language}</span>`
+                                  ? html`<span class="text-[10px] font-mono text-cyan-400/80"
+                                      >${method.language}</span
+                                    >`
                                   : ""}
                               </div>
                               ${method.description
-                                ? html`<p class="text-[10px] text-slate-400">${method.description}</p>`
+                                ? html`<p class="text-[10px] text-slate-400">
+                                    ${method.description}
+                                  </p>`
                                 : ""}
                               <span class="text-[9px] text-slate-600">
                                 ${method.timestamp
@@ -1028,11 +1035,22 @@ export function ProblemModal({
                                         ),
                                       }}
                                     ></pre>`
-                                  : html`<p class="px-4 py-3 text-[11px] text-slate-600">No code saved for this approach.</p>`}
+                                  : html`<p class="px-4 py-3 text-[11px] text-slate-600">
+                                      No code saved for this approach.
+                                    </p>`}
                                 ${method.aiReview
                                   ? html`<div class="px-4 py-3 border-t border-white/5">
-                                      <p class="text-[9px] uppercase tracking-wider text-slate-600 mb-1.5">AI Review</p>
-                                      <p class="text-[11px] text-slate-400 leading-relaxed">${method.aiReview.slice(0, 300)}${method.aiReview.length > 300 ? "…" : ""}</p>
+                                      <p
+                                        class="text-[9px] uppercase tracking-wider text-slate-600 mb-1.5"
+                                      >
+                                        AI Review
+                                      </p>
+                                      <p class="text-[11px] text-slate-400 leading-relaxed">
+                                        ${method.aiReview.slice(0, 300)}${method.aiReview.length >
+                                        300
+                                          ? "…"
+                                          : ""}
+                                      </p>
                                     </div>`
                                   : ""}
                               </div>

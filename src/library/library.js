@@ -269,7 +269,9 @@ function LibraryApp() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!userRes.ok) {
-        dbg.error(`processOAuthToken(): GitHub /user returned ${userRes.status} — token may be invalid`);
+        dbg.error(
+          `processOAuthToken(): GitHub /user returned ${userRes.status} — token may be invalid`,
+        );
         throw new Error(`GitHub /user returned ${userRes.status}`);
       }
       const user = await userRes.json();
@@ -313,8 +315,13 @@ function LibraryApp() {
       if (event.origin !== "null" && !allowedOrigins.includes(event.origin)) return;
       const data = event.data;
       if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") return;
-      dbg.log(`handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}, token ${data.token ? "present" : "MISSING"}`);
-      if (!data.token) { dbg.error("handleOAuthMessage(): OAuth error:", data.error); return; }
+      dbg.log(
+        `handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}, token ${data.token ? "present" : "MISSING"}`,
+      );
+      if (!data.token) {
+        dbg.error("handleOAuthMessage(): OAuth error:", data.error);
+        return;
+      }
       await processOAuthToken(data.token, data.provider);
     };
     window.addEventListener("message", handleOAuthMessage);
@@ -362,10 +369,17 @@ function LibraryApp() {
       if (!tokenChanges) return;
       const token = (tokenChanges.newValue || {})["github"];
       const old = (tokenChanges.oldValue || {})["github"];
-      dbg.log(`handleStorageAuth(): auth.tokens changed — token ${token ? "present" : "absent"}, changed=${token !== old}`);
+      dbg.log(
+        `handleStorageAuth(): auth.tokens changed — token ${token ? "present" : "absent"}, changed=${token !== old}`,
+      );
       if (token && token !== old) {
         dbg.log(`handleStorageAuth(): new github token detected — calling processOAuthToken`);
-        processOAuthToken(token, "github").catch((e) => rawError("[CodeLedger:LibraryApp] handleStorageAuth(): processOAuthToken threw:", e?.message || e));
+        processOAuthToken(token, "github").catch((e) =>
+          rawError(
+            "[CodeLedger:LibraryApp] handleStorageAuth(): processOAuthToken threw:",
+            e?.message || e,
+          ),
+        );
       }
     };
     chrome.storage.onChanged.addListener(handleStorageAuth);
@@ -490,7 +504,11 @@ function LibraryApp() {
     // Firefox: COOP navigation makes popup a "dead object" — treat that as closed.
     const poll = setInterval(() => {
       let closed = false;
-      try { closed = popup.closed; } catch { closed = true; }
+      try {
+        closed = popup.closed;
+      } catch {
+        closed = true;
+      }
       if (closed) {
         clearInterval(poll);
         dbg.log(`triggerReauth(): popup closed — checking storage for token`);
@@ -506,11 +524,16 @@ function LibraryApp() {
                 clearInterval(checkToken);
                 dbg.log(`triggerReauth(): token found in storage — processing`);
                 processOAuthToken(t, "github").catch((e) =>
-                  rawError("[CodeLedger:LibraryApp] triggerReauth(): processOAuthToken after close failed:", e?.message)
+                  rawError(
+                    "[CodeLedger:LibraryApp] triggerReauth(): processOAuthToken after close failed:",
+                    e?.message,
+                  ),
                 );
               } else if (++attempts >= 6) {
                 clearInterval(checkToken);
-                dbg.log(`triggerReauth(): no token after 3 s — onChanged relay will handle it if relay succeeded`);
+                dbg.log(
+                  `triggerReauth(): no token after 3 s — onChanged relay will handle it if relay succeeded`,
+                );
               }
             })
             .catch(() => clearInterval(checkToken));

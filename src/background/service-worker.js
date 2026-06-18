@@ -2585,7 +2585,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     !changedUrl.includes("codeledger.vkrishna04.me") ||
     !changedUrl.includes("/api/auth/") ||
     !changedUrl.includes("/callback")
-  ) return;
+  )
+    return;
 
   // Deduplicate: one relay per tab (handles rapid re-fires on same URL)
   if (_processingAuthTabs.has(tabId)) return;
@@ -2677,13 +2678,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Primary path is direct storage write in presence-marker.js; this is belt-and-suspenders.
   if (msg.type === "CODELEDGER_AUTH_RELAY") {
     let senderHost;
-    try { senderHost = new URL(sender?.url || sender?.tab?.url || "").hostname; } catch { senderHost = ""; }
+    try {
+      senderHost = new URL(sender?.url || sender?.tab?.url || "").hostname;
+    } catch {
+      senderHost = "";
+    }
     if (senderHost !== "codeledger.vkrishna04.me") {
       dbg.warn(`CODELEDGER_AUTH_RELAY: rejected relay from unexpected host: ${senderHost}`);
       sendResponse({ ok: false });
       return true;
     }
-    dbg.log(`CODELEDGER_AUTH_RELAY: received from ${senderHost}, provider=${msg.provider}, token=${msg.token ? msg.token.slice(0, 7) + "..." : "MISSING"}`);
+    dbg.log(
+      `CODELEDGER_AUTH_RELAY: received from ${senderHost}, provider=${msg.provider}, token=${msg.token ? msg.token.slice(0, 7) + "..." : "MISSING"}`,
+    );
     if (msg.token && msg.provider) {
       Storage.setAuthToken(msg.provider, msg.token)
         .then(() => dbg.log(`CODELEDGER_AUTH_RELAY: ✓ token saved for ${msg.provider}`))

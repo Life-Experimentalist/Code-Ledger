@@ -59,7 +59,9 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
     let mounted = true;
     const fetchToken = () =>
       Storage.getAuthToken("github")
-        .then((t) => { if (mounted) setOauthToken(t || ""); })
+        .then((t) => {
+          if (mounted) setOauthToken(t || "");
+        })
         .catch(() => {});
 
     fetchToken();

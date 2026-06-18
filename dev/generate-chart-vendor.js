@@ -22,7 +22,9 @@ if (!fs.existsSync(SRC)) {
 }
 
 const content = fs.readFileSync(SRC, "utf8");
-const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "node_modules", "chart.js", "package.json"), "utf8"));
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(ROOT, "node_modules", "chart.js", "package.json"), "utf8"),
+);
 const version = pkg.version;
 
 // JSON.stringify safely escapes all special characters (backticks, quotes, etc.)
@@ -33,4 +35,6 @@ export const CHART_JS_INLINE = ${JSON.stringify(content)};
 `;
 
 fs.writeFileSync(DEST, output, "utf8");
-console.log(`chart-source.js written (${(content.length / 1024).toFixed(1)} KB) from chart.js@${version}`);
+console.log(
+  `chart-source.js written (${(content.length / 1024).toFixed(1)} KB) from chart.js@${version}`,
+);

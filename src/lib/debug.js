@@ -90,7 +90,9 @@ const _origConsole = {
  * Always-on error logger that bypasses the debug gate.
  * Use for auth errors and other critical failures that must always be visible.
  */
-export function rawError(...args) { _origConsole.error(...args); }
+export function rawError(...args) {
+  _origConsole.error(...args);
+}
 
 let _consolePatched = false;
 

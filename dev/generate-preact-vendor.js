@@ -47,10 +47,7 @@ fs.writeFileSync(
 console.log(`✓ vendor/preact.js → preact@${preactVer} (official npm, no CDN)`);
 
 // ── 2. vendor/htm.js ─────────────────────────────────────────────────────────
-const htmSrc = fs.readFileSync(
-  path.join(ROOT, "node_modules/htm/dist/htm.module.js"),
-  "utf8",
-);
+const htmSrc = fs.readFileSync(path.join(ROOT, "node_modules/htm/dist/htm.module.js"), "utf8");
 fs.writeFileSync(
   path.join(ROOT, "src/vendor/htm.js"),
   `// SOURCE: node_modules/htm@${htmVer}/dist/htm.module.js\n` +
