@@ -14,67 +14,91 @@ import { CONSTANTS } from "../core/constants.js";
 
 const dbg = createDebugger("WelcomePage");
 
+// ── Step definitions ──────────────────────────────────────────────────────────
+
 const STEPS = [
   {
     id: "installed",
     icon: "🧩",
     label: "Extension installed",
     desc: "CodeLedger is running in your browser.",
+    required: true,
+    skippable: false,
   },
   {
     id: "github",
     icon: "🔗",
-    label: "GitHub connected",
-    desc: "Authorized with GitHub so commits can be made on your behalf.",
+    label: "Connect GitHub",
+    desc: "Authorize with GitHub so your solutions can be committed automatically.",
+    required: true,
+    skippable: false,
   },
   {
     id: "repo",
     icon: "📁",
-    label: "Repository linked",
-    desc: "A GitHub repo is configured to receive your solutions.",
+    label: "Link a repository",
+    desc: "Choose or create a GitHub repo to store all your solutions.",
+    required: true,
+    skippable: false,
+  },
+  {
+    id: "ai",
+    icon: "🤖",
+    label: "Configure AI review",
+    desc: "Add an AI provider (Gemini recommended — free API keys available) for instant code reviews.",
+    required: false,
+    skippable: true,
+  },
+  {
+    id: "import",
+    icon: "📥",
+    label: "Import past solutions",
+    desc: "Bring in all your existing LeetCode accepted submissions.",
+    required: false,
+    skippable: true,
   },
   {
     id: "solve",
     icon: "✅",
-    label: "First problem solved",
-    desc: "Solve any accepted problem on LeetCode, GeeksForGeeks, or Codeforces.",
-  },
-  {
-    id: "commit",
-    icon: "💾",
-    label: "First commit to GitHub",
-    desc: "Your solution was automatically committed to your repository.",
+    label: "Solve a problem",
+    desc: "Submit any accepted solution on LeetCode to see the full auto-commit flow.",
+    required: false,
+    skippable: true,
   },
 ];
 
-const PLATFORMS = [
-  {
-    name: "LeetCode",
-    url: CONSTANTS.PLATFORMS.leetcode.baseUrl + "/",
-    color: CONSTANTS.PLATFORMS.leetcode.color,
-    favicon: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
-  },
-  {
-    name: "GeeksForGeeks",
-    url: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase,
-    color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
-    favicon: `${CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl}/favicon.ico`,
-  },
-  {
-    name: "Codeforces",
-    url: CONSTANTS.PLATFORMS.codeforces.problemsetUrl,
-    color: CONSTANTS.PLATFORMS.codeforces.color,
-    favicon: `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/favicon.ico`,
-  },
-];
+// ── Helper: open a tab ────────────────────────────────────────────────────────
+function openTab(url) {
+  if (chrome?.runtime?.id) chrome.tabs.create({ url });
+  else window.open(url, "_blank");
+}
+
+function openExtTab(path) {
+  openTab(chrome.runtime.getURL(path));
+}
 
 // ── Main app ──────────────────────────────────────────────────────────────────
 
 function WelcomeApp() {
   const [settings, setSettings] = useState({});
-  const [checks, setChecks] = useState({});
+  const [checks, setChecks] = useState({ installed: true });
   const [gitUser, setGitUser] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [skipped, setSkipped] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("cl_welcome_skipped") || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  const skip = (id) => {
+    const next = { ...skipped, [id]: true };
+    setSkipped(next);
+    try {
+      localStorage.setItem("cl_welcome_skipped", JSON.stringify(next));
+    } catch {}
+  };
 
   const load = useCallback(async () => {
     const [s, problems] = await Promise.all([
@@ -88,14 +112,23 @@ function WelcomeApp() {
     const token = await Storage.getAuthToken("github").catch(() => null);
     newChecks.github = !!token;
     newChecks.repo = !!(s?.github_repo || s?.gitRepo);
-    newChecks.solve = (problems || []).length > 0;
+
+    // AI: any AI provider key is configured
+    const aiKeys = await Storage.getAIKeys().catch(() => null);
+    const hasAI =
+      aiKeys &&
+      Object.values(aiKeys).some((v) =>
+        Array.isArray(v) ? v.some((k) => !!k) : !!v,
+      );
+    newChecks.ai = !!hasAI || !!skipped.ai;
+
+    newChecks.import = (problems || []).length > 0 || !!skipped.import;
+    newChecks.solve = (problems || []).length > 0 || !!skipped.solve;
 
     try {
       const committed = await Storage.getCommittedSlugLangs();
-      newChecks.commit = Object.keys(committed || {}).length > 0;
-    } catch (_) {
-      newChecks.commit = newChecks.solve;
-    }
+      newChecks.solve = Object.keys(committed || {}).length > 0 || !!skipped.solve;
+    } catch {}
 
     setChecks(newChecks);
 
@@ -109,36 +142,34 @@ function WelcomeApp() {
         })
         .catch(() => {});
     }
-  }, []);
+  }, [skipped]);
 
   useEffect(() => {
     let mounted = true;
     load().catch(() => {});
+
     const onStorage = () => {
       if (mounted) load().catch(() => {});
     };
     window.addEventListener("storage", onStorage);
+
+    // chrome.storage.onChanged fires when auth token is saved by the OAuth relay.
+    // window.addEventListener("storage") only catches localStorage, not chrome.storage.
+    const onChromeStorage = (changes) => {
+      if (changes["auth.tokens"] && mounted) load().catch(() => {});
+    };
+    chrome?.storage?.onChanged?.addListener(onChromeStorage);
+
     return () => {
       mounted = false;
       window.removeEventListener("storage", onStorage);
+      chrome?.storage?.onChanged?.removeListener(onChromeStorage);
     };
   }, [load, refreshKey]);
 
-  const doneCount = STEPS.filter((s) => checks[s.id]).length;
-  const allDone = doneCount === STEPS.length;
-
-  const openLibrary = () => {
-    if (chrome?.runtime?.id)
-      chrome.tabs.create({
-        url: chrome.runtime.getURL("library/library.html"),
-      });
-  };
-  const openSettings = () => {
-    if (chrome?.runtime?.id)
-      chrome.tabs.create({
-        url: chrome.runtime.getURL("library/library.html") + "?tab=settings&settingsTab=git",
-      });
-  };
+  const requiredDone = STEPS.filter((s) => s.required).every((s) => !!checks[s.id]);
+  const allDone = STEPS.every((s) => !!checks[s.id]);
+  const doneCount = STEPS.filter((s) => !!checks[s.id]).length;
 
   const repoUrl = (() => {
     const repo = settings.github_repo || settings.gitRepo;
@@ -147,23 +178,66 @@ function WelcomeApp() {
     return owner ? `https://github.com/${owner}/${repo}` : null;
   })();
 
-  const openSetupWizard = () => {
-    if (chrome?.runtime?.id)
-      chrome.tabs.create({
-        url:
-          chrome.runtime.getURL("library/library.html") +
-          "?tab=settings&settingsTab=git&openSetup=true",
-      });
-  };
-
-  const stepAction = (stepId) => {
-    if (stepId === "github") return { label: "Connect GitHub →", onClick: openSettings };
-    if (stepId === "repo") return { label: "Set up repository →", onClick: openSetupWizard };
-    if (stepId === "solve")
+  const stepAction = (step) => {
+    if (step.id === "github") {
       return {
-        label: "Start solving →",
-        onClick: () => window.open(CONSTANTS.PLATFORMS.leetcode.baseUrl + "/", "_blank"),
+        primary: {
+          label: "Connect GitHub →",
+          onClick: () => {
+            // Open the OAuth popup directly — same flow as clicking "Connect" in Settings.
+            const popup = window.open(
+              `${CONSTANTS.URLS.AUTH_WORKER}/auth/github`,
+              "cl_oauth",
+              "width=600,height=700,menubar=no,toolbar=no",
+            );
+            if (!popup) {
+              // Popup blocked — fall back to the settings tab so user can click there
+              openExtTab("library/library.html?tab=settings&settingsTab=git");
+            }
+          },
+        },
       };
+    }
+    if (step.id === "repo") {
+      return {
+        primary: {
+          label: "Set up repository →",
+          onClick: () =>
+            openExtTab("library/library.html?tab=settings&settingsTab=git&openSetup=true"),
+        },
+      };
+    }
+    if (step.id === "ai") {
+      return {
+        primary: {
+          label: "Configure AI →",
+          onClick: () => openExtTab("library/library.html?tab=settings&settingsTab=ai"),
+        },
+        secondary: {
+          label: "Get free Gemini key ↗",
+          onClick: () => openTab("https://aistudio.google.com/app/apikey"),
+        },
+        skip: true,
+      };
+    }
+    if (step.id === "import") {
+      return {
+        primary: {
+          label: "Import from LeetCode →",
+          onClick: () => openTab("https://leetcode.com/progress/"),
+        },
+        skip: true,
+      };
+    }
+    if (step.id === "solve") {
+      return {
+        primary: {
+          label: "Go to LeetCode →",
+          onClick: () => openTab(CONSTANTS.PLATFORMS.leetcode.baseUrl + "/"),
+        },
+        skip: true,
+      };
+    }
     return null;
   };
 
@@ -196,9 +270,8 @@ function WelcomeApp() {
         </div>
       </div>
 
-      <!-- Setup -->
+      <!-- Setup checklist -->
       <div class="w-full max-w-lg">
-        <!-- Checklist header -->
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest">
             Setup checklist
@@ -227,16 +300,19 @@ function WelcomeApp() {
         </div>
 
         <!-- Steps -->
-        <div class="flex flex-col gap-3 mb-10">
+        <div class="flex flex-col gap-3 mb-8">
           ${STEPS.map((step) => {
             const done = !!checks[step.id];
-            const action = !done ? stepAction(step.id) : null;
+            const actions = !done ? stepAction(step) : null;
             return html`
               <div
                 class="flex items-start gap-4 p-4 rounded-xl border transition-colors ${done
                   ? "border-emerald-500/20 bg-emerald-500/5"
-                  : "border-white/5 bg-white/[0.02]"}"
+                  : step.required
+                    ? "border-cyan-500/15 bg-white/[0.02]"
+                    : "border-white/5 bg-white/[0.015]"}"
               >
+                <!-- Status dot -->
                 <div
                   class="mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${done
                     ? "bg-emerald-500/20 text-emerald-400"
@@ -254,23 +330,69 @@ function WelcomeApp() {
                       </svg>`
                     : html`<span class="w-2 h-2 rounded-full bg-current block"></span>`}
                 </div>
+
+                <!-- Text -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="text-sm">${step.icon}</span>
-                    <span class="text-sm font-medium ${done ? "text-white" : "text-slate-400"}"
+                    <span class="text-sm font-medium ${done ? "text-white" : "text-slate-300"}"
                       >${step.label}</span
                     >
+                    ${!step.required && !done
+                      ? html`<span
+                          class="text-[9px] text-slate-600 border border-slate-700 rounded px-1"
+                          >optional</span
+                        >`
+                      : ""}
                   </div>
                   <p class="text-[11px] text-slate-600 mt-0.5">${step.desc}</p>
+
+                  ${step.id === "ai" && !done
+                    ? html`
+                        <p class="text-[10px] text-slate-500 mt-1">
+                          Recommended:
+                          <span class="text-cyan-500/70">Gemini</span> — get a free API key at
+                          <button
+                            onClick=${() => openTab("https://aistudio.google.com/app/apikey")}
+                            class="text-cyan-400 underline decoration-dotted hover:text-cyan-300"
+                            >aistudio.google.com</button
+                          >
+                        </p>
+                      `
+                    : ""}
                 </div>
-                ${action
+
+                <!-- Actions -->
+                ${actions
                   ? html`
-                      <button
-                        onClick=${action.onClick}
-                        class="shrink-0 text-[10px] text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors"
-                      >
-                        ${action.label}
-                      </button>
+                      <div class="flex flex-col items-end gap-1.5 shrink-0">
+                        <button
+                          onClick=${actions.primary.onClick}
+                          class="text-[10px] text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                        >
+                          ${actions.primary.label}
+                        </button>
+                        ${actions.secondary
+                          ? html`
+                              <button
+                                onClick=${actions.secondary.onClick}
+                                class="text-[9px] text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap"
+                              >
+                                ${actions.secondary.label}
+                              </button>
+                            `
+                          : ""}
+                        ${actions.skip
+                          ? html`
+                              <button
+                                onClick=${() => skip(step.id)}
+                                class="text-[9px] text-slate-700 hover:text-slate-500 transition-colors"
+                              >
+                                skip for now
+                              </button>
+                            `
+                          : ""}
+                      </div>
                     `
                   : ""}
               </div>
@@ -278,7 +400,7 @@ function WelcomeApp() {
           })}
         </div>
 
-        <!-- All done -->
+        <!-- All done / Required done -->
         ${allDone &&
         html`
           <div
@@ -287,7 +409,19 @@ function WelcomeApp() {
             <div class="text-2xl mb-1">🎉</div>
             <p class="text-sm text-emerald-400 font-semibold">You're all set!</p>
             <p class="text-xs text-slate-500 mt-1">
-              Start solving — every accepted submission is automatically committed to GitHub.
+              Every accepted submission is now automatically committed to GitHub.
+            </p>
+          </div>
+        `}
+        ${!allDone &&
+        requiredDone &&
+        html`
+          <div
+            class="mb-8 p-3 rounded-xl border border-cyan-500/20 bg-cyan-500/5 text-center"
+          >
+            <p class="text-sm text-cyan-400 font-semibold">Core setup complete ✓</p>
+            <p class="text-xs text-slate-500 mt-1">
+              Auto-commit is active. The optional steps above enhance your experience.
             </p>
           </div>
         `}
@@ -295,7 +429,7 @@ function WelcomeApp() {
         <!-- Action buttons -->
         <div class="flex flex-wrap gap-3 justify-center mb-12">
           <button
-            onClick=${openLibrary}
+            onClick=${() => openExtTab("library/library.html")}
             class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-sm transition-colors"
           >
             Open Library →
@@ -311,53 +445,14 @@ function WelcomeApp() {
                 >
               `
             : ""}
-          ${!checks.github || !checks.repo
-            ? html`
-                <button
-                  onClick=${openSettings}
-                  class="px-5 py-2.5 rounded-xl border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-400 text-sm transition-colors"
-                >
-                  Finish Setup →
-                </button>
-              `
-            : ""}
         </div>
 
-        <!-- Start solving -->
-        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4">
-          Start solving
-        </h2>
-        <div class="grid grid-cols-3 gap-3">
-          ${PLATFORMS.map(
-            (p) => html`
-              <a
-                href=${p.url}
-                target="_blank"
-                rel="noreferrer"
-                class="flex flex-col items-center gap-2 p-4 rounded-xl border border-white/5 hover:border-white/10 bg-white/[0.02] hover:bg-white/5 transition-colors group"
-              >
-                <img
-                  src=${p.favicon}
-                  alt=""
-                  class="w-6 h-6 object-contain"
-                  onError=${(e) => {
-                    e.target.style.display = "none";
-                  }}
-                />
-                <span class="text-xs text-slate-400 group-hover:text-white transition-colors"
-                  >${p.name}</span
-                >
-              </a>
-            `,
-          )}
-        </div>
+        <!-- Footer -->
+        <p class="mt-4 text-[11px] text-slate-700 text-center max-w-sm">
+          This page can be reopened from the extension popup at any time. Your data is stored
+          locally and synced to your own GitHub — never shared with third parties.
+        </p>
       </div>
-
-      <!-- Footer -->
-      <p class="mt-16 text-[11px] text-slate-700 text-center max-w-sm">
-        This page can be reopened from the extension popup at any time. Your data is stored locally
-        and synced to your own GitHub — never shared with third parties.
-      </p>
     </div>
   `;
 }

@@ -66,6 +66,9 @@ fs.writeFileSync(
   path.join(chromeDir, "manifest.json"),
   JSON.stringify(chromeManifest, null, 4) + "\n",
 );
+// Remove source-specific manifests — only the built manifest.json belongs in dist
+fs.rmSync(path.join(chromeDir, "manifest-chromium.json"), { force: true });
+fs.rmSync(path.join(chromeDir, "manifest-firefox.json"), { force: true });
 
 // Build Firefox dist
 console.log("Building Firefox extension...");
@@ -77,5 +80,8 @@ fs.writeFileSync(
   path.join(firefoxDir, "manifest.json"),
   JSON.stringify(ffManifest, null, 4) + "\n",
 );
+// Remove source-specific manifests — only the built manifest.json belongs in dist
+fs.rmSync(path.join(firefoxDir, "manifest-chromium.json"), { force: true });
+fs.rmSync(path.join(firefoxDir, "manifest-firefox.json"), { force: true });
 
 console.log("Dist build complete. Run `node dev/package.js` to create release zips.");

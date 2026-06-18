@@ -131,9 +131,11 @@ export function createBlob(owner, repo, base64Content, token) {
 
 // ── Repository management ─────────────────────────────────────────────────────
 
-/** POST /user/repos — create a new repository */
-export function createRepository(name, token) {
-  return apiFetch("/user/repos", token, {
+/** POST /user/repos or /orgs/{owner}/repos — create a new repository.
+ *  Pass owner to route to an org; omit for the authenticated user's account. */
+export function createRepository(name, token, owner = null) {
+  const url = owner ? `/orgs/${owner}/repos` : "/user/repos";
+  return apiFetch(url, token, {
     method: "POST",
     body: JSON.stringify({
       name,

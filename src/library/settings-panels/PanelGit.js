@@ -49,16 +49,37 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
   const [mirrorRepo, setMirrorRepo] = useState("");
   const [mirrorCheckState, setMirrorCheckState] = useState(null); // null|checking|ok|err
   const mirrorCheckTimer = useRef(null);
+  const didAutoImportRef = useRef(false);
 
   // Auto-detected CodeLedger repo suggestion
   const [detectedRepo, setDetectedRepo] = useState(null); // { owner, repo } | null
   const [detectedDismissed, setDetectedDismissed] = useState(false);
 
   useEffect(() => {
-    Storage.getAuthToken("github")
-      .then((t) => setOauthToken(t || ""))
-      .catch(() => {});
+    let mounted = true;
+    const fetchToken = () =>
+      Storage.getAuthToken("github")
+        .then((t) => { if (mounted) setOauthToken(t || ""); })
+        .catch(() => {});
+
+    fetchToken();
     loadSyncCount();
+
+    // React immediately when auth token is written from the OAuth popup relay.
+    // The first useEffect dep [settings] won't catch auth.tokens changes since
+    // settings and auth tokens live in separate storage keys.
+    const onChanged = (changes) => {
+      if (changes[CONSTANTS.SK.AUTH_TOKENS]) fetchToken();
+    };
+    if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+      chrome.storage.onChanged.addListener(onChanged);
+    }
+    return () => {
+      mounted = false;
+      if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+        chrome.storage.onChanged.removeListener(onChanged);
+      }
+    };
   }, [settings]);
 
   // Auto-detect a CodeLedger-managed repo when token exists but none is configured
@@ -390,6 +411,21 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
       setImporting(false);
     }
   };
+
+  // Auto-import when a repo is first linked and local library is empty
+  useEffect(() => {
+    if (didAutoImportRef.current || !repoName || !oauthToken) return;
+    didAutoImportRef.current = true;
+    Storage.getAllProblems?.()
+      .then((all) => {
+        if (!all || all.length === 0) {
+          setImportMsg("Repo linked — importing existing solutions from repository…");
+          handleImport();
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoName, oauthToken]);
 
   // ── Mirror helpers ────────────────────────────────────────────────────────
 
@@ -1020,7 +1056,9 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
               remoteOnly=${importData.remoteOnly}
               providerName="GitHub"
               onResolve=${async (resolved) => {
-                await applyImport(resolved);
+                // Stamp with _conflictResolvedAt so importFromRepo won't re-flag these
+                // until RESYNC_ALL successfully pushes them to GitHub.
+                await applyImport(resolved, { fromConflictResolution: true });
                 setImportData(null);
                 setSyncNeedsPush(false);
                 const s = await Storage.getSettings();
@@ -1048,18 +1086,33 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                   );
                   setImportMsg("");
                 } catch (e) {
-                  setImportMsg(`Resolved locally, but repo push failed: ${e.message}`);
+                  // Push failed — resolved locally only. _conflictResolvedAt marker in IDB
+                  // will prevent the modal from reappearing on the next import until a
+                  // successful sync happens via RESYNC_ALL triggered by a new solve.
+                  flash(
+                    `Resolved locally (${resolved.length} problem${resolved.length !== 1 ? "s" : ""}). Repo push failed — will retry on next sync.`,
+                    false,
+                  );
+                  setImportMsg("");
                 } finally {
                   setSyncBusy(false);
                   loadSyncCount();
                 }
               }}
-              onCancel=${(_resolvedSoFar, remaining) => {
+              onCancel=${async (_resolvedSoFar, remaining) => {
+                // Apply whatever the user already resolved — don't discard their work.
+                if (Array.isArray(_resolvedSoFar) && _resolvedSoFar.length > 0) {
+                  await applyImport(_resolvedSoFar, { fromConflictResolution: true });
+                  // Best-effort push of the partial resolutions
+                  if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+                    chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode: "bulk" }, () => {});
+                  }
+                }
                 setImportData(null);
                 setSyncNeedsPush(false);
-                const leftover = Array.isArray(remaining)
-                  ? remaining.length
-                  : (importData?.conflicts?.length ?? 0);
+                const leftover = Array.isArray(remaining) ? remaining.length : 0;
+                const s = await Storage.getSettings();
+                await Storage.setSettings({ ...s, _pendingConflicts: leftover });
                 onSettingsChange?.("_pendingConflicts", leftover);
               }}
             />

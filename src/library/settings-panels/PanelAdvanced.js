@@ -217,10 +217,10 @@ export function PanelAdvanced({ settings, onSettingsChange }) {
           defaultOn=${true}
         />
         <${ToggleRow}
-          settingKey="telemetryEnabled"
-          label="Anonymous telemetry"
-          desc="Sends a daily solve count ping to counter.vkrishna04.me. No personal data is included."
-          defaultOn=${true}
+          settingKey="telemetryOptIn"
+          label="Anonymous telemetry (opt-in)"
+          desc="Sends an anonymous solve-count ping to counter.vkrishna04.me. No personal data or code is included. Off by default."
+          defaultOn=${false}
         />
       </div>
 

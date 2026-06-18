@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Code Ledger",
-    "version": "1.4.5",
+    "version": "1.4.6",
     "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
     "author": "VKrishna04",
     "homepage_url": "https://codeledger.vkrishna04.me",
@@ -14,9 +14,11 @@
     "permissions": [
         "storage",
         "alarms",
-        "sidePanel"
+        "sidePanel",
+        "tabs"
     ],
     "host_permissions": [
+        "*://codeledger.vkrishna04.me/*",
         "*://*.leetcode.com/*",
         "*://*.geeksforgeeks.org/*",
         "*://*.codeforces.com/*",

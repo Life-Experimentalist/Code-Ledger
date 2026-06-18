@@ -158,6 +158,10 @@ export async function processSubmission(handler, page, isManual) {
 
       const dedupKey = `cl_committed_${slug}`;
       const lastId = sessionStorage.getItem(dedupKey);
+      // Also check IDB: sessionStorage is cleared on page reload (SPA cache), so a problem
+      // already committed in a prior session could otherwise be resubmitted.
+      const existingProblem = await Storage.getProblem(handler.makeProblemId(slug)).catch(() => null);
+      const alreadyInDB = existingProblem && existingProblem.submissionId === String(latest.id);
       dbg.log(
         "[processSubmission] dedupKey=" +
           dedupKey +
@@ -165,10 +169,12 @@ export async function processSubmission(handler, page, isManual) {
           lastId +
           ", currentId=" +
           latest.id +
+          ", alreadyInDB=" +
+          alreadyInDB +
           ", isManual=" +
           isManual,
       );
-      if (!isManual && lastId === String(latest.id)) {
+      if (!isManual && (lastId === String(latest.id) || alreadyInDB)) {
         dbg.log("Skipping already-committed submission", slug, latest.id);
         return false;
       }

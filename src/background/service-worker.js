@@ -864,6 +864,16 @@ async function handleSolved(data) {
     }
   }
 
+  // Notify open library tabs so they refresh the problem list immediately
+  try {
+    const libUrl = chrome.runtime.getURL("library/library.html");
+    chrome.tabs.query({ url: libUrl }, (tabs) => {
+      (tabs || []).forEach((tab) => {
+        chrome.tabs.sendMessage(tab.id, { type: "PROBLEM_SAVED", id: data.id }).catch(() => {});
+      });
+    });
+  } catch (_) {}
+
   // 3. AI Review (if enabled)
   // Note: settings is loaded here so rename detection below can use it too
   const settings = await Storage.getSettings();
@@ -1539,6 +1549,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
 
   const newProblems = []; // never committed — need initial commit
   const maintenanceItems = []; // committed but paths/content drifted — need maintenance
+  const localProblemKeys = new Set();
 
   for (let p of allProblems) {
     // Enrich with canonical data before path computation
@@ -1549,6 +1560,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
 
     const key = getProblemCommitKey(p);
     if (!key) continue;
+    localProblemKeys.add(key);
 
     const newPaths = getProblemFiles(p, settings).map((f) => f.path);
     const isPending = pendingKeys.has(key);
@@ -1571,6 +1583,19 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       maintenanceItems.push({ problem: p, oldPaths: oldPaths || [], newPaths });
     }
     // else: already committed, paths match, content matches — skip
+  }
+
+  // Detect remote problems that no longer exist locally (deleted after conflict resolution).
+  // Only run when we have a real file tree — avoids false-deleting everything on an empty fetch.
+  if (remoteFileTree.length > 0) {
+    for (const [key, remoteEntry] of remoteByCommitKey.entries()) {
+      if (!localProblemKeys.has(key)) {
+        const oldPaths = _inferCommittedPaths(remoteEntry, remoteFileTree);
+        if (oldPaths.length > 0) {
+          maintenanceItems.push({ problem: remoteEntry, oldPaths, newPaths: [] });
+        }
+      }
+    }
   }
 
   dbg.log(
@@ -1807,18 +1832,20 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
     const maintDeletes = [];
 
     for (const { problem, oldPaths, newPaths } of maintenanceItems) {
-      for (const f of getProblemFiles(problem, settings)) maintFiles.push(f);
-      try {
-        if (problem.notes?.trim()) {
-          const base = problemBase(
-            problem.id || problem.titleSlug,
-            problem.canonical,
-            settings,
-            problem.platform,
-          );
-          maintFiles.push({ path: `${base}/notes.md`, content: problem.notes });
-        }
-      } catch (_) {}
+      if (newPaths.length > 0) {
+        for (const f of getProblemFiles(problem, settings)) maintFiles.push(f);
+        try {
+          if (problem.notes?.trim()) {
+            const base = problemBase(
+              problem.id || problem.titleSlug,
+              problem.canonical,
+              settings,
+              problem.platform,
+            );
+            maintFiles.push({ path: `${base}/notes.md`, content: problem.notes });
+          }
+        } catch (_) {}
+      }
       const newPathSet = new Set(newPaths);
       for (const oldPath of oldPaths) {
         if (!newPathSet.has(oldPath)) maintDeletes.push(oldPath);
@@ -1849,6 +1876,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
 
     const infraPaths = new Set(infraBundle.map((f) => f.path));
     for (const { problem, newPaths: updatedPaths } of maintenanceItems) {
+      if (updatedPaths.length === 0) continue; // deleted from local DB — nothing to update
       await Storage.saveProblem({
         ...problem,
         _committedPaths: updatedPaths.filter((p) => !infraPaths.has(p)),
@@ -2530,8 +2558,80 @@ async function processAIReviewQueue(options = {}) {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "install") {
+    // Open the welcome page on first install so the user is guided through setup
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome/welcome.html") });
+  }
   init();
+});
+
+// OAuth tab relay — background-side pull; works in Chrome MV3 (SW) and Firefox.
+//
+// WHY A SINGLE-EVENT RETRY LOOP:
+//   Chrome's service worker can be terminated between separate `tabs.onUpdated`
+//   events (e.g. between changeInfo.url and changeInfo.status==='complete'), which
+//   would wipe any in-memory state. By starting a self-contained retry loop WITHIN
+//   the URL-change event, the active promise chain keeps the SW alive for the entire
+//   ~6-second retry window — no state needs to survive across events.
+//
+// Requires: "tabs" permission (both manifests).
+const _processingAuthTabs = new Set(); // dedup guard (same event, not cross-SW-restarts)
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // Only act when the tab URL changes to the OAuth callback path
+  const changedUrl = changeInfo.url || "";
+  if (
+    !changedUrl.includes("codeledger.vkrishna04.me") ||
+    !changedUrl.includes("/api/auth/") ||
+    !changedUrl.includes("/callback")
+  ) return;
+
+  // Deduplicate: one relay per tab (handles rapid re-fires on same URL)
+  if (_processingAuthTabs.has(tabId)) return;
+  _processingAuthTabs.add(tabId);
+  dbg.log(`OAuth tab relay: callback URL detected in tab ${tabId} — starting retry loop`);
+
+  // Self-contained retry loop.  The promise chain keeps the SW alive through all retries.
+  // First attempt waits 300 ms for the content script to finish document_end work;
+  // subsequent retries wait 500 ms.  Total window: ~7.5 s (15 × 500 ms).
+  const MAX_ATTEMPTS = 15;
+  let attempt = 0;
+
+  function tryFetch() {
+    return new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 300 : 500))
+      .then(() => {
+        attempt++;
+        dbg.log(`OAuth tab relay: attempt ${attempt}/${MAX_ATTEMPTS} for tab ${tabId}`);
+        return chrome.tabs.sendMessage(tabId, { type: "CL_GET_AUTH_DATA" });
+      })
+      .then((data) => {
+        if (data?.token && data?.provider) {
+          dbg.log(`OAuth tab relay: got token for ${data.provider} — saving`);
+          return Storage.setAuthToken(data.provider, data.token).then(() => {
+            dbg.log(`OAuth tab relay: ✓ token saved for ${data.provider}`);
+            _processingAuthTabs.delete(tabId);
+            // Close the popup tab now that the token is persisted
+            chrome.tabs.remove(tabId).catch(() => {});
+          });
+        }
+        // Content script responded but no token yet — retry
+        if (attempt < MAX_ATTEMPTS) return tryFetch();
+        dbg.warn(`OAuth tab relay: no token received after ${MAX_ATTEMPTS} attempts`);
+        _processingAuthTabs.delete(tabId);
+      })
+      .catch((e) => {
+        // sendMessage failed (content script not injected yet) — retry
+        if (attempt < MAX_ATTEMPTS) return tryFetch();
+        dbg.warn(`OAuth tab relay: gave up after ${MAX_ATTEMPTS} attempts (last: ${e?.message})`);
+        _processingAuthTabs.delete(tabId);
+      });
+  }
+
+  tryFetch().catch((e) => {
+    dbg.error(`OAuth tab relay: unexpected error:`, e?.message);
+    _processingAuthTabs.delete(tabId);
+  });
 });
 
 init();
@@ -2572,6 +2672,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   dbg.log(
     `onMessage(): received msg.type=${msg.type} from ${sender?.id || sender?.tab?.id || sender?.url || "unknown"}`,
   );
+
+  // OAuth relay fallback: content script sends here when chrome.storage write fails.
+  // Primary path is direct storage write in presence-marker.js; this is belt-and-suspenders.
+  if (msg.type === "CODELEDGER_AUTH_RELAY") {
+    let senderHost;
+    try { senderHost = new URL(sender?.url || sender?.tab?.url || "").hostname; } catch { senderHost = ""; }
+    if (senderHost !== "codeledger.vkrishna04.me") {
+      dbg.warn(`CODELEDGER_AUTH_RELAY: rejected relay from unexpected host: ${senderHost}`);
+      sendResponse({ ok: false });
+      return true;
+    }
+    dbg.log(`CODELEDGER_AUTH_RELAY: received from ${senderHost}, provider=${msg.provider}, token=${msg.token ? msg.token.slice(0, 7) + "..." : "MISSING"}`);
+    if (msg.token && msg.provider) {
+      Storage.setAuthToken(msg.provider, msg.token)
+        .then(() => dbg.log(`CODELEDGER_AUTH_RELAY: ✓ token saved for ${msg.provider}`))
+        .catch((e) => dbg.error(`CODELEDGER_AUTH_RELAY: failed to save token:`, e?.message));
+    } else {
+      dbg.warn(`CODELEDGER_AUTH_RELAY: missing provider or token — nothing saved`);
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
   if (msg.type === "QUEUE_ALL_AI_REVIEWS") {
     (async () => {
       try {

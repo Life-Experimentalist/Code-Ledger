@@ -10,7 +10,7 @@ const dbg = createDebugger("Telemetry");
 
 /**
  * CFlair-Counter integration for anonymous telemetry.
- * Opt-in is controlled by `settings.telemetryOptIn` (default: true per schema).
+ * Opt-in is controlled by `settings.telemetryOptIn` (default: false — explicitly opt-in).
  */
 export const Telemetry = {
   async track(event, metadata = {}) {
