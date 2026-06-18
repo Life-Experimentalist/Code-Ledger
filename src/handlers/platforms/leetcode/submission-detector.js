@@ -83,10 +83,25 @@ export function onSubmitFired(handler) {
     handler._resultPollTimer = null;
   }
 
-  const initialText =
-    document.querySelector('[data-e2e-locator="submission-result"]')?.textContent?.trim() ?? null;
+  // Try multiple selectors to survive LeetCode UI redesigns.
+  const getResultText = () => {
+    const selectors = [
+      '[data-e2e-locator="submission-result"]',
+      '[data-e2e-locator="console-result"]',
+      '[data-testid*="result"]',
+      '[data-testid*="verdict"]',
+      '[role="status"]',
+      '[class*="result-state"]',
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el?.textContent?.trim()) return el.textContent.trim();
+    }
+    return null;
+  };
 
-  let wasCleared = initialText === null;
+  const initialText = getResultText();
+  let wasCleared = initialText === null || !/\S/.test(initialText || "");
   let attempts = 0;
   const MAX_ATTEMPTS = 60;
 
@@ -99,16 +114,14 @@ export function onSubmitFired(handler) {
       return;
     }
 
-    const resultEl = document.querySelector('[data-e2e-locator="submission-result"]');
+    const currentText = getResultText() || "";
 
-    if (!resultEl || !/\S/.test(resultEl.textContent || "")) {
+    if (/judging|running|pending|submitting/i.test(currentText)) {
       wasCleared = true;
       return;
     }
 
-    const currentText = (resultEl.textContent || "").trim();
-
-    if (/judging|running|pending|submitting/i.test(currentText)) {
+    if (!currentText) {
       wasCleared = true;
       return;
     }
@@ -123,9 +136,14 @@ export function onSubmitFired(handler) {
       return;
     }
 
-    dbg.log("Accepted result detected via submit hook");
-    const page = detectPage(window.location.pathname);
-    processSubmission(handler, page, false).catch((e) => dbg.error("processSubmission failed", e));
+    // LeetCode's WebSocket updates the DOM ~1.5s before the GraphQL cache commits
+    // the new submission as "Accepted". Without this delay the dedup check fetches
+    // the previous accepted submission (same ID → already-in-DB → skip).
+    dbg.log("Accepted detected via submit hook — waiting 1.5s for GraphQL sync");
+    setTimeout(() => {
+      const page = detectPage(window.location.pathname);
+      processSubmission(handler, page, false).catch((e) => dbg.error("processSubmission failed", e));
+    }, 1500);
   }, 1000);
 }
 

@@ -949,42 +949,95 @@ export function ProblemModal({
           ${activeTab === "methods"
             ? html`
                 <div class="flex flex-col gap-4 h-full">
+                  <!-- Navigation back to the problem code tab -->
+                  <div class="flex items-center justify-between">
+                    <button
+                      onClick=${() => {
+                        const codeTab = baseTabs[0]?.id || "code";
+                        _lastModalTab = codeTab;
+                        setActiveTab(codeTab);
+                      }}
+                      class="text-[10px] text-slate-500 hover:text-cyan-400 transition-colors flex items-center gap-1"
+                    >
+                      ← Problem Code
+                    </button>
+                    <span class="text-[10px] text-slate-600">
+                      ${methods.length} approach${methods.length !== 1 ? "es" : ""}
+                    </span>
+                  </div>
+
                   ${methods.map(
                     (method, idx) => html`
-                      <div
-                        class="p-3 rounded-lg border ${selectedMethodIdx === idx
-                          ? "border-cyan-500/50 bg-cyan-500/10"
-                          : "border-white/10 bg-white/5"} transition-colors cursor-pointer"
-                      >
-                        <button onClick=${() => setSelectedMethodIdx(idx)} class="w-full text-left">
-                          <div class="flex items-start justify-between mb-2">
-                            <div>
-                              <h4 class="font-semibold text-sm text-white">${method.title}</h4>
-                              <span class="text-[10px] font-mono text-cyan-400"
-                                >${method.language}</span
-                              >
+                      <div class="rounded-xl border overflow-hidden ${selectedMethodIdx === idx
+                        ? "border-cyan-500/40"
+                        : "border-white/10"} transition-colors">
+                        <!-- Card header -->
+                        <button
+                          onClick=${() => setSelectedMethodIdx(idx === selectedMethodIdx ? -1 : idx)}
+                          class="w-full text-left p-3 ${selectedMethodIdx === idx
+                            ? "bg-cyan-500/8"
+                            : "bg-white/[0.02] hover:bg-white/[0.04]"} transition-colors"
+                        >
+                          <div class="flex items-start justify-between">
+                            <div class="flex-1 min-w-0">
+                              <div class="flex items-center gap-2 mb-0.5">
+                                <h4 class="font-semibold text-sm text-white">${method.title}</h4>
+                                ${method.language
+                                  ? html`<span class="text-[10px] font-mono text-cyan-400/80">${method.language}</span>`
+                                  : ""}
+                              </div>
+                              ${method.description
+                                ? html`<p class="text-[10px] text-slate-400">${method.description}</p>`
+                                : ""}
+                              <span class="text-[9px] text-slate-600">
+                                ${method.timestamp
+                                  ? new Date(method.timestamp).toLocaleDateString()
+                                  : "No date"}
+                              </span>
                             </div>
-                            <button
-                              onClick=${(e) => {
-                                e.stopPropagation();
-                                handleDeleteMethod(idx);
-                              }}
-                              class="text-xs px-2 py-1 rounded bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors"
-                            >
-                              Delete
-                            </button>
+                            <div class="flex items-center gap-2 shrink-0 ml-3">
+                              <span class="text-[10px] text-slate-600">
+                                ${selectedMethodIdx === idx ? "▲" : "▼"}
+                              </span>
+                              <button
+                                onClick=${(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteMethod(idx);
+                                }}
+                                class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
-                          ${method.description
-                            ? html`<p class="text-[10px] text-slate-400 mb-2">
-                                ${method.description}
-                              </p>`
-                            : ""}
-                          <span class="text-[9px] text-slate-600"
-                            >${method.timestamp
-                              ? new Date(method.timestamp).toLocaleDateString()
-                              : "No date"}</span
-                          >
                         </button>
+
+                        <!-- Expanded: code view -->
+                        ${selectedMethodIdx === idx
+                          ? html`
+                              <div class="border-t border-white/5">
+                                ${method.code
+                                  ? html`<pre
+                                      class="text-[11px] leading-relaxed overflow-x-auto bg-black/40 p-4 whitespace-pre font-mono m-0 max-h-72"
+                                      dangerouslySetInnerHTML=${{
+                                        // Safe: highlightCode() runs escHtml() on all user input
+                                        // before adding its own controlled <span style="..."> tags.
+                                        __html: highlightCode(
+                                          method.code,
+                                          (method.language || "").toLowerCase(),
+                                        ),
+                                      }}
+                                    ></pre>`
+                                  : html`<p class="px-4 py-3 text-[11px] text-slate-600">No code saved for this approach.</p>`}
+                                ${method.aiReview
+                                  ? html`<div class="px-4 py-3 border-t border-white/5">
+                                      <p class="text-[9px] uppercase tracking-wider text-slate-600 mb-1.5">AI Review</p>
+                                      <p class="text-[11px] text-slate-400 leading-relaxed">${method.aiReview.slice(0, 300)}${method.aiReview.length > 300 ? "…" : ""}</p>
+                                    </div>`
+                                  : ""}
+                              </div>
+                            `
+                          : ""}
                       </div>
                     `,
                   )}
@@ -1685,37 +1738,6 @@ modalTabRegistry.register("*", [
         onRemoveFromQueue=${onRemoveFromQueue}
         removeFromQueueBusy=${removeFromQueueBusy}
       />`;
-    },
-  },
-  {
-    id: "notes",
-    label: "Notes",
-    show: (p) => !!p?.notes,
-    render(problem, { html }) {
-      return html` <div class="prose prose-invert prose-sm max-w-none">
-        <pre class="whitespace-pre-wrap text-sm text-slate-300 font-sans leading-relaxed">
-${problem.notes}</pre
-        >
-      </div>`;
-    },
-  },
-  {
-    id: "methods",
-    label: (p) => `Methods (${p.methods?.length || 0})`,
-    show: (p) => p.methods?.length > 0,
-    render(problem, { html, onUpdate }) {
-      return html`<div class="flex flex-col gap-4">
-        ${(problem.methods || []).map(
-          (method, i) =>
-            html`<${MethodCard}
-              key=${i}
-              method=${method}
-              methodIndex=${i}
-              problem=${problem}
-              onUpdate=${onUpdate}
-            />`,
-        )}
-      </div>`;
     },
   },
   {

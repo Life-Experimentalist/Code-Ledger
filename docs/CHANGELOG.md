@@ -6,6 +6,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.7] — 2026-06-18
+
+### Fixed
+
+- **LeetCode auto-save not working** — `onSubmitFired` used a single hardcoded `[data-e2e-locator="submission-result"]` selector that silently fails when LeetCode changes its UI. The selector list is now an array of fallbacks (`data-e2e-locator`, `data-testid*=result`, `data-testid*=verdict`, `role=status`, `class*=result-state`). Additionally, a 1 500 ms delay is now inserted between detecting the "Accepted" banner and calling the GraphQL API — LeetCode's WebSocket pushes the DOM update ~1.5 s before the backend marks the submission as Accepted in the API, causing the dedup check to fetch the previous submission (already in DB → skip). The delay ensures the API returns the correct new submission ID.
+- **Conflict modal: "Keep both" caused file-path collision on push** — `buildResolved` created a second problem record with a mutated `"-alt-"` ID for the remote copy. Because both records share the same `titleSlug`, RESYNC_ALL tried to write two entries with the same git file path, corrupting the commit. "Keep both" now saves the remote's code as a new method entry on the local problem (title: "Remote approach (date)", preserving the remote code, AI review, and runtime stats) instead of creating a duplicate problem record.
+- **Methods tab shown twice in problem modal** — The global `modalTabRegistry` registration included "methods" and "notes" tabs, while the modal's `tabs` array also added them manually, producing two identical tabs. The registry registrations for "methods" and "notes" have been removed; the manually-built tabs and their custom JSX renderers are the sole source of truth.
+
+### Changed
+
+- **Methods tab: expandable code view + back navigation** — Method cards in the methods tab are now collapsible: clicking a card expands it to show the method's syntax-highlighted code and a truncated AI review inline. A "← Problem Code" button at the top of the tab navigates back to the first code tab.
+
+---
+
 ## [1.4.6] — 2026-06-17
 
 ### Fixed

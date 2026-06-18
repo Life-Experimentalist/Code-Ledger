@@ -483,10 +483,19 @@ export function ConflictResolutionModal({
       const ch = chArr[i];
       if (ch === null) return;
       if (ch === "both") {
-        resolved.push(c.local);
-        const remoteId =
-          (c.remote.id || c.remote.titleSlug || "r") + "-alt-" + Date.now() + "-" + i;
-        resolved.push({ ...c.remote, id: remoteId });
+        // Store the remote code as a new method entry on the local problem.
+        // Creating a separate problem record causes file-path collisions on push
+        // (same titleSlug → same path in the repo). Methods avoid this cleanly.
+        const existingMethods = Array.isArray(c.local.methods) ? c.local.methods : [];
+        const remoteMethod = {
+          title: `Remote approach (${fmtDate(c.remote.timestamp)})`,
+          language: c.remote.lang?.name || c.remote.language || "?",
+          description: `Runtime: ${c.remote.runtime || "—"} · Memory: ${c.remote.memory || "—"}`,
+          code: c.remote.code || "",
+          aiReview: c.remote.aiReview || "",
+          timestamp: c.remote.timestamp || Date.now(),
+        };
+        resolved.push({ ...c.local, methods: [...existingMethods, remoteMethod] });
       } else if (ch === "remote") {
         resolved.push(c.remote);
       } else {
