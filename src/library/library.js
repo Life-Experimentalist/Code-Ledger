@@ -4,13 +4,13 @@
  */
 
 import { h, render } from "/vendor/preact-bundle.js";
-import { useState, useEffect, useMemo, useCallback } from "/vendor/preact-bundle.js";
+import { useState, useEffect, useMemo, useCallback, useRef } from "/vendor/preact-bundle.js";
 import { htm } from "/vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "/core/storage.js";
 import { CONSTANTS } from "/core/constants.js";
-import { initDebug, setDebug, createDebugger } from "/lib/debug.js";
+import { initDebug, setDebug, createDebugger, rawError } from "/lib/debug.js";
 const dbg = createDebugger("LibraryApp");
 import { applyThemeFromStorage, setupThemeListener } from "/core/theme-engine.js";
 import { getQueryParam, updateQueryParams } from "/core/url-state.js";
@@ -66,11 +66,31 @@ function LibraryApp() {
   const [reauthBusy, setReauthBusy] = useState(false);
   const [importReport, setImportReport] = useState(null);
 
-  // Reload problems from IndexedDB (used after import or external change)
+  // Ref tracks whether a conflict-resolution modal is currently active.
+  // Used by reloadProblems to avoid interrupting an in-progress resolution.
+  const conflictActiveRef = useRef(false);
+  useEffect(() => {
+    conflictActiveRef.current = currentDuplicateGroup !== null;
+  }, [currentDuplicateGroup]);
+
+  // Reload problems from IndexedDB (used after import or external change).
+  // Also re-checks for duplicates when no conflict modal is currently showing,
+  // so that any conflicts re-created by a background sync are shown correctly.
   const reloadProblems = useCallback(() => {
     setLoading(true);
     Storage.getAllProblems()
-      .then((p) => setProblems(p || []))
+      .then((p) => {
+        setProblems(p || []);
+        if (!conflictActiveRef.current) {
+          const dups = findDuplicates(p || []).sort((a, b) => {
+            const isDiff = (g) => classifyDuplicatePair(g[0], g[1]) === "diff-approach";
+            return isDiff(b) - isDiff(a);
+          });
+          setDuplicateGroups(dups);
+          if (dups.length > 0) setCurrentDuplicateGroup(dups[0]);
+          else setCurrentDuplicateGroup(null);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -234,82 +254,79 @@ function LibraryApp() {
     });
   }, [activeTab, searchQuery]);
 
-  // Listen for OAuth messages from Worker
+  // Core OAuth post-processing: save token, fetch user info, update all state.
+  // Called from both the window message listener (popup path) and the storage
+  // change listener (COOP relay path via service worker).
+  const processOAuthToken = useCallback(async (token, provider = "github") => {
+    if (!token || provider !== "github") return;
+    dbg.log(`processOAuthToken(): received ${provider} token (${token.slice(0, 7)}...)`);
+    try {
+      dbg.log(`processOAuthToken(): saving token to storage...`);
+      await Storage.setAuthToken("github", token);
+      dbg.log(`processOAuthToken(): ✓ token saved — fetching GitHub user info`);
+
+      const userRes = await fetch("https://api.github.com/user", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!userRes.ok) {
+        dbg.error(
+          `processOAuthToken(): GitHub /user returned ${userRes.status} — token may be invalid`,
+        );
+        throw new Error(`GitHub /user returned ${userRes.status}`);
+      }
+      const user = await userRes.json();
+      dbg.log(`processOAuthToken(): ✓ GitHub user=${user.login}`);
+
+      const currentSettings = await Storage.getSettings();
+      const hasRepo = !!(currentSettings?.github_repo || currentSettings?.gitRepo);
+      dbg.log(`processOAuthToken(): hasRepo=${hasRepo}`);
+
+      const updatedSettings = { ...currentSettings, github_username: user.login };
+      if (!currentSettings?.github_owner) updatedSettings.github_owner = user.login;
+      // avatars.githubusercontent.com is a public CDN — store URL directly, never fetch().
+      if (user.avatar_url) updatedSettings.github_avatar = user.avatar_url;
+      await Storage.setSettings(updatedSettings);
+      dbg.log(`processOAuthToken(): ✓ settings saved`);
+
+      await Storage.setDebugEnabled(true).catch(() => {});
+      setDebug(true);
+
+      if (!hasRepo) {
+        dbg.log(`processOAuthToken(): no repo configured — opening onboarding modal`);
+        setOnboardingData({ username: user.login, token });
+        setShowGitHubOnboarding(true);
+      }
+
+      setGitUser(user.login);
+      setGitAvatar(user.avatar_url || null);
+      setSettings(updatedSettings);
+      setTokenExpired(false);
+      setSetupIncomplete(false);
+      dbg.log(`processOAuthToken(): ✓ complete — user=${user.login}, showOnboarding=${!hasRepo}`);
+    } catch (e) {
+      rawError("[CodeLedger:LibraryApp] processOAuthToken(): FATAL —", e?.message || e);
+    }
+  }, []); // useState setters are stable references — no deps needed
+
+  // Listen for OAuth messages from Worker (popup path, non-COOP browsers)
   useEffect(() => {
     const handleOAuthMessage = async (event) => {
-      // Validate origin
       const allowedOrigins = [new URL(CONSTANTS.URLS.AUTH_WORKER).origin, window.location.origin];
-      if (event.origin !== "null" && !allowedOrigins.includes(event.origin)) {
-        return;
-      }
-
+      if (event.origin !== "null" && !allowedOrigins.includes(event.origin)) return;
       const data = event.data;
-      if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") {
-        return;
-      }
-
+      if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") return;
+      dbg.log(
+        `handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}, token ${data.token ? "present" : "MISSING"}`,
+      );
       if (!data.token) {
-        dbg.error("OAuth error:", data.error);
+        dbg.error("handleOAuthMessage(): OAuth error:", data.error);
         return;
       }
-
-      // Save token and get user info
-      try {
-        await Storage.setAuthToken("github", data.token);
-
-        const userRes = await fetch("https://api.github.com/user", {
-          headers: { Authorization: `Bearer ${data.token}` },
-        });
-
-        if (!userRes.ok) throw new Error("Failed to fetch user");
-        const user = await userRes.json();
-
-        // Check if repo is already configured
-        const currentSettings = await Storage.getSettings();
-        const hasRepo = !!(currentSettings?.github_repo || currentSettings?.gitRepo);
-
-        // Save username and avatar to settings for sync operations and UI
-        const updatedSettings = {
-          ...currentSettings,
-          github_username: user.login,
-        };
-        if (!currentSettings?.github_owner) {
-          updatedSettings.github_owner = user.login;
-        }
-        // avatars.githubusercontent.com is a public CDN — store and use the URL directly.
-        // Do NOT fetch() it: any non-simple fetch triggers a CORS preflight that the CDN rejects.
-        if (user.avatar_url) {
-          updatedSettings.github_avatar = user.avatar_url;
-        }
-        await Storage.setSettings(updatedSettings);
-
-        // Enable debug logging to assist with troubleshooting after OAuth
-        await Storage.setDebugEnabled(true).catch(() => {});
-        setDebug(true);
-
-        // Show onboarding if no repo is configured
-        if (!hasRepo) {
-          setOnboardingData({
-            username: user.login,
-            token: data.token,
-          });
-          setShowGitHubOnboarding(true);
-        }
-
-        // Update user display and clear any expired-token state.
-        setGitUser(user.login);
-        setGitAvatar(user.avatar_url || null);
-        setSettings(updatedSettings);
-        setTokenExpired(false);
-        setSetupIncomplete(false);
-      } catch (e) {
-        dbg.error("OAuth handler error:", e);
-      }
+      await processOAuthToken(data.token, data.provider);
     };
-
     window.addEventListener("message", handleOAuthMessage);
     return () => window.removeEventListener("message", handleOAuthMessage);
-  }, []);
+  }, [processOAuthToken]);
 
   // Listen for import complete broadcast from the service worker
   useEffect(() => {
@@ -342,6 +359,44 @@ function LibraryApp() {
     return () => chrome.runtime.onMessage.removeListener(handleReauthRequired);
   }, []);
 
+  // COOP relay path: content script on callback page writes token directly to storage.
+  // We watch storage here so this works for both regular tabs and Firefox sidebar
+  // (chrome.tabs.query misses sidebar views).
+  useEffect(() => {
+    if (!chrome?.storage?.onChanged) return;
+    const handleStorageAuth = (changes) => {
+      const tokenChanges = changes[CONSTANTS.SK.AUTH_TOKENS];
+      if (!tokenChanges) return;
+      const token = (tokenChanges.newValue || {})["github"];
+      const old = (tokenChanges.oldValue || {})["github"];
+      dbg.log(
+        `handleStorageAuth(): auth.tokens changed — token ${token ? "present" : "absent"}, changed=${token !== old}`,
+      );
+      if (token && token !== old) {
+        dbg.log(`handleStorageAuth(): new github token detected — calling processOAuthToken`);
+        processOAuthToken(token, "github").catch((e) =>
+          rawError(
+            "[CodeLedger:LibraryApp] handleStorageAuth(): processOAuthToken threw:",
+            e?.message || e,
+          ),
+        );
+      }
+    };
+    chrome.storage.onChanged.addListener(handleStorageAuth);
+    return () => chrome.storage.onChanged.removeListener(handleStorageAuth);
+  }, [processOAuthToken]);
+
+  // Refresh problem list when service worker saves a new problem (e.g. auto-detected solve).
+  useEffect(() => {
+    if (!window.chrome?.runtime?.onMessage) return;
+    const handleProblemSaved = (msg) => {
+      if (msg?.type !== "PROBLEM_SAVED") return;
+      reloadProblems();
+    };
+    chrome.runtime.onMessage.addListener(handleProblemSaved);
+    return () => chrome.runtime.onMessage.removeListener(handleProblemSaved);
+  }, [reloadProblems]);
+
   const handleOnboardingComplete = async () => {
     setShowGitHubOnboarding(false);
     // Refresh settings to reflect repo setup
@@ -362,6 +417,11 @@ function LibraryApp() {
         } else {
           setDuplicateGroups([]);
           setCurrentDuplicateGroup(null);
+          // All conflicts resolved — sync remote immediately so deleted duplicates
+          // are removed from GitHub before the next scheduled maintenance window.
+          if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+            chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode: "bulk" }).catch(() => {});
+          }
         }
       }
     },
@@ -386,6 +446,9 @@ function LibraryApp() {
     }
     if (deletedIds.length > 0) {
       setProblems((prev) => prev.filter((p) => !deletedIds.includes(p.id)));
+      if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+        chrome.runtime.sendMessage({ type: "RESYNC_ALL", mode: "bulk" }).catch(() => {});
+      }
     }
     const remaining = duplicateGroups.filter(
       (g) => !(g.length >= 2 && classifyDuplicatePair(g[0], g[1]) === "same-code"),
@@ -403,37 +466,78 @@ function LibraryApp() {
     async (token, _owner) => {
       const t = token || (await Storage.getAuthToken("github").catch(() => null));
       if (!t) return;
-      let uName = gitUser;
-      if (!uName) {
-        const u = await fetch("https://api.github.com/user", {
-          headers: { Authorization: `Bearer ${t}` },
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .catch(() => null);
-        uName = u?.login || "";
+      // Validate the token before opening the modal — stale PATs produce 401s
+      // inside GitHubOnboardingModal which are confusing and show no clear error.
+      const userRes = await fetch("https://api.github.com/user", {
+        headers: { Authorization: `Bearer ${t}` },
+      }).catch(() => null);
+      if (!userRes?.ok) {
+        if (userRes?.status === 401) {
+          await Storage.setAuthToken("github", "").catch(() => {});
+          setGitUser(null);
+          setTokenExpired(true);
+        }
+        return;
       }
-      setOnboardingData({ username: uName, token: t });
+      const user = await userRes.json();
+      setOnboardingData({ username: user.login || gitUser || "", token: t });
       setShowGitHubOnboarding(true);
     },
     [gitUser],
   );
 
   // Inline OAuth reconnect — opens the OAuth popup without navigating away.
-  // The existing handleOAuthMessage listener picks up the token on success.
+  // Token arrives via the COOP relay path (content script → storage → handleStorageAuth).
   const triggerReauth = useCallback(() => {
     const authUrl = `${CONSTANTS.URLS.AUTH_WORKER}/auth/github`;
+    dbg.log(`triggerReauth(): opening OAuth popup → ${authUrl}`);
     setReauthBusy(true);
     const popup = window.open(authUrl, "OAuth", "width=600,height=700");
     if (!popup) {
       setReauthBusy(false);
+      dbg.warn(`triggerReauth(): popup blocked — user needs to allow popups`);
       alert("Please allow popups for this page to reconnect GitHub.");
       return;
     }
-    // Stop spinner once popup closes (success clears tokenExpired via handleOAuthMessage)
+    dbg.log(`triggerReauth(): popup opened — polling for close`);
+    // Stop spinner once popup closes (success clears tokenExpired via processOAuthToken).
+    // Firefox: COOP navigation makes popup a "dead object" — treat that as closed.
     const poll = setInterval(() => {
-      if (popup.closed) {
+      let closed = false;
+      try {
+        closed = popup.closed;
+      } catch {
+        closed = true;
+      }
+      if (closed) {
         clearInterval(poll);
+        dbg.log(`triggerReauth(): popup closed — checking storage for token`);
         setReauthBusy(false);
+        // Firefox fallback: the tabs.onUpdated relay writes storage and closes the tab,
+        // but if that completes slightly after the popup.closed poll fires, add a short
+        // retry loop so we still catch the token without needing onChanged to fire.
+        let attempts = 0;
+        const checkToken = setInterval(() => {
+          Storage.getAuthToken("github")
+            .then((t) => {
+              if (t) {
+                clearInterval(checkToken);
+                dbg.log(`triggerReauth(): token found in storage — processing`);
+                processOAuthToken(t, "github").catch((e) =>
+                  rawError(
+                    "[CodeLedger:LibraryApp] triggerReauth(): processOAuthToken after close failed:",
+                    e?.message,
+                  ),
+                );
+              } else if (++attempts >= 6) {
+                clearInterval(checkToken);
+                dbg.log(
+                  `triggerReauth(): no token after 3 s — onChanged relay will handle it if relay succeeded`,
+                );
+              }
+            })
+            .catch(() => clearInterval(checkToken));
+        }, 500);
       }
     }, 500);
   }, []);

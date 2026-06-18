@@ -132,6 +132,16 @@ export async function importFromRepo(owner, repo, git) {
       continue;
     }
     if (!_fieldsEqual(local, remote)) {
+      // Skip re-detecting a conflict that was already resolved locally but not yet pushed.
+      // _conflictResolvedAt is set by applyImport() when called from conflict resolution.
+      // Once RESYNC_ALL pushes the local version, remote will match local and this branch
+      // won't fire anymore.
+      if (local._conflictResolvedAt && local._conflictResolvedAt > (remote.timestamp || 0)) {
+        dbg.log(
+          `importFromRepo(): skipping re-detection for ${local.id} — resolved locally, push pending`,
+        );
+        continue;
+      }
       conflicts.push({ local, remote });
     }
   }
@@ -174,8 +184,10 @@ function _linkMultiLangSolutions(problems) {
  *
  * @param {object[]} resolvedProblems
  */
-export async function applyImport(resolvedProblems) {
-  dbg.log(`applyImport(): saving ${resolvedProblems.length} resolved problem(s)...`);
+export async function applyImport(resolvedProblems, { fromConflictResolution = false } = {}) {
+  dbg.log(
+    `applyImport(): saving ${resolvedProblems.length} resolved problem(s)${fromConflictResolution ? " (conflict resolution)" : ""}...`,
+  );
 
   // Snapshot existing data before overwriting — rolling backup
   try {
@@ -191,8 +203,14 @@ export async function applyImport(resolvedProblems) {
   // Link multi-language solutions before saving
   _linkMultiLangSolutions(resolvedProblems);
 
+  // Stamp resolved problems so importFromRepo won't re-flag them until they're pushed
+  const now = Date.now();
+  const toSave = fromConflictResolution
+    ? resolvedProblems.map((p) => ({ ...p, _conflictResolvedAt: now }))
+    : resolvedProblems;
+
   let saved = 0;
-  for (const p of resolvedProblems) {
+  for (const p of toSave) {
     try {
       await Storage.saveProblem(p);
       saved++;

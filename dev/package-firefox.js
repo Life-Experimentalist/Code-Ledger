@@ -18,7 +18,7 @@ const outPath = resolve(`releases/codeledger-firefox-v${version}.zip`);
 const zip = new AdmZip();
 
 // Add all src files, replacing manifest.json with the Firefox-compatible one
-zip.addLocalFolder("./src", "", (name) => name !== "manifest.json");
+zip.addLocalFolder("./src", "", (name) => name !== "manifest.json" && !/desktop\.ini$/i.test(name));
 zip.addLocalFile(tmpManifest, "", "manifest.json");
 zip.writeZip(outPath);
 

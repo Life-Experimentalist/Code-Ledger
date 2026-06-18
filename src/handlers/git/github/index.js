@@ -216,7 +216,8 @@ export class GitHubHandler extends BaseGitHandler {
         if (err.status !== 404) throw err;
 
         dbg.log(`commit(): repo not found — creating ${owner}/${name}…`);
-        await api.createRepository(name, token);
+        const isOrg = owner !== userRes.login;
+        await api.createRepository(name, token, isOrg ? owner : null);
         isNewRepo = true;
 
         // GitHub needs a moment after auto_init to create the initial commit

@@ -86,6 +86,14 @@ const _origConsole = {
   groupEnd: console.groupEnd ? console.groupEnd.bind(console) : () => {},
 };
 
+/**
+ * Always-on error logger that bypasses the debug gate.
+ * Use for auth errors and other critical failures that must always be visible.
+ */
+export function rawError(...args) {
+  _origConsole.error(...args);
+}
+
 let _consolePatched = false;
 
 function _updateConsoleHooks() {

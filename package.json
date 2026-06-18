@@ -1,6 +1,6 @@
 {
   "name": "Code ledger",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "displayName": "CodeLedger",
   "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
   "author": "VKrishna04",
@@ -58,8 +58,11 @@
     "sync:manifests": "node dev/sync-manifests.js",
     "domains:update": "node dev/generate-manifest-domains.js",
     "validate:openapi": "node dev/validate-openapi.js",
-    "deploy:worker": "cd worker && npx wrangler pages deploy public",
-    "format:check": "npx prettier --check \"src/**/*.js\" \"dev/**/*.js\" \"worker/src/**/*.js\" \"worker/public/assets/**/*.js\""
+    "deploy:worker": "cd worker && npx wrangler deploy",
+    "format:check": "npx prettier --check \"src/**/*.js\" \"dev/**/*.js\" \"worker/src/**/*.js\" \"worker/public/assets/**/*.js\"",
+    "emoji:scan": "node dev/emoji-tools.js scan",
+    "emoji:repair": "node dev/emoji-tools.js repair",
+    "vendor:preact": "node dev/generate-preact-vendor.js"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",

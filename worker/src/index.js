@@ -140,12 +140,15 @@ async function createAppJWT(c) {
  * The extension's handleOAuth listens for exactly type === 'CODELEDGER_AUTH'.
  */
 function authCallbackHtml(provider, token, error = "") {
-  const msg = JSON.stringify({
+  const safeMsg = JSON.stringify({
     type: "CODELEDGER_AUTH",
     provider,
     token,
     error,
   });
+  // Primary relay: auth data embedded in a DOM element read by the content script at
+  // document_end. Same-page postMessage is a fallback for race conditions or older deploys.
+  // Target origin is window.location.origin (self) — not '*', which would broadcast everywhere.
   const status = token
     ? "Authentication successful. Closing…"
     : `Authentication failed: ${error || "unknown error"}`;
@@ -153,12 +156,17 @@ function authCallbackHtml(provider, token, error = "") {
 <html><head><title>CodeLedger Auth</title>
 <style>body{font-family:system-ui,sans-serif;background:#050508;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
 </head><body>
+<div id="codeledger-auth-result" data-auth="${safeMsg.replace(/"/g, "&quot;")}" style="display:none"></div>
 <p>${status}</p>
 <script>
 (function(){
-  var msg = ${msg};
-  if(window.opener){try{window.opener.postMessage(msg,'*');}catch(e){}}
-  if(${JSON.stringify(!!token)}) setTimeout(function(){try{window.close();}catch(e){}},1200);
+  var msg = ${safeMsg};
+  // Fallback: same-page postMessage for content scripts that miss document_end timing.
+  // Only delivered to this window (window.location.origin target), not broadcast widely.
+  try{window.postMessage(msg, window.location.origin);}catch(e){}
+  // Content script closes the popup after writing the token to storage.
+  // This 5 s fallback fires only if the content script fails entirely.
+  if(${JSON.stringify(!!token)}) setTimeout(function(){try{window.close();}catch(e){}},5000);
 })();
 </script>
 </body></html>`;
