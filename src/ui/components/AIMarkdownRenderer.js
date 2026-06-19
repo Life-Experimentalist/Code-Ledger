@@ -60,6 +60,11 @@ function renderTable(block) {
   return `<div class="my-3 overflow-x-auto rounded-lg border border-white/10"><table class="w-full text-left border-collapse"><thead class="bg-white/5"><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
 }
 
+function _safeLink(_, label, url) {
+  const safeUrl = /^https?:\/\//i.test(url) ? url : "#";
+  return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline">${label}</a>`;
+}
+
 /** Apply inline formatting to already-escaped text. */
 function renderInline(t) {
   return t
@@ -69,10 +74,7 @@ function renderInline(t) {
       /`([^`]+)`/g,
       '<code class="px-1 py-0.5 rounded bg-white/10 text-cyan-300 text-[0.85em] font-mono">$1</code>',
     )
-    .replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener" class="text-cyan-400 hover:text-cyan-300 underline">$1</a>',
-    );
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, _safeLink);
 }
 
 export function parseMarkdown(text) {
@@ -147,10 +149,7 @@ export function parseMarkdown(text) {
     )
     .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener" class="text-cyan-400 hover:text-cyan-300 underline">$1</a>',
-    )
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, _safeLink)
     .replace(/^[-*] (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
     .replace(
       /((?:<li class="ml-4 list-disc">[\s\S]+?<\/li>\n?)+)/g,
