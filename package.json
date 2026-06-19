@@ -82,14 +82,14 @@
     "@types/node": "^22.13.10",
     "adm-zip": "^0.5.17",
     "bestzip": "^2.2.1",
-    "esbuild": "^0.25.1",
+    "esbuild": "0.28.1",
     "js-yaml": "^4.1.0",
     "nodemon": "^3.1.9",
     "octokit": "^4.0.0",
+    "prettier": "^3.8.3",
     "puppeteer": "^24.15.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "prettier": "^3.8.3",
     "wrangler": "^4.85.0"
   }
 }
