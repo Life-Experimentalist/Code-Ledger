@@ -1,6 +1,6 @@
 ﻿# Privacy Policy
 
-**Last updated**: 2026-05-07
+**Last updated**: 2026-06-22
 
 ## Overview
 
@@ -163,7 +163,7 @@ See GitHub's [Terms of Service](https://docs.github.com/en/site-policy/github-te
 We may update this privacy policy to reflect changes in our service. If we make material changes, we will:
 
 - Update the date at the top of this document
-- Notify you via GitHub release notes or email (if we contact you)
+- Notify you via GitHub release notes
 
 Your continued use of CodeLedger after changes means you accept the new policy.
 
@@ -177,7 +177,7 @@ For privacy questions or concerns:
 - **GitHub Issues**: https://github.com/Life-Experimentalist/Code-Ledger/issues/new
 - **GitHub Discussions**: https://github.com/Life-Experimentalist/Code-Ledger/discussions
 
-We will respond within 7 business days.
+We will respond within 7-21 business days.
 
 ---
 
@@ -190,5 +190,5 @@ CodeLedger stores all data locally in your browser. It commits code to your GitH
 ---
 
 **License**: Apache 2.0
-**Last updated**: 2026-05-07
-**Version**: 1.1.0
+**Last updated**: 2026-06-22
+**Version**: 4.6.0
