@@ -107,38 +107,60 @@ function LibraryApp() {
 
   // Load canonical map and build a fast lookup (tolerates multiple JSON shapes)
   useEffect(() => {
-    fetch(CONSTANTS.URLS.CANONICAL_MAP_RAW, { cache: "default" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
+    Promise.all([
+      fetch(CONSTANTS.URLS.CANONICAL_MAP_RAW, { cache: "default" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+      Storage.getLocalCanonicalEntries().catch(() => []),
+    ])
+      .then(([cdnData, localEntries]) => {
         const lookup = new Map(); // "platform:slug" → { id, title }
-        const entries = Array.isArray(data) ? data : data.entries || [];
-        for (const e of entries) {
-          const id = e.canonicalId || e.slug;
-          const title = e.canonicalTitle || e.title || id;
-          if (!id) continue;
-          // aliases as array [{ platform, slug }]
-          if (Array.isArray(e.aliases)) {
-            for (const a of e.aliases) {
-              if (a.platform && a.slug)
-                lookup.set(`${a.platform}:${a.slug}`, {
-                  id,
-                  title,
-                });
-            }
-          }
-          // aliases / platforms as object { platform: slug }
-          const obj = e.aliases ?? e.platforms;
-          if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-            for (const [plat, slug] of Object.entries(obj)) {
-              if (slug) lookup.set(`${plat}:${slug}`, { id, title });
+
+        // 1. Populate from CDN
+        if (cdnData) {
+          const entries = Array.isArray(cdnData) ? cdnData : cdnData.entries || [];
+          for (const e of entries) {
+            const id = e.canonicalId || e.slug;
+            const title = e.canonicalTitle || e.title || id;
+            if (!id) continue;
+
+            const aliases = Array.isArray(e.aliases)
+              ? e.aliases
+              : e.platforms || e.aliases
+                ? Object.entries(e.platforms || e.aliases).map(([p, s]) => ({
+                    platform: p,
+                    slug: s,
+                  }))
+                : [];
+
+            for (const a of aliases) {
+              if (a.platform && a.slug) {
+                lookup.set(`${a.platform}:${a.slug}`, { id, title, topic: e.topic, tags: e.tags });
+              }
             }
           }
         }
+
+        // 2. Populate/Override from Local Entries
+        if (Array.isArray(localEntries)) {
+          for (const e of localEntries) {
+            const id = e.canonicalId;
+            const title = e.canonicalTitle || id;
+            if (!id) continue;
+
+            const aliases = Array.isArray(e.aliases) ? e.aliases : [];
+            for (const a of aliases) {
+              if (a.platform && a.slug) {
+                lookup.set(`${a.platform}:${a.slug}`, { id, title, topic: e.topic, tags: e.tags });
+              }
+            }
+          }
+        }
+
         setCanonicalLookup(lookup);
       })
       .catch(() => {});
-  }, []);
+  }, [problems]);
 
   // Enrich raw problems with canonical data (computed, not persisted)
   const enrichedProblems = useMemo(() => {
@@ -153,70 +175,76 @@ function LibraryApp() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([Storage.getAllProblems(), Storage.getSettings()])
-      .then(([p, s]) => {
-        if (!mounted) return;
-        setProblems(p || []);
-        setSettings(s || {});
-        // Hydrate display state from saved settings (avatar + username)
-        if (s?.github_avatar) setGitAvatar(s.github_avatar);
-        if (s?.github_username) setGitUser(s.github_username);
+    (async () => {
+      try {
+        await Storage.repairGFGTimestamps();
+      } catch (_) {}
+      if (!mounted) return;
+      Promise.all([Storage.getAllProblems(), Storage.getSettings()])
+        .then(([p, s]) => {
+          if (!mounted) return;
+          setProblems(p || []);
+          setSettings(s || {});
+          // Hydrate display state from saved settings (avatar + username)
+          if (s?.github_avatar) setGitAvatar(s.github_avatar);
+          if (s?.github_username) setGitUser(s.github_username);
 
-        // Check for duplicate problems — diff-approach groups first so the
-        // user handles manual decisions before 10-second auto-resolvers run.
-        // Uses classifyDuplicatePair so sort order matches what the modal renders.
-        const dups = findDuplicates(p || []).sort((a, b) => {
-          const isDiff = (g) => classifyDuplicatePair(g[0], g[1]) === "diff-approach";
-          return isDiff(b) - isDiff(a);
-        });
-        setDuplicateGroups(dups);
-        if (dups.length > 0) {
-          setCurrentDuplicateGroup(dups[0]);
-        }
+          // Check for duplicate problems — diff-approach groups first so the
+          // user handles manual decisions before 10-second auto-resolvers run.
+          // Uses classifyDuplicatePair so sort order matches what the modal renders.
+          const dups = findDuplicates(p || []).sort((a, b) => {
+            const isDiff = (g) => classifyDuplicatePair(g[0], g[1]) === "diff-approach";
+            return isDiff(b) - isDiff(a);
+          });
+          setDuplicateGroups(dups);
+          if (dups.length > 0) {
+            setCurrentDuplicateGroup(dups[0]);
+          }
 
-        // Resolve GitHub user via OAuth token only — no PAT fallback.
-        // Validates the token against /user on every load; if the token
-        // is revoked or invalid the user is prompted to reconnect inline.
-        Storage.getAuthToken("github").then(async (oauthToken) => {
-          const hasRepo = !!(s?.github_repo || s?.gitRepo);
-          if (!oauthToken) {
-            // Never authenticated — show first-time setup prompt.
-            if (mounted) setSetupIncomplete(true);
-            return;
-          }
-          // Inject into local settings state so SettingsSchema "Connected" indicator works.
-          // This is display-only — never persisted to chrome.storage.
-          if (mounted) {
-            setSettings((prev) => ({ ...prev, github_token: oauthToken }));
-          }
-          try {
-            const res = await fetch(`${CONSTANTS.GIT_PROVIDERS.github.apiBase}/user`, {
-              headers: { Authorization: `Bearer ${oauthToken}` },
-            });
-            if (!res.ok) {
-              if (res.status === 401) {
-                // Token revoked or invalidated by GitHub — clear and show expired banner.
-                await Storage.setAuthToken("github", "");
-                if (mounted) {
-                  setSettings((prev) => ({ ...prev, github_token: "" }));
-                  setGitUser(null);
-                  setTokenExpired(true);
-                }
-              }
+          // Resolve GitHub user via OAuth token only — no PAT fallback.
+          // Validates the token against /user on every load; if the token
+          // is revoked or invalid the user is prompted to reconnect inline.
+          Storage.getAuthToken("github").then(async (oauthToken) => {
+            const hasRepo = !!(s?.github_repo || s?.gitRepo);
+            if (!oauthToken) {
+              // Never authenticated — show first-time setup prompt.
+              if (mounted) setSetupIncomplete(true);
               return;
             }
-            const u = await res.json();
-            if (!mounted) return;
-            if (u?.login) setGitUser(u.login);
-            if (u?.avatar_url && !s?.github_avatar) setGitAvatar(u.avatar_url);
-            setSetupIncomplete(!hasRepo);
-          } catch (_) {
-            // Network failure — don't clear the token, don't show expired banner.
-            if (mounted) setSetupIncomplete(!hasRepo);
-          }
-        });
-      })
-      .finally(() => mounted && setLoading(false));
+            // Inject into local settings state so SettingsSchema "Connected" indicator works.
+            // This is display-only — never persisted to chrome.storage.
+            if (mounted) {
+              setSettings((prev) => ({ ...prev, github_token: oauthToken }));
+            }
+            try {
+              const res = await fetch(`${CONSTANTS.GIT_PROVIDERS.github.apiBase}/user`, {
+                headers: { Authorization: `Bearer ${oauthToken}` },
+              });
+              if (!res.ok) {
+                if (res.status === 401) {
+                  // Token revoked or invalidated by GitHub — clear and show expired banner.
+                  await Storage.setAuthToken("github", "");
+                  if (mounted) {
+                    setSettings((prev) => ({ ...prev, github_token: "" }));
+                    setGitUser(null);
+                    setTokenExpired(true);
+                  }
+                }
+                return;
+              }
+              const u = await res.json();
+              if (!mounted) return;
+              if (u?.login) setGitUser(u.login);
+              if (u?.avatar_url && !s?.github_avatar) setGitAvatar(u.avatar_url);
+              setSetupIncomplete(!hasRepo);
+            } catch (_) {
+              // Network failure — don't clear the token, don't show expired banner.
+              if (mounted) setSetupIncomplete(!hasRepo);
+            }
+          });
+        })
+        .finally(() => mounted && setLoading(false));
+    })();
     return () => (mounted = false);
   }, []);
 
@@ -465,7 +493,12 @@ function LibraryApp() {
   const handleSetupRepo = useCallback(
     async (token, _owner) => {
       const t = token || (await Storage.getAuthToken("github").catch(() => null));
-      if (!t) return;
+      if (!t) {
+        // No token — start OAuth so the user can authenticate first.
+        // After OAuth completes, processOAuthToken auto-opens the onboarding modal.
+        triggerReauth();
+        return;
+      }
       // Validate the token before opening the modal — stale PATs produce 401s
       // inside GitHubOnboardingModal which are confusing and show no clear error.
       const userRes = await fetch("https://api.github.com/user", {
@@ -476,6 +509,13 @@ function LibraryApp() {
           await Storage.setAuthToken("github", "").catch(() => {});
           setGitUser(null);
           setTokenExpired(true);
+        } else {
+          // Network error or other transient failure — still try to open the modal
+          // with whatever username we have cached so the user isn't blocked.
+          if (gitUser) {
+            setOnboardingData({ username: gitUser, token: t });
+            setShowGitHubOnboarding(true);
+          }
         }
         return;
       }
@@ -646,6 +686,7 @@ function LibraryApp() {
         copyableEnabled=${settings?.aiCopyable === true}
         problems=${enrichedProblems}
         settings=${settings}
+        onSettingsChange=${handleSettingsChange}
       />`;
     if (activeTab === "behaviour-bank")
       return html`<${BehaviourBankView} problems=${enrichedProblems} onNavigate=${setActiveTab} />`;
@@ -663,50 +704,6 @@ function LibraryApp() {
 
   return html`
     <div class="flex flex-col h-full w-full bg-[var(--cl-bg)]">
-      ${importReport &&
-      html`
-        <div
-          class="px-4 py-3 bg-emerald-900/30 border-b border-emerald-500/20 flex items-center gap-3 flex-wrap text-sm shrink-0"
-        >
-          <span class="text-emerald-300 font-medium">Import complete:</span>
-          <span class="text-slate-300">${importReport.saved} saved</span>
-          ${importReport.autoMerged > 0 &&
-          html`<span class="text-slate-400">· ${importReport.autoMerged} auto-merged</span>`}
-          ${importReport.conflicts > 0 &&
-          html`<span class="text-amber-300"
-            >· ${importReport.conflicts} conflict${importReport.conflicts === 1 ? "" : "s"} need
-            review</span
-          >`}
-          ${importReport.missingCode > 0 &&
-          html`<span class="text-slate-400"
-            >· ${importReport.missingCode} queued for code recovery</span
-          >`}
-          ${importReport.missingTags > 0 &&
-          html`<span class="text-slate-400"
-            >· ${importReport.missingTags} queued for tag refresh</span
-          >`}
-          <div class="ml-auto flex gap-2">
-            ${importReport.conflicts > 0 &&
-            html`
-              <button
-                onClick=${() => {
-                  setActiveTab("settings");
-                  setImportReport(null);
-                }}
-                class="px-3 py-1 text-xs rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-200 hover:bg-amber-500/25 transition-colors"
-              >
-                View conflicts
-              </button>
-            `}
-            <button
-              onClick=${() => setImportReport(null)}
-              class="px-3 py-1 text-xs rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      `}
       <header
         class="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[var(--cl-surface)] shrink-0"
       >
@@ -834,7 +831,52 @@ function LibraryApp() {
         </div>
       </header>
 
-      <main class="flex-1 flex overflow-hidden">
+      ${importReport &&
+      html`
+        <div
+          class="px-4 py-3 bg-emerald-900/30 border-b border-emerald-500/20 flex items-center gap-3 flex-wrap text-sm shrink-0"
+        >
+          <span class="text-emerald-300 font-medium">Import complete:</span>
+          <span class="text-slate-300">${importReport.saved} saved</span>
+          ${importReport.autoMerged > 0 &&
+          html`<span class="text-slate-400">· ${importReport.autoMerged} auto-merged</span>`}
+          ${importReport.conflicts > 0 &&
+          html`<span class="text-amber-300"
+            >· ${importReport.conflicts} conflict${importReport.conflicts === 1 ? "" : "s"} need
+            review</span
+          >`}
+          ${importReport.missingCode > 0 &&
+          html`<span class="text-slate-400"
+            >· ${importReport.missingCode} queued for code recovery</span
+          >`}
+          ${importReport.missingTags > 0 &&
+          html`<span class="text-slate-400"
+            >· ${importReport.missingTags} queued for tag refresh</span
+          >`}
+          <div class="ml-auto flex gap-2">
+            ${importReport.conflicts > 0 &&
+            html`
+              <button
+                onClick=${() => {
+                  setActiveTab("settings");
+                  setImportReport(null);
+                }}
+                class="px-3 py-1 text-xs rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-200 hover:bg-amber-500/25 transition-colors"
+              >
+                View conflicts
+              </button>
+            `}
+            <button
+              onClick=${() => setImportReport(null)}
+              class="px-3 py-1 text-xs rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      `}
+
+      <main class="flex-1 flex overflow-hidden min-h-0">
         <aside
           style=${{ width: sidebarCollapsed ? "72px" : "260px" }}
           class="border-r border-white/5 bg-[var(--cl-surface)] flex flex-col p-3 shrink-0 transition-all"
@@ -949,7 +991,7 @@ function LibraryApp() {
           </div>
         </aside>
 
-        <div class="flex-1 bg-[var(--cl-bg)] p-6 overflow-y-auto">
+        <div class="flex-1 bg-[var(--cl-bg)] p-6 overflow-y-auto min-h-0">
           ${tokenExpired
             ? html`
                 <div

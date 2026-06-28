@@ -23,7 +23,12 @@ export class Packager {
     zip.addLocalFolder(
       resolve(this.ctx.rootDir, "src"),
       "",
-      (name) => name !== "manifest.json" && !/desktop\.ini$/i.test(name),
+      (name) => {
+        return name !== "manifest-chromium.json" &&
+               name !== "manifest-firefox.json" &&
+               name !== "manifest.json" &&
+               !/desktop\.ini$/i.test(name);
+      },
     );
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
@@ -55,7 +60,12 @@ export class Packager {
     zip.addLocalFolder(
       resolve(this.ctx.rootDir, "src"),
       "",
-      (name) => name !== "manifest.json" && !/desktop\.ini$/i.test(name),
+      (name) => {
+        return name !== "manifest-chromium.json" &&
+               name !== "manifest-firefox.json" &&
+               name !== "manifest.json" &&
+               !/desktop\.ini$/i.test(name);
+      },
     );
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 

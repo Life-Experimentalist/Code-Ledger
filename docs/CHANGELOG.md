@@ -6,6 +6,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.7] — 2026-06-26
+
+### Added
+
+- **Compliance: Built-in Demo AI Assistant & Reviews** — If no AI API keys are configured (such as during Chrome Web Store review), the extension falls back to a built-in Demo model. This allows reviewers and new users to test AI reviews and chat functionality immediately without third-party setup.
+
+### Fixed
+
+- **CWS: Create Repository flow unblocked** — "Set up repository" button silently did nothing when no GitHub token was saved (user hadn't authenticated yet). It now triggers the OAuth popup immediately, so the full Create Repository flow is accessible without needing to go through Settings first. Additionally, the "Create Repository" button inside the onboarding modal was disabled while checking name availability; it now remains active (the 422 from GitHub handles the taken-name case) so reviewers and users are never stuck waiting on a background API check.
+- **GeeksForGeeks: Actual Submission Time Import** — Fixed a bug where GFG on-demand code recovery would keep the profile-import timestamp (i.e. the import date) instead of updating it to the actual submission time scraped from GFG's submissions page. Problem timestamp now correctly matches the latest solve.
+- **GeeksForGeeks: Backdated Git Commits** — Recovered GFG problems are now committed individually in the background with the correct backdated submission time as the commit time, matching LeetCode parity.
+- **Library: Updated GeeksForGeeks Links** — Solutions panel page now links GFG Practice directly to `https://www.geeksforgeeks.org/explore` instead of the old URL. Added a direct link to `https://www.geeksforgeeks.org/profile` on the GFG card.
+- **GeeksForGeeks: Secure Profile Import** — The "Import All Solves" button is now only injected if the profile page contains the "Edit Profile" button, preventing users from importing solves from profiles they do not own.
+- **Compliance: Privacy Policy Clarified** — Rewrote `PRIVACY.md` to fully declare data collection, handling, storage, and sharing details to fully satisfy Chrome Web Store User Data Privacy requirements.
+- **Build: Release zips no longer duplicated in releases root** — `packager.js`, `package-chrome.js`, and `package-firefox.js` were writing zips to both `releases/` (root) and `releases/{version}/`. Zips now go only to the versioned subdirectory. Existing stray `codeledger-chromium-v1.4.7.zip` and `codeledger-firefox-v1.4.7.zip` from the root have been removed.
+
 ## [1.4.6] — 2026-06-18
 
 ### Fixed
