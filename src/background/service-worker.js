@@ -12,7 +12,11 @@ import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
 import { buildConversationSystemPrompt } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
-import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
+import {
+  handleRefreshMetadata,
+  completeRefreshMetadata,
+  refreshSingleGFGProblem,
+} from "./refresh-metadata-handler.js";
 import { triggerCodeRecovery } from "./code-recovery-handler.js";
 import {
   buildProblemFiles,
@@ -30,6 +34,7 @@ import {
   forceRebuildRepo,
   detectRepoLayoutVersion,
   migrateProblemIds,
+  migrateTagsToCanonical,
 } from "./migration-manager.js";
 import { SyncEngine, importFromRepo, applyImport } from "./sync-engine.js";
 import { detectDuplicate, normalizeCode } from "../core/duplicate-detector.js";
@@ -67,12 +72,26 @@ import {
   listBackups,
   commitBackupToGitHub,
   fetchBackupSnapshot,
+  restoreSnapshot,
+  buildSnapshot,
 } from "../core/backup/backup-manager.js";
 import {
   findDuplicatesForProblem,
   compareSolutions as compareSolutionsForDedup,
 } from "../core/ai-deduplication.js";
-import { recordAIReview, getProblemStats, recordAIInsights } from "../core/behavior-bank.js";
+import {
+  recordSolve,
+  recordChatInteraction,
+  recordHintView,
+  recordAIReview,
+  getProblemStats,
+  recordAIInsights,
+  autoPopulateFromHistory,
+} from "../core/behavior-bank.js";
+
+// Lazy reference to topic-resolver (populated on first use)
+let _topicResolver = { normalizeTag: (t) => t };
+import("../core/topic-resolver.js").then((m) => { _topicResolver = m; }).catch(() => {});
 
 let _syncAlarmBound = false;
 let _reviewQueueAlarmBound = false;
@@ -158,6 +177,15 @@ async function getAIReviewQueueStatus() {
 
 const dbg = createDebugger("ServiceWorker");
 
+let initResolve;
+const initPromise = new Promise((resolve) => {
+  initResolve = resolve;
+});
+
+// Register event listeners synchronously at startup so they are never missed
+// if a cold start event wakes up the service worker.
+eventBus.on("problem:solved", handleSolved);
+
 // Init background
 async function init() {
   await initDebug();
@@ -169,6 +197,9 @@ async function init() {
 
   // Migrate existing problem IDs to platform-scoped format (lc/gfg/cf prefix).
   migrateProblemIds().catch((e) => dbg.error(`init(): migrateProblemIds failed:`, e));
+  migrateTagsToCanonical().catch((e) =>
+    dbg.warn("migrateTagsToCanonical() failed (non-blocking):", e?.message),
+  );
 
   // Register handlers
   dbg.log(`init(): registering handlers...`);
@@ -179,6 +210,11 @@ async function init() {
 
   // Initialize AI review queue store
   await initializeReviewQueueStore();
+
+  // Retroactively repair GFG timestamps from recovered methods
+  await Storage.repairGFGTimestamps().catch((e) => {
+    dbg.error("init(): repairGFGTimestamps failed:", e);
+  });
 
   // Detect extension updates and flag migration if needed
   try {
@@ -197,7 +233,6 @@ async function init() {
   }
 
   // Set up event listeners
-  eventBus.on("problem:solved", handleSolved);
 
   chrome.tabs.onRemoved.addListener((tabId) => {
     completeRefreshMetadata(tabId);
@@ -212,6 +247,7 @@ async function init() {
         periodInMinutes: CONSTANTS.SYNC_ALARM_PERIOD_MIN || 30,
       });
       chrome.alarms.create("AI_REVIEW_QUEUE", { periodInMinutes: 5 });
+      chrome.alarms.create("CODE_RECOVERY_QUEUE", { periodInMinutes: 1 });
       // Batch-commit pending AI reviews and metadata edits every 10 minutes.
       // This prevents one-commit-per-problem clutter for maintenance operations.
       chrome.alarms.create("MAINTENANCE_COMMIT", { periodInMinutes: 10 });
@@ -222,6 +258,10 @@ async function init() {
         } else if (alarm?.name === "AI_REVIEW_QUEUE") {
           processAIReviewQueue().catch((e) =>
             dbg.warn("AI review queue processing failed:", e.message),
+          );
+        } else if (alarm?.name === "CODE_RECOVERY_QUEUE") {
+          processCodeRecoveryQueue().catch((e) =>
+            dbg.warn("Code recovery queue processing failed:", e.message),
           );
         } else if (alarm?.name === "MAINTENANCE_COMMIT") {
           (async () => {
@@ -274,6 +314,9 @@ async function init() {
   autoSyncSettings().catch(() => {});
 
   dbg.log("init(): ✓ background initialized");
+  if (initResolve) {
+    initResolve();
+  }
 }
 
 async function applyFirstRunDefaults() {
@@ -507,20 +550,55 @@ async function generateAIReview(problem = {}, settings = null) {
 
       dbg.log(`generateAIReview(): ✓ success via ${providerId} (${String(review).length} chars)`);
 
-      // Parse AI-inferred tags if the problem had none
-      if (review && (!problem.tags || problem.tags.length === 0)) {
-        const tagsMatch = review.match(/^TAGS:\s*(.+)$/m);
+      // Parse AI-inferred metadata
+      let inferredMetadata = null;
+      if (review) {
+        const metaRegex = /METADATA\s*\n([\s\S]*?)\n\s*END_METADATA/i;
+        const blockMatch = review.match(metaRegex);
+        let blockText = "";
+        if (blockMatch) {
+          blockText = blockMatch[0];
+          review = review.replace(blockMatch[0], "").trim();
+        } else {
+          // Fallback: look for individual lines starting with TAGS, TOPIC, PATTERN, DIFFICULTY
+          const lines = review.split("\n");
+          const keptLines = [];
+          for (const line of lines) {
+            if (/^(TAGS|TOPIC|PATTERN|DIFFICULTY|METADATA|END_METADATA):/i.test(line)) {
+              blockText += line + "\n";
+            } else {
+              keptLines.push(line);
+            }
+          }
+          review = keptLines.join("\n").trim();
+        }
+
+        const tagsMatch = blockText.match(/TAGS:\s*(.+)/i);
+        const topicMatch = blockText.match(/TOPIC:\s*(.+)/i);
+        const patternMatch = blockText.match(/PATTERN:\s*(.+)/i);
+        const diffMatch = blockText.match(/DIFFICULTY:\s*(.+)/i);
+
+        const meta = {};
         if (tagsMatch) {
-          const parsed = tagsMatch[1]
+          meta.tags = tagsMatch[1]
             .split(",")
             .map((t) => t.trim())
             .filter(Boolean);
-          if (parsed.length) {
-            inferredTags = parsed;
-            dbg.log(`generateAIReview(): inferred tags: ${parsed.join(", ")}`);
-          }
-          // Strip TAGS line from review so it doesn't appear in the UI
-          review = review.replace(/^TAGS:\s*.+$/m, "").trim();
+          inferredTags = meta.tags; // For backwards compatibility
+        }
+        if (topicMatch) {
+          meta.topic = topicMatch[1].trim();
+        }
+        if (patternMatch) {
+          meta.pattern = patternMatch[1].trim();
+        }
+        if (diffMatch) {
+          meta.difficulty = diffMatch[1].trim();
+        }
+
+        if (Object.keys(meta).length > 0) {
+          inferredMetadata = meta;
+          dbg.log("generateAIReview(): parsed inferred metadata", meta);
         }
       }
 
@@ -532,7 +610,8 @@ async function generateAIReview(problem = {}, settings = null) {
         summary: review.slice(0, 200),
       }).catch(() => {});
 
-      return { review, providerId, inferredTags };
+      const modelId = provider.model || CONSTANTS.AI_PROVIDERS[providerId]?.defaultModel || "";
+      return { review, providerId, modelId, inferredTags, inferredMetadata };
     } catch (err) {
       const errMsg = String(err?.message || "").toLowerCase();
       if (errMsg.includes("timeout")) {
@@ -555,14 +634,88 @@ async function generateAIReview(problem = {}, settings = null) {
   }
 
   if (triedCount === 0) {
-    throw new Error(
-      "No AI providers are enabled. Add an API key and enable a provider in Settings → AI.",
-    );
+    dbg.log("generateAIReview(): no providers enabled, returning Demo review");
+    return {
+      review: `### CodeLedger Demo Review
+
+**Status:** Running in Demo Mode (no API key configured)
+
+This is a simulated review to demonstrate CodeLedger's AI review functionality. To generate live, customized reviews based on your code:
+1. Open the CodeLedger **Settings** panel.
+2. Navigate to the **AI** tab.
+3. Select your preferred provider (e.g., Google Gemini, OpenAI, Claude, or local Ollama).
+4. Enter your personal API key and click **Save**.
+
+---
+
+#### ✦ Initial Impressions
+The structure of your code is clean and readable. The problem-solving logic aligns with standard approaches for **${problem.title || problem.titleSlug || "this problem"}**.
+
+#### ✦ Code Analysis
+- **Time Complexity:** Optimized to match the average complexity for this type of problem.
+- **Space Complexity:** Operates within acceptable limits without excessive auxiliary storage.
+- **Style:** Good variable naming and clear loop structure.
+
+*Demo Mode — Settings → AI to connect.*`,
+      providerId: "demo",
+      modelId: "demo-model",
+      inferredTags: [],
+      inferredMetadata: {
+        tags: [],
+        topic: "Demo",
+        pattern: "Demo",
+        difficulty: problem.difficulty || "Easy",
+      },
+    };
   }
 
   throw new Error(
     "AI review failed — all providers returned errors. Check your API keys in Settings → AI.",
   );
+}
+
+function applyInferredMetadata(problem, inferredMetadata) {
+  if (!inferredMetadata) return problem;
+  const updated = { ...problem };
+  if (
+    inferredMetadata.tags &&
+    Array.isArray(inferredMetadata.tags) &&
+    inferredMetadata.tags.length > 0
+  ) {
+    // Normalize AI-returned tags through canonical system
+    const { normalizeTag } = _topicResolver;
+    const normalizedNew = inferredMetadata.tags
+      .map((t) => normalizeTag(t))
+      .filter(Boolean);
+
+    const existingTags = Array.isArray(problem.tags) ? problem.tags : [];
+    const hasUsefulExisting = existingTags.length > 0 && existingTags.some((t) => t !== "Untagged");
+
+    if (hasUsefulExisting) {
+      // Merge: union existing + new (canonical), deduplicated
+      const merged = [...new Set([...existingTags, ...normalizedNew])];
+      updated.tags = merged;
+    } else {
+      // No existing tags — use AI-inferred ones directly
+      updated.tags = normalizedNew;
+    }
+  }
+  if (inferredMetadata.topic) {
+    const { normalizeTag } = _topicResolver;
+    updated.topic = normalizeTag(inferredMetadata.topic) || inferredMetadata.topic;
+  }
+  if (inferredMetadata.pattern) {
+    updated.pattern = inferredMetadata.pattern;
+  }
+  if (inferredMetadata.difficulty) {
+    const d =
+      inferredMetadata.difficulty.charAt(0).toUpperCase() +
+      inferredMetadata.difficulty.slice(1).toLowerCase();
+    if (["Easy", "Medium", "Hard"].includes(d)) {
+      updated.difficulty = d;
+    }
+  }
+  return updated;
 }
 
 async function commitUpdatedProblem(problem, settings) {
@@ -627,6 +780,10 @@ async function commitUpdatedProblem(problem, settings) {
     dbg.log(`commitUpdatedProblem(): ✓ commit succeeded`);
     _maybeGenerateAISummary(currentSettings).catch(() => {});
     // Rolling backup — fire-and-forget, errors logged internally
+    buildSnapshot()
+      .then((snapshot) => Storage.updateRollingBackup(snapshot))
+      .catch((e) => dbg.warn("Failed to update local rolling backup on update:", e));
+
     const _git = registry.getGitProvider(currentSettings.gitProvider || "github");
     if (_git) {
       const _owner = currentSettings.github_owner || currentSettings.github_username || "";
@@ -813,6 +970,7 @@ async function handleSyncApplyImport(problems = []) {
   return { saved: Array.isArray(problems) ? problems.length : 0 };
 }
 async function handleSolved(data) {
+  await initPromise;
   dbg.log(`handleSolved(): received solve event, titleSlug=${data.titleSlug}`);
 
   // 0. Incognito mode guard — silently skip recording and committing
@@ -857,6 +1015,15 @@ async function handleSolved(data) {
     }
   }
   await Storage.saveProblem(data);
+  await recordSolve({
+    slug: data.titleSlug || data.id || "",
+    platform: data.platform || "",
+    difficulty: data.difficulty || "",
+    lang: langName,
+    elapsedSeconds: data.elapsedSeconds || 0,
+    tags: data.tags || [],
+  }).catch((e) => dbg.warn("Failed to record solve in behavior bank:", e?.message));
+
   {
     const problemCommitKey = getProblemCommitKey(data);
     if (problemCommitKey) {
@@ -898,10 +1065,17 @@ async function handleSolved(data) {
   const shouldAutoReview = settings.autoReview !== false && data._requestAIReview === true;
   if (shouldAutoReview) {
     try {
-      const { review, providerId } = await generateAIReview(data, settings);
+      const { review, providerId, modelId, inferredMetadata } = await generateAIReview(
+        data,
+        settings,
+      );
       data.aiReview = review;
-      await Storage.saveProblem(data);
-      dbg.log(`handleSolved(): ✓ AI review success via ${providerId}`);
+      data._aiProvider = providerId;
+      data._aiModel = modelId;
+
+      let updatedData = applyInferredMetadata(data, inferredMetadata);
+      await Storage.saveProblem(updatedData);
+      dbg.log(`handleSolved(): ✓ AI review success via ${providerId} (${modelId})`);
     } catch (err) {
       // 3b. Duplicate Detection — check if code matches existing solutions
       try {
@@ -1111,10 +1285,28 @@ async function handleSolved(data) {
         } catch (_) {}
       }
 
+      // Local rolling backup (always-current snapshot)
+      buildSnapshot()
+        .then((snapshot) => Storage.updateRollingBackup(snapshot))
+        .catch((e) => dbg.warn("Failed to update local rolling backup on solve:", e));
+
       // Scheduled backup on solve (if enabled)
-      if (settings.schedBackupOnSolve) {
-        const allP = await Storage.getAllProblems().catch(() => []);
-        Storage.addScheduledBackup({ problems: allP, settings }, "on-solve").catch(() => {});
+      if (settings.schedBackupOnSolve !== false) {
+        buildSnapshot()
+          .then((snapshot) => Storage.addScheduledBackup(snapshot, "on-solve"))
+          .catch((e) => dbg.warn("Failed to save scheduled backup on solve:", e));
+      }
+
+      // GitHub rolling backup (if enabled)
+      const _git = registry.getGitProvider(settings.gitProvider || "github");
+      if (_git) {
+        const _owner = settings.github_owner || settings.github_username || "";
+        const _repo = settings.github_repo || settings.gitRepo || "";
+        if (_owner && _repo) {
+          maybeCommitRollingBackup(_owner, _repo, _git).catch((err) => {
+            dbg.warn("maybeCommitRollingBackup failed inside handleSolved:", err);
+          });
+        }
       }
 
       // Fire-and-forget: rename files to canonical paths if needed
@@ -1936,6 +2128,7 @@ async function handleBulkImport(problems = []) {
   const pendingKeys = [];
   let autoMerged = 0;
   let conflicts = 0;
+  let actualSaved = 0;
 
   // Group by titleSlug
   const bySlug = {};
@@ -2034,16 +2227,26 @@ async function handleBulkImport(problems = []) {
   const importedIds = new Set(problems.map((p) => p.id));
   const imported = allSaved.filter((p) => importedIds.has(p.id));
 
+  const toRefresh = [];
+
   for (const p of imported) {
     if (!p.code && p.platform === "leetcode" && p.titleSlug) {
       await enqueueReview(p.id, 999).catch(() => {});
       missingCode++;
     }
-    if (!p.tags?.length || !["Easy", "Medium", "Hard"].includes(p.difficulty)) {
-      await Storage.markForMetadataRefresh?.(p.id).catch(() => {});
+    if (
+      !p.tags?.length ||
+      !["Easy", "Medium", "Hard"].includes(p.difficulty) ||
+      !p.problemStatement
+    ) {
+      toRefresh.push(p);
       if (!p.tags?.length) missingTags++;
       if (!["Easy", "Medium", "Hard"].includes(p.difficulty)) missingDifficulty++;
     }
+  }
+
+  if (toRefresh.length > 0) {
+    handleRefreshMetadata(toRefresh).catch(() => {});
   }
 
   // Kick review queue immediately if there are problems without code needing recovery
@@ -2166,6 +2369,7 @@ async function handleAIChat(messages, context = {}) {
   });
 
   dbg.log(`handleAIChat(): ${providers.length} provider(s) in fallback chain`);
+  let triedCount = 0;
   for (let idx = 0; idx < providers.length; idx++) {
     const provider = providers[idx];
     if (settings[`${provider.id}_enabled`] === false) {
@@ -2181,6 +2385,7 @@ async function handleAIChat(messages, context = {}) {
       );
       continue;
     }
+    triedCount++;
     try {
       dbg.log(`handleAIChat(): attempt ${idx + 1}/${providers.length} - calling ${provider.id}...`);
       const response = await ai.chat(messagesWithContext, {
@@ -2190,7 +2395,13 @@ async function handleAIChat(messages, context = {}) {
       dbg.log(
         `handleAIChat(): received response from ${provider.id} (${String(response || "").length} chars)`,
       );
-      return response;
+      const modelId = provider.model || CONSTANTS.AI_PROVIDERS[provider.id]?.defaultModel || "";
+      return {
+        response,
+        providerId: provider.id,
+        modelId,
+        isFallback: idx > 0,
+      };
     } catch (e) {
       dbg.warn(
         `handleAIChat(): attempt ${idx + 1}/${providers.length} - ${provider.id} failed:`,
@@ -2200,6 +2411,16 @@ async function handleAIChat(messages, context = {}) {
   }
 
   dbg.error(`handleAIChat(): all providers exhausted`);
+
+  if (triedCount === 0) {
+    dbg.log("handleAIChat(): no providers enabled, returning Demo response");
+    return {
+      response: _generateDemoResponse(messages, context),
+      providerId: "demo",
+      modelId: "demo-model",
+      isFallback: true,
+    };
+  }
 
   // Check if the issue is rate limiting or missing config
   const rateKeyword = /rate.?limit|quota|429|too.many|throttle/i;
@@ -2216,6 +2437,43 @@ async function handleAIChat(messages, context = {}) {
   }
 
   throw new Error("No AI providers available or configured. Add an API key in Settings → AI.");
+}
+
+function _generateDemoResponse(messages, context) {
+  const lastUserMessage = messages[messages.length - 1]?.content || "";
+  const problemTitle = context.title || "this problem";
+
+  if (/hello|hi|hey/i.test(lastUserMessage)) {
+    return `Hello! I am the built-in CodeLedger Demo Assistant. 
+
+I am running in **Demo Mode** because no external AI provider (like Google Gemini, OpenAI, or Claude) has been configured with an API key yet.
+
+To connect me to a live LLM, you can add an API key at any time in **Settings → AI**.
+
+In the meantime, I can simulate Socratic tutoring or direct explanations for **${problemTitle}**! Feel free to ask me questions about your code, time complexity, or potential edge cases.`;
+  }
+
+  if (/complexity|time|space|fast|slow/i.test(lastUserMessage)) {
+    return `Let's analyze the complexity of your solution for **${problemTitle}**.
+
+Based on a typical approach:
+1. **Time Complexity:** Usually \\(O(N)\\) or \\(O(N \\log N)\\) depending on the algorithm. For array sorting or tree traversals, we aim for linear or linearithmic time.
+2. **Space Complexity:** \\(O(1)\\) if we modify in-place, or \\(O(N)\\) if we use auxiliary arrays, recursion stacks, or hash maps.
+
+*Note: This is a simulated response in Demo Mode. Connect an API key in Settings to receive live, real-time code complexity analysis.*`;
+  }
+
+  return `I received your message: "${lastUserMessage}".
+
+I am currently running in **Demo Mode** because no external AI provider has been configured. 
+
+### How to enable real AI Reviews & Chats:
+1. Open the CodeLedger **Settings** panel (gear icon).
+2. Go to the **AI** tab.
+3. Select your preferred provider (e.g., Google Gemini, OpenAI, Claude, or local Ollama).
+4. Enter your personal API key and click **Save**.
+
+Once configured, I will automatically analyze your DSA solutions and answer any follow-up questions in real-time!`;
 }
 
 async function handleRegenerateAIReview(problem = {}) {
@@ -2236,7 +2494,10 @@ async function handleRegenerateAIReview(problem = {}) {
   dbg.log(
     `handleRegenerateAIReview(): requesting new AI review${methodIndex >= 0 ? ` (method ${methodIndex})` : ""}...`,
   );
-  const { review, providerId } = await generateAIReview(problem, settings);
+  const { review, providerId, modelId, inferredMetadata } = await generateAIReview(
+    problem,
+    settings,
+  );
 
   let updated;
   if (methodIndex >= 0) {
@@ -2245,11 +2506,25 @@ async function handleRegenerateAIReview(problem = {}) {
     const stored = (await Storage.getProblem(slug)) || problem;
     const methods = [...(stored.methods || [])];
     if (methods[methodIndex]) {
-      methods[methodIndex] = { ...methods[methodIndex], aiReview: review };
+      methods[methodIndex] = {
+        ...methods[methodIndex],
+        aiReview: review,
+        _aiProvider: providerId,
+        _aiModel: modelId,
+      };
     }
     updated = { ...stored, methods };
   } else {
-    updated = { ...problem, aiReview: review };
+    updated = {
+      ...problem,
+      aiReview: review,
+      _aiProvider: providerId,
+      _aiModel: modelId,
+    };
+  }
+
+  if (inferredMetadata) {
+    updated = applyInferredMetadata(updated, inferredMetadata);
   }
 
   await Storage.saveProblem(updated);
@@ -2315,6 +2590,94 @@ async function handleQueueAllAIReviews(missingOnly = false) {
   // Kick the processor immediately rather than waiting for the next alarm tick
   if (queued > 0) processAIReviewQueue().catch(() => {});
   return { queued, skipped };
+}
+
+// ============================================================================
+// Code Recovery Background Queue
+// ============================================================================
+
+let _codeRecoveryBusy = false;
+let _codeRecoverySlowTick = 0;
+
+async function processCodeRecoveryQueue() {
+  if (_codeRecoveryBusy) return;
+
+  const settings = await Storage.getSettings();
+  const speed = settings.codeRecoveryQueueSpeed || "disabled";
+
+  if (speed === "disabled") return;
+  if (speed === "slow") {
+    _codeRecoverySlowTick = (_codeRecoverySlowTick + 1) % 5;
+    if (_codeRecoverySlowTick !== 0) return;
+  }
+
+  // Fast: up to 6 problems per minute (one every 10s). Slow: 1 problem per 5 mins.
+  const batchSize = speed === "fast" ? 6 : 1;
+
+  try {
+    _codeRecoveryBusy = true;
+    const all = await Storage.getAllProblems();
+
+    // Eligible problems: missing code or explicit flag
+    const eligible = all.filter(
+      (p) =>
+        p._needsCodeFetch ||
+        (p.platform === "geeksforgeeks" &&
+          p._importedFromProfile &&
+          (!p.code || p.code.trim() === "")),
+    );
+    if (eligible.length === 0) return;
+
+    // Sort newest first
+    eligible.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    const batch = eligible.slice(0, batchSize);
+    dbg.log(
+      `processCodeRecoveryQueue(): found ${eligible.length} eligible, processing ${batch.length} (${speed} mode)`,
+    );
+
+    for (let i = 0; i < batch.length; i++) {
+      const p = batch[i];
+      dbg.log(`processCodeRecoveryQueue(): recovering code for ${p.titleSlug} (id: ${p.id})`);
+
+      const res = await triggerCodeRecovery(p).catch((e) => ({ ok: false, error: e.message }));
+
+      const current = await Storage.getProblem(p.id);
+      if (current) {
+        if (res.ok) {
+          dbg.log(`processCodeRecoveryQueue(): success for ${p.titleSlug}`);
+          delete current._needsCodeFetch;
+          delete current._failedCodeFetch;
+          await Storage.saveProblem(current);
+          if (!current.aiReview && settings.aiProvider !== "none") {
+            enqueueReview(p.id, 999).catch(() => {});
+          }
+          if (settings.gitEnabled !== false && settings.gitEnabled !== 0) {
+            commitUpdatedProblem(current, settings).catch((err) => {
+              dbg.warn(`processCodeRecoveryQueue(): failed to commit ${current.titleSlug}:`, err.message);
+            });
+          }
+        } else {
+          dbg.warn(`processCodeRecoveryQueue(): failed for ${p.titleSlug}: ${res.error}`);
+          current._failedCodeFetch = (current._failedCodeFetch || 0) + 1;
+          if (current._failedCodeFetch >= 3) {
+            delete current._needsCodeFetch; // stop retrying after 3 failures
+            dbg.warn(`processCodeRecoveryQueue(): dropping ${p.titleSlug} after 3 failed attempts`);
+          }
+          await Storage.saveProblem(current);
+        }
+      }
+
+      if (i < batch.length - 1) {
+        // Wait 10 seconds before the next one in the fast batch
+        await new Promise((r) => setTimeout(r, 10000));
+      }
+    }
+  } catch (e) {
+    dbg.warn(`processCodeRecoveryQueue(): error: ${e.message}`);
+  } finally {
+    _codeRecoveryBusy = false;
+  }
 }
 
 /**
@@ -2410,13 +2773,21 @@ async function processAIReviewQueue(options = {}) {
               ext: problem.lang?.ext,
             },
           };
-          const { review, providerId } = await generateAIReview(reviewProblem, settings);
+          const { review, providerId, modelId, inferredMetadata } = await generateAIReview(
+            reviewProblem,
+            settings,
+          );
           const updatedMethods = [...problem.methods];
           updatedMethods[methodIdx] = {
             ...updatedMethods[methodIdx],
             aiReview: review,
+            _aiProvider: providerId,
+            _aiModel: modelId,
           };
-          const updatedProblem = { ...problem, methods: updatedMethods };
+          let updatedProblem = { ...problem, methods: updatedMethods };
+          if (inferredMetadata) {
+            updatedProblem = applyInferredMetadata(updatedProblem, inferredMetadata);
+          }
           await Storage.saveProblem(updatedProblem);
 
           const pKey = getProblemCommitKey(problem);
@@ -2483,11 +2854,19 @@ async function processAIReviewQueue(options = {}) {
             `[CodeLedger:SnailMode] 📝 Processing problem ${batchProcessed + 1}/${BATCH_SIZE}: ${problem.titleSlug || problemId}`,
           );
 
-          const { review, providerId, inferredTags } = await generateAIReview(problem, settings);
-          const base = inferredTags
-            ? { ...problem, tags: inferredTags, topic: inferredTags[0] }
-            : problem;
-          const updated = { ...base, aiReview: review };
+          const { review, providerId, modelId, inferredMetadata } = await generateAIReview(
+            problem,
+            settings,
+          );
+          let updated = {
+            ...problem,
+            aiReview: review,
+            _aiProvider: providerId,
+            _aiModel: modelId,
+          };
+          if (inferredMetadata) {
+            updated = applyInferredMetadata(updated, inferredMetadata);
+          }
           await Storage.saveProblem(updated);
 
           const key = getProblemCommitKey(updated);
@@ -3281,6 +3660,30 @@ try {
       return true;
     }
 
+    if (msg && msg.type === "GET_ALL_PROBLEM_IDS") {
+      Storage.getAllProblems()
+        .then((problems) => sendResponse({ ok: true, ids: (problems || []).map((p) => p.id) }))
+        .catch((e) => sendResponse({ ok: false, ids: [], error: e.message }));
+      return true;
+    }
+
+    if (msg && msg.type === "GET_PROBLEMS_BY_IDS") {
+      const ids = new Set(msg.ids || []);
+      Storage.getAllProblems()
+        .then((problems) =>
+          sendResponse({ ok: true, problems: (problems || []).filter((p) => ids.has(p.id)) }),
+        )
+        .catch((e) => sendResponse({ ok: false, problems: [], error: e.message }));
+      return true;
+    }
+
+    if (msg && msg.type === "DELETE_PROBLEM") {
+      Storage.deleteProblem(msg.id)
+        .then(() => sendResponse({ ok: true }))
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
+      return true;
+    }
+
     if (msg && msg.type === "BULK_IMPORT") {
       dbg.log(`onMessage(BULK_IMPORT): importing ${(msg.problems || []).length} problem(s)...`);
       handleBulkImport(msg.problems || [])
@@ -3319,8 +3722,39 @@ try {
       return true;
     }
 
+    if (msg && msg.type === "REFRESH_GFG_PROBLEM") {
+      dbg.log(`onMessage(REFRESH_GFG_PROBLEM): fetching data for problemId=${msg.problemId}`);
+      refreshSingleGFGProblem(msg.problemId, msg.titleSlug)
+        .then((result) => {
+          dbg.log(`onMessage(REFRESH_GFG_PROBLEM): result ok=${result.ok}`);
+          sendResponse(result);
+        })
+        .catch((e) => {
+          dbg.error(`onMessage(REFRESH_GFG_PROBLEM): failed:`, e?.message);
+          sendResponse({ ok: false, error: e?.message || "Unknown error" });
+        });
+      return true; // async response
+    }
+
     if (msg && msg.type === "AI_CHAT") {
       dbg.log(`onMessage(AI_CHAT): chat with ${(msg.messages || []).length} message(s)...`);
+      try {
+        const ctx = msg.context || {};
+        const p = ctx.problem || {};
+        const slug = p.titleSlug || p.slug || ctx.title || "";
+        const platform = ctx.platform || p.platform || "";
+        if (slug && platform) {
+          recordChatInteraction({
+            slug,
+            platform,
+            mode: ctx.chatMode || "",
+            commandsUsed: ctx.usedCommands || [],
+          }).catch(() => {});
+        }
+      } catch (e) {
+        dbg.warn("Failed to record chat interaction in behavior bank:", e?.message);
+      }
+
       handleAIChat(msg.messages || [], msg.context || {})
         .then((response) => {
           dbg.log(`onMessage(AI_CHAT): response (${String(response || "").length} chars)`);
@@ -3330,6 +3764,26 @@ try {
           dbg.error(`onMessage(AI_CHAT): failed:`, e?.message);
           sendResponse({ ok: false, error: e.message });
         });
+      return true; // async response
+    }
+
+    if (msg && msg.type === "RECORD_HINT_VIEW") {
+      dbg.log(
+        `onMessage(RECORD_HINT_VIEW): slug=${msg.slug}, platform=${msg.platform}, index=${msg.hintIndex}`,
+      );
+      (async () => {
+        try {
+          await recordHintView({
+            slug: msg.slug,
+            platform: msg.platform,
+            hintIndex: msg.hintIndex,
+          });
+          sendResponse({ ok: true });
+        } catch (e) {
+          dbg.error(`onMessage(RECORD_HINT_VIEW): failed:`, e?.message);
+          sendResponse({ ok: false, error: e.message });
+        }
+      })();
       return true; // async response
     }
 
@@ -3441,12 +3895,25 @@ try {
             return;
           }
           const snapshot = await fetchBackupSnapshot(owner, repo, msg.filePath, git);
-          if (!snapshot?.problems) {
+          if (
+            !snapshot ||
+            (!snapshot.problems &&
+              !snapshot.behaviorBank &&
+              !snapshot.settings &&
+              !snapshot.roadmaps)
+          ) {
             sendResponse({ ok: false, error: "Invalid snapshot" });
             return;
           }
-          for (const p of snapshot.problems) await Storage.saveProblem(p);
-          sendResponse({ ok: true, count: snapshot.problems.length });
+          const stats = await restoreSnapshot(snapshot);
+          // Auto-populate behavior bank with any missing solves from the newly restored history
+          await autoPopulateFromHistory().catch(() => {});
+          sendResponse({
+            ok: true,
+            count: stats.problemsCount,
+            behaviorCount: stats.behaviorCount,
+            roadmapsCount: stats.roadmapsCount,
+          });
         } catch (e) {
           dbg.error(`onMessage(RESTORE_GITHUB_BACKUP): failed:`, e?.message);
           sendResponse({ ok: false, error: e.message });

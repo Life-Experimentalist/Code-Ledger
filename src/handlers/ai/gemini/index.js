@@ -76,7 +76,14 @@ export class GeminiHandler extends BaseAIHandler {
     for (let attempt = 0; attempt < keyCount; attempt++) {
       // eslint-disable-next-line no-await-in-loop
       const key = await this.keyPool.getNextKey();
-      if (!key) break;
+      if (!key) {
+        if (!lastErr) {
+          lastErr = new Error(
+            "All API keys for Gemini are currently in cooldown (rate-limited). Please wait and try again.",
+          );
+        }
+        break;
+      }
 
       try {
         dbg.log(`review(): attempt ${attempt + 1}/${keyCount}, calling Gemini API...`);
@@ -88,6 +95,8 @@ export class GeminiHandler extends BaseAIHandler {
             contents: [{ parts: [{ text: prompt }] }],
           }),
         });
+
+        this._updateRateLimits(res.headers);
 
         if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
 

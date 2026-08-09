@@ -12,6 +12,7 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("PanelPlatforms");
 
 import { CONSTANTS } from "../../core/constants.js";
+import { RAW_MAPPINGS, getKnownTopics, getTopicType } from "../../core/topic-resolver.js";
 
 const PLATFORMS = Object.values(CONSTANTS.PLATFORMS);
 const DIFFICULTY_LABELS = ["Easy", "Medium", "Hard"];
@@ -31,10 +32,39 @@ const PLATFORM_SYNC_URLS = {
 
 export function PanelPlatforms({ settings, onSettingsChange }) {
   const [importMsg, setImportMsg] = useState({});
+  const [newTagFrom, setNewTagFrom] = useState("");
+  const knownTopics = getKnownTopics();
+  const [newTagTo, setNewTagTo] = useState(knownTopics[0] || "");
+
+  const customMappings = settings?.topicMappings || {};
+
+  const addCustomMapping = () => {
+    if (!newTagFrom.trim() || !newTagTo.trim()) return;
+    onSettingsChange("topicMappings", {
+      ...customMappings,
+      [newTagFrom.trim()]: newTagTo.trim(),
+    });
+    setNewTagFrom("");
+    setNewTagTo(knownTopics[0] || "");
+  };
+
+  const deleteCustomMapping = (fromKey) => {
+    const next = { ...customMappings };
+    delete next[fromKey];
+    onSettingsChange("topicMappings", next);
+  };
 
   const isPlatformEnabled = (pid) => {
     const key = `${pid}_enabled`;
-    return settings?.[key] !== false;
+    if (settings?.[key] !== undefined) {
+      return settings[key] === true;
+    }
+    const legacyKey =
+      pid === "geeksforgeeks" ? "gfg_enable" : pid === "codeforces" ? "cf_enable" : `${pid}_enable`;
+    if (settings?.[legacyKey] !== undefined) {
+      return settings[legacyKey] === true;
+    }
+    return pid !== "codeforces";
   };
 
   const togglePlatform = (pid) => {
@@ -294,10 +324,231 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                   )}
                 </div>
               `}
+
+              <!-- GeeksForGeeks-specific settings -->
+              ${p.id === "geeksforgeeks" &&
+              html`
+                <div class="pt-1 border-t border-white/5 space-y-3">
+                  <p class="text-[11px] text-slate-500 uppercase tracking-widest font-medium">
+                    GeeksForGeeks Settings
+                  </p>
+
+                  <div class="space-y-1">
+                    <label class="text-[10px] text-slate-500">GFG Username</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. vkrishna04"
+                      value=${settings?.gfg_username || ""}
+                      onInput=${(e) => onSettingsChange("gfg_username", e.target.value)}
+                      class="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
+                    />
+                  </div>
+
+                  ${[
+                    {
+                      key: "gfg_readme",
+                      label: "Include problem description",
+                      desc: "Save full problem statement and your stats to README.md.",
+                      defaultOn: true,
+                    },
+                    {
+                      key: "gfg_timer",
+                      label: "Floating solve timer",
+                      desc: "Display a floating stopwatch overlay while solving problems on GFG.",
+                      defaultOn: true,
+                    },
+                    {
+                      key: "gfg_copy_btn",
+                      label: "Copy code button",
+                      desc: "Inject a copy-to-clipboard button into the GFG editor area.",
+                      defaultOn: true,
+                    },
+                    {
+                      key: "gfg_ai_panel",
+                      label: "Floating AI assistant",
+                      desc: "Show a floating AI chat panel for instant code feedback on GFG problem pages.",
+                      defaultOn: true,
+                    },
+                  ].map(
+                    ({ key, label, desc, defaultOn = true }) => html`
+                      <label key=${key} class="flex items-start gap-3 cursor-pointer">
+                        <div class="flex-1">
+                          <p class="text-xs text-slate-300">${label}</p>
+                          <p class="text-[10px] text-slate-600">${desc}</p>
+                        </div>
+                        <button
+                          onClick=${() =>
+                            onSettingsChange(
+                              key,
+                              settings?.[key] !== undefined ? !settings[key] : !defaultOn,
+                            )}
+                          class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
+                          ${(settings?.[key] !== undefined ? !!settings[key] : defaultOn)
+                            ? "bg-cyan-500/30 border-cyan-500/40"
+                            : "bg-white/5 border-white/10"}"
+                        >
+                          <span
+                            class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
+                          ${(settings?.[key] !== undefined ? !!settings[key] : defaultOn)
+                              ? "translate-x-4"
+                              : "translate-x-0.5"}"
+                          >
+                          </span>
+                        </button>
+                      </label>
+                    `,
+                  )}
+                </div>
+              `}
             `}
           </div>
         `;
       })}
+
+      <!-- Tag Normalization Mappings -->
+      <div class="pt-6 border-t border-white/10 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-white mb-1">Tag & Topic Normalization</h3>
+          <p class="text-xs text-slate-500">
+            Map different tag names (e.g. platform-specific names like "Arrays" or "hashing") to a
+            single canonical topic node (e.g. "Array" or "Hash Table") in the graph.
+          </p>
+        </div>
+
+        <div class="bg-white/2 border border-white/5 rounded-xl p-4 space-y-4">
+          <!-- Add Mappings Form -->
+          <div class="flex items-end gap-3 flex-wrap sm:flex-nowrap">
+            <div class="flex-1 min-w-[150px] space-y-1">
+              <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold"
+                >Unnormalized Tag</label
+              >
+              <input
+                type="text"
+                placeholder="e.g. Arrays"
+                value=${newTagFrom}
+                onInput=${(e) => setNewTagFrom(e.target.value)}
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
+              />
+            </div>
+            <div class="flex-1 min-w-[150px] space-y-1">
+              <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold"
+                >Canonical Topic (Target Node)</label
+              >
+              <select
+                value=${newTagTo}
+                onChange=${(e) => setNewTagTo(e.target.value)}
+                class="w-full bg-slate-900 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/40"
+              >
+                ${knownTopics.map(
+                  (topic) => html`<option key=${topic} value=${topic}>${topic}</option>`,
+                )}
+              </select>
+            </div>
+            <button
+              onClick=${addCustomMapping}
+              class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white text-xs font-medium rounded-lg transition-colors shrink-0 h-[32px] flex items-center justify-center"
+            >
+              Add Link
+            </button>
+          </div>
+
+          <!-- Existing Mappings List -->
+          ${Object.keys(customMappings).length === 0
+            ? html`<p class="text-xs text-slate-600 italic">No custom tag mappings added yet.</p>`
+            : html`
+                <div
+                  class="max-h-60 overflow-y-auto border border-white/5 rounded-lg divide-y divide-white/5 bg-black/20"
+                >
+                  ${Object.entries(customMappings).map(
+                    ([from, to]) => html`
+                      <div key=${from} class="flex items-center justify-between p-2.5 text-xs">
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="px-2 py-0.5 bg-rose-500/10 text-rose-300 border border-rose-500/20 rounded font-mono"
+                            >${from}</span
+                          >
+                          <span class="text-slate-500">→</span>
+                          <span
+                            class="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 rounded font-mono"
+                            >${to}</span
+                          >
+                        </div>
+                        <button
+                          onClick=${() => deleteCustomMapping(from)}
+                          class="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1 rounded-md transition-colors"
+                          title="Delete mapping"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    `,
+                  )}
+                </div>
+              `}
+        </div>
+
+        <!-- Predefined Canonical Topics & Aliases Reference Guide -->
+        <details
+          class="group bg-white/2 border border-white/5 rounded-xl overflow-hidden transition-all duration-300"
+        >
+          <summary
+            class="flex items-center justify-between p-4 cursor-pointer select-none text-xs font-semibold text-slate-300 hover:bg-white/5 list-none"
+          >
+            <span class="flex items-center gap-2">
+              <span class="group-open:hidden">▸</span>
+              <span class="hidden group-open:inline">▾</span>
+              View Predefined Canonical Topics & Aliases
+            </span>
+            <span class="text-[10px] text-slate-500 font-normal">Show built-in rules</span>
+          </summary>
+          <div class="p-4 border-t border-white/5 bg-black/40 space-y-4">
+            <p class="text-xs text-slate-400">
+              Below is the reference guide of standard canonical topics, their category types (Data
+              Structure vs. Algorithm), and the predefined aliases that automatically map to them:
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
+              ${knownTopics.map((topic) => {
+                const type = getTopicType(topic);
+                const aliases = RAW_MAPPINGS[topic] || [];
+                return html`
+                  <div
+                    key=${topic}
+                    class="p-3 bg-white/2 border border-white/5 rounded-lg space-y-2"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-medium text-slate-200">${topic}</span>
+                      <span
+                        class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded
+                        ${type === "data-structure"
+                          ? "bg-purple-500/10 text-purple-300 border border-purple-500/20"
+                          : "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20"}"
+                      >
+                        ${type === "data-structure" ? "Data Structure" : "Algorithm"}
+                      </span>
+                    </div>
+                    <div class="flex flex-wrap gap-1">
+                      ${aliases.length === 0
+                        ? html`<span class="text-[10px] text-slate-600 italic"
+                            >No aliases defined</span
+                          >`
+                        : aliases.map(
+                            (alias) => html`
+                              <span
+                                key=${alias}
+                                class="text-[10px] font-mono px-1.5 py-0.5 bg-white/5 text-slate-400 rounded"
+                              >
+                                ${alias}
+                              </span>
+                            `,
+                          )}
+                    </div>
+                  </div>
+                `;
+              })}
+            </div>
+          </div>
+        </details>
+      </div>
     </div>
   `;
 }

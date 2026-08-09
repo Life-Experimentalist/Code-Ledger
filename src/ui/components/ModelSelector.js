@@ -22,12 +22,20 @@ export function ModelSelector({
   endpoint,
   providerEnabled = true,
   onToggleEnabled = () => {},
+  excludeModel = "",
 }) {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [paused, setPaused] = useState(false);
   const [manualTrigger, setManualTrigger] = useState(0);
+
+  // Reset selected model if it becomes excluded
+  useEffect(() => {
+    if (excludeModel && selectedModel === excludeModel) {
+      onSelect("");
+    }
+  }, [excludeModel, selectedModel, onSelect]);
 
   // Clear paused when endpoint changes so we attempt again.
   useEffect(() => setPaused(false), [endpoint]);
@@ -125,14 +133,18 @@ export function ModelSelector({
         value=${selectedModel || ""}
         onChange=${(e) => onSelect(e.target.value)}
       >
-        ${selectedModel && !(models || []).find((mm) => mm.id === selectedModel)
+        ${selectedModel &&
+        selectedModel !== excludeModel &&
+        !(models || []).find((mm) => mm.id === selectedModel)
           ? html`<option value=${selectedModel}>${selectedModel}</option>`
           : ""}
-        ${models.map(
-          (m) => html`
-            <option key=${m.id} value=${m.id}>${m.label || m.displayName || m.id}</option>
-          `,
-        )}
+        ${models
+          .filter((m) => !excludeModel || m.id !== excludeModel)
+          .map(
+            (m) => html`
+              <option key=${m.id} value=${m.id}>${m.label || m.displayName || m.id}</option>
+            `,
+          )}
       </select>
       <button
         class="px-2 py-1 text-xs bg-[#111827] rounded text-white"

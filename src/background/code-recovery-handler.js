@@ -40,11 +40,18 @@ export async function triggerCodeRecovery(problem) {
   // submissions page — this avoids reading from the editor cache (which for free LeetCode
   // users only persists in the browser and is not server-side retrievable).
   const encoded = encodeURIComponent(problemId);
-  const lcProblemsBase = CONSTANTS.PLATFORMS.leetcode.problemsBase;
-  const base = submissionId
-    ? `${lcProblemsBase}${encodeURIComponent(titleSlug)}/submissions/${submissionId}/`
-    : `${lcProblemsBase}${encodeURIComponent(titleSlug)}/`;
-  const url = `${base}?codeledger_code_fetch=1&codeledger_problemid=${encoded}#cl-pid=${encoded}`;
+  let url;
+  if (problem.platform === "geeksforgeeks") {
+    const gfgProblemsBase = CONSTANTS.PLATFORMS.geeksforgeeks.problemsBase;
+    const base = `${gfgProblemsBase}${encodeURIComponent(titleSlug)}/1`;
+    url = `${base}?codeledger_fetch=1&codeledger_code_fetch=1&codeledger_problemid=${encoded}#cl-pid=${encoded}`;
+  } else {
+    const lcProblemsBase = CONSTANTS.PLATFORMS.leetcode.problemsBase;
+    const base = submissionId
+      ? `${lcProblemsBase}${encodeURIComponent(titleSlug)}/submissions/${submissionId}/`
+      : `${lcProblemsBase}${encodeURIComponent(titleSlug)}/`;
+    url = `${base}?codeledger_code_fetch=1&codeledger_problemid=${encoded}#cl-pid=${encoded}`;
+  }
   dbg.log(
     `triggerCodeRecovery(${titleSlug}): opening background tab (submissionId=${submissionId || "unknown"})`,
   );

@@ -4,6 +4,7 @@
  */
 
 import { createDebugger } from "../lib/debug.js";
+import { normalizeTag, getTopicType } from "./topic-resolver.js";
 
 const dbg = createDebugger("KnowledgeGraph");
 
@@ -67,7 +68,7 @@ function blendColors(colorsArr) {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-export function buildKnowledgeGraph(problems) {
+export function buildKnowledgeGraph(problems, customMappings = {}) {
   dbg.log(`buildKnowledgeGraph(): building from ${(problems || []).length} problems`);
   const nodes = new Map(); // id → node
   const edges = []; // { source, target, type }
@@ -91,6 +92,7 @@ export function buildKnowledgeGraph(problems) {
         color: topicColor(topic),
         size: 24,
         count: 0,
+        category: getTopicType(topic),
       });
     }
     const node = nodes.get(id);
@@ -107,8 +109,10 @@ export function buildKnowledgeGraph(problems) {
   for (const p of problems) {
     const id = `problem:${p.platform}:${p.titleSlug || p.id}`;
 
-    // Use ALL tags for topic edges — this is the key fix (was only using first tag)
-    const allTopics = Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : [p.topic || "Untagged"];
+    // Normalize tags
+    const rawTopics = Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : [p.topic || "Untagged"];
+    const allTopics = rawTopics.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+    if (allTopics.length === 0) allTopics.push("Untagged");
     const primaryTopic = allTopics[0];
 
     // Determine node color: difficulty-based, but blended if solved on multiple platforms
@@ -140,6 +144,9 @@ export function buildKnowledgeGraph(problems) {
       acRate: p.acRate || null,
       runtimePct: p.runtimePct || null,
       memoryPct: p.memoryPct || null,
+      canonical: p.canonical || null,
+      canonicalId: p.canonical?.id || null,
+      hasCanonical: !!p.canonical?.id,
     });
 
     // Create edges for ALL topics (not just the first one)
@@ -161,10 +168,15 @@ export function buildKnowledgeGraph(problems) {
         if (!sim.titleSlug) continue;
         const simId = `problem:leetcode:${sim.titleSlug}`;
         if (!nodes.has(simId)) {
-          const simTopics =
+          const rawSimTopics =
             Array.isArray(sim.topicTags) && sim.topicTags.length > 0
               ? sim.topicTags.map((t) => t.name || t)
               : [sim.topic || primaryTopic];
+          const simTopics = rawSimTopics
+            .map((t) => normalizeTag(t, customMappings))
+            .filter(Boolean);
+          if (simTopics.length === 0) simTopics.push("Untagged");
+
           nodes.set(simId, {
             id: simId,
             type: "problem",
@@ -197,48 +209,110 @@ export function buildKnowledgeGraph(problems) {
     }
   }
 
-  // Second pass: detect cross-platform duplicates (same titleSlug, different platforms)
-  // Merge their platform lists and blend colors to show multi-platform status
+  // Second pass: detect cross-platform duplicates and canonical equivalents, then merge them into single nodes
+  const parent = new Map();
+  function findNode(i) {
+    if (!parent.has(i)) parent.set(i, i);
+    if (parent.get(i) === i) return i;
+    const p = findNode(parent.get(i));
+    parent.set(i, p);
+    return p;
+  }
+  function unionNode(i, j) {
+    const rootI = findNode(i);
+    const rootJ = findNode(j);
+    if (rootI !== rootJ) parent.set(rootI, rootJ);
+  }
+
   for (const [, idSet] of slugToIds) {
     if (idSet.size <= 1) continue;
     const ids = [...idSet];
-    const allPlatforms = ids.map((id) => nodes.get(id)?.platform).filter(Boolean);
-    const blended = blendColors(allPlatforms.map((pl) => PLATFORM_COLOR[pl] || "#64748b"));
+    for (let i = 1; i < ids.length; i++) unionNode(ids[0], ids[i]);
+  }
+  for (const [, group] of canonicalGroups) {
+    if (group.length <= 1) continue;
+    for (let i = 1; i < group.length; i++) unionNode(group[0], group[i]);
+  }
 
-    for (const id of ids) {
-      const node = nodes.get(id);
-      if (!node) continue;
-      node.platforms = allPlatforms;
-      node.isMultiPlatform = true;
-      // Use blended platform color as accent; difficulty color stays as base
-      node.platformColor = blended;
-      // Add canonical cross-platform edges
-      for (const other of ids) {
-        if (other !== id) {
-          edges.push({
-            source: id,
-            target: other,
-            type: "canonical",
-          });
-        }
+  const mergedGroups = new Map();
+  for (const id of nodes.keys()) {
+    if (nodes.get(id).type !== "problem") continue;
+    const root = findNode(id);
+    if (!mergedGroups.has(root)) mergedGroups.set(root, []);
+    mergedGroups.get(root).push(id);
+  }
+
+  for (const [root, group] of mergedGroups) {
+    if (group.length <= 1) {
+      nodes.get(root).mergedProblemIds = [root];
+      continue;
+    }
+    const rootNode = nodes.get(root);
+
+    const allPlatforms = new Set();
+    const allTags = new Set();
+    const allMergedIds = [];
+    let isSolved = false;
+    let baseColor = null;
+
+    let hasCanonical = false;
+    let canonical = null;
+    let canonicalId = null;
+
+    for (const id of group) {
+      const n = nodes.get(id);
+      allMergedIds.push(n.id);
+      (n.platforms || []).forEach((pl) => allPlatforms.add(pl));
+      (n.tags || []).forEach((t) => allTags.add(t));
+      if (n.solved) isSolved = true;
+      if (n.solved && !baseColor) baseColor = n.color;
+      if (n.hasCanonical) {
+        hasCanonical = true;
+        canonical = n.canonical;
+        canonicalId = n.canonicalId;
       }
+    }
+
+    rootNode.platforms = [...allPlatforms];
+    rootNode.isMultiPlatform = rootNode.platforms.length > 1;
+    rootNode.platformColor = blendColors(
+      rootNode.platforms.map((pl) => PLATFORM_COLOR[pl] || "#64748b"),
+    );
+    rootNode.solved = isSolved;
+    rootNode.color = baseColor || rootNode.color;
+    rootNode.tags = [...allTags];
+    rootNode.mergedProblemIds = allMergedIds;
+    rootNode.hasCanonical = hasCanonical;
+    rootNode.canonical = canonical;
+    rootNode.canonicalId = canonicalId;
+
+    for (const id of group) {
+      if (id !== root) nodes.delete(id);
     }
   }
 
-  // Canonical cross-platform edges from metadata
-  for (const [, group] of canonicalGroups) {
-    for (let i = 0; i < group.length - 1; i++) {
-      edges.push({
-        source: group[i],
-        target: group[i + 1],
-        type: "canonical",
-      });
+  // Remap edges and clean up duplicates/self-loops
+  const finalEdges = [];
+  const edgeSet = new Set();
+  for (const edge of edges) {
+    if (edge.source.startsWith("problem:")) edge.source = findNode(edge.source);
+    if (edge.target.startsWith("problem:")) edge.target = findNode(edge.target);
+
+    if (edge.source === edge.target) continue;
+
+    // Sort source and target to eliminate bidirectional duplicates
+    const [minNode, maxNode] =
+      edge.source < edge.target ? [edge.source, edge.target] : [edge.target, edge.source];
+    const key = `${minNode}->${maxNode}:${edge.type}`;
+    if (!edgeSet.has(key)) {
+      edgeSet.add(key);
+      finalEdges.push(edge);
     }
   }
 
   const result = {
     nodes: [...nodes.values()],
-    edges,
+    edges: finalEdges,
   };
   dbg.log(
     `buildKnowledgeGraph(): ✓ complete - ${result.nodes.length} nodes, ${result.edges.length} edges`,

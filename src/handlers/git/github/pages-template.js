@@ -533,7 +533,7 @@ export function getPagesHtml(opts = {}) {
       if (p.url) return p.url;
       var pl = (p.platform || '').toLowerCase();
       if (pl === 'leetcode' && p.titleSlug) return 'https://leetcode.com/problems/' + p.titleSlug + '/';
-      if (pl === 'geeksforgeeks' && p.titleSlug) return 'https://practice.geeksforgeeks.org/problems/' + p.titleSlug + '/';
+      if (pl === 'geeksforgeeks' && p.titleSlug) return 'https://www.geeksforgeeks.org/problems/' + p.titleSlug + '/';
       if (pl === 'codeforces' && p.titleSlug) return 'https://codeforces.com/problemset/problem/' + p.titleSlug;
       return '#';
     }

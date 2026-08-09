@@ -4,6 +4,7 @@
  */
 
 import { registry } from "../core/handler-registry.js";
+import { buildProblemFiles } from "../core/path-builder.js";
 import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("GitEngine");
@@ -25,18 +26,13 @@ export const GitEngine = {
     }
 
     try {
-      const topicFolder = problemContext.topic || "Untagged";
-      const cleanTitle = (problemContext.titleSlug || problemContext.title || "unknown").replace(
-        /[^a-zA-Z0-9-]/g,
-        "-",
-      );
-      const langExt = problemContext.lang?.ext || "txt";
-      const filePath = `topics/${topicFolder}/${cleanTitle}/solution.${langExt}`;
-      dbg.log(`commitSolve(): prepared file path=${filePath}`);
+      const problem = { ...problemContext, code };
+      const files = buildProblemFiles(problem, settings);
+      dbg.log(`commitSolve(): prepared ${files.length} file(s), first path=${files[0]?.path}`);
 
       await gitHandler.commit(
-        [{ path: filePath, content: code }],
-        `[${topicFolder}] Solved ${problemContext.title}`,
+        files,
+        `Solved ${problemContext.title}`,
         settings.github_repo || settings.gitRepo,
       );
 

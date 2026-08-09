@@ -212,8 +212,8 @@ export const CONSTANTS = Object.freeze({
       domains: ["geeksforgeeks.org", "practice.geeksforgeeks.org", "www.geeksforgeeks.org"],
       baseUrl: "https://www.geeksforgeeks.org",
       problemsBase: "https://www.geeksforgeeks.org/problems/",
-      practiceBase: "https://practice.geeksforgeeks.org/problems/",
-      status: FEATURE_STATUS.ALPHA,
+      practiceBase: "https://www.geeksforgeeks.org/problems/",
+      status: FEATURE_STATUS.STABLE,
     },
     codeforces: {
       id: "codeforces",
@@ -338,6 +338,9 @@ export const CONSTANTS = Object.freeze({
     if (!titleSlug) return "#";
     const p = this.PLATFORMS[platform];
     if (!p?.problemsBase) return "#";
+    if (platform === "geeksforgeeks") {
+      return p.problemsBase + titleSlug + "/1";
+    }
     return p.problemsBase + titleSlug + "/";
   },
 
@@ -356,4 +359,71 @@ export const CONSTANTS = Object.freeze({
     // Duration to pause after hitting error threshold (2 hours)
     PAUSE_DURATION_MS: 1.5 * 60 * 60 * 1000,
   },
+
+  // ── Canonical Topics List ──
+  CANONICAL_DSA_TOPICS: [
+    "Dynamic Programming",
+    "Greedy",
+    "Recursion",
+    "Backtracking",
+    "Divide and Conquer",
+    "Bit Manipulation",
+    "Math",
+    "Two Pointers",
+    "Sliding Window",
+    "Binary Search",
+    "Sorting",
+    "Depth-First Search",
+    "Breadth-First Search",
+    "Array",
+    "String",
+    "Hash Table",
+    "Linked List",
+    "Stack",
+    "Queue",
+    "Heap (Priority Queue)",
+    "Tree",
+    "Binary Search Tree",
+    "Trie",
+    "Graph",
+    "Union Find",
+    "Segment Tree",
+    "Binary Indexed Tree",
+  ],
+
+  // ── Language Display Name Normalization Map ──
+  LANG_NORM_MAP: {
+    python: "Python",
+    py: "Python",
+    python2: "Python2",
+    py2: "Python2",
+    python3: "Python3",
+    py3: "Python3",
+    cpp: "C++",
+    "c++": "C++",
+    c: "C",
+    java: "Java",
+    javascript: "JavaScript",
+    js: "JavaScript",
+    typescript: "TypeScript",
+    ts: "TypeScript",
+    ruby: "Ruby",
+    golang: "Go",
+    go: "Go",
+    swift: "Swift",
+    kotlin: "Kotlin",
+    scala: "Scala",
+    rust: "Rust",
+    php: "PHP",
+    csharp: "C#",
+    "c#": "C#",
+    dart: "Dart",
+    racket: "Racket",
+    erlang: "Erlang",
+    elixir: "Elixir",
+    mysql: "MySQL",
+    postgresql: "PostgreSQL",
+    bash: "Bash",
+  },
 });
+

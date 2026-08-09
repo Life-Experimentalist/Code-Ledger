@@ -20,6 +20,7 @@ export class BaseAIHandler {
     this.dbg = createDebugger(`${name}AIHandler`);
     this.supportsMCPTools = false; // Override in subclass if supported
     this.mcpToolFormat = "generic"; // Override with provider format: "openai" | "claude" | "gemini" | "deepseek"
+    this.rateLimitStats = null;
   }
 
   async review(code, problemContext) {
@@ -132,5 +133,39 @@ export class BaseAIHandler {
   async processMCPToolCalls(toolCalls) {
     const results = await processMCPToolCalls(toolCalls, this.mcpToolFormat);
     return formatToolResultsForAI(results);
+  }
+
+  getRateLimitStats() {
+    return this.rateLimitStats;
+  }
+
+  _updateRateLimits(headers) {
+    if (!headers) return;
+    try {
+      // Check OpenAI standard headers
+      const reqLimit =
+        headers.get("x-ratelimit-limit-requests") || headers.get("x-ratelimit-limit");
+      const reqRemaining =
+        headers.get("x-ratelimit-remaining-requests") || headers.get("x-ratelimit-remaining");
+      const reqReset =
+        headers.get("x-ratelimit-reset-requests") || headers.get("x-ratelimit-reset");
+
+      // Check Anthropic standard headers
+      const antLimit = headers.get("anthropic-ratelimit-requests-limit");
+      const antRemaining = headers.get("anthropic-ratelimit-requests-remaining");
+      const antReset = headers.get("anthropic-ratelimit-requests-reset");
+
+      const limit = reqLimit || antLimit;
+      const remaining = reqRemaining || antRemaining;
+      const reset = reqReset || antReset;
+
+      if (limit !== null && limit !== undefined) {
+        this.rateLimitStats = {
+          limit: parseInt(limit, 10),
+          remaining: parseInt(remaining || "0", 10),
+          reset: reset || "",
+        };
+      }
+    } catch (_) {}
   }
 }

@@ -48,6 +48,7 @@ This index is the canonical entry point for project documentation.
 ## Strategy and Product
 
 - Portfolio integration: [reference/strategy/portfolio-integration.md](reference/strategy/portfolio-integration.md)
+- Knowledge Graph Superpower: [superpowers/knowledge-graph.md](superpowers/knowledge-graph.md)
 
 ## Legacy and Transitional Notes
 

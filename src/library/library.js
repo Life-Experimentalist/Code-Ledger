@@ -300,6 +300,7 @@ function LibraryApp() {
         dbg.error(
           `processOAuthToken(): GitHub /user returned ${userRes.status} — token may be invalid`,
         );
+        alert(`GitHub authentication failed (HTTP ${userRes.status}). Please try connecting again.`);
         throw new Error(`GitHub /user returned ${userRes.status}`);
       }
       const user = await userRes.json();
@@ -569,10 +570,10 @@ function LibraryApp() {
                     e?.message,
                   ),
                 );
-              } else if (++attempts >= 6) {
+              } else if (++attempts >= 20) {
                 clearInterval(checkToken);
                 dbg.log(
-                  `triggerReauth(): no token after 3 s — onChanged relay will handle it if relay succeeded`,
+                  `triggerReauth(): no token after 10 s — onChanged relay will handle it if relay succeeded`,
                 );
               }
             })

@@ -110,6 +110,14 @@ export const CHAT_COMMANDS = [
     usage: "/formula",
     kind: "visual",
   },
+  {
+    id: "solution",
+    label: "Solution Code",
+    description:
+      "Get only the core solution code (no comments, short variable names, no preset wrapper).",
+    usage: "/solution",
+    kind: "tutor",
+  },
 ];
 
 export const AI_MENTION_OPTIONS = [
@@ -338,6 +346,13 @@ ${submission.feedback ? `- Feedback: ${submission.feedback}` : ""}`
     );
   }
 
+  if (expanded.includes("/solution")) {
+    expanded = expanded.replace(
+      /\/solution/g,
+      "Please provide ONLY the raw core solution code. Follow these rules: 1. Use no comments. 2. Use short variable names. 3. Do not include any preset wrapper code block (like class Solution/def ...), just provide the inner core logic/body directly. 4. Return only the clean, raw code directly without any surrounding explanations or markdown wrappers.",
+    );
+  }
+
   return expanded;
 }
 
@@ -365,6 +380,7 @@ export function getUsedVariables(text) {
         "test",
         "diagram",
         "formula",
+        "solution",
       ].includes(varName)
     ) {
       if (!vars.includes(varName)) vars.push(varName);

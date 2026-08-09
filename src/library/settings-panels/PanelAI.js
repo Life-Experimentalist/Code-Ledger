@@ -144,9 +144,22 @@ export function PanelAI({ settings, onSettingsChange }) {
   const fallbackProvider = settings?.aiSecondary || "";
   const autoReview = settings?.autoReview !== false;
 
-  const isProviderEnabled = (id) => settings?.[`${id}_enabled`] !== false;
+  const isProviderEnabled = (id) => settings?.[`${id}_enabled`] === true;
 
-  const toggleProvider = (id) => onSettingsChange(`${id}_enabled`, !isProviderEnabled(id));
+  const toggleProvider = (id) => {
+    const nextVal = !isProviderEnabled(id);
+    onSettingsChange(`${id}_enabled`, nextVal);
+    if (!nextVal) {
+      if (settings?.aiProvider === id) {
+        onSettingsChange("aiProvider", "");
+        onSettingsChange("aiPrimaryModel", "");
+      }
+      if (settings?.aiSecondary === id) {
+        onSettingsChange("aiSecondary", "");
+        onSettingsChange("aiSecondaryModel", "");
+      }
+    }
+  };
 
   const saveKeys = async (providerId) => {
     const raw = keyDraft[providerId] || "";
@@ -185,6 +198,47 @@ export function PanelAI({ settings, onSettingsChange }) {
     all[providerId] = keys;
     await Storage.setAIKeys(all);
     setSavedKeys(all);
+  };
+
+  const copyKey = (key, providerId) => {
+    navigator.clipboard
+      .writeText(key)
+      .then(() => {
+        setTestResult((r) => ({
+          ...r,
+          [providerId]: "Key copied!",
+        }));
+        setTimeout(() => {
+          setTestResult((r) => {
+            const updated = { ...r };
+            delete updated[providerId];
+            return updated;
+          });
+        }, 1500);
+      })
+      .catch(() => {});
+  };
+
+  const copyAllKeys = (providerId) => {
+    const keys = Array.isArray(savedKeys[providerId]) ? savedKeys[providerId] : [];
+    if (keys.length === 0) return;
+    const joined = keys.join(", ");
+    navigator.clipboard
+      .writeText(joined)
+      .then(() => {
+        setTestResult((r) => ({
+          ...r,
+          [providerId]: "All keys copied!",
+        }));
+        setTimeout(() => {
+          setTestResult((r) => {
+            const updated = { ...r };
+            delete updated[providerId];
+            return updated;
+          });
+        }, 1500);
+      })
+      .catch(() => {});
   };
 
   const testKey = async (providerId) => {
@@ -451,6 +505,37 @@ export function PanelAI({ settings, onSettingsChange }) {
         </p>
       </div>
 
+      <!-- Chats visibility -->
+      <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-2">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-slate-300">
+              Show problem-linked chats in global list
+            </p>
+            <p class="text-[11px] text-slate-500">
+              Show chats associated with specific problems in the main AI Chats tab.
+            </p>
+          </div>
+          <button
+            onClick=${() =>
+              onSettingsChange(
+                "showProblemChats",
+                settings.showProblemChats !== false ? false : true,
+              )}
+            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
+              ${settings.showProblemChats !== false
+              ? "bg-cyan-500/30 border-cyan-500/40"
+              : "bg-white/5 border-white/10"}"
+          >
+            <span
+              class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
+              ${settings.showProblemChats !== false ? "translate-x-4" : "translate-x-0.5"}"
+            >
+            </span>
+          </button>
+        </div>
+      </div>
+
       <!-- Primary + Fallback selectors -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Provider Order</h3>
@@ -462,7 +547,10 @@ export function PanelAI({ settings, onSettingsChange }) {
             onChange=${(e) => onSettingsChange("aiProvider", e.target.value)}
             class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-cyan-500/40"
           >
-            ${PROVIDERS.map((p) => html` <option key=${p.id} value=${p.id}>${p.name}</option> `)}
+            <option value="">None</option>
+            ${PROVIDERS.filter((p) => isProviderEnabled(p.id)).map(
+              (p) => html` <option key=${p.id} value=${p.id}>${p.name}</option> `,
+            )}
           </select>
           <${ModelSelector}
             providerId=${primaryProvider}
@@ -481,7 +569,9 @@ export function PanelAI({ settings, onSettingsChange }) {
             class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-cyan-500/40"
           >
             <option value="">None</option>
-            ${PROVIDERS.map((p) => html` <option key=${p.id} value=${p.id}>${p.name}</option> `)}
+            ${PROVIDERS.filter((p) => isProviderEnabled(p.id)).map(
+              (p) => html` <option key=${p.id} value=${p.id}>${p.name}</option> `,
+            )}
           </select>
           <p class="text-[11px] text-cyan-400/80">
             You can reuse the same provider as primary if the fallback model is different.
@@ -494,6 +584,7 @@ export function PanelAI({ settings, onSettingsChange }) {
               onSelect=${(v) => onSettingsChange("aiSecondaryModel", v)}
               endpoint=${settings?.[`${fallbackProvider}_endpoint`] || ""}
               providerEnabled=${isProviderEnabled(fallbackProvider)}
+              excludeModel=${primaryProvider === fallbackProvider ? settings?.aiPrimaryModel : ""}
             />
           `}
         </div>
@@ -554,6 +645,17 @@ export function PanelAI({ settings, onSettingsChange }) {
                   <div class="space-y-2">
                     ${keys.length > 0 &&
                     html`
+                      <div
+                        class="flex items-center justify-between text-[11px] text-slate-500 mb-1"
+                      >
+                        <span>Saved Keys (${keys.length})</span>
+                        <button
+                          onClick=${() => copyAllKeys(p.id)}
+                          class="text-cyan-400 hover:text-cyan-300 transition-colors bg-transparent border-none p-0 cursor-pointer text-xs"
+                        >
+                          Copy All
+                        </button>
+                      </div>
                       <div class="flex flex-wrap gap-1.5">
                         ${keys.map(
                           (k, i) => html`
@@ -563,8 +665,15 @@ export function PanelAI({ settings, onSettingsChange }) {
                             >
                               ${maskKey(k)}
                               <button
+                                onClick=${() => copyKey(k, p.id)}
+                                class="text-slate-600 hover:text-white transition-colors ml-1"
+                                title="Copy key"
+                              >
+                                📋
+                              </button>
+                              <button
                                 onClick=${() => removeKey(p.id, i)}
-                                class="text-slate-600 hover:text-rose-400 transition-colors ml-0.5"
+                                class="text-slate-600 hover:text-rose-400 transition-colors ml-0.5 font-bold"
                                 title="Remove key"
                               >
                                 ×

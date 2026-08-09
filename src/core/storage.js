@@ -7,6 +7,8 @@ import { storage as browserStorage } from "../lib/browser-compat.js";
 import { CONSTANTS } from "./constants.js";
 import { createDebugger } from "../lib/debug.js";
 import { normalizeAIPrompts } from "./ai-prompts.js";
+import { normalizeTag } from "./topic-resolver.js";
+import { canonicalMapper } from "./canonical-mapper.js";
 const dbg = createDebugger("Storage");
 
 /**
@@ -41,7 +43,8 @@ export const Storage = {
 
   async setSettings(settings) {
     dbg.log(`setSettings(): saving ${Object.keys(settings || {}).length} settings keys`);
-    await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: settings });
+    const s = { ...(settings || {}), __updatedAt: new Date().toISOString() };
+    await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: s });
   },
 
   // AI key helpers: store a mapping { providerId: [keys...] }
@@ -298,9 +301,69 @@ export const Storage = {
   async saveProblem(problem) {
     const problemId = problem?.id || problem?.titleSlug || "unknown";
     dbg.log(`saveProblem(): saving problem ${problemId} (${problem?.platform || "unknown"})`);
+
+    let mergedProblem = problem;
+    let existing = null;
+    try {
+      existing = await this.getProblem(problemId);
+      if (existing) {
+        mergedProblem = {
+          ...existing,
+          ...problem,
+          notes: problem.notes !== undefined ? problem.notes : existing.notes || "",
+          methods: problem.methods !== undefined ? problem.methods : existing.methods || [],
+          manuallyEdited: problem.manuallyEdited ?? existing.manuallyEdited ?? false,
+        };
+      }
+    } catch (e) {
+      dbg.warn(`saveProblem(): merge failed (non-blocking) for ${problemId}:`, e?.message);
+    }
+
+    // Enrich with canonical mapping if not manually edited and we don't have it yet
+    try {
+      if (!mergedProblem.manuallyEdited && (!existing || !existing.canonical)) {
+        const canonicalEntry = await canonicalMapper.resolveAsync(
+          mergedProblem.platform || "",
+          mergedProblem.titleSlug || mergedProblem.id || "",
+        );
+        if (canonicalEntry) {
+          mergedProblem.canonical = canonicalEntry;
+          if (canonicalEntry.topic) {
+            mergedProblem.topic = canonicalEntry.topic;
+          }
+          if (Array.isArray(canonicalEntry.tags) && canonicalEntry.tags.length > 0) {
+            const uniqueTags = new Set([...canonicalEntry.tags, ...(mergedProblem.tags || [])]);
+            mergedProblem.tags = [...uniqueTags];
+          }
+        }
+      }
+    } catch (e) {
+      dbg.warn("saveProblem(): canonical enrichment failed:", e?.message);
+    }
+
+    // Normalize tags and topics using custom settings mappings
+    try {
+      const settings = await this.getSettings();
+      const customMappings = settings?.topicMappings || {};
+      if (mergedProblem.tags && Array.isArray(mergedProblem.tags)) {
+        mergedProblem.tags = [
+          ...new Set(
+            mergedProblem.tags
+              .map((t) => normalizeTag(t, customMappings))
+              .filter(Boolean),
+          ),
+        ];
+      }
+      if (mergedProblem.topic) {
+        mergedProblem.topic = normalizeTag(mergedProblem.topic, customMappings);
+      }
+    } catch (e) {
+      dbg.warn(`saveProblem(): tag normalization failed:`, e?.message);
+    }
+
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS, "readwrite");
     return new Promise((resolve, reject) => {
-      const request = store.put(problem);
+      const request = store.put(mergedProblem);
       request.onsuccess = () => {
         dbg.log(`saveProblem(): ✓ saved ${problemId}`);
         resolve();
@@ -316,10 +379,41 @@ export const Storage = {
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS);
     return new Promise((resolve, reject) => {
       const request = store.get(id);
-      request.onsuccess = () => {
-        const found = !!request.result;
+      request.onsuccess = async () => {
+        const p = request.result;
+        if (p) {
+          try {
+            // Resolve canonical dynamically on lookup
+            const canonicalEntry = await canonicalMapper.resolveAsync(
+              p.platform || "",
+              p.titleSlug || p.id || "",
+            );
+            if (canonicalEntry) {
+              p.canonical = canonicalEntry;
+              if (canonicalEntry.topic) {
+                p.topic = canonicalEntry.topic;
+              }
+              if (Array.isArray(canonicalEntry.tags) && canonicalEntry.tags.length > 0) {
+                const uniqueTags = new Set([...canonicalEntry.tags, ...(p.tags || [])]);
+                p.tags = [...uniqueTags];
+              }
+            }
+
+            const settings = await this.getSettings();
+            const customMappings = settings?.topicMappings || {};
+            if (p.tags && Array.isArray(p.tags)) {
+              p.tags = p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+            }
+            if (p.topic) {
+              p.topic = normalizeTag(p.topic, customMappings);
+            }
+          } catch (e) {
+            dbg.warn(`getProblem(): enrichment/normalization failed:`, e?.message);
+          }
+        }
+        const found = !!p;
         dbg.log(`getProblem(${id}): ${found ? "✓ found" : "NOT found"}`);
-        resolve(request.result);
+        resolve(p);
       };
       request.onerror = () => {
         dbg.error(`getProblem(${id}): ✗ error`, request.error);
@@ -329,13 +423,44 @@ export const Storage = {
   },
 
   async getAllProblems() {
+    // Pre-load the canonical map once so all resolve calls are fast/synchronous
+    await canonicalMapper.loadMap().catch(() => {});
+
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS);
     return new Promise((resolve, reject) => {
       const request = store.getAll();
-      request.onsuccess = () => {
-        const count = (request.result || []).length;
-        dbg.log(`getAllProblems(): retrieved ${count} problem(s)`);
-        resolve(request.result);
+      request.onsuccess = async () => {
+        const cleaned = (request.result || []).filter(Boolean);
+        try {
+          const settings = await this.getSettings();
+          const customMappings = settings?.topicMappings || {};
+          for (const p of cleaned) {
+            const canonicalEntry = canonicalMapper.resolve(
+              p.platform || "",
+              p.titleSlug || p.id || "",
+            );
+            if (canonicalEntry) {
+              p.canonical = canonicalEntry;
+              if (canonicalEntry.topic) {
+                p.topic = canonicalEntry.topic;
+              }
+              if (Array.isArray(canonicalEntry.tags) && canonicalEntry.tags.length > 0) {
+                const uniqueTags = new Set([...canonicalEntry.tags, ...(p.tags || [])]);
+                p.tags = [...uniqueTags];
+              }
+            }
+            if (p.tags && Array.isArray(p.tags)) {
+              p.tags = p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+            }
+            if (p.topic) {
+              p.topic = normalizeTag(p.topic, customMappings);
+            }
+          }
+        } catch (e) {
+          dbg.warn(`getAllProblems(): tag normalization failed:`, e?.message);
+        }
+        dbg.log(`getAllProblems(): retrieved ${cleaned.length} problem(s)`);
+        resolve(cleaned);
       };
       request.onerror = () => {
         dbg.error(`getAllProblems(): ✗ error`, request.error);
@@ -507,6 +632,36 @@ export const Storage = {
       return JSON.parse(raw["cl.renames"] || "[]");
     } catch {
       return [];
+    }
+  },
+
+  async repairGFGTimestamps() {
+    dbg.log("repairGFGTimestamps(): checking for problems with mismatched timestamps");
+    try {
+      const problems = await this.getAllProblems();
+      let updatedCount = 0;
+      for (const p of problems) {
+        if (p.platform === "geeksforgeeks" && Array.isArray(p.methods) && p.methods.length > 0) {
+          const validTimes = p.methods.map((m) => m.timestamp).filter((t) => t > 0 && !isNaN(t));
+          if (validTimes.length > 0) {
+            const minTime = Math.min(...validTimes);
+            // If the current timestamp is newer/different than the actual first solve time, update it!
+            if (p.timestamp !== minTime) {
+              dbg.log(
+                `repairGFGTimestamps(): repairing timestamp for ${p.id}: ${p.timestamp} -> ${minTime}`,
+              );
+              p.timestamp = minTime;
+              await this.saveProblem(p);
+              updatedCount++;
+            }
+          }
+        }
+      }
+      if (updatedCount > 0) {
+        dbg.log(`repairGFGTimestamps(): ✓ repaired ${updatedCount} GFG problem timestamps`);
+      }
+    } catch (e) {
+      dbg.error("repairGFGTimestamps(): failed:", e?.message);
     }
   },
 };

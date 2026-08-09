@@ -12,7 +12,8 @@
 
 import { createDebugger } from "../../lib/debug.js";
 import { Storage } from "../storage.js";
-import { getAllInsights } from "../memory/knowledge-bank.js";
+import { getAllInsights, importInsights } from "../memory/knowledge-bank.js";
+import { autoPopulateFromHistory } from "../behavior-bank.js";
 
 const dbg = createDebugger("BackupManager");
 
@@ -27,10 +28,12 @@ const COMMIT_INTERVAL_KEY = "_backupCommitCount";
  * @returns {Promise<object>}
  */
 export async function buildSnapshot() {
-  const [problems, settings, knowledge] = await Promise.all([
+  const [problems, settings, knowledge, behaviorBank, roadmaps] = await Promise.all([
     Storage.getAllProblems().catch(() => []),
     Storage.getSettings().catch(() => ({})),
     getAllInsights().catch(() => []),
+    Storage.getBehaviorBank().catch(() => ({})),
+    Storage.getRoadmaps().catch(() => []),
   ]);
 
   // Strip transient/private keys from settings
@@ -42,11 +45,13 @@ export async function buildSnapshot() {
   );
 
   return {
-    version: 1,
+    version: 2,
     createdAt: new Date().toISOString(),
     problems,
     settings: safeSettings,
     knowledge,
+    behaviorBank,
+    roadmaps,
   };
 }
 
@@ -200,4 +205,80 @@ export async function fetchBackupSnapshot(owner, repo, filePath, git) {
     dbg.warn(`fetchBackupSnapshot(): failed for ${filePath}:`, e?.message);
     return null;
   }
+}
+
+/**
+ * Restores a full backup snapshot (problems, behavior bank, roadmaps, settings, knowledge bank).
+ * Merges items to prevent deleting existing data.
+ * @param {object} snapshot
+ * @returns {Promise<{problemsCount: number, behaviorCount: number, roadmapsCount: number}>}
+ */
+export async function restoreSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    throw new Error("Invalid snapshot payload");
+  }
+
+  // 1. Restore Problems (merge existing)
+  let problemsCount = 0;
+  if (Array.isArray(snapshot.problems)) {
+    for (const p of snapshot.problems) {
+      if (p && (p.id || p.titleSlug)) {
+        await Storage.saveProblem(p);
+        problemsCount++;
+      }
+    }
+  }
+
+  // 2. Restore Behavior Bank (merge key-value records)
+  let behaviorCount = 0;
+  if (
+    snapshot.behaviorBank &&
+    typeof snapshot.behaviorBank === "object" &&
+    !Array.isArray(snapshot.behaviorBank)
+  ) {
+    const currentBank = await Storage.getBehaviorBank().catch(() => ({}));
+    const mergedBank = { ...currentBank, ...snapshot.behaviorBank };
+    await Storage.setBehaviorBank(mergedBank);
+    behaviorCount = Object.keys(snapshot.behaviorBank).length;
+  }
+
+  // 3. Restore Roadmaps (merge by ID)
+  let roadmapsCount = 0;
+  if (Array.isArray(snapshot.roadmaps)) {
+    const currentRoadmaps = await Storage.getRoadmaps().catch(() => []);
+    const roadmapsMap = new Map(currentRoadmaps.map((r) => [r.id, r]));
+    for (const r of snapshot.roadmaps) {
+      if (r && r.id) {
+        roadmapsMap.set(r.id, { ...(roadmapsMap.get(r.id) || {}), ...r });
+        roadmapsCount++;
+      }
+    }
+    await Storage.setRoadmaps([...roadmapsMap.values()]);
+  }
+
+  // 4. Restore Settings (merge non-sensitive settings)
+  if (
+    snapshot.settings &&
+    typeof snapshot.settings === "object" &&
+    !Array.isArray(snapshot.settings)
+  ) {
+    const currentSettings = await Storage.getSettings().catch(() => ({}));
+    const safeSettings = Object.fromEntries(
+      Object.entries(snapshot.settings).filter(
+        ([k]) =>
+          !k.startsWith("_") && !k.includes("token") && !k.includes("key") && !k.includes("secret"),
+      ),
+    );
+    await Storage.setSettings({ ...currentSettings, ...safeSettings });
+  }
+
+  // 5. Restore Knowledge Bank (insights)
+  if (Array.isArray(snapshot.knowledge) && snapshot.knowledge.length > 0) {
+    await importInsights(snapshot.knowledge).catch(() => {});
+  }
+
+  // 6. Ensure behavior bank is seeded/auto-populated from restored history if empty
+  await autoPopulateFromHistory().catch(() => {});
+
+  return { problemsCount, behaviorCount, roadmapsCount };
 }

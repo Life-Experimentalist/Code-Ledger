@@ -10,7 +10,7 @@ const html = htm.bind(h);
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("ProblemModal");
-import { cleanCode, highlightCode } from "../../lib/syntax-highlight.js";
+import { cleanCode, highlightCode, highlightCodeWithLines } from "../../lib/syntax-highlight.js";
 import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { AIReviewPanel } from "../../ui/components/AIReviewPanel.js";
@@ -20,6 +20,7 @@ import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
 import { modalTabRegistry } from "../../core/modal-tab-registry.js";
 import { expandChatVariables } from "../../lib/chat-variables.js";
 import { CONSTANTS } from "../../core/constants.js";
+import { cleanGfgSlug } from "../../core/gfg-utils.js";
 // Side-effect: registers LeetCode tabs into modalTabRegistry
 import "../../handlers/platforms/leetcode/modal-tabs.js";
 
@@ -86,7 +87,7 @@ export const PLATFORM_META = {
     favicon: "https://www.geeksforgeeks.org/favicon.ico",
     label: "GeeksForGeeks",
     color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
-    url: (slug) => CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + slug,
+    url: (slug) => CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + cleanGfgSlug(slug) + "/1",
   },
   codeforces: {
     favicon: "https://codeforces.com/favicon.ico",
@@ -126,6 +127,7 @@ export function ProblemModal({
   onNavigateProblem,
   onOpenGraphProblem,
   onNavigate,
+  hideCloseButton = false,
 }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [copied, setCopied] = useState(false);
@@ -364,26 +366,97 @@ export function ProblemModal({
   const handleRefreshData = useCallback(async () => {
     if (refreshing) return;
     setRefreshing(true);
-    try {
-      const id = encodeURIComponent(problem.titleSlug || problem.id || "");
-      const url = `${problemUrl}${problemUrl.includes("?") ? "&" : "?"}codeledger_fetch=1&cl_fetch_id=${id}`;
-      window.open(url, "_blank", "noopener,noreferrer,width=800,height=600");
 
-      let fetched = false;
-      for (let i = 0; i < 20; i++) {
-        await new Promise((r) => setTimeout(r, 500));
-        try {
-          const updated = await Storage.getProblem(problem.id || problem.titleSlug);
-          if (updated?.problemStatement && updated.problemStatement !== problem.problemStatement) {
-            onUpdate?.(updated);
-            fetched = true;
-            break;
+    try {
+      // GFG: use the direct API call (no background tab needed)
+      if (
+        problem.platform === "geeksforgeeks" &&
+        typeof chrome !== "undefined" &&
+        chrome.runtime?.id
+      ) {
+        const result = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage(
+              {
+                type: "REFRESH_GFG_PROBLEM",
+                problemId: problem.id,
+                titleSlug: problem.titleSlug,
+              },
+              (resp) => {
+                if (chrome.runtime.lastError) {
+                  resolve({ ok: false, error: chrome.runtime.lastError.message });
+                } else {
+                  resolve(resp || { ok: false, error: "No response" });
+                }
+              },
+            );
+          } catch (e) {
+            resolve({ ok: false, error: e?.message || "Extension context error" });
           }
-        } catch (_) {}
+        });
+
+        if (result.ok && result.data) {
+          onUpdate?.(result.data);
+        } else {
+          setChatError("Fetch failed: " + (result.error || "Unknown error"));
+          setTimeout(() => setChatError(""), 6000);
+        }
+        return;
       }
-      if (!fetched) {
-        setChatError("Refresh timeout. Check the opened tab and try again.");
-        setTimeout(() => setChatError(""), 5000);
+
+      // LeetCode / Codeforces: open a background tab with ?codeledger_fetch=1
+      let fetched = false;
+
+      const onMessageListener = (msg) => {
+        if (msg && msg.type === "REFRESH_METADATA_DONE" && msg.slug === problem.titleSlug) {
+          fetched = true;
+        }
+      };
+
+      if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener(onMessageListener);
+      }
+
+      try {
+        const id = encodeURIComponent(problem.titleSlug || problem.id || "");
+        const url = `${problemUrl}${problemUrl.includes("?") ? "&" : "?"}codeledger_fetch=1&cl_fetch_id=${id}`;
+        window.open(url, "_blank", "noopener,noreferrer,width=800,height=600");
+
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          try {
+            const updated = await Storage.getProblem(problem.id || problem.titleSlug);
+            const tagsChanged = JSON.stringify(updated?.tags) !== JSON.stringify(problem.tags);
+            const diffChanged = updated?.difficulty !== problem.difficulty;
+            const descChanged =
+              updated?.problemStatement && updated.problemStatement !== problem.problemStatement;
+
+            if (fetched || tagsChanged || diffChanged || descChanged) {
+              onUpdate?.(updated);
+              fetched = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        if (!fetched) {
+          try {
+            const updated = await Storage.getProblem(problem.id || problem.titleSlug);
+            if (updated) {
+              onUpdate?.(updated);
+              fetched = true;
+            }
+          } catch (_) {}
+        }
+
+        if (!fetched) {
+          setChatError("Refresh timeout. Check the opened tab and try again.");
+          setTimeout(() => setChatError(""), 5000);
+        }
+      } finally {
+        if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+          chrome.runtime.onMessage.removeListener(onMessageListener);
+        }
       }
     } catch (e) {
       setChatError("Refresh failed: " + (e.message || e));
@@ -457,7 +530,10 @@ export function ProblemModal({
 
       const aiMsg = {
         role: "assistant",
-        content: response,
+        content: response.response,
+        providerId: response.providerId,
+        modelId: response.modelId,
+        isFallback: response.isFallback,
         ts: Date.now(),
       };
       const finalMsgs = [...updatedMsgs, aiMsg];
@@ -786,12 +862,16 @@ export function ProblemModal({
                   </button>
                 `
               : ""}
-            <button
-              onClick=${onClose}
-              class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              ✕
-            </button>
+            ${!hideCloseButton
+              ? html`
+                  <button
+                    onClick=${onClose}
+                    class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    ✕
+                  </button>
+                `
+              : ""}
           </div>
         </div>
 
@@ -1025,11 +1105,11 @@ export function ProblemModal({
                               <div class="border-t border-white/5">
                                 ${method.code
                                   ? html`<pre
-                                      class="text-[11px] leading-relaxed overflow-x-auto bg-black/40 p-4 whitespace-pre font-mono m-0 max-h-72"
+                                      class="text-[11px] leading-relaxed overflow-x-auto bg-black/40 py-3 whitespace-pre font-mono m-0 max-h-72"
                                       dangerouslySetInnerHTML=${{
-                                        // Safe: highlightCode() runs escHtml() on all user input
+                                        // Safe: highlightCodeWithLines() runs escHtml() on all user input
                                         // before adding its own controlled <span style="..."> tags.
-                                        __html: highlightCode(
+                                        __html: highlightCodeWithLines(
                                           method.code,
                                           (method.language || "").toLowerCase(),
                                         ),
@@ -1202,6 +1282,8 @@ export function ProblemModal({
                     onRemoveFromQueue: handleRemoveFromQueue,
                     removeFromQueueBusy,
                     settings,
+                    problemList,
+                    onNavigateProblem,
                   };
                   return renderer(problem, ctx);
                 })()}
@@ -1242,6 +1324,9 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
 
   if (!problem.code) {
     const isExtensionCtx = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+    const isGFG = problem.platform === "geeksforgeeks";
+    const platformName = isGFG ? "GeeksForGeeks" : "LeetCode";
+    const loginUrl = isGFG ? "https://www.geeksforgeeks.org" : "https://leetcode.com";
     return html`
       <div class="flex flex-col items-center gap-4 py-12 text-center">
         <p class="text-slate-500 text-sm">Code was not extracted for this submission.</p>
@@ -1276,22 +1361,38 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                 disabled=${recovering}
                 class="px-4 py-2 rounded-lg bg-cyan-600/15 border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-600/30 disabled:opacity-40 transition-colors"
               >
-                ${recovering ? "Recovering code…" : "Recover Code from LeetCode"}
+                ${recovering ? "Recovering code…" : `Recover Code from ${platformName}`}
               </button>
               ${recoveryError
-                ? html` <p class="text-rose-400 text-xs max-w-xs">${recoveryError}</p>
-                    <a
-                      href=${CONSTANTS.PLATFORMS.leetcode.baseUrl}
-                      target="_blank"
-                      rel="noopener"
-                      class="text-[10px] text-cyan-500 hover:text-cyan-300 underline"
-                    >
-                      Open LeetCode to log in, then retry
-                    </a>`
+                ? html`
+                    <p class="text-rose-400 text-xs max-w-xs">${recoveryError}</p>
+                    <div class="flex flex-col gap-1.5 mt-1">
+                      <a
+                        href=${loginUrl}
+                        target="_blank"
+                        rel="noopener"
+                        class="text-[10px] text-cyan-500 hover:text-cyan-300 underline"
+                      >
+                        Open ${platformName} to log in, then retry
+                      </a>
+                      ${isGFG
+                        ? html`
+                            <a
+                              href=${`https://www.geeksforgeeks.org/search/?q=${encodeURIComponent(problem.title)}`}
+                              target="_blank"
+                              rel="noopener"
+                              class="text-[10px] text-cyan-500 hover:text-cyan-300 underline"
+                            >
+                              Search GFG for "${problem.title}" to find the new link
+                            </a>
+                          `
+                        : ""}
+                    </div>
+                  `
                 : ""}
               <p class="text-slate-600 text-[10px] max-w-xs">
-                Opens a background LeetCode tab to fetch your latest accepted submission. Make sure
-                you are logged into LeetCode first.
+                Opens a background ${platformName} tab to fetch your latest accepted submission.
+                Make sure you are logged into ${platformName} first.
               </p>
             `
           : html`<p class="text-slate-600 text-xs">
@@ -1302,12 +1403,18 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
   }
 
   const rawLang = problem.lang?.slug || problem.lang?.name || problem.language || "";
-  const highlighted = highlightCode(problem.code, rawLang);
-  return html`<div class="flex flex-col gap-2">
-    <div class="flex justify-between items-center">
-      <span class="text-[10px] uppercase tracking-wider text-slate-600">
-        ${langName || "Solution"}
-      </span>
+  const highlighted = highlightCodeWithLines(problem.code, rawLang);
+  return html`<div class="flex flex-col gap-1.5">
+    <div
+      class="flex items-center justify-between px-3 py-2 bg-[#0d0d14] border border-white/5 rounded-t-xl border-b-0"
+    >
+      <div class="flex items-center gap-2">
+        <span
+          class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono uppercase tracking-wider"
+        >
+          ${langName || "code"}
+        </span>
+      </div>
       <button
         onClick=${copyCode}
         class="text-[10px] px-2.5 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
@@ -1315,10 +1422,16 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
         ${copied ? "✓ Copied" : "Copy"}
       </button>
     </div>
-    <pre
-      class="text-xs leading-relaxed overflow-x-auto bg-black/50 rounded-xl border border-white/5 p-4 whitespace-pre font-mono m-0"
-      dangerouslySetInnerHTML=${{ __html: highlighted }}
-    ></pre>
+    <div
+      class="overflow-x-auto bg-[#060609] rounded-b-xl border border-white/5 border-t-0"
+      style="font-size:13px;line-height:1.65;"
+    >
+      <pre
+        class="font-mono m-0 py-3"
+        style="white-space:pre;"
+        dangerouslySetInnerHTML=${{ __html: highlighted }}
+      ></pre>
+    </div>
   </div>`;
 }
 
@@ -1694,9 +1807,9 @@ function MethodCard({ method, methodIndex, problem, onUpdate }) {
         : ""}
     </div>
     <pre
-      class="text-xs leading-relaxed overflow-x-auto bg-black/50 p-4 whitespace-pre font-mono m-0 max-h-96"
+      class="text-xs leading-relaxed overflow-x-auto bg-black/50 py-3 whitespace-pre font-mono m-0 max-h-96"
       dangerouslySetInnerHTML=${{
-        __html: highlightCode(method.code || "// (no code)", (method.language || "").toLowerCase()),
+        __html: highlightCodeWithLines(method.code || "// (no code)", (method.language || "").toLowerCase()),
       }}
     ></pre>
     <div class="border-t border-white/10 p-3">
@@ -1705,6 +1818,8 @@ function MethodCard({ method, methodIndex, problem, onUpdate }) {
         onGenerate=${handleGenerateReview}
         loading=${busy}
         error=${error}
+        providerId=${method._aiProvider}
+        modelId=${method._aiModel}
       />
     </div>
   </div>`;
@@ -1717,7 +1832,7 @@ modalTabRegistry.register("*", [
   {
     id: "code",
     label: "Code",
-    show: (p) => !!p.code || p.platform === "leetcode",
+    show: (p) => p && (!!p.code || p.platform === "leetcode" || p.platform === "geeksforgeeks"),
     render(problem, { html, langName, copied, copyCode, onUpdate }) {
       return html`<${CodeTab}
         problem=${problem}
@@ -1742,19 +1857,40 @@ modalTabRegistry.register("*", [
         reviewError,
         onRemoveFromQueue,
         removeFromQueueBusy,
+        queueStatus,
+        queueError,
+        onRunQueueNow,
+        runQueueBusy,
       },
     ) {
+      if (!problem.code) {
+        return html`
+          <div
+            class="p-6 bg-[#0a0a0f] rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center gap-4"
+          >
+            <p class="text-sm text-slate-400">
+              No code is saved for this problem. You must recover/import your solution code before
+              running an AI review.
+            </p>
+            <p class="text-xs text-slate-500">
+              Go to the <strong>Code</strong> tab to fetch your solution from the platform.
+            </p>
+          </div>
+        `;
+      }
       return html`<${AIReviewPanel}
         review=${problem.aiReview || ""}
         onGenerate=${onGenerateAIReview}
         loading=${reviewBusy}
         error=${reviewError}
         queueStatus=${queueStatus}
-        queueError=${queueStatusError}
-        onRunQueueNow=${handleRunAIReviewQueueNow}
-        runQueueBusy=${queueActionBusy}
+        queueError=${queueError}
+        onRunQueueNow=${onRunQueueNow}
+        runQueueBusy=${runQueueBusy}
         onRemoveFromQueue=${onRemoveFromQueue}
         removeFromQueueBusy=${removeFromQueueBusy}
+        providerId=${problem._aiProvider}
+        modelId=${problem._aiModel}
       />`;
     },
   },

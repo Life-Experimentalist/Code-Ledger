@@ -906,7 +906,7 @@ The importer:
    - Navigates to the problem page
    - Fetches problem metadata (title, difficulty, tags) via GraphQL
    - Fetches the solution code via GraphQL submissionDetail query
-4. Builds the full file structure locally (topics/{topic}/{problem}/{lang}.{ext})
+4. Builds the full file structure locally via `buildProblemFiles()` — layout v3: `problems/{canonicalId}/{platform}/{platformId}.{ext}` with canonical mapping, or `problems/{platformId}/{platformId}.{ext}` without
 5. Creates `meta.json` and updates `index.json` locally
 6. Makes **ONE single atomic commit** via the GitHub API Tree endpoint with ALL files
 7. Commit message: `chore: import {count} solutions from LeetCode profile`

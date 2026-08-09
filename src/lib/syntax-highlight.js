@@ -634,7 +634,8 @@ export function cleanCode(code) {
  */
 export function highlightCode(code, lang = "") {
   const cleaned = cleanCode(code || "");
-  const normLang = LANG_ALIASES[lang.toLowerCase()] || lang.toLowerCase();
+  const cleanLang = String(lang || "").toLowerCase().replace(/[\s\-_]+/g, "");
+  const normLang = LANG_ALIASES[cleanLang] || LANG_ALIASES[lang.toLowerCase()] || cleanLang;
   const kws = KEYWORDS[normLang];
 
   if (!kws) {
@@ -689,3 +690,72 @@ export function highlightCode(code, lang = "") {
 
   return result;
 }
+
+/**
+ * Splits highlighted HTML line by line, ensuring open <span ...> tags
+ * are closed at line end and re-opened at the next line start.
+ */
+function splitHtmlLines(html) {
+  const rawLines = html.split("\n");
+  const result = [];
+  let openSpans = [];
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    const prefix = openSpans.join("");
+
+    const tagRe = /<\/?span[^>]*>/gi;
+    let match;
+    const currentLineOpenSpans = [...openSpans];
+
+    while ((match = tagRe.exec(line)) !== null) {
+      const tag = match[0];
+      if (tag.toLowerCase().startsWith("<span")) {
+        currentLineOpenSpans.push(tag);
+      } else if (tag.toLowerCase() === "</span>") {
+        currentLineOpenSpans.pop();
+      }
+    }
+
+    const suffix = currentLineOpenSpans.map(() => "</span>").join("");
+    result.push(prefix + line + suffix);
+    openSpans = currentLineOpenSpans;
+  }
+
+  return result;
+}
+
+/**
+ * Like highlightCode() but wraps each line in a numbered container.
+ * Returns an HTML string for use in a code block with line numbers.
+ *
+ * @param {string} code  The source code (plain text)
+ * @param {string} lang  Language identifier
+ * @returns {string}     HTML string — a table with gutter + code columns
+ */
+export function highlightCodeWithLines(code, lang = "") {
+  const cleaned = cleanCode(code || "");
+  const lines = cleaned.split("\n");
+  // Remove a single trailing empty line that editors often append
+  if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+
+  const highlightedHtml = highlightCode(cleaned, lang);
+  const highlightedLines = splitHtmlLines(highlightedHtml);
+
+  // Pad highlighted lines to match original line count if split differs
+  while (highlightedLines.length < lines.length) highlightedLines.push("");
+
+  const rows = lines.map((_, i) => {
+    const lineNum = i + 1;
+    const lineContent = highlightedLines[i] ?? "";
+    return (
+      `<tr>` +
+      `<td style="color:#374151;user-select:none;text-align:right;padding:0 12px 0 16px;min-width:44px;font-variant-numeric:tabular-nums;border-right:1px solid rgba(255,255,255,0.06);">${lineNum}</td>` +
+      `<td style="padding:0 16px;width:100%;white-space:pre;">${lineContent}</td>` +
+      `</tr>`
+    );
+  });
+
+  return `<table style="border-collapse:collapse;width:100%;font-family:inherit;font-size:inherit;tab-size:4;-moz-tab-size:4;"><tbody>${rows.join("\n")}</tbody></table>`;
+}
+

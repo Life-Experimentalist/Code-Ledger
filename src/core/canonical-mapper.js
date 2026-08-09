@@ -130,6 +130,13 @@ class CanonicalMapper {
     }
   }
 
+  async resolveAsync(platform, slug) {
+    if (this.map.size === 0) {
+      await this.loadMap().catch(() => {});
+    }
+    return this.resolve(platform, slug);
+  }
+
   /**
    * Resolves a platform-specific problem to its canonical identity.
    */

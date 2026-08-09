@@ -75,9 +75,31 @@ body {
 [data-theme="light"] .text-slate-300 {
   color: #1f2937 !important;
 }
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200 {
+  color: #1f2937 !important;
+}
+[data-theme="light"] .text-cyan-300,
+[data-theme="light"] .text-cyan-400 {
+  color: #0891b2 !important;
+}
 [data-theme="light"] .text-white {
   color: #0f172a !important;
 }
+
+/* Global light-mode inputs, selects, and textareas */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background-color: var(--cl-card) !important;
+  color: var(--cl-text) !important;
+  border-color: var(--cl-border) !important;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: var(--cl-text-muted) !important;
+}
+
 
 /* Sidebar nav active / hover */
 [data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover {

@@ -69,6 +69,52 @@ export function MultiLineAIChatInput({
   // Track whether we're in a suggestion session to correctly handle backspace
   const tokenActiveRef = useRef(false);
 
+  // ── Prompt History Navigation ──
+  const [promptHistory, setPromptHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [draft, setDraft] = useState("");
+  const isNavigatingHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+      chrome.storage.local.get("cl_prompt_history", (res) => {
+        const history = res.cl_prompt_history || [];
+        setPromptHistory(history);
+        setHistoryIndex(history.length);
+      });
+    }
+  }, []);
+
+  // Monitor value transitions to auto-save successfully sent prompts
+  const prevValueRef = useRef(value);
+  useEffect(() => {
+    if (prevValueRef.current && prevValueRef.current.trim() && !value) {
+      const sentPrompt = prevValueRef.current.trim();
+      if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+        chrome.storage.local.get("cl_prompt_history", (res) => {
+          let history = res.cl_prompt_history || [];
+          history = history.filter((p) => p !== sentPrompt);
+          history.push(sentPrompt);
+          if (history.length > 50) history.shift();
+          chrome.storage.local.set({ cl_prompt_history: history }, () => {
+            setPromptHistory(history);
+            setHistoryIndex(history.length);
+          });
+        });
+      }
+    }
+    prevValueRef.current = value;
+  }, [value]);
+
+  // Reset history pointer when user types manually
+  useEffect(() => {
+    if (isNavigatingHistoryRef.current) {
+      isNavigatingHistoryRef.current = false;
+      return;
+    }
+    setHistoryIndex(promptHistory.length);
+  }, [value, promptHistory.length]);
+
   // ── Core dropdown logic ───────────────────────────────────────────────────
 
   function computeSuggestions(text, cursor) {
@@ -212,6 +258,59 @@ export function MultiLineAIChatInput({
           replaceToken(insert, suggestionState.start, suggestionState.end);
         }
         return;
+      }
+    }
+
+    if (!suggestionState.visible) {
+      if (e.key === "ArrowUp") {
+        const ta = textareaRef.current;
+        const isCursorAtStart = ta && ta.selectionStart === 0 && ta.selectionEnd === 0;
+        const isMultiLine = ta && ta.value.includes("\n");
+        if (isCursorAtStart && !isMultiLine && promptHistory.length > 0) {
+          e.preventDefault();
+          let newIndex = historyIndex - 1;
+          if (newIndex < 0) newIndex = 0;
+
+          if (historyIndex === promptHistory.length) {
+            setDraft(value || "");
+          }
+
+          setHistoryIndex(newIndex);
+          isNavigatingHistoryRef.current = true;
+          onChange?.(promptHistory[newIndex]);
+
+          requestAnimationFrame(() => {
+            ta.selectionStart = ta.selectionEnd = promptHistory[newIndex].length;
+          });
+          return;
+        }
+      } else if (e.key === "ArrowDown") {
+        const ta = textareaRef.current;
+        const isCursorAtEnd =
+          ta && ta.selectionStart === ta.value.length && ta.selectionEnd === ta.value.length;
+        const isMultiLine = ta && ta.value.includes("\n");
+        if (isCursorAtEnd && !isMultiLine && promptHistory.length > 0) {
+          e.preventDefault();
+          let newIndex = historyIndex + 1;
+          if (newIndex > promptHistory.length) {
+            newIndex = promptHistory.length;
+          }
+
+          setHistoryIndex(newIndex);
+          isNavigatingHistoryRef.current = true;
+          if (newIndex === promptHistory.length) {
+            onChange?.(draft);
+            requestAnimationFrame(() => {
+              ta.selectionStart = ta.selectionEnd = draft.length;
+            });
+          } else {
+            onChange?.(promptHistory[newIndex]);
+            requestAnimationFrame(() => {
+              ta.selectionStart = ta.selectionEnd = promptHistory[newIndex].length;
+            });
+          }
+          return;
+        }
       }
     }
 

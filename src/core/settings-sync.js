@@ -148,6 +148,13 @@ export async function syncSettingsFromGitHub() {
       return { synced: 0, message: "No remote sync file found" };
     }
 
+    const localUpdatedAt = settings.__updatedAt;
+    const remoteSyncedAt = remote.__syncedAt || remote.updatedAt;
+    if (localUpdatedAt && remoteSyncedAt && new Date(localUpdatedAt) >= new Date(remoteSyncedAt)) {
+      dbg.log("syncSettingsFromGitHub(): local settings are newer or equal — skipping pull");
+      return { synced: 0, message: "Local settings are newer" };
+    }
+
     let syncedCount = 0;
 
     // Restore theme separately (stored in its own storage key)

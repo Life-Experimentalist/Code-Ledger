@@ -51,6 +51,7 @@ const DEFAULT_REPO_TOPICS = [
 export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   const [step, setStep] = useState("check");
   const [repoName, setRepoName] = useState(DEFAULT_REPO_NAME);
+  const [isPrivate, setIsPrivate] = useState(true); // Default to true for safer creation
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
@@ -300,17 +301,17 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
           body: JSON.stringify({
             name: cleanName,
             description: DEFAULT_REPO_DESC,
-            private: false,
-            auto_init: true,
+            private: isPrivate,
+            auto_init: false,
             has_wiki: false,
             has_issues: true,
           }),
         });
       } catch (e) {
-        if (e.status === 403 || e.status === 401)
-          throw new Error(
-            "Permission denied. Disconnect and reconnect GitHub in Settings to approve repository permissions.",
-          );
+        if (e.status === 403 || e.status === 401) {
+          const msg = e.body?.message || e.message;
+          throw new Error(`Permission denied: ${msg}. If this persists, ensure you have permission to create repositories under ${selectedOwner}.`);
+        }
         if (e.status === 422) {
           const msg = e.body?.errors?.[0]?.message || e.message;
           throw new Error(`Repository creation failed: ${msg}`);
@@ -355,6 +356,11 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     try {
       const repoData = await ghFetch(`/repos/${selectedOwner}/${repoToLink}`).catch((e) => {
         if (e.status === 404) throw new Error("Repository not found.");
+        if (e.status === 403 || e.status === 401) {
+          throw new Error(
+            "Permission denied. Disconnect and reconnect GitHub in Settings to approve repository permissions.",
+          );
+        }
         throw e;
       });
 
@@ -735,6 +741,21 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     </p>
                   </div>
 
+                  <div class="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-lg mt-2">
+                    <input
+                      type="checkbox"
+                      id="private-repo-toggle"
+                      checked=${isPrivate}
+                      onChange=${(e) => setIsPrivate(e.target.checked)}
+                      disabled=${busy}
+                      class="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/50 bg-black"
+                    />
+                    <label for="private-repo-toggle" class="flex flex-col cursor-pointer">
+                      <span class="text-sm font-medium text-slate-200">Private Repository</span>
+                      <span class="text-xs text-slate-400">Only you can see this repository. (GitHub Pages requires a public repo for free tier)</span>
+                    </label>
+                  </div>
+
                   ${error
                     ? html`<div
                         class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs whitespace-pre-wrap"
@@ -987,24 +1008,21 @@ async function initializeRepository(owner, repo, token) {
     return res.json();
   };
 
-  // Get latest commit SHA — retry up to 6× since GitHub needs a moment after creation
+  // Check if repository is empty or already has commits
   let latestSha, baseTreeSha;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    try {
-      let ref;
-      try {
-        ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/main`);
-      } catch (_) {
-        ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/master`);
-      }
-      latestSha = ref.object.sha;
-      const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
-      baseTreeSha = commit.tree.sha;
-      break;
-    } catch (_) {
-      if (attempt === 5) throw new Error("Repository branch not ready. Please try again.");
-      await new Promise((r) => setTimeout(r, 2000));
-    }
+  let isRootCommit = false;
+  let defaultBranch = "main";
+
+  try {
+    const repoInfo = await ghFetch(`/repos/${owner}/${repo}`);
+    defaultBranch = repoInfo.default_branch || "main";
+    const ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/${defaultBranch}`);
+    latestSha = ref.object.sha;
+    const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
+    baseTreeSha = commit.tree.sha;
+  } catch (e) {
+    // If we get an error (e.g. 409 Conflict for empty repo), it's likely an empty repository
+    isRootCommit = true;
   }
 
   const now = new Date().toISOString();
@@ -1017,52 +1035,76 @@ async function initializeRepository(owner, repo, token) {
     stats: { total: 0, easy: 0, medium: 0, hard: 0 },
   };
 
+  const treePayload = {
+    tree: [
+      {
+        path: "index.json",
+        mode: "100644",
+        type: "blob",
+        content: JSON.stringify(indexJson, null, 2),
+      },
+      {
+        path: "index.html",
+        mode: "100644",
+        type: "blob",
+        content: getPagesHtml(),
+      },
+      {
+        path: ".gitignore",
+        mode: "100644",
+        type: "blob",
+        content: "node_modules/\n.env\n*.log\n.DS_Store\n",
+      },
+    ]
+  };
+
+  if (!isRootCommit) {
+    treePayload.base_tree = baseTreeSha;
+  }
+
   const treeRes = await ghFetch(`/repos/${owner}/${repo}/git/trees`, {
     method: "POST",
-    body: JSON.stringify({
-      base_tree: baseTreeSha,
-      tree: [
-        {
-          path: "index.json",
-          mode: "100644",
-          type: "blob",
-          content: JSON.stringify(indexJson, null, 2),
-        },
-        {
-          path: "index.html",
-          mode: "100644",
-          type: "blob",
-          content: getPagesHtml(),
-        },
-        {
-          path: ".gitignore",
-          mode: "100644",
-          type: "blob",
-          content: "node_modules/\n.env\n*.log\n.DS_Store\n",
-        },
-      ],
-    }),
+    body: JSON.stringify(treePayload),
   });
+
+  const commitPayload = {
+    message: "chore: initialize CodeLedger structure",
+    tree: treeRes.sha,
+  };
+
+  if (!isRootCommit) {
+    commitPayload.parents = [latestSha];
+  }
 
   const commitRes = await ghFetch(`/repos/${owner}/${repo}/git/commits`, {
     method: "POST",
-    body: JSON.stringify({
-      message: "chore: initialize CodeLedger structure",
-      tree: treeRes.sha,
-      parents: [latestSha],
-    }),
+    body: JSON.stringify(commitPayload),
   });
 
-  for (const branch of ["main", "master"]) {
+  if (isRootCommit) {
+    // Create new main branch since repository is empty
+    await ghFetch(`/repos/${owner}/${repo}/git/refs`, {
+      method: "POST",
+      body: JSON.stringify({
+        ref: "refs/heads/main",
+        sha: commitRes.sha
+      })
+    });
+    // Ensure default branch is set to main
     try {
-      await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
+      await ghFetch(`/repos/${owner}/${repo}`, {
         method: "PATCH",
-        body: JSON.stringify({ sha: commitRes.sha, force: false }),
+        body: JSON.stringify({ default_branch: "main" })
       });
-      break;
     } catch (_) {
-      /* try next */
+      // Ignore if patching default branch fails
     }
+  } else {
+    // Advance existing branch
+    await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/${defaultBranch}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: commitRes.sha, force: false }),
+    });
   }
 }
 

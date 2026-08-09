@@ -50,6 +50,7 @@ class ModalTabRegistry {
    * Tabs with show(problem) === false are excluded.
    */
   getTabs(platform, problem) {
+    if (!problem) return [];
     const global = this._tabs.get("*") || [];
     const specific = this._tabs.get(platform) || [];
     // Platform-specific tabs override global "*" tabs with the same id

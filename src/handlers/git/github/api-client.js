@@ -133,14 +133,14 @@ export function createBlob(owner, repo, base64Content, token) {
 
 /** POST /user/repos or /orgs/{owner}/repos — create a new repository.
  *  Pass owner to route to an org; omit for the authenticated user's account. */
-export function createRepository(name, token, owner = null) {
+export function createRepository(name, token, owner = null, isPrivate = true) {
   const url = owner ? `/orgs/${owner}/repos` : "/user/repos";
   return apiFetch(url, token, {
     method: "POST",
     body: JSON.stringify({
       name,
       description: "Collection of solved DSA problems managed by CodeLedger",
-      private: false,
+      private: isPrivate,
       auto_init: true,
       has_wiki: false,
       has_projects: false,

@@ -167,38 +167,45 @@ export async function processSubmission(handler, page, isManual) {
       slug = submission?.question?.titleSlug || slug;
       if (!isManual && submission?.statusCode !== 10) return false;
     } else {
-      const listRes = await handler._gql(QUERIES.SUBMISSION_LIST, {
-        offset: 0,
-        limit: 10,
-        questionSlug: slug,
-      });
-      const subs = listRes.data?.questionSubmissionList?.submissions || [];
-      const latest = subs.find((s) => /accepted/i.test(s.statusDisplay)) || subs[0];
-      if (!latest) return false;
-
       const dedupKey = `cl_committed_${slug}`;
-      const lastId = sessionStorage.getItem(dedupKey);
-      // Also check IDB: sessionStorage is cleared on page reload (SPA cache), so a problem
-      // already committed in a prior session could otherwise be resubmitted.
-      const existingProblem = await Storage.getProblem(handler.makeProblemId(slug)).catch(
-        () => null,
-      );
-      const alreadyInDB = existingProblem && existingProblem.submissionId === String(latest.id);
-      dbg.log(
-        "[processSubmission] dedupKey=" +
-          dedupKey +
-          ", lastId=" +
-          lastId +
-          ", currentId=" +
-          latest.id +
-          ", alreadyInDB=" +
-          alreadyInDB +
-          ", isManual=" +
-          isManual,
-      );
-      if (!isManual && (lastId === String(latest.id) || alreadyInDB)) {
-        dbg.log("Skipping already-committed submission", slug, latest.id);
-        return false;
+      let latest = null;
+      let attempts = 0;
+      const MAX_GQL_RETRY = 5;
+
+      while (attempts < MAX_GQL_RETRY) {
+        const listRes = await handler._gql(QUERIES.SUBMISSION_LIST, {
+          offset: 0,
+          limit: 10,
+          questionSlug: slug,
+        });
+        const subs = listRes.data?.questionSubmissionList?.submissions || [];
+        latest = subs.find((s) => /accepted/i.test(s.statusDisplay)) || subs[0];
+
+        if (!latest) return false;
+
+        const existingProblem = await Storage.getProblem(handler.makeProblemId(slug)).catch(
+          () => null,
+        );
+        const alreadyInDB = existingProblem && existingProblem.submissionId === String(latest.id);
+        const lastId = sessionStorage.getItem(dedupKey);
+
+        const isStale = lastId === String(latest.id) || alreadyInDB;
+        const nowSec = Math.floor(Date.now() / 1000);
+        const latestTs = Number(latest.timestamp || 0);
+
+        if (!isManual && isStale && nowSec - latestTs > 15) {
+          dbg.log(
+            `[processSubmission] Latest accepted submission ${latest.id} is stale (age: ${nowSec - latestTs}s). Retrying list fetch to wait for sync... Attempt ${attempts + 1}/${MAX_GQL_RETRY}`,
+          );
+          attempts++;
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        } else {
+          if (!isManual && isStale) {
+            dbg.log("Skipping already-committed submission", slug, latest.id);
+            return false;
+          }
+          break;
+        }
       }
 
       const detailRes = await handler._gql(QUERIES.SUBMISSION_DETAIL, {
@@ -208,7 +215,7 @@ export async function processSubmission(handler, page, isManual) {
       if (!submission) return false;
 
       if (!submission.code) {
-        const monacoCode = handler._getCodeFromMonaco();
+        const monacoCode = await handler._getCodeFromMonaco();
         if (monacoCode) submission = { ...submission, code: monacoCode };
       }
 

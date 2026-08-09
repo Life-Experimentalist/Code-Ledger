@@ -661,7 +661,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
           ${repoName
             ? html`
                 <button
-                  onClick=${onSetupRepo}
+                  onClick=${() => onSetupRepo()}
                   class="text-[11px] text-slate-500 hover:text-cyan-400 transition-colors"
                 >
                   Change →
@@ -702,7 +702,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
               <div class="flex flex-col items-start gap-2">
                 <p class="text-sm text-slate-500">No repository connected.</p>
                 <button
-                  onClick=${onSetupRepo}
+                  onClick=${() => onSetupRepo()}
                   class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-sm rounded-lg transition-colors"
                 >
                   Set up repository →

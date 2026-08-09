@@ -171,3 +171,85 @@ export async function getAllEntries() {
 export async function clearBehaviorBank() {
   await save({});
 }
+
+/**
+ * Automatically populate behavior bank entries from existing solve history.
+ * Scans all stored problems and seeds missing solves/data into the behavior bank.
+ */
+export async function autoPopulateFromHistory() {
+  dbg.log("autoPopulateFromHistory(): starting checks");
+  if (!(await isEnabled())) {
+    dbg.log("autoPopulateFromHistory(): behavior bank disabled, skipping");
+    return;
+  }
+  const bank = await load();
+  let problems = [];
+  try {
+    problems = (await Storage.getAllProblems()) || [];
+  } catch (e) {
+    dbg.warn("autoPopulateFromHistory(): failed to load problems:", e?.message);
+    return;
+  }
+
+  let updated = false;
+  for (const p of problems) {
+    const slug = p.titleSlug || p.id;
+    if (!slug) continue;
+    const platform = p.platform || "leetcode";
+    const key = `${platform}::${slug}`;
+
+    // Skip if there's already an entry for this problem with solve records
+    if (bank[key] && bank[key].solves && bank[key].solves.length > 0) {
+      continue;
+    }
+
+    // Seed data structure
+    const entry = bank[key] || {
+      slug,
+      platform,
+      difficulty: p.difficulty || "",
+      lang: p.lang || "unknown",
+      tags: p.tags || [],
+      solves: [],
+    };
+
+    if (Array.isArray(p.solutions) && p.solutions.length > 0) {
+      entry.solves = p.solutions
+        .map((sol) => ({
+          ts: sol.ts || sol.timestamp || p.timestamp || Date.now(),
+          elapsedSeconds: sol.meta?.elapsedSeconds || p.elapsedSeconds || 0,
+          lang: sol.lang || p.lang || "unknown",
+        }))
+        .sort((a, b) => a.ts - b.ts)
+        .slice(-10);
+    } else {
+      entry.solves = [
+        {
+          ts: p.timestamp || Date.now(),
+          elapsedSeconds: p.elapsedSeconds || 0,
+          lang: p.lang || "unknown",
+        },
+      ];
+    }
+
+    if (p.tags) {
+      entry.tags = p.tags;
+    }
+    if (p.difficulty) {
+      entry.difficulty = p.difficulty;
+    }
+    if (entry.solves.length > 0) {
+      entry.lang = entry.solves[entry.solves.length - 1].lang;
+    }
+
+    bank[key] = entry;
+    updated = true;
+  }
+
+  if (updated) {
+    await save(bank);
+    dbg.log("autoPopulateFromHistory(): behavior bank successfully seeded from solve history");
+  } else {
+    dbg.log("autoPopulateFromHistory(): no new behavior bank entries needed to seed");
+  }
+}

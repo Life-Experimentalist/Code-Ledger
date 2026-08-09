@@ -16,6 +16,7 @@ export class OpenRouterHandler extends BaseAIHandler {
   constructor() {
     super("openrouter", "OpenRouter");
     this.keyPool = new APIKeyPool("openrouter");
+    this.dbg = dbg;
   }
 
   getSettingsSchema() {
@@ -98,6 +99,8 @@ export class OpenRouterHandler extends BaseAIHandler {
             messages: [{ role: "user", content: prompt }],
           }),
         });
+
+        this._updateRateLimits(res.headers);
 
         if (!res.ok) throw new Error(`OpenRouter API error: ${res.status}`);
 

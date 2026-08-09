@@ -14,6 +14,7 @@ const DIST_CHROME = path.join(ROOT, "dist", "unpacked-chrome");
 const DIST_FIREFOX = path.join(ROOT, "dist", "unpacked-firefox");
 
 function copyRecursiveSync(src, dest) {
+  if (path.basename(src).toLowerCase() === "desktop.ini") return;
   if (fs.statSync(src).isDirectory()) {
     if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
     fs.readdirSync(src).forEach((item) =>

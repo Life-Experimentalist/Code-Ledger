@@ -582,16 +582,6 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [activeTab, schema]);
 
-  // When a provider is selected as primary/secondary, auto-enable it
-  useEffect(() => {
-    const selected = [values?.aiProvider, values?.aiSecondary].filter(Boolean);
-    selected.forEach((pid) => {
-      if (values?.[`${pid}_enabled`] !== true) {
-        onChange(`${pid}_enabled`, true);
-      }
-    });
-  }, [values?.aiProvider, values?.aiSecondary, onChange]);
-
   // Open welcome tab the first time a repo is linked
   useEffect(() => {
     const prev = prevRepoRef.current;
@@ -726,6 +716,52 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       delete updated[`${keyField}:all`];
       return updated;
     });
+  };
+
+  const handleDeleteSavedKey = async (providerId, idx) => {
+    const all = await Storage.getAIKeys();
+    const existing = Array.isArray(all[providerId]) ? [...all[providerId]] : [];
+    if (idx >= 0 && idx < existing.length) {
+      existing.splice(idx, 1);
+      all[providerId] = existing;
+      await Storage.setAIKeys(all);
+      setSavedAIKeys(all);
+    }
+  };
+
+  const handleCopyKey = (key, resultKey) => {
+    navigator.clipboard
+      .writeText(key)
+      .then(() => {
+        setTestResults((s) => ({ ...s, [resultKey]: "Key copied!" }));
+        setTimeout(() => {
+          setTestResults((s) => {
+            const updated = { ...s };
+            delete updated[resultKey];
+            return updated;
+          });
+        }, 1500);
+      })
+      .catch(() => {});
+  };
+
+  const handleCopyAllKeys = (providerId, keyField) => {
+    const keys = Array.isArray(savedAIKeys[providerId]) ? savedAIKeys[providerId] : [];
+    if (keys.length === 0) return;
+    const joined = keys.join(", ");
+    navigator.clipboard
+      .writeText(joined)
+      .then(() => {
+        setTestResults((s) => ({ ...s, [`${keyField}:all`]: "All keys copied!" }));
+        setTimeout(() => {
+          setTestResults((s) => {
+            const updated = { ...s };
+            delete updated[`${keyField}:all`];
+            return updated;
+          });
+        }, 1500);
+      })
+      .catch(() => {});
   };
 
   const handleTestEndpoint = async (providerId, endpointVal, fieldKey) => {
@@ -925,7 +961,6 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
 
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
-    if (values?.aiProvider === providerId || values?.aiSecondary === providerId) return true;
     return values?.[`${providerId}_enabled`] === true;
   };
 
@@ -1444,6 +1479,9 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                       endpoint=${values[`${secondaryProvider}_endpoint`] || ""}
                       providerEnabled=${isProviderEffectivelyEnabled(secondaryProvider)}
                       onToggleEnabled=${(val) => onChange(`${secondaryProvider}_enabled`, val)}
+                      excludeModel=${primaryProvider === secondaryProvider
+                        ? values.aiPrimaryModel
+                        : ""}
                     />`
                   : ""}
               </div>
@@ -1491,21 +1529,26 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                     type="checkbox"
                     class="sr-only peer"
                     checked=${providerEnabled}
-                    disabled=${isPinned}
-                    onChange=${(e) => onChange(enabledField, e.target.checked)}
+                    onChange=${(e) => {
+                      const isEn = e.target.checked;
+                      onChange(enabledField, isEn);
+                      if (!isEn) {
+                        if (values?.aiProvider === pid) {
+                          onChange("aiProvider", "");
+                          onChange("aiPrimaryModel", "");
+                        }
+                        if (values?.aiSecondary === pid) {
+                          onChange("aiSecondary", "");
+                          onChange("aiSecondaryModel", "");
+                        }
+                      }
+                    }}
                   />
                   <div
-                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500 disabled:opacity-50"
+                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
                   ></div>
                 </label>
               </div>
-              ${isPinned
-                ? html`<p class="text-[11px] text-amber-400">
-                    This provider is active as
-                    ${values?.aiProvider === pid ? " primary " : " secondary "}and cannot be
-                    disabled.
-                  </p>`
-                : ""}
               ${p.keyRequired
                 ? html`
                     <div class="space-y-3">
@@ -1535,6 +1578,13 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                           >
                             Test All
                           </button>
+                          <button
+                            onClick=${() => handleCopyAllKeys(pid, keyField)}
+                            disabled=${savedKeys.length === 0}
+                            class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] disabled:opacity-40 text-xs text-white rounded transition-colors"
+                          >
+                            Copy All Keys
+                          </button>
                         </div>
                       </div>
                       ${testResults[`${keyField}:all`]
@@ -1543,37 +1593,121 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                           </div>`
                         : ""}
 
-                      <div class="space-y-2">
-                        ${keyList.map(
-                          (k, idx) => html`
-                            <div
-                              key=${`${pid}-${idx}`}
-                              class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
-                            >
-                              <span class="text-xs text-slate-300 font-mono">${maskKey(k)}</span>
-                              <div class="flex items-center gap-2">
-                                <button
-                                  onClick=${() =>
-                                    handleTestKey(pid, k, `${keyField}:${idx}`, endpoint)}
-                                  class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-                                >
-                                  ${testing[`${keyField}:${idx}`] ? "Testing..." : "Test"}
-                                </button>
-                                ${(() => {
-                                  const r = testResults[`${keyField}:${idx}`];
-                                  if (!r) return "";
-                                  const ok = r === "OK";
-                                  return html`<span
-                                    class="text-[11px] ${ok ? "text-emerald-400" : "text-rose-400"}"
-                                    >${r}</span
-                                  >`;
-                                })()}
+                      <!-- Saved Keys List -->
+                      ${savedKeys.length > 0
+                        ? html`
+                            <div class="space-y-2">
+                              <div
+                                class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold"
+                              >
+                                Saved Keys (${savedKeys.length})
+                              </div>
+                              <div class="space-y-2">
+                                ${savedKeys.map(
+                                  (k, idx) => html`
+                                    <div
+                                      key=${`saved-${pid}-${idx}`}
+                                      class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
+                                    >
+                                      <span class="text-xs text-slate-300 font-mono"
+                                        >${maskKey(k)}</span
+                                      >
+                                      <div class="flex items-center gap-2">
+                                        <button
+                                          onClick=${() =>
+                                            handleTestKey(
+                                              pid,
+                                              k,
+                                              `${keyField}:saved:${idx}`,
+                                              endpoint,
+                                            )}
+                                          class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                                        >
+                                          ${testing[`${keyField}:saved:${idx}`]
+                                            ? "Testing..."
+                                            : "Test"}
+                                        </button>
+                                        ${(() => {
+                                          const r = testResults[`${keyField}:saved:${idx}`];
+                                          if (!r) return "";
+                                          const ok = r === "OK";
+                                          return html`<span
+                                            class="text-[11px] ${ok
+                                              ? "text-emerald-400"
+                                              : "text-rose-400"}"
+                                            >${r}</span
+                                          >`;
+                                        })()}
+                                        <button
+                                          onClick=${() =>
+                                            handleCopyKey(k, `${keyField}:saved:${idx}`)}
+                                          title="Copy API Key"
+                                          class="p-1 text-slate-400 hover:text-white transition-colors"
+                                        >
+                                          📋
+                                        </button>
+                                        <button
+                                          onClick=${() => handleDeleteSavedKey(pid, idx)}
+                                          title="Delete API Key"
+                                          class="p-1 text-slate-400 hover:text-red-400 transition-colors"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    </div>
+                                  `,
+                                )}
                               </div>
                             </div>
-                          `,
-                        )}
-                      </div>
+                          `
+                        : ""}
 
+                      <!-- Draft Keys List -->
+                      ${keyList.length > 0
+                        ? html`
+                            <div class="space-y-2">
+                              <div
+                                class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold"
+                              >
+                                Draft Keys (${keyList.length})
+                              </div>
+                              <div class="space-y-2">
+                                ${keyList.map(
+                                  (k, idx) => html`
+                                    <div
+                                      key=${`draft-${pid}-${idx}`}
+                                      class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
+                                    >
+                                      <span class="text-xs text-slate-300 font-mono"
+                                        >${maskKey(k)}</span
+                                      >
+                                      <div class="flex items-center gap-2">
+                                        <button
+                                          onClick=${() =>
+                                            handleTestKey(pid, k, `${keyField}:${idx}`, endpoint)}
+                                          class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                                        >
+                                          ${testing[`${keyField}:${idx}`] ? "Testing..." : "Test"}
+                                        </button>
+                                        ${(() => {
+                                          const r = testResults[`${keyField}:${idx}`];
+                                          if (!r) return "";
+                                          const ok = r === "OK";
+                                          return html`<span
+                                            class="text-[11px] ${ok
+                                              ? "text-emerald-400"
+                                              : "text-rose-400"}"
+                                            >${r}</span
+                                          >`;
+                                        })()}
+                                      </div>
+                                    </div>
+                                  `,
+                                )}
+                              </div>
+                            </div>
+                          `
+                        : ""}
                       ${(() => {
                         const hasFailed = keyList.some((_, idx) => {
                           const r = testResults[`${keyField}:${idx}`];

@@ -46,6 +46,7 @@ if (!SKIP_CSS) {
 if (fs.existsSync(DIST_DIR)) fs.rmSync(DIST_DIR, { recursive: true, force: true });
 
 function copyRecursive(src, dest) {
+  if (path.basename(src).toLowerCase() === "desktop.ini") return;
   if (fs.statSync(src).isDirectory()) {
     fs.mkdirSync(dest, { recursive: true });
     fs.readdirSync(src).forEach((item) =>

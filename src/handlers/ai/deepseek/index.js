@@ -16,6 +16,7 @@ export class DeepSeekHandler extends BaseAIHandler {
   constructor() {
     super("deepseek", "DeepSeek");
     this.keyPool = new APIKeyPool("deepseek");
+    this.dbg = dbg;
   }
 
   getSettingsSchema() {
@@ -93,6 +94,8 @@ export class DeepSeekHandler extends BaseAIHandler {
             messages: [{ role: "user", content: prompt }],
           }),
         });
+
+        this._updateRateLimits(res.headers);
 
         if (!res.ok) throw new Error(`DeepSeek API error: ${res.status}`);
 

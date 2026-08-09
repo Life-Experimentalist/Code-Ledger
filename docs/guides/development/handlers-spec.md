@@ -118,7 +118,7 @@ Best Practices
 
 - Keep `dom-selectors.js` minimal and provide `LEGACY_SELECTORS` for older site variants.
 - Avoid long-running work in `detectSubmission()` — keep it fast and idempotent.
-- When committing files, provide a deterministic `path` (e.g., `topics/{topic}/{titleSlug}/{lang}.{ext}`) and include a consistent `index.json` metadata file.
+- When committing files, provide a deterministic `path` via `buildProblemFiles()` from `src/core/path-builder.js` (resolves to `problems/{canonicalId}/{platform}/{platformId}.{ext}` with canonical, or `problems/{platformId}/{platformId}.{ext}` without) and include a consistent `index.json` metadata file.
 
 Further reading
 

@@ -90,10 +90,8 @@
         <p>TL;DR — CodeLedger never sees your code, your AI keys, or your GitHub token. Everything lives in your browser and your own GitHub repo.</p>
       </div>
 
-      <h2>1. What data we collect</h2>
-      <p><strong>We collect nothing.</strong> CodeLedger does not operate any analytics, telemetry, logging, or tracking infrastructure. The extension runs entirely inside your browser.</p>
-
-      <h2>2. Data stored locally (in your browser)</h2>
+      <h2>1. Data Collection</h2>
+      <p><strong>We collect nothing on our servers.</strong> CodeLedger does not operate any analytics, telemetry, logging, or tracking infrastructure. The extension runs entirely inside your browser.</p>
       <p>The extension stores the following data <strong>only in your browser's local storage and IndexedDB</strong>:</p>
       <ul>
         <li>Your GitHub OAuth access token (used to push commits to your repo)</li>
@@ -102,52 +100,28 @@
         <li>Solved problem metadata and AI reviews (in IndexedDB)</li>
         <li>AI chat history</li>
       </ul>
-      <p>None of this data is transmitted to CodeLedger servers. Your browser storage is under your full control.</p>
 
-      <h2>3. Data sent to GitHub</h2>
-      <p>When you solve a problem, CodeLedger commits the following to <strong>your own GitHub repository</strong> using the GitHub API:</p>
+      <h2>2. Data Handling & Usage</h2>
+      <p>Your data is processed strictly to provide the extension's core functionality: pushing code to your GitHub repo and requesting AI code reviews using your provided API keys. CodeLedger does not track your browsing activity, sell your data, or use advertising SDKs.</p>
+
+      <h2>3. Data Storage & Security</h2>
+      <p>All data remains on your device under your control. It is protected by your browser's encryption and security boundaries. You can delete all data at any time by uninstalling the extension or clearing the extension's local data.</p>
+
+      <h2>4. Data Sharing & Third-Party Disclosure</h2>
+      <p>We do not sell or share your data. Data is only transmitted to the third parties you explicitly configure:</p>
       <ul>
-        <li>Your solution code</li>
-        <li>Problem metadata (title, difficulty, tags, platform)</li>
-        <li>AI review text (if AI review is enabled)</li>
-        <li>An updated <code>index.json</code> tracking your solved problems</li>
+        <li><strong>GitHub</strong>: Your solution code and metadata are sent directly to your own repository using the GitHub API.</li>
+        <li><strong>AI Providers (Optional)</strong>: Your code and metadata are sent to the provider you select using your own API key. You are subject to their respective privacy policies.</li>
+        <li><strong>Cloudflare Worker</strong>: Used exclusively to relay the GitHub OAuth code exchange. No tokens or personal data are stored or logged on the worker.</li>
       </ul>
-      <p>This data goes directly from your browser to GitHub's API. CodeLedger infrastructure is not involved.</p>
 
-      <h2>4. Data sent to AI providers</h2>
-      <p>If you configure an AI provider, your solution code and problem metadata are sent to that provider using <strong>your own API key</strong>. Review each provider's privacy policy:</p>
-      <ul>
-        <li><a href="https://ai.google.dev/terms" target="_blank" rel="noopener">Google Gemini</a></li>
-        <li><a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">OpenAI</a></li>
-        <li><a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic Claude</a></li>
-        <li><a href="https://www.deepseek.com/privacy" target="_blank" rel="noopener">DeepSeek</a></li>
-        <li>Ollama: runs locally — no external requests</li>
-      </ul>
-      <p>AI review is optional and can be disabled in Settings → AI.</p>
-
-      <h2>5. The OAuth relay server</h2>
-      <p>CodeLedger operates one server at <code>codeledger.vkrishna04.me/api</code>. Its sole purpose is the GitHub OAuth code exchange:</p>
-      <ul>
-        <li>Your browser sends GitHub's temporary <code>code</code> parameter to this server</li>
-        <li>The server exchanges it for an access token via GitHub's API</li>
-        <li>The token is returned to your browser and stored locally</li>
-        <li><strong>The token is never logged, stored, or transmitted elsewhere</strong></li>
-      </ul>
-      <p>The server does not log IP addresses, request bodies, tokens, or any user-identifying information. Cloudflare Workers processes the request in-memory only.</p>
-
-      <h2>6. The Library web app</h2>
-      <p>The Library at <code>codeledger.vkrishna04.me/library</code> reads your problems directly from your GitHub repository via the GitHub API using your token. No data is cached or stored on our servers.</p>
-
-      <h2>7. Cookies and tracking</h2>
-      <p>We use no cookies, no third-party analytics (no Google Analytics, Mixpanel, etc.), no fingerprinting, and no advertising SDKs.</p>
-
-      <h2>8. Children's privacy</h2>
+      <h2>5. Children's privacy</h2>
       <p>CodeLedger is not directed at children under 13. We do not knowingly collect information from children.</p>
 
-      <h2>9. Changes to this policy</h2>
+      <h2>6. Changes to this policy</h2>
       <p>If we make material changes, we will update the "Last updated" date above and note it in the <a href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG</a>.</p>
 
-      <h2>10. Contact</h2>
+      <h2>7. Contact</h2>
       <p>Questions? Open an issue on <a href="https://github.com/Life-Experimentalist/Code-Ledger/issues" target="_blank" rel="noopener">GitHub</a> or email <a href="mailto:krishnalsh2004@gmail.com">krishnalsh2004@gmail.com</a>.</p>
     </div>
 

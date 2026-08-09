@@ -67,6 +67,14 @@ export class GitHubHandler extends BaseGitHandler {
           advanced: true,
         },
         {
+          key: "github_repo_private",
+          label: "Create as Private Repository",
+          type: "toggle",
+          default: true,
+          description: "When auto-creating the repository, make it private instead of public.",
+          advanced: true,
+        },
+        {
           key: "github_pages",
           label: "Enable GitHub Pages",
           type: "toggle",
@@ -217,7 +225,8 @@ export class GitHubHandler extends BaseGitHandler {
 
         dbg.log(`commit(): repo not found — creating ${owner}/${name}…`);
         const isOrg = owner !== userRes.login;
-        await api.createRepository(name, token, isOrg ? owner : null);
+        const isPrivate = settings["github_repo_private"] !== false; // Default to true
+        await api.createRepository(name, token, isOrg ? owner : null, isPrivate);
         isNewRepo = true;
 
         // GitHub needs a moment after auto_init to create the initial commit

@@ -20,6 +20,7 @@ import { Storage } from "../core/storage.js";
 import { registry } from "../core/handler-registry.js";
 import { createDebugger } from "../lib/debug.js";
 import { CONSTANTS } from "../core/constants.js";
+import { cleanGfgSlug } from "../core/gfg-utils.js";
 
 const dbg = createDebugger("MigrationManager");
 
@@ -94,6 +95,47 @@ export async function migrateProblemIds() {
   }
 
   dbg.log(`migrateProblemIds(): ✓ complete — ${byNewId.size} record(s) rekeyed`);
+
+  // Clean up any corrupt GFG problem records (double-hyphen, trailing /0 /1, etc.)
+  await sanitizeGfgProblemSlugs().catch((err) => {
+    dbg.error("migrateProblemIds(): sanitizeGfgProblemSlugs failed:", err.message);
+  });
+}
+
+export async function sanitizeGfgProblemSlugs() {
+  const problems = await Storage.getAllProblems().catch(() => []);
+  const gfgProblems = problems.filter((p) => p && p.platform === "geeksforgeeks");
+
+  let updatedCount = 0;
+  for (const p of gfgProblems) {
+    const rawSlug = p.titleSlug || p.id.replace(/^gfg-/, "");
+    if (!rawSlug) continue;
+
+    const cleanSlug = cleanGfgSlug(rawSlug);
+    const newId = `gfg-${cleanSlug}`;
+
+    if (cleanSlug !== p.titleSlug || newId !== p.id) {
+      dbg.log(
+        `sanitizeGfgProblemSlugs(): migrating dirty GFG problem ${p.id} (${p.titleSlug}) -> ${newId} (${cleanSlug})`,
+      );
+
+      // Delete old record
+      await Storage.deleteProblem(p.id).catch(() => {});
+
+      // Save new record
+      const updated = {
+        ...p,
+        id: newId,
+        titleSlug: cleanSlug,
+      };
+      await Storage.saveProblem(updated).catch(() => {});
+      updatedCount++;
+    }
+  }
+
+  if (updatedCount > 0) {
+    dbg.log(`sanitizeGfgProblemSlugs(): completed, cleaned ${updatedCount} GFG problem(s)`);
+  }
 }
 
 async function _getGitContext() {
@@ -376,4 +418,51 @@ function _buildIndexJson(problems) {
     null,
     2,
   );
+}
+
+/**
+ * One-time migration: normalize all stored problem tags to canonical DSA topic names.
+ *
+ * Reads every problem from IDB, runs tags through normalizeTag(), deduplicates,
+ * re-saves only if tags actually changed. Idempotent — tracks completion via
+ * a settings flag (cl.migration.tagsCanonical.v1) so it never runs twice.
+ */
+export async function migrateTagsToCanonical() {
+  const MIGRATION_KEY = "cl.migration.tagsCanonical.v1";
+  const settings = await Storage.getSettings().catch(() => ({}));
+  if (settings[MIGRATION_KEY]) {
+    dbg.log("migrateTagsToCanonical(): already completed, skipping");
+    return;
+  }
+
+  // Lazy-import to avoid circular deps in ESM (topic-resolver is pure)
+  const { normalizeTag } = await import("../core/topic-resolver.js");
+
+  const problems = await Storage.getAllProblems().catch(() => []);
+  dbg.log(`migrateTagsToCanonical(): scanning ${problems.length} problem(s)`);
+
+  let changed = 0;
+  for (const p of problems) {
+    if (!Array.isArray(p.tags) || p.tags.length === 0) continue;
+
+    const normalized = [...new Set(p.tags.map((t) => normalizeTag(t)).filter(Boolean))];
+    const normalizedTopic = p.topic ? normalizeTag(p.topic) : p.topic;
+
+    // Check if anything actually changed
+    const isDiff =
+      normalized.length !== p.tags.length ||
+      normalized.some((t, i) => t !== p.tags[i]) ||
+      (p.topic && normalizedTopic !== p.topic);
+
+    if (!isDiff) continue;
+
+    await Storage.saveProblem({ ...p, tags: normalized, ...(normalizedTopic ? { topic: normalizedTopic } : {}) }).catch((e) =>
+      dbg.warn(`migrateTagsToCanonical(): failed to update ${p.id}:`, e?.message),
+    );
+    changed++;
+  }
+
+  // Mark as done
+  await Storage.setSettings({ ...settings, [MIGRATION_KEY]: true }).catch(() => {});
+  dbg.log(`migrateTagsToCanonical(): ✓ complete — ${changed}/${problems.length} problem(s) updated`);
 }

@@ -45,3 +45,6 @@ docs/NEXT_PHASE_ROADMAP.md
 docs/temp/
 
 # .remember/
+.devprune.json
+.devprune-ignore
+ignore.devprune.json
