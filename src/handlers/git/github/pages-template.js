@@ -761,7 +761,7 @@ export function getPagesHtml(opts = {}) {
           var lang = (p.lang && p.lang.name) ? p.lang.name : (p.language || (p.lang && p.lang.ext) || '—');
           var url = problemUrl(p);
           rows += '<tr>'
-            + '<td><a href="' + url + '" target="_blank" rel="noreferrer">' + escHtml(p.title || '—') + '</a></td>'
+            + '<td><a href="' + escHtml(url) + '" target="_blank" rel="noreferrer">' + escHtml(p.title || '—') + '</a></td>'
             + '<td>' + diffBadge(p.difficulty) + '</td>'
             + '<td style="color:var(--muted);font-size:.7rem">' + escHtml(lang) + '</td>'
             + '</tr>';

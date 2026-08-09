@@ -9,37 +9,63 @@
  *   CODELEDGER_GH_APP_CLIENT_ID       — GitHub OAuth App client ID
  *   CODELEDGER_GH_APP_CLIENT_SECRET   — GitHub OAuth App client secret
  *   CANONICAL_UPLOAD_TOKEN            — random token for /api/admin/canonical
+ *   SESSION_SECRET                    — random secret, signs the OAuth state cookie
  *
- * Optional (for GitHub App JWT features):
- *   CODELEDGER_GH_APP_PRIVATE_KEY     — PKCS#8 PEM private key
- *   CODELEDGER_GH_APP_ID              — GitHub App numeric ID
- *   CODELEDGER_GH_APP_WEBHOOK_SECRET  — webhook HMAC secret
+ * Optional:
+ *   CODELEDGER_GH_APP_WEBHOOK_SECRET  — webhook HMAC secret. When unset, the
+ *                                       webhook endpoint refuses every request.
  *
  * KV binding: CANONICAL_MAP
+ *
+ * NOTE ON AUTH MODEL: CodeLedger uses a classic OAuth App, not a GitHub App.
+ * A GitHub App's user-to-server token silently ignores the `scope` parameter and
+ * cannot create repositories on a personal account, which is what onboarding does
+ * first. The secret NAMES retain their historical `GH_APP` prefix so existing
+ * deployments keep working; see env() below.
  */
 
 import { Hono } from "hono";
 
 const app = new Hono();
 
-/* ── CORS headers ─────────────────────────────────────────────────── */
+/* ── Constants ────────────────────────────────────────────────────── */
 
-const CORS_HEADERS = {
+const VERSION = "1.0.0";
+
+/** Scopes the client may request. Anything else is rejected.
+ *  public_repo is the default: it can create and push to public repos but
+ *  cannot read private ones. Full `repo` is only for users who opt into a
+ *  private ledger, and is requested at that moment rather than up front. */
+const ALLOWED_SCOPES = new Set(["public_repo", "public_repo,workflow", "repo", "repo,workflow"]);
+const DEFAULT_SCOPE = "public_repo,workflow";
+
+const STATE_COOKIE = "cl_oauth_state";
+const STATE_TTL_MS = 10 * 60 * 1000;
+
+/* ── CORS ─────────────────────────────────────────────────────────── */
+
+/** Public, unauthenticated, read-only endpoints may be read cross-origin.
+ *  Authenticated endpoints deliberately get NO CORS headers so a browser will
+ *  not let another origin read their responses. */
+const PUBLIC_CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "GET,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
 };
 
-app.options("*", (c) => new Response(null, { status: 204, headers: CORS_HEADERS }));
+app.options("/api/health", () => new Response(null, { status: 204, headers: PUBLIC_CORS }));
+app.options("/api/data/*", () => new Response(null, { status: 204, headers: PUBLIC_CORS }));
 
 /* ── Env helper ───────────────────────────────────────────────────── */
 
 function env(c, key) {
   const aliases = {
-    GH_CLIENT_ID: ["CODELEDGER_GH_APP_CLIENT_ID", "GITHUB_CLIENT_ID"],
-    GH_CLIENT_SECRET: ["CODELEDGER_GH_APP_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"],
-    GH_APP_KEY: ["CODELEDGER_GH_APP_PRIVATE_KEY", "GITHUB_APP_PRIVATE_KEY"],
-    GH_APP_ID: ["CODELEDGER_GH_APP_ID", "GITHUB_APP_ID"],
+    GH_CLIENT_ID: ["CODELEDGER_OAUTH_CLIENT_ID", "CODELEDGER_GH_APP_CLIENT_ID", "GITHUB_CLIENT_ID"],
+    GH_CLIENT_SECRET: [
+      "CODELEDGER_OAUTH_CLIENT_SECRET",
+      "CODELEDGER_GH_APP_CLIENT_SECRET",
+      "GITHUB_CLIENT_SECRET",
+    ],
     GH_WEBHOOK_SECRET: ["CODELEDGER_GH_APP_WEBHOOK_SECRET", "GITHUB_APP_WEBHOOK_SECRET"],
   };
   const names = aliases[key] || [key];
@@ -49,124 +75,127 @@ function env(c, key) {
   return undefined;
 }
 
-/* ── GitHub App JWT helpers (optional — only used if key is present) ─ */
+/* ── Encoding helpers ─────────────────────────────────────────────── */
 
-function base64UrlEncode(bytes) {
-  let str = "";
-  for (const b of bytes) str += String.fromCharCode(b);
-  return btoa(str).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+/** Escapes text for interpolation into HTML text nodes and quoted attributes. */
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function jsonBase64(obj) {
-  return base64UrlEncode(new TextEncoder().encode(JSON.stringify(obj)));
+/** Serialises a value for embedding inside a <script> block.
+ *  JSON.stringify alone is unsafe here: it does not escape `</script>`, so a
+ *  string containing that sequence would terminate the block and let the rest
+ *  be parsed as markup. U+2028/U+2029 are valid in JSON but are JavaScript
+ *  line terminators, so they are escaped as well. */
+function jsonForScript(value) {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
-/**
- * Converts PEM (PKCS#1 or PKCS#8) to a PKCS#8 ArrayBuffer.
- * GitHub downloads PKCS#1 (.pem); crypto.subtle needs PKCS#8.
- */
-function pemToArrayBuffer(pem) {
-  const isPkcs1 = pem.includes("BEGIN RSA PRIVATE KEY");
-  const b64 = pem
-    .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/g, "")
-    .replace(/-----END (RSA )?PRIVATE KEY-----/g, "")
-    .replace(/\s+/g, "");
-  const binary = atob(b64);
-  const pkcs1 = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) pkcs1[i] = binary.charCodeAt(i);
-
-  if (!isPkcs1) return pkcs1.buffer;
-
-  // Wrap PKCS#1 in a PKCS#8 ASN.1 envelope
-  const rsaOid = new Uint8Array([
-    0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00,
-  ]);
-  const encLen = (n) =>
-    n < 128
-      ? new Uint8Array([n])
-      : n < 256
-        ? new Uint8Array([0x81, n])
-        : new Uint8Array([0x82, (n >> 8) & 0xff, n & 0xff]);
-  const concat = (...arrs) => {
-    const out = new Uint8Array(arrs.reduce((s, a) => s + a.length, 0));
-    let off = 0;
-    for (const a of arrs) {
-      out.set(a, off);
-      off += a.length;
-    }
-    return out;
-  };
-  const octet = concat(new Uint8Array([0x04]), encLen(pkcs1.length), pkcs1);
-  const inner = concat(rsaOid, octet);
-  const pkcs8 = concat(new Uint8Array([0x30]), encLen(inner.length), inner);
-  return pkcs8.buffer;
+function bytesToHex(buf) {
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-let _cachedKey = null;
-async function getAppJwtKey(c) {
-  if (_cachedKey) return _cachedKey;
-  const pem = env(c, "GH_APP_KEY");
-  if (!pem) return null;
-  _cachedKey = await crypto.subtle.importKey(
-    "pkcs8",
-    pemToArrayBuffer(pem),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+/** Length-independent, constant-time string comparison.
+ *  A plain `!==` leaks how many leading characters matched via timing. */
+function timingSafeEqual(a, b) {
+  const enc = new TextEncoder();
+  const ab = enc.encode(String(a));
+  const bb = enc.encode(String(b));
+  // Compare fixed-width digests so differing lengths do not short-circuit.
+  let diff = ab.length ^ bb.length;
+  const len = Math.max(ab.length, bb.length);
+  for (let i = 0; i < len; i++) {
+    diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+async function hmacHex(secret, message) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
-  return _cachedKey;
+  return bytesToHex(await crypto.subtle.sign("HMAC", key, enc.encode(message)));
 }
 
-async function createAppJWT(c) {
-  const key = await getAppJwtKey(c);
-  if (!key) throw new Error("GitHub App private key not configured");
-  const appId = env(c, "GH_APP_ID");
-  if (!appId) throw new Error("GitHub App ID not configured");
+/* ── OAuth state (CSRF protection) ────────────────────────────────── */
 
-  const now = Math.floor(Date.now() / 1000);
-  const payload = `${jsonBase64({ alg: "RS256", typ: "JWT" })}.${jsonBase64({
-    iat: now - 60,
-    exp: now + 600,
-    iss: Number(appId),
-  })}`;
-  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(payload));
-  return `${payload}.${base64UrlEncode(new Uint8Array(sig))}`;
+/** Builds an opaque, tamper-evident state token: <nonce>.<issuedAt>.<hmac>.
+ *  Without this, an attacker can complete an OAuth flow with their own code and
+ *  silently bind the victim's extension to the attacker's GitHub account. */
+async function issueState(secret) {
+  const nonce = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+  const issuedAt = Date.now();
+  const body = `${nonce}.${issuedAt}`;
+  return `${body}.${await hmacHex(secret, body)}`;
 }
 
-/* ── OAuth postMessage helper ─────────────────────────────────────── */
+async function verifyState(secret, state) {
+  if (!state) return false;
+  const parts = String(state).split(".");
+  if (parts.length !== 3) return false;
+  const [nonce, issuedAt, mac] = parts;
+  const expected = await hmacHex(secret, `${nonce}.${issuedAt}`);
+  if (!timingSafeEqual(mac, expected)) return false;
+  const ts = Number(issuedAt);
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts < STATE_TTL_MS;
+}
+
+function readCookie(c, name) {
+  const raw = c.req.header("cookie") || "";
+  for (const part of raw.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return decodeURIComponent(v.join("="));
+  }
+  return "";
+}
+
+/* ── OAuth callback page ──────────────────────────────────────────── */
 
 /**
- * Returns an HTML page that posts CODELEDGER_AUTH to window.opener then closes.
- * The extension's handleOAuth listens for exactly type === 'CODELEDGER_AUTH'.
+ * Returns an HTML page that hands CODELEDGER_AUTH to the extension, then closes.
+ * The token travels via a DOM attribute read by the content script at
+ * document_end; the same-page postMessage is a fallback for timing races.
+ *
+ * Every interpolation below is escaped: `error` originates from GitHub's
+ * redirect query string and is therefore attacker-controlled.
  */
 function authCallbackHtml(provider, token, error = "") {
-  const safeMsg = JSON.stringify({
-    type: "CODELEDGER_AUTH",
-    provider,
-    token,
-    error,
-  });
-  // Primary relay: auth data embedded in a DOM element read by the content script at
-  // document_end. Same-page postMessage is a fallback for race conditions or older deploys.
-  // Target origin is window.location.origin (self) — not '*', which would broadcast everywhere.
+  const payload = { type: "CODELEDGER_AUTH", provider, token, error };
+  const attr = escapeHtml(JSON.stringify(payload));
   const status = token
     ? "Authentication successful. Closing…"
-    : `Authentication failed: ${error || "unknown error"}`;
+    : `Authentication failed: ${escapeHtml(error || "unknown error")}`;
+
   return `<!DOCTYPE html>
-<html><head><title>CodeLedger Auth</title>
+<html lang="en"><head><meta charset="utf-8"><title>CodeLedger Auth</title>
 <style>body{font-family:system-ui,sans-serif;background:#050508;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
 </head><body>
-<div id="codeledger-auth-result" data-auth="${safeMsg.replace(/"/g, "&quot;")}" style="display:none"></div>
+<div id="codeledger-auth-result" data-auth="${attr}" style="display:none"></div>
 <p>${status}</p>
 <script>
 (function(){
-  var msg = ${safeMsg};
-  // Fallback: same-page postMessage for content scripts that miss document_end timing.
-  // Only delivered to this window (window.location.origin target), not broadcast widely.
+  var msg = ${jsonForScript(payload)};
+  // Fallback only: delivered to this window alone, never broadcast with '*'.
   try{window.postMessage(msg, window.location.origin);}catch(e){}
-  // Content script closes the popup after writing the token to storage.
-  // This 5 s fallback fires only if the content script fails entirely.
-  if(${JSON.stringify(!!token)}) setTimeout(function(){try{window.close();}catch(e){}},5000);
+  // Fires only if the content script fails to close the popup itself.
+  if(${jsonForScript(!!token)}) setTimeout(function(){try{window.close();}catch(e){}},5000);
 })();
 </script>
 </body></html>`;
@@ -174,139 +203,127 @@ function authCallbackHtml(provider, token, error = "") {
 
 /* ── Routes ───────────────────────────────────────────────────────── */
 
-// Health — used for smoke testing + uptime monitoring
 app.get("/api/health", (c) =>
-  c.json({ ok: true, version: "1.0.0", ts: Date.now() }, 200, CORS_HEADERS),
+  c.json({ ok: true, version: VERSION, ts: Date.now() }, 200, PUBLIC_CORS),
 );
 
-// GitHub App: list installations (requires App key configured)
-app.get("/api/app/installations", async (c) => {
-  try {
-    const jwt = await createAppJWT(c);
-    const res = await fetch("https://api.github.com/app/installations", {
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        Accept: "application/vnd.github+json",
-      },
-    });
-    return c.json(await res.json(), res.status, CORS_HEADERS);
-  } catch (e) {
-    return c.json({ error: e.message }, 500, CORS_HEADERS);
-  }
-});
-
-// GitHub App: create installation access token
-app.post("/api/app/installations/:id/access_tokens", async (c) => {
-  const id = c.req.param("id");
-  try {
-    const jwt = await createAppJWT(c);
-    const res = await fetch(`https://api.github.com/app/installations/${id}/access_tokens`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        Accept: "application/vnd.github+json",
-      },
-    });
-    return c.json(await res.json(), res.status, CORS_HEADERS);
-  } catch (e) {
-    return c.json({ error: e.message }, 500, CORS_HEADERS);
-  }
-});
-
 // OAuth: redirect to provider
-app.get("/api/auth/:provider", (c) => {
+app.get("/api/auth/:provider", async (c) => {
   const provider = c.req.param("provider")?.toLowerCase();
-  const origin = new URL(c.req.url).origin;
-
-  if (provider === "github") {
-    const clientId = env(c, "GH_CLIENT_ID");
-    if (!clientId)
-      return c.text("GitHub OAuth not configured — set CODELEDGER_GH_APP_CLIENT_ID", 400);
-    const redirectUri = `${origin}/api/auth/github/callback`;
-    // Scopes needed:
-    // - repo: Create repos, push commits, manage Pages
-    // - workflow: Create GitHub Actions workflows
-    // - user: Read user profile info
-    const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=repo,workflow,user&allow_signup=true`;
-    return c.redirect(url);
+  if (provider !== "github") {
+    return c.json({ error: `Unsupported provider: ${provider}` }, 404);
   }
 
-  return c.json({ error: `Unsupported provider: ${provider}` }, 404, CORS_HEADERS);
+  const clientId = env(c, "GH_CLIENT_ID");
+  if (!clientId) {
+    return c.text("GitHub OAuth not configured — set CODELEDGER_OAUTH_CLIENT_ID", 500);
+  }
+  const sessionSecret = c.env?.SESSION_SECRET;
+  if (!sessionSecret) {
+    return c.text("GitHub OAuth not configured — set SESSION_SECRET", 500);
+  }
+
+  // Callers may request a wider scope (private ledger); anything unrecognised
+  // falls back to the least-privilege default rather than being passed through.
+  const requested = c.req.query("scope");
+  const scope = ALLOWED_SCOPES.has(requested) ? requested : DEFAULT_SCOPE;
+
+  const origin = new URL(c.req.url).origin;
+  const redirectUri = `${origin}/api/auth/github/callback`;
+  const state = await issueState(sessionSecret);
+
+  const url =
+    `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(clientId)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&scope=${encodeURIComponent(scope)}` +
+    `&state=${encodeURIComponent(state)}` +
+    `&allow_signup=true`;
+
+  // SameSite=Lax is correct here: the callback arrives as a top-level GET
+  // navigation from github.com, which Lax permits.
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: url,
+      "Set-Cookie": `${STATE_COOKIE}=${encodeURIComponent(state)}; Path=/api/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax`,
+    },
+  });
 });
 
 // GitHub OAuth callback
 app.get("/api/auth/github/callback", async (c) => {
+  const clearCookie = `${STATE_COOKIE}=; Path=/api/auth; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
+  const reply = (token, error) =>
+    new Response(authCallbackHtml("github", token, error), {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Set-Cookie": clearCookie,
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+      },
+    });
+
   const code = c.req.query("code");
   const error = c.req.query("error");
   const errorDesc = c.req.query("error_description");
 
-  if (error) {
-    return c.html(authCallbackHtml("github", "", errorDesc || error));
-  }
+  if (error) return reply("", errorDesc || error);
+  if (!code) return reply("", "No code received from GitHub");
 
-  if (!code) {
-    return c.html(authCallbackHtml("github", "", "No code received from GitHub"));
+  // CSRF: the state echoed by GitHub must match the one we issued in this browser.
+  const sessionSecret = c.env?.SESSION_SECRET;
+  const returned = c.req.query("state");
+  const stored = readCookie(c, STATE_COOKIE);
+  if (!sessionSecret) return reply("", "OAuth not configured on server");
+  if (!returned || !stored || !timingSafeEqual(returned, stored)) {
+    return reply("", "Authorization state mismatch — please start the sign-in again");
+  }
+  if (!(await verifyState(sessionSecret, returned))) {
+    return reply("", "Authorization request expired — please start the sign-in again");
   }
 
   const clientId = env(c, "GH_CLIENT_ID");
   const clientSecret = env(c, "GH_CLIENT_SECRET");
-  if (!clientId || !clientSecret) {
-    return c.html(authCallbackHtml("github", "", "OAuth not configured on server"));
-  }
+  if (!clientId || !clientSecret) return reply("", "OAuth not configured on server");
 
   try {
     const res = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: clientId,
         client_secret: clientSecret,
         code,
+        redirect_uri: `${new URL(c.req.url).origin}/api/auth/github/callback`,
       }),
     });
     const data = await res.json();
-    const token = data.access_token || "";
-    const err = data.error_description || data.error || "";
-    return c.html(authCallbackHtml("github", token, err));
+    return reply(data.access_token || "", data.error_description || data.error || "");
   } catch (e) {
-    return c.html(authCallbackHtml("github", "", e.message));
+    return reply("", e.message);
   }
 });
 
 // GitHub webhook receiver
 app.post("/api/webhook/github", async (c) => {
+  const secret = env(c, "GH_WEBHOOK_SECRET");
+  // Fail closed. Previously an unset secret skipped verification entirely,
+  // leaving the endpoint open to forged deliveries.
+  if (!secret) return c.text("Webhook not configured", 503);
+
   const sigHeader = c.req.header("x-hub-signature-256") || "";
   const bodyText = await c.req.text();
-  const secret = env(c, "GH_WEBHOOK_SECRET");
+  const expected = `sha256=${await hmacHex(secret, bodyText)}`;
+  if (!timingSafeEqual(sigHeader, expected)) return c.text("Invalid signature", 401);
 
-  if (secret) {
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      "raw",
-      enc.encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    const sig = await crypto.subtle.sign("HMAC", key, enc.encode(bodyText));
-    const hex = Array.from(new Uint8Array(sig))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    if (`sha256=${hex}` !== sigHeader) {
-      return c.text("Invalid signature", 401);
-    }
-  }
-
-  return c.json({ ok: true }, 200, CORS_HEADERS);
+  return c.json({ ok: true }, 200);
 });
 
 // Canonical map: read from KV or GitHub raw fallback
 app.get("/api/data/canonical-map.json", async (c) => {
   const headers = {
-    ...CORS_HEADERS,
+    ...PUBLIC_CORS,
     "Content-Type": "application/json",
     "Cache-Control": "public, max-age=3600",
   };
@@ -321,33 +338,35 @@ app.get("/api/data/canonical-map.json", async (c) => {
     const res = await fetch(
       "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/refs/heads/main/src/data/canonical-map.json",
     );
+    if (!res.ok) return c.json({ error: "Canonical map unavailable" }, 503, PUBLIC_CORS);
     return new Response(await res.text(), { status: 200, headers });
   } catch (e) {
-    return c.json({ error: "Canonical map unavailable" }, 503, CORS_HEADERS);
+    return c.json({ error: "Canonical map unavailable" }, 503, PUBLIC_CORS);
   }
 });
 
-// Canonical map: admin update (protected)
+// Canonical map: admin update (protected — deliberately no CORS headers)
 app.post("/api/admin/canonical", async (c) => {
+  const expected = c.env?.CANONICAL_UPLOAD_TOKEN;
+  if (!expected) return c.json({ error: "Upload not configured" }, 503);
+
   const auth = c.req.header("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  if (!token || token !== c.env?.CANONICAL_UPLOAD_TOKEN) {
-    return c.json({ error: "Unauthorized" }, 401, CORS_HEADERS);
+  if (!token || !timingSafeEqual(token, expected)) {
+    return c.json({ error: "Unauthorized" }, 401);
   }
-  const kv = c.env?.CANONICAL_MAP;
-  if (!kv) return c.json({ error: "KV not bound" }, 500, CORS_HEADERS);
-  await kv.put("canonical-map", await c.req.text());
-  return c.json({ ok: true }, 200, CORS_HEADERS);
-});
 
-// Post-install redirect from GitHub App marketplace
-app.get("/api/post_install", (c) => {
-  const installId = c.req.query("installation_id") || "";
-  const action = c.req.query("setup_action") || "";
-  const params = new URLSearchParams();
-  if (installId) params.set("installation_id", installId);
-  if (action) params.set("setup_action", action);
-  return c.redirect(`/?${params.toString()}`);
+  const kv = c.env?.CANONICAL_MAP;
+  if (!kv) return c.json({ error: "KV not bound" }, 500);
+
+  const body = await c.req.text();
+  try {
+    JSON.parse(body);
+  } catch {
+    return c.json({ error: "Body must be valid JSON" }, 400);
+  }
+  await kv.put("canonical-map", body);
+  return c.json({ ok: true }, 200);
 });
 
 // favicon fallback — redirect to the extension icon

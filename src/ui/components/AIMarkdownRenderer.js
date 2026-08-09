@@ -61,7 +61,12 @@ function renderTable(block) {
 }
 
 function _safeLink(_, label, url) {
-  const safeUrl = /^https?:\/\//i.test(url) ? url : "#";
+  // Two separate concerns, both required:
+  //  1. Scheme allowlist — blocks javascript:, data:, vbscript: URLs.
+  //  2. Attribute escaping — a URL may pass the scheme test and still contain a
+  //     quote, e.g. https://x" onmouseover="…, which would break out of the
+  //     href attribute and inject an event handler.
+  const safeUrl = /^https?:\/\//i.test(url) ? escapeHtml(url) : "#";
   return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline">${label}</a>`;
 }
 

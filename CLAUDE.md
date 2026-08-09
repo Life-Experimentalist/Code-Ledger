@@ -199,7 +199,7 @@ If commits fail, check in this order:
 2. **Token is valid** — `Storage.getAuthToken('github')` is non-empty; if empty, OAuth failed
 3. **GitHub response status** — Check response.status before parsing body; 404 usually means repo doesn't exist
 4. **Files array is valid** — Each file has `path` (string), `content` (string); if missing, commit prep was incomplete
-5. **Base branch exists** — For new repos, must have `auto_init: true` to generate initial commit SHA
+5. **Base branch exists** — If `git/ref/heads/{branch}` 404s the repo is empty, so the commit must be built as a root commit (no `base_tree`, no `parents`) and the ref created rather than patched
 
 If all checks pass but commit still fails, the issue is likely in the Trees API call itself (check OPENAPI.yaml for the exact endpoint contract).
 
@@ -407,7 +407,7 @@ const repo = settings.github_repo || settings.gitRepo;
 
 The `GitHubOnboardingModal` (`src/ui/components/GitHubOnboardingModal.js`) handles first-time repo setup:
 
-- **Create new repo**: Uses `auto_init: true` so GitHub creates an initial commit and default branch. Required for the Trees API to work (needs a base SHA).
+- **Create new repo**: Uses `auto_init: false`, then writes the first commit itself. `initializeRepository()` detects the empty repo (the `git/ref/heads/{branch}` lookup fails), omits `base_tree` and `parents` to build a **root commit**, and then creates `refs/heads/main` explicitly. This keeps the repo free of a GitHub-generated README. Note `api-client.js` `createRepo()` still passes `auto_init: true` for the non-onboarding path — both work, but the two paths differ.
 - **Repo init**: Uses the **Trees API** (`POST /git/trees` → `POST /git/commits` → `PATCH /git/refs/heads/main`) for atomic multi-file creation. Never use the Contents API (`PUT /contents/`) — it creates one commit per file and requires `btoa()` which breaks on non-ASCII (emoji).
 - **Token flow**: OAuth token is already saved to `auth.tokens` by the time the modal opens (saved by `library.js` handleOAuthMessage). The modal should NOT re-save the token to settings.
 - **Trigger**: Only `library.js` shows the modal (via `showGitHubOnboarding` state). `SettingsSchema.js` does NOT trigger onboarding — it only stores the token and fetches the username.

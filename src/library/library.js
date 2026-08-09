@@ -340,8 +340,12 @@ function LibraryApp() {
   // Listen for OAuth messages from Worker (popup path, non-COOP browsers)
   useEffect(() => {
     const handleOAuthMessage = async (event) => {
+      // Strict origin allowlist. Origin "null" must NOT be accepted: it is what
+      // sandboxed iframes, data: and file: documents report, so allowing it lets
+      // any web page the user visits inject an attacker-controlled GitHub token
+      // and silently redirect the user's ledger to a repository they do not own.
       const allowedOrigins = [new URL(CONSTANTS.URLS.AUTH_WORKER).origin, window.location.origin];
-      if (event.origin !== "null" && !allowedOrigins.includes(event.origin)) return;
+      if (!allowedOrigins.includes(event.origin)) return;
       const data = event.data;
       if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") return;
       dbg.log(
