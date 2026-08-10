@@ -114,6 +114,49 @@ describe("OAuth callback — CSRF", () => {
   });
 });
 
+describe("OAuth callback — credential type", () => {
+  /**
+   * Completes a real state round-trip and stubs only GitHub's token endpoint,
+   * so the exchange runs exactly as it does in production.
+   */
+  async function exchange(tokenResponse) {
+    const { state, cookie } = await issuedState();
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) =>
+      String(url).includes("login/oauth/access_token")
+        ? new Response(JSON.stringify(tokenResponse), {
+            headers: { "Content-Type": "application/json" },
+          })
+        : realFetch(url, init);
+    try {
+      const res = await req(`/api/auth/github/callback?code=abc&state=${encodeURIComponent(state)}`, {
+        headers: { cookie },
+      });
+      return await res.text();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  }
+
+  test("passes through a classic OAuth App token", async () => {
+    const body = await exchange({ access_token: "gho_valid", scope: "public_repo,workflow" });
+    assert.ok(body.includes("gho_valid"), "a valid OAuth token must reach the extension");
+  });
+
+  test("refuses a GitHub App user-to-server token instead of failing later", async () => {
+    // A GitHub App ignores the requested scope and returns an expiring token.
+    // Such a token 403s on POST /user/repos — the Chrome Web Store rejection.
+    const body = await exchange({
+      access_token: "ghu_appToken",
+      expires_in: 28800,
+      refresh_token: "ghr_x",
+      scope: "",
+    });
+    assert.ok(!body.includes("ghu_appToken"), "the unusable token must not be handed out");
+    assert.match(body, /OAuth App/);
+  });
+});
+
 describe("OAuth callback — XSS (attacker-controlled error_description)", () => {
   test("does not emit a raw script-closing tag from error_description", async () => {
     const payload = "</script><img src=x onerror=alert(1)>";

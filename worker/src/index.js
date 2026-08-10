@@ -299,6 +299,20 @@ app.get("/api/auth/github/callback", async (c) => {
       }),
     });
     const data = await res.json();
+
+    // A GitHub App issues user-to-server tokens: it ignores the `scope` we
+    // requested and returns an expiring token instead. Such a token cannot call
+    // POST /user/repos, which surfaces much later as an unexplained 403 during
+    // repository creation. Refuse it here, where the cause is still visible.
+    if (data.access_token && (data.expires_in || data.refresh_token) && !data.scope) {
+      return reply(
+        "",
+        "This server is configured with a GitHub App client ID. CodeLedger needs a " +
+          "classic OAuth App — set CODELEDGER_OAUTH_CLIENT_ID and " +
+          "CODELEDGER_OAUTH_CLIENT_SECRET from an OAuth App registration.",
+      );
+    }
+
     return reply(data.access_token || "", data.error_description || data.error || "");
   } catch (e) {
     return reply("", e.message);
