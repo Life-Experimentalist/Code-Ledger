@@ -33,6 +33,7 @@ export async function apiFetch(url, token, opts = {}, _left = 2) {
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github.v3+json",
+    "X-GitHub-Api-Version": "2022-11-28",
     ...(opts.headers || {}),
   };
   if (["POST", "PATCH", "PUT"].includes(method) && !headers["Content-Type"]) {
@@ -47,10 +48,14 @@ export async function apiFetch(url, token, opts = {}, _left = 2) {
     throw e;
   }
 
-  // Rate-limit — wait for Retry-After then retry
-  if (res.status === 429 && _left > 0) {
-    const wait = Math.max(1, parseInt(res.headers.get("Retry-After") || "2", 10));
-    dbg.warn(`rate-limited — waiting ${wait}s then retrying (${_left} left)`);
+  // Rate-limit — wait for Retry-After then retry.
+  // GitHub signals the secondary limit as 429 but the primary limit as 403 with
+  // x-ratelimit-remaining: 0. Without that second check a rate-limited call is
+  // indistinguishable from a permissions failure and gets reported as one.
+  const exhausted = res.headers.get("x-ratelimit-remaining") === "0";
+  if ((res.status === 429 || (res.status === 403 && exhausted)) && _left > 0) {
+    const wait = _retryAfterSeconds(res);
+    dbg.warn(`rate-limited (${res.status}) — waiting ${wait}s then retrying (${_left} left)`);
     await _sleep(wait * 1000);
     return apiFetch(url, token, opts, _left - 1);
   }
@@ -66,12 +71,33 @@ export async function apiFetch(url, token, opts = {}, _left = 2) {
     const body = await res.json().catch(() => ({}));
     const err = new Error(`GitHub ${res.status}: ${body.message || res.statusText}`);
     err.status = res.status;
+    // The parsed body carries the detail that matters for 422 (body.errors[])
+    // and for telling a GitHub App refusal apart from a genuine one. Attaching
+    // it lets describeGitHubError() explain the failure instead of echoing it.
+    err.body = body;
     dbg.error(`${method} ${fullUrl} → ${res.status}:`, err.message);
     throw err;
   }
 
   const text = await res.text();
   return text ? JSON.parse(text) : {};
+}
+
+/**
+ * Seconds to wait before retrying, from Retry-After (delta seconds) or
+ * x-ratelimit-reset (absolute epoch seconds). Capped at 60 s: a longer wait
+ * would outlive the service worker, and the caller retries anyway.
+ */
+function _retryAfterSeconds(res) {
+  const retryAfter = parseInt(res.headers.get("Retry-After") || "", 10);
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(retryAfter, 60);
+
+  const reset = parseInt(res.headers.get("x-ratelimit-reset") || "", 10);
+  if (Number.isFinite(reset)) {
+    const delta = Math.ceil(reset - Date.now() / 1000);
+    if (delta > 0) return Math.min(delta, 60);
+  }
+  return 2;
 }
 
 function _sleep(ms) {
@@ -188,7 +214,14 @@ export function enablePages(owner, repo, _branch, token) {
  * Returns a single file object OR an array of directory entries.
  */
 export function getContents(owner, repo, path, token) {
-  return apiFetch(`/repos/${owner}/${repo}/contents/${path}`, token);
+  // Path segments come from problem topics and titles, so they routinely contain
+  // characters that are legal in a git path but not in a URL — "C#" truncates
+  // the request at the fragment, spaces and "?" break it outright.
+  const encoded = String(path || "")
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+  return apiFetch(`/repos/${owner}/${repo}/contents/${encoded}`, token);
 }
 
 /**

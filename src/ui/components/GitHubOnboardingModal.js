@@ -12,6 +12,12 @@ import { createDebugger } from "../../lib/debug.js";
 import { registry } from "../../core/handler-registry.js";
 import { getPagesHtml } from "../../handlers/git/github/pages-template.js";
 import { importFromRepo, applyImport } from "../../background/sync-engine.js";
+import {
+  fetchTokenScopes,
+  canCreatePrivateRepo,
+  describeGitHubError,
+  PRIVATE_SCOPE,
+} from "../../handlers/git/github/permissions.js";
 import { ConflictResolutionModal } from "../../library/components/ConflictResolutionModal.js";
 
 const html = htm.bind(h);
@@ -51,7 +57,14 @@ const DEFAULT_REPO_TOPICS = [
 export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   const [step, setStep] = useState("check");
   const [repoName, setRepoName] = useState(DEFAULT_REPO_NAME);
-  const [isPrivate, setIsPrivate] = useState(true); // Default to true for safer creation
+  // Public by default: the default OAuth scope is public_repo, and a solutions
+  // ledger is normally a portfolio the user wants visible. Ticking "private"
+  // requires the wider `repo` scope, which is requested on demand — see
+  // privateAllowed below.
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [scopes, setScopes] = useState(null); // Set<string> | null (unknown)
+  // Non-fatal problems from optional setup steps, shown on the final screen.
+  const [setupWarnings, setSetupWarnings] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
@@ -88,6 +101,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     setBusy(false);
     setNameCheck(null);
     setPostSyncState(null);
+    setSetupWarnings([]);
     setRepoName(DEFAULT_REPO_NAME);
     setSelectedOwner(username || "");
     setStep("check");
@@ -130,7 +144,35 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       .finally(() => setOrgsLoading(false));
   }, [isOpen, token]);
 
+  // Read the token's granted scopes so the private-repo option is only offered
+  // when it can actually succeed. Without this the user picks "private", and
+  // GitHub answers a bare 403 several steps later.
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    let cancelled = false;
+    fetchTokenScopes(token)
+      .then((s) => {
+        if (cancelled) return;
+        setScopes(s);
+        if (s && !canCreatePrivateRepo(s)) setIsPrivate(false);
+      })
+      .catch(() => {
+        /* Unknown scopes leave every option available; the request is the real check. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, token]);
+
   if (!isOpen) return null;
+
+  const privateAllowed = canCreatePrivateRepo(scopes);
+
+  /** Re-runs the OAuth flow asking for the wider `repo` scope. */
+  const grantPrivateAccess = () => {
+    const url = `${CONSTANTS.URLS.AUTH_WORKER}/auth/github?scope=${encodeURIComponent(PRIVATE_SCOPE)}`;
+    window.open(url, "codeledger-oauth", "width=600,height=760");
+  };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -308,27 +350,45 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
           }),
         });
       } catch (e) {
-        if (e.status === 403 || e.status === 401) {
-          const msg = e.body?.message || e.message;
-          throw new Error(`Permission denied: ${msg}. If this persists, ensure you have permission to create repositories under ${selectedOwner}.`);
-        }
-        if (e.status === 422) {
-          const msg = e.body?.errors?.[0]?.message || e.message;
-          throw new Error(`Repository creation failed: ${msg}`);
-        }
-        throw e;
+        throw new Error(
+          describeGitHubError(e, {
+            action: "create repositories",
+            owner: selectedOwner,
+            isPrivate,
+          }),
+        );
       }
 
-      setProgress("Setting up initial files…");
-      await initializeRepository(repoData.owner.login, repoData.name, token);
-
-      setProgress("Applying repository settings…");
-      await configureRepositoryPresentation(repoData.owner.login, repoData.name, token);
-
-      setProgress("Enabling GitHub Pages…");
-      await enableGitHubPages(repoData.owner.login, repoData.name, token);
-
+      // The repository now exists. Link it before anything else: if a later
+      // step throws, the user must not be left with a created-but-unlinked repo
+      // whose name is then taken on every retry.
       await saveRepoConfig(repoData.owner.login, repoData.name);
+
+      const warnings = [];
+      const bestEffort = async (label, fn) => {
+        setProgress(label);
+        try {
+          await fn();
+        } catch (e) {
+          dbg.warn(`${label} failed:`, e.message);
+          warnings.push(describeGitHubError(e, { owner: repoData.owner.login }));
+        }
+      };
+
+      // None of these are required to commit solutions. Pages in particular
+      // fails routinely — it is unavailable for private repos on the free tier
+      // and returns 409 when it is already enabled.
+      await bestEffort("Setting up initial files…", () =>
+        initializeRepository(repoData.owner.login, repoData.name, token),
+      );
+      await bestEffort("Applying repository settings…", () =>
+        configureRepositoryPresentation(repoData.owner.login, repoData.name, token),
+      );
+      await bestEffort("Enabling GitHub Pages…", () =>
+        enableGitHubPages(repoData.owner.login, repoData.name, token),
+      );
+      setSetupWarnings(warnings);
+
       setFinalRepo(repoData.name);
       setFinalOwner(repoData.owner.login);
       setProgress("Setup complete!");
@@ -355,13 +415,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     setProgress("Validating repository…");
     try {
       const repoData = await ghFetch(`/repos/${selectedOwner}/${repoToLink}`).catch((e) => {
-        if (e.status === 404) throw new Error("Repository not found.");
-        if (e.status === 403 || e.status === 401) {
-          throw new Error(
-            "Permission denied. Disconnect and reconnect GitHub in Settings to approve repository permissions.",
-          );
-        }
-        throw e;
+        throw new Error(
+          describeGitHubError(e, { action: "read that repository", owner: selectedOwner }),
+        );
       });
 
       const contents = await ghFetch(`/repos/${selectedOwner}/${repoToLink}/contents`).catch(
@@ -747,13 +803,26 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                       id="private-repo-toggle"
                       checked=${isPrivate}
                       onChange=${(e) => setIsPrivate(e.target.checked)}
-                      disabled=${busy}
-                      class="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/50 bg-black"
+                      disabled=${busy || !privateAllowed}
+                      class="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/50 bg-black disabled:opacity-40"
                     />
                     <label for="private-repo-toggle" class="flex flex-col cursor-pointer">
                       <span class="text-sm font-medium text-slate-200">Private Repository</span>
-                      <span class="text-xs text-slate-400">Only you can see this repository. (GitHub Pages requires a public repo for free tier)</span>
+                      <span class="text-xs text-slate-400">
+                        ${privateAllowed
+                          ? "Only you can see this repository. GitHub Pages needs a public repo on the free tier."
+                          : "Your GitHub connection currently covers public repositories only."}
+                      </span>
                     </label>
+                    ${!privateAllowed
+                      ? html`<button
+                          type="button"
+                          onClick=${grantPrivateAccess}
+                          class="ml-auto shrink-0 px-2.5 py-1 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] hover:bg-cyan-500/25"
+                        >
+                          Grant access
+                        </button>`
+                      : null}
                   </div>
 
                   ${error
@@ -924,6 +993,25 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                       View on GitHub ↗
                     </a>
                   </div>
+                  ${setupWarnings.length
+                    ? html`
+                        <div
+                          class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-left"
+                        >
+                          <p class="text-xs font-medium text-amber-300 mb-1">
+                            Optional setup steps were skipped
+                          </p>
+                          <p class="text-[11px] text-amber-200/70 mb-2">
+                            Your repository is linked and solutions will still be committed.
+                          </p>
+                          <ul class="space-y-1">
+                            ${setupWarnings.map(
+                              (w) => html`<li class="text-[11px] text-amber-200/80">• ${w}</li>`,
+                            )}
+                          </ul>
+                        </div>
+                      `
+                    : null}
                   ${postSyncState?.phase === "syncing"
                     ? html`
                         <div class="space-y-2">

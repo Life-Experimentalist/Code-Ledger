@@ -318,9 +318,6 @@ function LibraryApp() {
       await Storage.setSettings(updatedSettings);
       dbg.log(`processOAuthToken(): ✓ settings saved`);
 
-      await Storage.setDebugEnabled(true).catch(() => {});
-      setDebug(true);
-
       if (!hasRepo) {
         dbg.log(`processOAuthToken(): no repo configured — opening onboarding modal`);
         setOnboardingData({ username: user.login, token });
