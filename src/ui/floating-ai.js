@@ -627,11 +627,17 @@ export function createFloatingAI(slug = "", opts = {}) {
           badge.style.alignItems = "center";
           badge.style.gap = "6px";
 
-          let badgeHTML = `🤖 ${msg.modelId || msg.providerId}`;
+          // Model ids come from the provider's own model list (OpenRouter and
+          // Ollama serve third-party names), so they are set as text rather
+          // than interpolated into markup.
+          badge.append(`🤖 ${msg.modelId || msg.providerId}`);
           if (msg.isFallback) {
-            badgeHTML += `<span style="padding: 1px 4px; font-size: 8px; background: rgba(244, 63, 94, 0.2); color: rgb(253, 164, 175); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 4px;">backup fallback</span>`;
+            const tag = document.createElement("span");
+            tag.textContent = "backup fallback";
+            tag.style.cssText =
+              "padding: 1px 4px; font-size: 8px; background: rgba(244, 63, 94, 0.2); color: rgb(253, 164, 175); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 4px;";
+            badge.appendChild(tag);
           }
-          badge.innerHTML = badgeHTML;
           bubble.insertBefore(badge, bubble.firstChild);
         }
         addApplyButtons(bubble);
