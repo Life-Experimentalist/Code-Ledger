@@ -48,6 +48,12 @@ Chrome Web Store requires each upload to exceed the last.
 - Behaviour bank recording how you interact with problems, off unless you turn it on.
 - Backups: manual JSON export, scheduled snapshots, and a snapshot before any bulk import.
 
+**Privacy**
+
+- A **Settings → Privacy** page that names every destination your data can reach: your GitHub repository, the sign-in relay, anyone with the link if the repository is public, the badge SVGs, the generated Pages site, `shields.io` if you pick that badge style, each AI provider you have configured, `mermaid.ink` when you press Render on a diagram, and the anonymous solve counter.
+- The page opens with the tier your current setup is actually in — Private, Shared, Public, or Code leaves — followed by what is live now and what is available but switched off. Every row says what leaves, where it goes, and links to the panel that turns it off.
+- The list is computed from your settings rather than written down, so it cannot fall out of step with what the extension does. The welcome page shows the same summary during setup.
+
 **Both browsers**
 
 - Chrome and Firefox from one source tree, with every extension API call routed through a single compatibility shim.
