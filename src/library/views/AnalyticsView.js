@@ -15,11 +15,13 @@ const dbg = createDebugger("AnalyticsView");
 import { ProblemModal } from "../components/ProblemModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { CONSTANTS } from "../../core/constants.js";
-import { normalizeTag, getTopicType } from "../../core/topic-resolver.js";
+import { normalizeTag } from "../../core/topic-resolver.js";
+import { classifyTopic, KIND } from "../../core/topic-taxonomy.js";
 
 import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
 import { loadUserDifficultyMap, mapDifficulty } from "../../core/difficulty-map.js";
+import { Storage } from "../../core/storage.js";
 
 // Curated Blind 75 / NeetCode 150 — covers all major topics with real LeetCode slugs
 const BLIND75 = [
@@ -378,6 +380,9 @@ function toMs(ts) {
 
 export function AnalyticsView({ problems, onNavigate }) {
   const [userMap, setUserMap] = useState({});
+  // settings.topicKinds — the user's own calls on which topics are structures
+  // and which are techniques. Empty until loaded; the built-in table covers it.
+  const [topicKinds, setTopicKinds] = useState({});
   const [modalProblem, setModalProblem] = useState(null);
   const [drilldown, setDrilldown] = useState(null); // { label, problems[] }
   const [modalProblemList, setModalProblemList] = useState([]); // list to navigate within modal
@@ -386,6 +391,11 @@ export function AnalyticsView({ problems, onNavigate }) {
     loadUserDifficultyMap()
       .then((map) => {
         if (m) setUserMap(map || {});
+      })
+      .catch(() => {});
+    Storage.getSettings()
+      .then((s) => {
+        if (m) setTopicKinds(s?.topicKinds || {});
       })
       .catch(() => {});
     return () => (m = false);
@@ -650,8 +660,8 @@ export function AnalyticsView({ problems, onNavigate }) {
     // For the radar, prefer Algorithm topics (lower weight = higher priority) as they're more insightful
     const sortedTopics = Object.entries(stats.topics).sort((a, b) => {
       // First by type: algorithms before data structures
-      const typeA = getTopicType(a[0]) === "algorithm" ? 0 : 1;
-      const typeB = getTopicType(b[0]) === "algorithm" ? 0 : 1;
+      const typeA = classifyTopic(a[0], topicKinds).kind === KIND.ALGO ? 0 : 1;
+      const typeB = classifyTopic(b[0], topicKinds).kind === KIND.ALGO ? 0 : 1;
       if (typeA !== typeB) return typeA - typeB;
       // Then by solve count (desc)
       return b[1].total - a[1].total;
@@ -767,7 +777,7 @@ export function AnalyticsView({ problems, onNavigate }) {
         ],
       },
     };
-  }, [stats]);
+  }, [stats, topicKinds]);
 
   // Split canonical topics into DS and Algorithm groups
   const [activeTopicTab, setActiveTopicTab] = useState("algo");
@@ -776,15 +786,18 @@ export function AnalyticsView({ problems, onNavigate }) {
     const ds = [];
     const algo = [];
     Object.entries(stats.topics).forEach(([topic, counts]) => {
-      const type = getTopicType(topic);
-      if (type === "data-structure") ds.push([topic, counts]);
-      else algo.push([topic, counts]);
+      // Database, Shell and Design are neither a structure nor a technique, and
+      // filing them under algorithms (as the old two-way split did) put "SQL"
+      // next to "Dynamic Programming" in the ranking.
+      const kind = classifyTopic(topic, topicKinds).kind;
+      if (kind === KIND.DS) ds.push([topic, counts]);
+      else if (kind === KIND.ALGO) algo.push([topic, counts]);
     });
     // Sort each group by solve count desc
     ds.sort((a, b) => b[1].total - a[1].total);
     algo.sort((a, b) => b[1].total - a[1].total);
     return { ds, algo };
-  }, [stats.topics]);
+  }, [stats.topics, topicKinds]);
 
   const activeTopics = activeTopicTab === "ds" ? topicsByType.ds : topicsByType.algo;
   const topTopics = activeTopics.slice(0, 8);

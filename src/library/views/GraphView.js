@@ -483,7 +483,7 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       ctx.stroke();
 
       // Double-circle/inner ring for data structures
-      if (n.category === "data-structure") {
+      if (n.category === "ds") {
         ctx.beginPath();
         ctx.arc(n.x, n.y, r * 0.65, 0, Math.PI * 2);
         ctx.strokeStyle = n.color;
@@ -740,6 +740,7 @@ export function GraphView({
     const { nodes: newNodes, edges: newEdges } = buildKnowledgeGraph(
       problems,
       settings?.topicMappings,
+      settings?.topicKinds,
     );
 
     const existingMap = new Map(simRef.current.nodes.map((n) => [n.id, n]));

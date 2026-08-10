@@ -12,10 +12,18 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("PanelPlatforms");
 
 import { CONSTANTS } from "../../core/constants.js";
-import { RAW_MAPPINGS, getKnownTopics, getTopicType } from "../../core/topic-resolver.js";
+import { RAW_MAPPINGS, getKnownTopics } from "../../core/topic-resolver.js";
+import { classifyTopic, KIND, KIND_LABEL } from "../../core/topic-taxonomy.js";
 
 const PLATFORMS = Object.values(CONSTANTS.PLATFORMS);
 const DIFFICULTY_LABELS = ["Easy", "Medium", "Hard"];
+
+/** Badge colours for the three topic axes, keyed by `KIND`. */
+const KIND_BADGE_CLASS = {
+  [KIND.DS]: "bg-purple-500/10 text-purple-300 border border-purple-500/20",
+  [KIND.ALGO]: "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20",
+  [KIND.DOMAIN]: "bg-slate-500/10 text-slate-400 border border-slate-500/20",
+};
 
 const PLATFORM_SYNC_URLS = {
   leetcode: {
@@ -503,12 +511,13 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
           </summary>
           <div class="p-4 border-t border-white/5 bg-black/40 space-y-4">
             <p class="text-xs text-slate-400">
-              Below is the reference guide of standard canonical topics, their category types (Data
-              Structure vs. Algorithm), and the predefined aliases that automatically map to them:
+              Below is the reference guide of standard canonical topics, the axis each one sits on
+              (data structure, algorithm, or neither), and the predefined aliases that automatically
+              map to them:
             </p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
               ${knownTopics.map((topic) => {
-                const type = getTopicType(topic);
+                const kind = classifyTopic(topic).kind || KIND.DOMAIN;
                 const aliases = RAW_MAPPINGS[topic] || [];
                 return html`
                   <div
@@ -519,11 +528,9 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                       <span class="text-xs font-medium text-slate-200">${topic}</span>
                       <span
                         class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded
-                        ${type === "data-structure"
-                          ? "bg-purple-500/10 text-purple-300 border border-purple-500/20"
-                          : "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20"}"
+                        ${KIND_BADGE_CLASS[kind]}"
                       >
-                        ${type === "data-structure" ? "Data Structure" : "Algorithm"}
+                        ${KIND_LABEL[kind]}
                       </span>
                     </div>
                     <div class="flex flex-wrap gap-1">

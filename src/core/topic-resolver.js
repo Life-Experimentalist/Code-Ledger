@@ -206,34 +206,10 @@ export function normalizeTag(tag, customMappings = {}) {
     .join(" ");
 }
 
-/**
- * Differentiates whether a topic is a Data Structure or Algorithm/Technique.
- * @param {string} topic
- * @returns {"data-structure"|"algorithm"}
- */
-export function getTopicType(topic) {
-  const dsTopics = new Set([
-    "Array",
-    "Linked List",
-    "Stack",
-    "Queue",
-    "Heap (Priority Queue)",
-    "Trie",
-    "Binary Search Tree",
-    "Segment Tree",
-    "Binary Indexed Tree",
-    "Graph",
-    "Union Find",
-    "Hash Table",
-    "Tree",
-  ]);
-
-  const normalized = normalizeTag(topic);
-  if (dsTopics.has(normalized)) {
-    return "data-structure";
-  }
-  return "algorithm";
-}
+// Topic classification (data structure vs algorithm vs neither) lives in
+// ./topic-taxonomy.js — see `classifyTopic`. It is not re-exported here because
+// that module imports `normalizeTag` from this one, and the import must stay
+// one-way.
 
 /**
  * Resolves the primary topic from a list of tags.

@@ -4,7 +4,8 @@
  */
 
 import { createDebugger } from "../lib/debug.js";
-import { normalizeTag, getTopicType } from "./topic-resolver.js";
+import { normalizeTag } from "./topic-resolver.js";
+import { classifyTopic, KIND } from "./topic-taxonomy.js";
 
 const dbg = createDebugger("KnowledgeGraph");
 
@@ -68,7 +69,12 @@ function blendColors(colorsArr) {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-export function buildKnowledgeGraph(problems, customMappings = {}) {
+/**
+ * @param {Array<object>} problems
+ * @param {object} [customMappings] `settings.topicMappings` — alias → canonical name
+ * @param {object} [topicKinds] `settings.topicKinds` — canonical name → "ds"|"algo"|"domain"
+ */
+export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = {}) {
   dbg.log(`buildKnowledgeGraph(): building from ${(problems || []).length} problems`);
   const nodes = new Map(); // id → node
   const edges = []; // { source, target, type }
@@ -92,7 +98,7 @@ export function buildKnowledgeGraph(problems, customMappings = {}) {
         color: topicColor(topic),
         size: 24,
         count: 0,
-        category: getTopicType(topic),
+        category: classifyTopic(topic, topicKinds).kind || KIND.DOMAIN,
       });
     }
     const node = nodes.get(id);
