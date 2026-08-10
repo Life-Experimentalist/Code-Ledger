@@ -322,10 +322,7 @@ try {
 }
 
 // Backoff calculation:
-const backoffMs = Math.min(
-  RETRY_BASE_DELAY_MS * Math.pow(2, retryCount),
-  RETRY_MAX_DELAY_MS,
-);
+const backoffMs = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, retryCount), RETRY_MAX_DELAY_MS);
 // 1st retry: 5000ms (5s)
 // 2nd retry: 10000ms (10s)
 // 3rd retry: 20000ms (20s)

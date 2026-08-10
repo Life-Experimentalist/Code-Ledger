@@ -85,15 +85,14 @@ npm run build:fast
 
 The code is ready, but to test OAuth end-to-end you need:
 
-**Worker Secrets** (in `worker/wrangler.toml`):
+**Worker secrets** (set with `npx wrangler secret put NAME` from `worker/`,
+never written into `wrangler.toml`):
 
-```toml
-CODELEDGER_GH_APP_PRIVATE_KEY = "..."      # PKCS#8 format
-CODELEDGER_GH_APP_ID = "..."               # Numeric GitHub App ID
-CODELEDGER_GH_APP_CLIENT_ID = "..."        # GitHub App Client ID
-CODELEDGER_GH_APP_CLIENT_SECRET = "..."    # GitHub App secret
-CODELEDGER_GH_APP_WEBHOOK_SECRET = "..."   # For webhook validation
-SESSION_SECRET = "..."                      # Random hex 32 bytes
+```
+CODELEDGER_OAUTH_CLIENT_ID       # OAuth App client ID, starts with Iv23li
+CODELEDGER_OAUTH_CLIENT_SECRET   # OAuth App client secret
+SESSION_SECRET                   # random hex, 32 bytes — signs the state cookie
+CANONICAL_UPLOAD_TOKEN           # random hex, 32 bytes — admin upload bearer
 ```
 
 **Deploy Worker:**

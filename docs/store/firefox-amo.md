@@ -48,6 +48,7 @@ The extension includes **optional, opt-in anonymous usage telemetry** (disabled 
 Thank you for reviewing CodeLedger.
 
 ### Quick Testing Steps:
+
 1. Load extension as temporary add-on via `about:debugging`.
 2. Click toolbar icon → Connect GitHub (OAuth flow via worker `codeledger.vkrishna04.me`).
 3. Set a repository name in settings.
@@ -55,19 +56,21 @@ Thank you for reviewing CodeLedger.
 5. Verify an atomic commit containing code, description, and stats appears in your GitHub repo in ~3 seconds.
 
 ### Key Security & Compliance Disclosures:
-* **No Remote Code:** All JS (Preact, htm, Chart.js) is bundled locally under `src/vendor/`. No CDNs, no `eval()`, and no `new Function()`.
-* **OAuth Security:** GitHub OAuth token is exchanged via a Cloudflare Worker proxy (`codeledger.vkrishna04.me`) and returned directly to the browser. Tokens are saved only in local extension storage and never stored on the worker.
-* **Strict Permission Scopes:**
-  * `storage`: Persists settings, OAuth token, and IndexedDB solve cache locally.
-  * `tabs` & `scripting`: Detects supported problem page URLs and checks solve status.
-  * Host permissions (`leetcode.com`, `geeksforgeeks.org`, `codeforces.com`): Observes DOM on coding platforms.
-  * Host permission `api.github.com`: Commits files directly to the user's repo.
-* **Opt-In Telemetry:** Disabled by default. If enabled under Settings → General, it sends only `{ version: "x.y.z", platform: "leetcode" }` to `counter.vkrishna04.me`. No code, tokens, or identifiers are included. Reviewers can verify in `src/core/telemetry.js`.
+
+- **No Remote Code:** All JS (Preact, htm, Chart.js) is bundled locally under `src/vendor/`. No CDNs, no `eval()`, and no `new Function()`.
+- **OAuth Security:** GitHub OAuth token is exchanged via a Cloudflare Worker proxy (`codeledger.vkrishna04.me`) and returned directly to the browser. Tokens are saved only in local extension storage and never stored on the worker.
+- **Strict Permission Scopes:**
+  - `storage`: Persists settings, OAuth token, and IndexedDB solve cache locally.
+  - `tabs` & `scripting`: Detects supported problem page URLs and checks solve status.
+  - Host permissions (`leetcode.com`, `geeksforgeeks.org`, `codeforces.com`): Observes DOM on coding platforms.
+  - Host permission `api.github.com`: Commits files directly to the user's repo.
+- **Opt-In Telemetry:** Disabled by default. If enabled under Settings → General, it sends only `{ version: "x.y.z", platform: "leetcode" }` to `counter.vkrishna04.me`. No code, tokens, or identifiers are included. Reviewers can verify in `src/core/telemetry.js`.
 
 ---
 
 ## End-User License Agreement (EULA) Text
-*(Paste into EULA text field)*
+
+_(Paste into EULA text field)_
 
 ```markdown
 # CodeLedger End-User License Agreement (EULA)
@@ -75,27 +78,32 @@ Thank you for reviewing CodeLedger.
 By installing or using the CodeLedger browser extension ("Software"), you agree to be bound by the terms of this End-User License Agreement.
 
 ## 1. Apache License 2.0
-CodeLedger is open-source software distributed under the Apache License, Version 2.0 ("License"). 
+
+CodeLedger is open-source software distributed under the Apache License, Version 2.0 ("License").
 You may obtain a copy of the License at:
 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 ## 2. Preamble & Key Terms
-*   **Ownership**: You retain full ownership and control of all code, API credentials, and data processed by CodeLedger. All problem solver history and settings are stored locally in your browser.
-*   **Usage**: You are granted a non-exclusive, worldwide, royalty-free license to use, copy, modify, and distribute this Software in accordance with the Apache 2.0 License.
+
+- **Ownership**: You retain full ownership and control of all code, API credentials, and data processed by CodeLedger. All problem solver history and settings are stored locally in your browser.
+- **Usage**: You are granted a non-exclusive, worldwide, royalty-free license to use, copy, modify, and distribute this Software in accordance with the Apache 2.0 License.
 
 ## 3. Disclaimer of Warranty
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## 4. Limitation of Liability
+
 IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ---
 
 ## Privacy Policy Text
-*(Paste into Privacy Policy text field)*
+
+_(Paste into Privacy Policy text field)_
 
 ```markdown
 # Privacy Policy for CodeLedger
@@ -108,11 +116,12 @@ CodeLedger is committed to protecting your privacy. The extension is designed so
 
 ## 1. Data Collection & Local Storage
 
-CodeLedger does not collect, store, or transmit any personal data to our own servers. 
+CodeLedger does not collect, store, or transmit any personal data to our own servers.
 
 All extension data is stored **locally on your device** using your browser's IndexedDB and secure local storage:
-*   **Problem history**: Solved problem titles, code, runtime/memory stats, difficulty, and tags.
-*   **API Configuration**: GitHub repository settings, GitHub OAuth access tokens, and optional AI provider API keys.
+
+- **Problem history**: Solved problem titles, code, runtime/memory stats, difficulty, and tags.
+- **API Configuration**: GitHub repository settings, GitHub OAuth access tokens, and optional AI provider API keys.
 
 ---
 
@@ -121,20 +130,24 @@ All extension data is stored **locally on your device** using your browser's Ind
 CodeLedger communicates with external services only to perform its core functionalities, as described below:
 
 ### A. GitHub API (`api.github.com`)
-*   **Purpose**: Commits your solved problem files and updates your progress index directly in a repository you own.
-*   **Data Sent**: Your solution code, problem descriptions, and runtime statistics.
-*   **Privacy**: Governed by the [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement).
+
+- **Purpose**: Commits your solved problem files and updates your progress index directly in a repository you own.
+- **Data Sent**: Your solution code, problem descriptions, and runtime statistics.
+- **Privacy**: Governed by the [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement).
 
 ### B. Cloudflare Worker OAuth Proxy (`codeledger.vkrishna04.me`)
-*   **Purpose**: Temporary proxy used strictly to exchange your GitHub OAuth code for an access token.
-*   **Handling**: The token passes through the worker and is returned immediately to your browser. **No tokens, codes, or credentials are logged, saved, or retained** on our servers.
-*   **Privacy**: Governed by the [Cloudflare Privacy Policy](https://www.cloudflare.com/privacy/).
+
+- **Purpose**: Temporary proxy used strictly to exchange your GitHub OAuth code for an access token.
+- **Handling**: The token passes through the worker and is returned immediately to your browser. **No tokens, codes, or credentials are logged, saved, or retained** on our servers.
+- **Privacy**: Governed by the [Cloudflare Privacy Policy](https://www.cloudflare.com/privacy/).
 
 ### C. Optional AI Code Review Providers
+
 If you choose to enable AI reviews and provide your own API key, CodeLedger makes direct requests to your configured provider:
-*   **Supported Providers**: Google Gemini, OpenAI, Anthropic Claude, DeepSeek, and OpenRouter.
-*   **Data Sent**: The code and description of the solved problem.
-*   **Local Alternative**: You can use Ollama (`http://localhost:11434`) to run models locally on your machine, preventing any code from being sent to external AI servers.
+
+- **Supported Providers**: Google Gemini, OpenAI, Anthropic Claude, DeepSeek, and OpenRouter.
+- **Data Sent**: The code and description of the solved problem.
+- **Local Alternative**: You can use Ollama (`http://localhost:11434`) to run models locally on your machine, preventing any code from being sent to external AI servers.
 
 ---
 
@@ -143,20 +156,23 @@ If you choose to enable AI reviews and provide your own API key, CodeLedger make
 CodeLedger includes anonymous usage telemetry which is **disabled by default** (`telemetryOptIn` is set to `false`).
 
 If and only if you explicitly opt-in under **Settings → General → Anonymous Usage Stats**:
-*   The extension sends a POST request to `https://counter.vkrishna04.me/api/v1/counter/solve/hit`.
-*   **Payload sent**: `{ event: "solve", platform: "leetcode", version: "x.y.z" }`
-*   **No identifiers, credentials, repository names, problem content, or code** are ever included in this telemetry payload.
-*   You can audit the implementation in our open-source codebase under `src/core/telemetry.js`.
+
+- The extension sends a POST request to `https://counter.vkrishna04.me/api/v1/counter/solve/hit`.
+- **Payload sent**: `{ event: "solve", platform: "leetcode", version: "x.y.z" }`
+- **No identifiers, credentials, repository names, problem content, or code** are ever included in this telemetry payload.
+- You can audit the implementation in our open-source codebase under `src/core/telemetry.js`.
 
 ---
 
 ## 4. User Rights & Data Deletion
-*   **Access**: You can view all stored data under the extension's "Sync" and "Settings" pages.
-*   **Deletion**: Uninstalling the extension completely purges all local storage and IndexedDB caches. You can also click **"Clear all data"** in the Settings tab to reset the extension.
+
+- **Access**: You can view all stored data under the extension's "Sync" and "Settings" pages.
+- **Deletion**: Uninstalling the extension completely purges all local storage and IndexedDB caches. You can also click **"Clear all data"** in the Settings tab to reset the extension.
 
 ---
 
 ## 5. Contact
+
 For any questions regarding this policy, please email: **github@vkrishna04.me** or open an issue on our GitHub repository: **https://github.com/Life-Experimentalist/Code-Ledger/issues**.
 ```
 

@@ -37,7 +37,7 @@ Worker → redirects to GitHub's OAuth authorize endpoint
 User → approves scope (repo access)
     ↓
 GitHub → redirects back to /api/auth/github/callback?code=XXX
- For details, see [GitHub App Setup](github-app-setup.md).
+ For details, see [GitHub OAuth App setup](github-oauth-app-setup.md).
 Worker → exchanges code for access token (using OAuth client ID/secret)
 Worker → posts token back to opener window (via postMessage)
     ↓
@@ -56,14 +56,20 @@ All secrets are **already set** in your repository. Here's what they do:
 | `CF_ZONE_ID`                       | DNS zone ID for codeledger.vkrishna04.me              | ✅   |
 | `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | ✅   |
 | `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | ✅   |
-| `SESSION_SECRET`                   | Secret for signing session tokens/JWTs                | ✅   |
-| `CODELEDGER_GH_APP_ID`             | GitHub App ID (numeric)                               | ✅   |
-| `CODELEDGER_GH_APP_PRIVATE_KEY`    | GitHub App private key (PEM format)                   | ✅   |
-| `CODELEDGER_GH_APP_CLIENT_ID`      | OAuth client ID from GitHub App                       | ✅   |
-| `CODELEDGER_GH_APP_CLIENT_SECRET`  | OAuth client secret                                   | ✅   |
-| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook secret for verifying GitHub events            | ✅   |
+| `SESSION_SECRET`                   | Signs the OAuth `state` cookie — sign-in 500s without | ✅   |
+| `CODELEDGER_OAUTH_CLIENT_ID`       | OAuth App client ID (`Iv23li…`)                       | ✅   |
+| `CODELEDGER_OAUTH_CLIENT_SECRET`   | OAuth App client secret                               | ✅   |
+| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook HMAC secret — optional                        | —    |
 
-> **Note:** These are named `CODELEDGER_GH_*` instead of `GITHUB_*` because GitHub Actions forbids repository secret names starting with `GITHUB_`.
+> **Note:** These are named `CODELEDGER_*` instead of `GITHUB_*` because GitHub Actions forbids repository secret names starting with `GITHUB_`.
+
+> The Worker also accepts the older `CODELEDGER_GH_APP_CLIENT_ID` /
+> `CODELEDGER_GH_APP_CLIENT_SECRET` names as aliases, so a deployment made
+> before the OAuth App switch keeps working.
+>
+> `CODELEDGER_GH_APP_ID` and `CODELEDGER_GH_APP_PRIVATE_KEY` are no longer read
+> by any code path. They existed for the GitHub App installation-token
+> endpoints, which have been removed. Delete them if they are still set.
 
 ---
 
@@ -104,24 +110,22 @@ Expected secrets in Cloudflare:
 
 ---
 
-## GitHub App Setup
+## GitHub OAuth App setup
 
-### GitHub App Configuration
+The app is a classic **OAuth App**, not a GitHub App — a GitHub App's
+user-to-server token cannot create repositories. Register it at
+<https://github.com/settings/developers> with:
 
-Your GitHub App (`CodeLedger Dev`) should be configured with:
+1. **Authorization callback URL:** `https://codeledger.vkrishna04.me/api/auth/github/callback`
+2. **Homepage URL:** `https://codeledger.vkrishna04.me`
 
-1. **Callback URL:** `https://codeledger.vkrishna04.me/api/auth/github/callback`
-2. **Webhook URL:** `https://codeledger.vkrishna04.me/api/webhook/github`
-3. **Permissions:**
-   - **Repository:**
-     - `Contents` (read & write) — for committing solutions
-     - `Metadata` (read) — required
-     - `Webhooks` (read) — for receiving events
-   - **Organization:** (if applicable)
-     - `Members` (read) — optional, for org-wide insights
-4. **Events:** `push`, `pull_request`, `issues`, `workflow_run`
+There are no permissions to configure. OAuth Apps carry no stored permission
+set; scopes are requested per authorization, and the Worker requests
+`public_repo,workflow` by default and `repo` when the user chooses a private
+ledger.
 
-> For details, see [GitHub App Setup](github-app-setup.md).
+> For the full walkthrough, including secret rotation, see
+> [GitHub OAuth App setup](github-oauth-app-setup.md).
 
 ---
 
@@ -211,13 +215,15 @@ curl -X POST https://codeledger.vkrishna04.me/api/admin/canonical \
 
 Expected: Accepts upload (200 OK or 401 if token missing/invalid).
 
-### 5. App Installations (requires GitHub App JWT)
+### 5. Removed endpoints stay removed
 
 ```bash
-curl https://codeledger.vkrishna04.me/api/app/installations
+curl -o /dev/null -w '%{http_code}\n' https://codeledger.vkrishna04.me/api/app/installations
 ```
 
-Expected: Returns list of GitHub App installations (200 OK) or 500 if secrets missing.
+Expected: `404`. The GitHub App installation and token-minting endpoints were
+removed; they served unauthenticated token requests. A `200` here means an old
+Worker build is still live — redeploy.
 
 ---
 
@@ -352,6 +358,6 @@ cd worker && npm ci && npm run dev
 
 For more details, see:
 
-- [GitHub App Setup](github-app-setup.md)
+- [GitHub OAuth App setup](github-oauth-app-setup.md)
 - [OPENAPI.yaml](../OPENAPI.yaml)
 - [Architecture](../architecture/README.md)

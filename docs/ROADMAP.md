@@ -1,0 +1,181 @@
+# Roadmap and recommendations
+
+Written against the 1.0.0 tree. Every claim here was checked against the code,
+not inferred from other docs. Items are grouped by what they ask you to do:
+**remove**, **modify**, **add**.
+
+---
+
+## Remove
+
+### 1. Eighteen modules nothing imports
+
+Each of these has zero references from any `.js`, `.html` or `.json` under
+`src/`, `dev/`, `test/` or `worker/`. They are not lazily loaded — the two places
+that do dynamic imports (`content/handler-loader.js` and the AI review path) both
+name their targets literally, and neither names any of these.
+
+```
+src/background/alarm-manager.js
+src/content/heartbeat.js
+src/core/canonical.js
+src/core/crypto.js
+src/core/git-provider-selector.js
+src/core/markdown-generator.js
+src/core/problem-graph.js
+src/handlers/ai/claude/model-fetcher.js
+src/handlers/ai/deepseek/model-fetcher.js
+src/handlers/ai/gemini/model-fetcher.js
+src/handlers/ai/ollama/model-fetcher.js
+src/handlers/ai/openai/model-fetcher.js
+src/handlers/platforms/leetcode/enhanced-detection.js
+src/library/settings-panels/PanelMCP.js
+src/ui/components/HandlerStatus.js
+src/ui/components/ProviderBadge.js
+src/ui/components/StatsRing.js
+src/ui/components/TelemetryPrompt.js
+```
+
+Three of them are worth calling out individually:
+
+- **`crypto.js`** is a PBKDF2 + AES-GCM-256 wrapper with a hardcoded salt
+  (`"codeledger-salt"`). Nothing calls it. Security-shaped code that no path
+  exercises is worse than no code — it invites a future contributor to reach for
+  it and inherit the fixed salt.
+- **`heartbeat.js`** is dead twice over. It is not in either manifest's
+  `content_scripts` (which load only `content/handler-loader.js` and
+  `content/presence-marker.js`), and the port name it opens, `"heartbeat"`, is
+  not one of the three the service worker's `onConnect` handler accepts
+  (`ai-review-keepalive`, `sync-keepalive`, `backup-keepalive`).
+  `constants.js` still exports `HEARTBEAT_PORT_NAME` for it.
+- **The five per-provider `model-fetcher.js` files** are vestigial.
+  `src/core/model-fetch.js` `fetchModelsForProvider()` serves every provider from
+  its `CONSTANTS.AI_PROVIDERS` entry — which is why OpenRouter ships with no
+  fetcher at all and works.
+
+Deleting them removes 1,353 lines that a reader has to rule out before trusting
+the module graph.
+
+### 2. `HEARTBEAT_PORT_NAME` from `constants.js`
+
+Follows the file above. It is referenced only by the dead module.
+
+### 3. The GitLab and Bitbucket handler stubs — decide, don't leave
+
+`src/handlers/git/gitlab/` and `src/handlers/git/bitbucket/` are registered in
+`init.js` but every method throws `"not yet implemented"`. They are already
+hidden from the provider picker and off the landing page, so no user can reach
+them. Either delete them or keep them and add a `docs/` note that they are
+scaffolding. Leaving live registrations for handlers that can only throw is the
+worst of the three.
+
+Recommendation: delete. Re-adding a provider is a day's work; carrying a
+throwing registration to 1.0.0 is a permanent footnote.
+
+---
+
+## Modify
+
+### 4. Four periodic alarms are created unconditionally at startup
+
+`service-worker.js` registers all of these whether or not there is any work:
+
+| Alarm                 | Period | Handler when idle          |
+| --------------------- | ------ | -------------------------- |
+| `CODE_RECOVERY_QUEUE` | 1 min  | returns on an empty queue  |
+| `AI_REVIEW_QUEUE`     | 5 min  | returns on an empty queue  |
+| `MAINTENANCE_COMMIT`  | 10 min | returns on no pending keys |
+| `SYNC`                | 30 min | performs a real sync       |
+
+Three of the four exist only to notice that they have nothing to do. The
+one-minute recovery alarm is the aggressive one: it wakes the service worker
+sixty times an hour, indefinitely, for a queue that is empty except in the
+minutes after a failed extraction.
+
+Better: register each queue alarm when something is first enqueued and clear it
+when the queue drains. Identical behaviour, no idle wakes. This matters for
+laptop battery and for the "why is this extension always running" question a
+reviewer or a user will eventually ask.
+
+### 5. `presence-marker.js` uses raw `console.*`
+
+About fifteen call sites, against the project's own rule that everything goes
+through `createDebugger()`. It is a non-module content script, so the fix is not
+a one-line import swap. It also carries the OAuth relay, which is the single most
+rejection-sensitive path in the extension.
+
+Deliberately not changed before a store resubmission. Worth doing immediately
+after acceptance, not before.
+
+### 6. Repo URLs still point at `Life-Experimentalist/Code-Ledger`
+
+The rename to `Life-Experimentalist/CodeLedger` has not happened yet. GitHub
+serves redirects after a rename, so every current link keeps working either way
+— which is why they were left alone rather than pre-broken. After the rename,
+sweep `README.md`, `worker/public/`, and the canonical-map fallback URL in
+`worker/src/index.js`.
+
+---
+
+## Add
+
+### 7. A first-run health check
+
+The Chrome Web Store rejection was a user who could not tell why repository
+creation failed. The fixes address the causes, but nothing yet tells a user
+_what state they are in_. A single panel that reports, in plain language:
+
+- token present / absent, and which storage path it came from
+- token type (OAuth App vs GitHub App) and granted scopes, read from the
+  `X-OAuth-Scopes` response header
+- target repo resolved, and whether it exists and is writable
+- last commit attempt and its outcome
+
+…turns every future report of this class from "it doesn't work" into a
+screenshot you can act on. This is the highest-value addition on the list.
+
+Most of the pieces exist already. `GitHubOnboardingModal.js` reads
+`X-OAuth-Scopes`, derives `canCreatePrivateRepo(scopes)`, and offers
+`grantPrivateAccess()` to re-run OAuth at the wider scope. What is missing is a
+place to see that state outside the first-run wizard, once something has gone
+wrong. **Settings → Advanced** is the natural home.
+
+### 8. An end-to-end test against a real repository
+
+The suite is 156 passing tests across 37 files, all unit-level with the GitHub
+API mocked. The one path that has now broken in production twice — OAuth token →
+create repo → root commit → ref creation — is the one path no test exercises
+against a live endpoint. A single opt-in integration test, gated on a PAT in the
+environment and skipped otherwise, would have caught both failures.
+
+---
+
+## Applying the deletions
+
+The removals in §1 and §2 were not applied. Run this to take them, from the
+repository root:
+
+```bash
+git rm src/background/alarm-manager.js src/content/heartbeat.js src/core/canonical.js src/core/crypto.js src/core/git-provider-selector.js src/core/markdown-generator.js src/core/problem-graph.js src/handlers/ai/claude/model-fetcher.js src/handlers/ai/deepseek/model-fetcher.js src/handlers/ai/gemini/model-fetcher.js src/handlers/ai/ollama/model-fetcher.js src/handlers/ai/openai/model-fetcher.js src/handlers/platforms/leetcode/enhanced-detection.js src/library/settings-panels/PanelMCP.js src/ui/components/HandlerStatus.js src/ui/components/ProviderBadge.js src/ui/components/StatsRing.js src/ui/components/TelemetryPrompt.js
+```
+
+Then drop `HEARTBEAT_PORT_NAME` from `src/core/constants.js` and re-run:
+
+```bash
+npm run lint && npm test && npm run format:check
+```
+
+---
+
+## Not recommended
+
+**Rewriting history to shrink the pack.** Thirty release zips were tracked
+before 1.0.0; the pack is 275 MiB and stays that way even though `releases/` is
+now ignored. Shrinking it needs `git filter-repo` and a force push, which breaks
+every existing clone and every commit SHA referenced from the changelog or the
+store listings. Not worth it for a repository this size.
+
+**A second git provider before 1.0.0 ships.** GitHub is the only target anyone
+has asked for, and the OAuth path there is still being validated against a store
+reviewer. Adding a second provider now doubles the surface of the exact thing
+that is currently under review.

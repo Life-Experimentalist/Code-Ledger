@@ -42,11 +42,11 @@ Copy the `refresh_token` from the response.
 
 ### Step 3 — Add GitHub secrets
 
-| Secret name | Value |
-|---|---|
-| `CWS_CLIENT_ID` | Google OAuth client ID |
+| Secret name         | Value                      |
+| ------------------- | -------------------------- |
+| `CWS_CLIENT_ID`     | Google OAuth client ID     |
 | `CWS_CLIENT_SECRET` | Google OAuth client secret |
-| `CWS_REFRESH_TOKEN` | Refresh token from step 2 |
+| `CWS_REFRESH_TOKEN` | Refresh token from step 2  |
 
 ---
 
@@ -68,8 +68,8 @@ Your addon slug is the URL-friendly identifier shown in the AMO developer dashbo
 
 ### Step 3 — Add GitHub secrets
 
-| Secret name | Value |
-|---|---|
+| Secret name      | Value                               |
+| ---------------- | ----------------------------------- |
 | `AMO_JWT_ISSUER` | JWT issuer from AMO API credentials |
 | `AMO_JWT_SECRET` | JWT secret from AMO API credentials |
 | `AMO_ADDON_SLUG` | Your addon slug (e.g. `codeledger`) |
@@ -91,11 +91,11 @@ Workflow: `.github/workflows/publish-edge.yml`
 
 ### Step 2 — Add GitHub secrets
 
-| Secret name | Value |
-|---|---|
-| `EDGE_PRODUCT_ID` | Extension product ID from Partner Center |
-| `EDGE_CLIENT_ID` | Azure AD app client ID |
-| `EDGE_CLIENT_SECRET` | Azure AD app client secret |
+| Secret name             | Value                                                            |
+| ----------------------- | ---------------------------------------------------------------- |
+| `EDGE_PRODUCT_ID`       | Extension product ID from Partner Center                         |
+| `EDGE_CLIENT_ID`        | Azure AD app client ID                                           |
+| `EDGE_CLIENT_SECRET`    | Azure AD app client secret                                       |
 | `EDGE_ACCESS_TOKEN_URL` | `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` |
 
 ---

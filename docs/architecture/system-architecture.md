@@ -211,17 +211,17 @@ accumulated over the interval into one atomic Trees API write.
 
 #### Key Functions
 
-| Function                                    | Purpose                                                  | Async |
-| ------------------------------------------- | -------------------------------------------------------- | ----- |
-| `init()`                                    | Bootstrap: storage, migrations, alarms, first-run defaults | ✓     |
-| `handleSolved(data)`                        | The `problem:solved` handler — the main write path         | ✓     |
-| `generateAIReview(problem, settings)`       | Call the configured AI provider, with fallbacks            | ✓     |
-| `commitUpdatedProblem(problem, settings)`   | Rebuild one problem's files and commit                     | ✓     |
-| `_commitWithFailover(files, message, …)`    | Try each configured target in order until one accepts      | ✓     |
-| `processAIReviewQueue(options)`             | `AI_REVIEW_QUEUE` alarm handler                            | ✓     |
-| `processCodeRecoveryQueue()`                | `CODE_RECOVERY_QUEUE` alarm handler                        | ✓     |
-| `handleResyncAll(mode, commitType)`         | Rebuild the whole repo from local IndexedDB                | ✓     |
-| `handleSyncPreview()` / `handleSyncApplyImport(problems)` | Two-step import: diff first, then apply       | ✓     |
+| Function                                                  | Purpose                                                    | Async |
+| --------------------------------------------------------- | ---------------------------------------------------------- | ----- |
+| `init()`                                                  | Bootstrap: storage, migrations, alarms, first-run defaults | ✓     |
+| `handleSolved(data)`                                      | The `problem:solved` handler — the main write path         | ✓     |
+| `generateAIReview(problem, settings)`                     | Call the configured AI provider, with fallbacks            | ✓     |
+| `commitUpdatedProblem(problem, settings)`                 | Rebuild one problem's files and commit                     | ✓     |
+| `_commitWithFailover(files, message, …)`                  | Try each configured target in order until one accepts      | ✓     |
+| `processAIReviewQueue(options)`                           | `AI_REVIEW_QUEUE` alarm handler                            | ✓     |
+| `processCodeRecoveryQueue()`                              | `CODE_RECOVERY_QUEUE` alarm handler                        | ✓     |
+| `handleResyncAll(mode, commitType)`                       | Rebuild the whole repo from local IndexedDB                | ✓     |
+| `handleSyncPreview()` / `handleSyncApplyImport(problems)` | Two-step import: diff first, then apply                    | ✓     |
 
 Every one of these logs through `createDebugger("ServiceWorker")`. There is no
 per-function log level: `src/lib/debug.js` holds a single boolean, read from the
@@ -293,9 +293,7 @@ async function getNextPendingReview() {
     return null;
   }
 
-  dbg.log(
-    `getNextPendingReview(): ✓ found ${item.problemId} (priority=${item.priority})`,
-  );
+  dbg.log(`getNextPendingReview(): ✓ found ${item.problemId} (priority=${item.priority})`);
   return item;
 }
 
@@ -334,15 +332,10 @@ async function markFailedWithRetry(itemId, error) {
     dbg.error(`markFailedWithRetry(${itemId}): max retries exceeded`);
     // ... stay in FAILED
   } else {
-    const backoff = Math.min(
-      RETRY_BASE_DELAY_MS * Math.pow(2, retryCount - 1),
-      RETRY_MAX_DELAY_MS,
-    );
+    const backoff = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, retryCount - 1), RETRY_MAX_DELAY_MS);
     const nextRetryTime = Date.now() + backoff;
 
-    dbg.log(
-      `markFailedWithRetry(${itemId}): retry #${retryCount} scheduled for +${backoff}ms`,
-    );
+    dbg.log(`markFailedWithRetry(${itemId}): retry #${retryCount} scheduled for +${backoff}ms`);
 
     await _updateQueueItem(itemId, {
       status: "failed",
@@ -457,14 +450,14 @@ Every message is built by `buildCommitMessage(type, data)` in
 `src/core/commit-messages.js`. The taxonomy is a bracketed prefix, not
 Conventional Commits — six types, and an unknown type falls back to `[chore]`:
 
-| `COMMIT_TYPES` value    | Produces                                          | Raised by                                     |
-| ----------------------- | ------------------------------------------------- | --------------------------------------------- |
-| `SOLVED`                | `[solved] Two Sum (Python) — Arrays`              | A new solve                                   |
-| `UPDATE`                | `[update] Two Sum — synced`                       | An existing problem changed                   |
-| `COMPREHENSIVE_UPDATE`  | `[comprehensive-update] import 42 submissions (leetcode)` | Profile / bulk import              |
-| `MAINTENANCE`           | `[maintenance] repo updated (7 files)`            | The `MAINTENANCE_COMMIT` alarm batch          |
-| `CHORE`                 | `[chore] sync 3 pending problems`                 | Resync of anything still uncommitted          |
-| `INIT`                  | `[init] CodeLedger repo initialized`              | First-run repository setup                    |
+| `COMMIT_TYPES` value   | Produces                                                  | Raised by                            |
+| ---------------------- | --------------------------------------------------------- | ------------------------------------ |
+| `SOLVED`               | `[solved] Two Sum (Python) — Arrays`                      | A new solve                          |
+| `UPDATE`               | `[update] Two Sum — synced`                               | An existing problem changed          |
+| `COMPREHENSIVE_UPDATE` | `[comprehensive-update] import 42 submissions (leetcode)` | Profile / bulk import                |
+| `MAINTENANCE`          | `[maintenance] repo updated (7 files)`                    | The `MAINTENANCE_COMMIT` alarm batch |
+| `CHORE`                | `[chore] sync 3 pending problems`                         | Resync of anything still uncommitted |
+| `INIT`                 | `[init] CodeLedger repo initialized`                      | First-run repository setup           |
 
 ---
 
@@ -516,9 +509,7 @@ async function importFromRepo() {
   // 1. Fetch remote index
   const remoteIndex = await ghGetContents(owner, repo, "index.json");
 
-  dbg.log(
-    `importFromRepo(): ✓ fetched ${Object.keys(remoteIndex).length} remote problems`,
-  );
+  dbg.log(`importFromRepo(): ✓ fetched ${Object.keys(remoteIndex).length} remote problems`);
 
   // 2. Get local problems
   const localProblems = await Storage.getAllProblems();
@@ -527,9 +518,7 @@ async function importFromRepo() {
     localIndex[p.problemId] = p;
   });
 
-  dbg.log(
-    `importFromRepo(): local has ${Object.keys(localIndex).length} problems`,
-  );
+  dbg.log(`importFromRepo(): local has ${Object.keys(localIndex).length} problems`);
 
   // 3. Detect new (not in local)
   const newProblems = [];
@@ -546,9 +535,7 @@ async function importFromRepo() {
     dbg.log(`importFromRepo(): ✓ imported ${remote.problemId}`);
   }
 
-  dbg.log(
-    `importFromRepo(): ✓ sync complete — ${newProblems.length} new problems`,
-  );
+  dbg.log(`importFromRepo(): ✓ sync complete — ${newProblems.length} new problems`);
 }
 ```
 
@@ -630,12 +617,12 @@ sequenceDiagram
 Settings are one flat object in `chrome.storage.local` under the `settings` key —
 not a nested schema. Secrets are deliberately kept out of it:
 
-| Data                | Key                                    | Written by                            |
-| ------------------- | -------------------------------------- | ------------------------------------- |
-| User preferences    | `settings`                             | `Storage.setSettings()`               |
-| OAuth tokens        | `auth.tokens`                          | `Storage.setAuthToken(provider, tok)` |
-| AI provider keys    | `ai.keys`                              | `Storage.setAIKeys(map)`              |
-| Debug flag          | `codeledger.debug`                     | `Storage.setDebugEnabled()`           |
+| Data             | Key                | Written by                            |
+| ---------------- | ------------------ | ------------------------------------- |
+| User preferences | `settings`         | `Storage.setSettings()`               |
+| OAuth tokens     | `auth.tokens`      | `Storage.setAuthToken(provider, tok)` |
+| AI provider keys | `ai.keys`          | `Storage.setAIKeys(map)`              |
+| Debug flag       | `codeledger.debug` | `Storage.setDebugEnabled()`           |
 
 Every key name comes from `CONSTANTS.SK` in `src/core/constants.js`. Never write
 a literal — a typo here does not throw, it silently reads back `undefined`.
@@ -838,14 +825,14 @@ problem.
 **File:** `src/core/constants.js` — the single source of truth. Read it there
 rather than trusting a copy; the values below are a pointer, not a mirror.
 
-| Export                  | What it holds                                                                                                     |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `VERSION`               | Read from the running manifest via `runtime.getManifest()`, so it cannot drift from what was packaged             |
-| `PLATFORMS`             | `leetcode`, `geeksforgeeks`, `codeforces`                                                                          |
-| `PLATFORM_CODE`         | The prefix in every problem id — `lc`, `gfg`, `cf`                                                                 |
-| `AI_PROVIDERS`          | Six providers, each with `endpoint`, `modelsEndpoint`, `defaultModel`, `supportsLiveFetch`, `keyRequired`          |
-| `ALARM_NAMES`           | `sync.periodic`, `reminder.daily`, `reminder.streak` — the literal strings `alarm-manager.js` registers and matches |
-| `SYNC_ALARM_PERIOD_MIN` | `30`                                                                                                               |
+| Export                  | What it holds                                                                                                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VERSION`               | Read from the running manifest via `runtime.getManifest()`, so it cannot drift from what was packaged                                                          |
+| `PLATFORMS`             | `leetcode`, `geeksforgeeks`, `codeforces`                                                                                                                      |
+| `PLATFORM_CODE`         | The prefix in every problem id — `lc`, `gfg`, `cf`                                                                                                             |
+| `AI_PROVIDERS`          | Six providers, each with `endpoint`, `modelsEndpoint`, `defaultModel`, `supportsLiveFetch`, `keyRequired`                                                      |
+| `ALARM_NAMES`           | `sync.periodic`, `reminder.daily`, `reminder.streak` — the literal strings `alarm-manager.js` registers and matches                                            |
+| `SYNC_ALARM_PERIOD_MIN` | `30`                                                                                                                                                           |
 | `SK`                    | Every storage key name. Never write a key as a literal — an unmatched literal reads as authoritative and silently disconnects whatever it was meant to control |
 
 `makeProblemId(platform, titleSlug)` on the same object builds the

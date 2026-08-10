@@ -97,10 +97,8 @@ curl -sf https://codeledger.vkrishna04.me/api/health
 manifest-chromium.json / manifest-firefox.json   — the build emits one manifest.json per target
 ├── background/service-worker.js      — SW: init, event bus, handles problem:solved, commits
 │   ├── sync-engine.js                — cross-device sync via repo index.json
-│   ├── migration-manager.js          — versioned storage migrations run on install/update
-│   └── alarm-manager.js              — chrome.alarms for reminders/sync
+│   └── migration-manager.js          — versioned storage migrations run on install/update
 ├── content/handler-loader.js         — matches hostname → dynamically imports platform handler
-│   ├── heartbeat.js                  — SW keepalive port
 │   └── presence-marker.js            — injects #codeledger-present on landing page
 ├── handlers/
 │   ├── _base/BasePlatformHandler.js  — safeQuery(), MutationObserver lifecycle
@@ -281,8 +279,10 @@ All handlers live in `src/handlers/` and follow a strict structure:
   - Examples: `leetcode/`, `geeksforgeeks/`, `codeforces/`
 
 - **AI provider handlers**: `src/handlers/ai/{name}/`
-  - `index.js` — AI handler class extending `BaseAIHandler`
-  - `model-fetcher.js` — fetch live models or static list
+  - `index.js` — AI handler class extending `BaseAIHandler`; this is the only
+    required file. Model listing is centralised in `src/core/model-fetch.js`
+    (`fetchModelsForProvider`), which reads the provider's entry in
+    `CONSTANTS.AI_PROVIDERS`. `openrouter/` ships as `index.js` alone.
   - Examples: `gemini/`, `openai/`, `claude/`, `deepseek/`, `ollama/`, `openrouter/`
 
 - **Git repository handlers**: `src/handlers/git/{name}/`
@@ -315,7 +315,7 @@ All handlers live in `src/handlers/` and follow a strict structure:
 | ------------------- | ----------------- | ---------------------------------------------------------- | ----------------------------------- |
 | Handler directories | kebab-case        | `leetcode`, `gemini`, `github`                             | All handlers indexed by name        |
 | Handler files       | `index.js`        | `index.js`                                                 | Standard entry point                |
-| Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `model-fetcher.js` | Clear purpose from name             |
+| Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `graphql-queries.js` | Clear purpose from name           |
 | Components          | PascalCase        | `SettingsSchema.js`, `ModelSelector.js`                    | React/Preact convention             |
 | Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                       | Distinguish from generic components |
 | Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                 | Lowercase for utility modules       |
@@ -463,10 +463,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## Adding a New AI Provider
 
 1. Create `src/handlers/ai/{name}/index.js` extending `BaseAIHandler`
-2. Create `model-fetcher.js` that fetches live models (or static list for providers without a models endpoint)
-3. Add provider config to `CONSTANTS.AI_PROVIDERS` in `src/core/constants.js`
-4. Register settings schema in `src/handlers/init.js`
-5. Wire into `ModelSelector.js` `loadModels()` switch
+2. Add the provider config to `CONSTANTS.AI_PROVIDERS` in `src/core/constants.js` —
+   this is what `src/core/model-fetch.js` reads to list models, so no
+   per-provider fetcher is needed
+3. Import the class in `src/handlers/init.js` and add it to the `ais` array;
+   `initializeHandlers()` registers it and calls its `getSettingsSchema()` if it
+   defines one
+4. If the provider needs a non-standard response shape, override
+   `fetchModels()` on the handler rather than adding a new module
 
 ---
 
