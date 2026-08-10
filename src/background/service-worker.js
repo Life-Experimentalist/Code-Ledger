@@ -27,6 +27,7 @@ import {
   LAYOUT_VERSION,
 } from "../core/path-builder.js";
 import { canonicalMapper } from "../core/canonical-mapper.js";
+import { dayKey } from "../core/gamification.js";
 import { getChatsByProblem } from "../core/ai-chat-storage.js";
 import { buildCommitMessage, COMMIT_TYPES, resolveCommitType } from "../core/commit-messages.js";
 import {
@@ -351,6 +352,22 @@ async function applyFirstRunDefaults() {
     if (!("autoReview" in settings)) {
       updates.autoReview = false;
       dbg.log(`applyFirstRunDefaults(): set autoReview=false`);
+    }
+    // The install day, stamped once and never rewritten.
+    //
+    // Streaks are floored here. Importing a LeetCode profile brings years of
+    // history with it, and every one of those points is worth keeping — but
+    // crediting the days would hand a brand-new user a streak they never lived,
+    // and the gaps in that history would open the timeline with a wall of
+    // misses. Points are lifetime; streaks start when the extension does.
+    if (!settings.installDay) {
+      updates.installDay = dayKey(Date.now());
+      dbg.log(`applyFirstRunDefaults(): set installDay=${updates.installDay}`);
+    }
+    // Gamification needs no key, no network and nobody else's terms of service,
+    // so unlike AI it starts on. The welcome page offers to turn it off.
+    if (!("gamificationEnabled" in settings)) {
+      updates.gamificationEnabled = true;
     }
     await Storage.setSettings({ ...settings, ...updates });
     dbg.log(
