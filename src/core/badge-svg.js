@@ -122,17 +122,54 @@ export function badge({ label, value, color = COLORS.slate, labelColor = "#555",
 /* Named badges                                                        */
 /* ------------------------------------------------------------------ */
 
-/** Streak badge. Turns blue on vacation and grey when the streak is zero. */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * `"2026-08-10"` → `"Aug 10"`.
+ *
+ * Parsed from the string rather than through `Date`, which would re-interpret an
+ * already timezone-shifted day key in the runtime's zone and could shift it back
+ * a day. Returns "" for anything unparseable, so a bad key drops the stamp
+ * instead of printing "NaN".
+ *
+ * @param {string} dayKey
+ * @returns {string}
+ */
+export function asOfLabel(dayKey) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dayKey || ""));
+  if (!m) return "";
+  const month = MONTHS[Number(m[2]) - 1];
+  if (!month) return "";
+  return `${month} ${Number(m[3])}`;
+}
+
+/**
+ * Streak badge. Turns blue on vacation and grey when the streak is zero.
+ *
+ * Carries the date it was computed. A badge is a picture committed at a moment
+ * in time — it cannot recount days when someone loads the README weeks later,
+ * and a bare "5 days" quietly becomes a lie the moment the user stops solving.
+ * "5 days · Aug 10" stays true forever, and the reader can see for themselves
+ * how old it is. The number only ever goes stale downward, because the next
+ * solve regenerates it.
+ */
 export function streakBadge(snapshot) {
   const n = snapshot.currentStreak || 0;
+  const asOf = asOfLabel(snapshot.today);
+  const stamp = asOf ? ` · ${asOf}` : "";
+
   if (snapshot.vacationActive) {
-    return badge({ label: "streak", value: "on vacation", color: COLORS.vacation });
+    return badge({
+      label: "streak",
+      value: `on vacation${stamp}`,
+      color: COLORS.vacation,
+    });
   }
   return badge({
     label: "streak",
-    value: n === 1 ? "1 day" : `${n} days`,
+    value: `${n === 1 ? "1 day" : `${n} days`}${stamp}`,
     color: n > 0 ? COLORS.fire : COLORS.dim,
-    title: `Current solving streak: ${n} day${n === 1 ? "" : "s"}`,
+    title: `Current solving streak: ${n} day${n === 1 ? "" : "s"}${asOf ? ` as of ${asOf}` : ""}`,
   });
 }
 
@@ -236,6 +273,9 @@ ${cell(340, formatCount(snapshot.totalSolves || 0), "solved", COLORS.level)}
   <text x="390" y="172" fill="#94a3b8" font-size="11" text-anchor="end" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
     snapshot.freezes || 0,
   )} ❄ · best ${escapeXml(snapshot.longestStreak || 0)}d</text>
+  <text x="210" y="190" fill="#475569" font-size="9" text-anchor="middle" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
+    asOfLabel(snapshot.today) ? `as of ${asOfLabel(snapshot.today)}` : "",
+  )}</text>
 </svg>`;
 }
 
@@ -306,7 +346,15 @@ export function badgeStats(snapshot) {
  */
 export function badgeUrl(baseUrl, name, snapshot) {
   const base = String(baseUrl || "").replace(/\/+$/, "");
-  const v = `${snapshot.totalPoints || 0}-${snapshot.currentStreak || 0}-${snapshot.totalSolves || 0}`;
+  // The day is part of the key because the badges carry an "as of" stamp. A
+  // vacation day regenerates identical numbers under a new date, and without
+  // the day here camo would keep serving yesterday's picture.
+  const v = [
+    snapshot.totalPoints || 0,
+    snapshot.currentStreak || 0,
+    snapshot.totalSolves || 0,
+    snapshot.today || "",
+  ].join("-");
   return `${base}/${BADGE_DIR}/${name}.svg?v=${encodeURIComponent(v)}`;
 }
 

@@ -148,7 +148,32 @@ describe("named badges", () => {
       config: { ...UTC, dailyTargetPoints: 25 },
       now: at("2026-03-03"),
     });
-    assert.match(streakBadge(s), /1 day</);
+    const svg = streakBadge(s);
+    assert.match(svg, /1 day /);
+    assert.doesNotMatch(svg, /1 days/);
+  });
+
+  test("streak badge is stamped with the day it was computed", () => {
+    // A badge is a picture taken at commit time; it cannot recount days when
+    // someone opens the README three weeks later. The stamp is what keeps
+    // "5 days" from silently becoming a false claim.
+    const s = computeSnapshot(ledger(["2026-03-03"]), {
+      config: { ...UTC, dailyTargetPoints: 25 },
+      now: at("2026-03-03"),
+    });
+    assert.match(streakBadge(s), /Mar 3/);
+    assert.match(streakCard(s), /as of Mar 3/);
+  });
+
+  test("an unparseable day drops the stamp rather than printing NaN", () => {
+    const svg = streakBadge({ currentStreak: 4, today: "not-a-date" });
+    assert.match(svg, /4 days/);
+    assert.doesNotMatch(svg, /NaN|undefined|·/);
+  });
+
+  test("the vacation badge is stamped too", () => {
+    const svg = streakBadge({ currentStreak: 9, vacationActive: true, today: "2026-12-25" });
+    assert.match(svg, /on vacation · Dec 25/);
   });
 
   test("streak badge is dimmed at zero rather than absent", () => {
@@ -294,6 +319,15 @@ describe("badgeUrl", () => {
     // Without this, GitHub's camo proxy serves the first badge forever.
     const before = badgeUrl("https://x.github.io/r", "streak", SNAP);
     const after = badgeUrl("https://x.github.io/r", "streak", { ...SNAP, currentStreak: 4 });
+    assert.notEqual(before, after);
+  });
+
+  test("the cache-buster changes when only the date does", () => {
+    // A vacation day regenerates identical numbers under a new stamp. Without
+    // the day in the key, camo would keep serving yesterday's picture and the
+    // stamp would be the thing that goes stale.
+    const before = badgeUrl("https://x.github.io/r", "streak", { ...SNAP, today: "2026-03-03" });
+    const after = badgeUrl("https://x.github.io/r", "streak", { ...SNAP, today: "2026-03-04" });
     assert.notEqual(before, after);
   });
 
