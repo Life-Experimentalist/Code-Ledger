@@ -48,3 +48,7 @@ docs/temp/
 .devprune.json
 .devprune-ignore
 ignore.devprune.json
+
+# Release artifacts — built by CI and attached to GitHub Releases.
+# Tracking them permanently inflates every clone.
+releases/

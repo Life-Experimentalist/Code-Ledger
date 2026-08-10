@@ -322,6 +322,7 @@ Before pushing: `npm run lint && npm run format:check && npm test`.
 - Testing guide: [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md)
 - OpenAPI contract: [docs/OPENAPI.yaml](docs/OPENAPI.yaml)
 - Adding a platform: [docs/guides/development/adding-platform-handler.md](docs/guides/development/adding-platform-handler.md)
+- Graphify knowledge-graph workflow: [docs/guides/development/graphify-workflow.md](docs/guides/development/graphify-workflow.md)
 - Security policy: [.github/SECURITY.md](.github/SECURITY.md)
 
 ---
