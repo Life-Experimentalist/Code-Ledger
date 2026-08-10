@@ -441,7 +441,8 @@ export function AnalyticsView({ problems, onNavigate }) {
       else if (cat === "Hard") s.hard++;
       else s.unknown++;
 
-      const rawTags = Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : p.topic ? [p.topic] : [];
+      const rawTags =
+        Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : p.topic ? [p.topic] : [];
       // Normalize tags through canonical system — deduplicates platform-specific variants
       const seenCanonical = new Set();
       rawTags.forEach((t) => {
@@ -600,7 +601,11 @@ export function AnalyticsView({ problems, onNavigate }) {
         (p) => {
           const tags = Array.isArray(p.tags) ? p.tags : [];
           // Match either exact tag or normalized canonical form
-          return tags.some((t) => normalizeTag(t) === topic || t === topic) || normalizeTag(p.topic) === topic || p.topic === topic;
+          return (
+            tags.some((t) => normalizeTag(t) === topic || t === topic) ||
+            normalizeTag(p.topic) === topic ||
+            p.topic === topic
+          );
         },
         "topic",
       );
@@ -631,28 +636,26 @@ export function AnalyticsView({ problems, onNavigate }) {
         (p) => (PLATFORM_META[p.platform]?.name || p.platform) === sectionFilter,
       );
     } else if (section === "topic") {
-      openDrilldown(
-        sectionFilter,
-        (p) => {
-          const tags = Array.isArray(p.tags) ? p.tags : [];
-          return tags.some((t) => normalizeTag(t) === sectionFilter) || normalizeTag(p.topic) === sectionFilter;
-        },
-      );
+      openDrilldown(sectionFilter, (p) => {
+        const tags = Array.isArray(p.tags) ? p.tags : [];
+        return (
+          tags.some((t) => normalizeTag(t) === sectionFilter) ||
+          normalizeTag(p.topic) === sectionFilter
+        );
+      });
     }
   }, [problems?.length, userMap]);
 
   const chartData = useMemo(() => {
     // For the radar, prefer Algorithm topics (lower weight = higher priority) as they're more insightful
-    const sortedTopics = Object.entries(stats.topics).sort(
-      (a, b) => {
-        // First by type: algorithms before data structures
-        const typeA = getTopicType(a[0]) === "algorithm" ? 0 : 1;
-        const typeB = getTopicType(b[0]) === "algorithm" ? 0 : 1;
-        if (typeA !== typeB) return typeA - typeB;
-        // Then by solve count (desc)
-        return b[1].total - a[1].total;
-      }
-    );
+    const sortedTopics = Object.entries(stats.topics).sort((a, b) => {
+      // First by type: algorithms before data structures
+      const typeA = getTopicType(a[0]) === "algorithm" ? 0 : 1;
+      const typeB = getTopicType(b[0]) === "algorithm" ? 0 : 1;
+      if (typeA !== typeB) return typeA - typeB;
+      // Then by solve count (desc)
+      return b[1].total - a[1].total;
+    });
     const tpLabels = sortedTopics.slice(0, 8).map((t) => t[0]);
     const maxTopicTotal = Math.max(1, ...Object.values(stats.topics).map((t) => t.total));
 
@@ -1159,24 +1162,20 @@ export function AnalyticsView({ problems, onNavigate }) {
             <h3 class="text-sm font-bold text-white tracking-wide">Topic Breakdown</h3>
             <div class="flex gap-1 p-0.5 bg-white/5 rounded-lg">
               <button
-                class=${
-                  `text-xs px-3 py-1 rounded-md transition-all font-medium ` +
-                  (activeTopicTab === "algo"
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                    : "text-slate-500 hover:text-slate-300")
-                }
+                class=${`text-xs px-3 py-1 rounded-md transition-all font-medium ` +
+                (activeTopicTab === "algo"
+                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                  : "text-slate-500 hover:text-slate-300")}
                 onClick=${() => setActiveTopicTab("algo")}
               >
                 Algorithms
                 <span class="ml-1 text-[10px] opacity-60">${topicsByType.algo.length}</span>
               </button>
               <button
-                class=${
-                  `text-xs px-3 py-1 rounded-md transition-all font-medium ` +
-                  (activeTopicTab === "ds"
-                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                    : "text-slate-500 hover:text-slate-300")
-                }
+                class=${`text-xs px-3 py-1 rounded-md transition-all font-medium ` +
+                (activeTopicTab === "ds"
+                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                  : "text-slate-500 hover:text-slate-300")}
                 onClick=${() => setActiveTopicTab("ds")}
               >
                 Data Structures
@@ -1187,7 +1186,8 @@ export function AnalyticsView({ problems, onNavigate }) {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             ${topTopics.map(([topic, counts]) => {
               const barPct = Math.round((counts.total / maxTopicCount) * 100);
-              const accentColor = activeTopicTab === "algo" ? "border-cyan-900/50" : "border-purple-900/50";
+              const accentColor =
+                activeTopicTab === "algo" ? "border-cyan-900/50" : "border-purple-900/50";
               return html`
                 <div
                   class="p-4 bg-[#0a0a0f] border border-white/5 rounded-xl hover:${accentColor} transition-colors cursor-pointer group"
@@ -1195,12 +1195,10 @@ export function AnalyticsView({ problems, onNavigate }) {
                 >
                   <div class="flex justify-between items-center mb-2">
                     <span
-                      class=${
-                        `font-medium text-sm transition-colors truncate pr-2 ` +
-                        (activeTopicTab === "algo"
-                          ? "text-slate-300 group-hover:text-cyan-400"
-                          : "text-slate-300 group-hover:text-purple-400")
-                      }
+                      class=${`font-medium text-sm transition-colors truncate pr-2 ` +
+                      (activeTopicTab === "algo"
+                        ? "text-slate-300 group-hover:text-cyan-400"
+                        : "text-slate-300 group-hover:text-purple-400")}
                       >${topic}</span
                     >
                     <span class="text-xs font-mono text-slate-500 shrink-0"
@@ -1210,31 +1208,44 @@ export function AnalyticsView({ problems, onNavigate }) {
                   <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
                     <div
                       class="h-full bg-emerald-500 transition-all"
-                      style=${{ width: `${counts.total ? (counts.easy / counts.total) * barPct : 0}%` }}
+                      style=${{
+                        width: `${counts.total ? (counts.easy / counts.total) * barPct : 0}%`,
+                      }}
                     ></div>
                     <div
                       class="h-full bg-amber-500 transition-all"
-                      style=${{ width: `${counts.total ? (counts.medium / counts.total) * barPct : 0}%` }}
+                      style=${{
+                        width: `${counts.total ? (counts.medium / counts.total) * barPct : 0}%`,
+                      }}
                     ></div>
                     <div
                       class="h-full bg-rose-500 transition-all"
-                      style=${{ width: `${counts.total ? (counts.hard / counts.total) * barPct : 0}%` }}
+                      style=${{
+                        width: `${counts.total ? (counts.hard / counts.total) * barPct : 0}%`,
+                      }}
                     ></div>
                   </div>
                   <div class="flex gap-3 mt-1.5 text-[10px] text-slate-600">
-                    ${counts.easy ? html`<span class="text-emerald-700">${counts.easy}E</span>` : ""}
-                    ${counts.medium ? html`<span class="text-amber-700">${counts.medium}M</span>` : ""}
+                    ${counts.easy
+                      ? html`<span class="text-emerald-700">${counts.easy}E</span>`
+                      : ""}
+                    ${counts.medium
+                      ? html`<span class="text-amber-700">${counts.medium}M</span>`
+                      : ""}
                     ${counts.hard ? html`<span class="text-rose-700">${counts.hard}H</span>` : ""}
                   </div>
                 </div>
               `;
             })}
           </div>
-          ${activeTopics.length > 8 ? html`
-            <p class="text-[11px] text-slate-600 text-center">
-              Showing top 8 of ${activeTopics.length} ${activeTopicTab === "algo" ? "algorithm" : "data structure"} topics
-            </p>
-          ` : ""}
+          ${activeTopics.length > 8
+            ? html`
+                <p class="text-[11px] text-slate-600 text-center">
+                  Showing top 8 of ${activeTopics.length}
+                  ${activeTopicTab === "algo" ? "algorithm" : "data structure"} topics
+                </p>
+              `
+            : ""}
         </div>
 
         <!-- Unsolved Next (Blind 75-based) -->

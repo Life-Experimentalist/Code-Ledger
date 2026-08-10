@@ -63,5 +63,7 @@ if (fatal.length) {
   process.exit(1);
 }
 
-console.log(`✓ no fatal type errors (${advisory} advisory finding(s) across ${parsed.length ? "checked" : "all"} files)`);
+console.log(
+  `✓ no fatal type errors (${advisory} advisory finding(s) across ${parsed.length ? "checked" : "all"} files)`,
+);
 console.log(`  run \`npx tsc --noEmit --checkJs\` to read the advisories.`);

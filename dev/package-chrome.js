@@ -18,10 +18,12 @@ const zip = new AdmZip();
 
 // Add all src files, excluding the split manifests and adding the chrome temporary manifest as manifest.json
 zip.addLocalFolder("./src", "", (name) => {
-  return name !== "manifest-chromium.json" &&
-         name !== "manifest-firefox.json" &&
-         name !== "manifest.json" &&
-         !/desktop\.ini$/i.test(name);
+  return (
+    name !== "manifest-chromium.json" &&
+    name !== "manifest-firefox.json" &&
+    name !== "manifest.json" &&
+    !/desktop\.ini$/i.test(name)
+  );
 });
 zip.addLocalFile(tmpManifest, "", "manifest.json");
 

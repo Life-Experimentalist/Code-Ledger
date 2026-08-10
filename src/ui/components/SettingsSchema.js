@@ -812,10 +812,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       // check any of them — or any page that obtains a handle to this view —
       // can post a CODELEDGER_AUTH message and swap in an attacker's GitHub
       // token, silently redirecting the user's ledger to a repo they do not own.
-      const allowedOrigins = trustedAuthOrigins(
-        CONSTANTS.URLS.AUTH_WORKER,
-        window.location.origin,
-      );
+      const allowedOrigins = trustedAuthOrigins(CONSTANTS.URLS.AUTH_WORKER, window.location.origin);
 
       const receiveMessage = async (ev) => {
         try {

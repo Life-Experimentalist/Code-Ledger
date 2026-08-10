@@ -348,9 +348,7 @@ export const Storage = {
       if (mergedProblem.tags && Array.isArray(mergedProblem.tags)) {
         mergedProblem.tags = [
           ...new Set(
-            mergedProblem.tags
-              .map((t) => normalizeTag(t, customMappings))
-              .filter(Boolean),
+            mergedProblem.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean),
           ),
         ];
       }

@@ -93,7 +93,11 @@ import {
 
 // Lazy reference to topic-resolver (populated on first use)
 let _topicResolver = { normalizeTag: (t) => t };
-import("../core/topic-resolver.js").then((m) => { _topicResolver = m; }).catch(() => {});
+import("../core/topic-resolver.js")
+  .then((m) => {
+    _topicResolver = m;
+  })
+  .catch(() => {});
 
 let _syncAlarmBound = false;
 let _reviewQueueAlarmBound = false;
@@ -686,9 +690,7 @@ function applyInferredMetadata(problem, inferredMetadata) {
   ) {
     // Normalize AI-returned tags through canonical system
     const { normalizeTag } = _topicResolver;
-    const normalizedNew = inferredMetadata.tags
-      .map((t) => normalizeTag(t))
-      .filter(Boolean);
+    const normalizedNew = inferredMetadata.tags.map((t) => normalizeTag(t)).filter(Boolean);
 
     const existingTags = Array.isArray(problem.tags) ? problem.tags : [];
     const hasUsefulExisting = existingTags.length > 0 && existingTags.some((t) => t !== "Untagged");
@@ -2673,7 +2675,10 @@ async function processCodeRecoveryQueue() {
           }
           if (settings.gitEnabled !== false && settings.gitEnabled !== 0) {
             commitUpdatedProblem(current, settings).catch((err) => {
-              dbg.warn(`processCodeRecoveryQueue(): failed to commit ${current.titleSlug}:`, err.message);
+              dbg.warn(
+                `processCodeRecoveryQueue(): failed to commit ${current.titleSlug}:`,
+                err.message,
+              );
             });
           }
         } else {

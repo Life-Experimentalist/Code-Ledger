@@ -634,7 +634,9 @@ export function cleanCode(code) {
  */
 export function highlightCode(code, lang = "") {
   const cleaned = cleanCode(code || "");
-  const cleanLang = String(lang || "").toLowerCase().replace(/[\s\-_]+/g, "");
+  const cleanLang = String(lang || "")
+    .toLowerCase()
+    .replace(/[\s\-_]+/g, "");
   const normLang = LANG_ALIASES[cleanLang] || LANG_ALIASES[lang.toLowerCase()] || cleanLang;
   const kws = KEYWORDS[normLang];
 
@@ -758,4 +760,3 @@ export function highlightCodeWithLines(code, lang = "") {
 
   return `<table style="border-collapse:collapse;width:100%;font-family:inherit;font-size:inherit;tab-size:4;-moz-tab-size:4;"><tbody>${rows.join("\n")}</tbody></table>`;
 }
-

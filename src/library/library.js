@@ -301,7 +301,9 @@ function LibraryApp() {
         dbg.error(
           `processOAuthToken(): GitHub /user returned ${userRes.status} — token may be invalid`,
         );
-        alert(`GitHub authentication failed (HTTP ${userRes.status}). Please try connecting again.`);
+        alert(
+          `GitHub authentication failed (HTTP ${userRes.status}). Please try connecting again.`,
+        );
         throw new Error(`GitHub /user returned ${userRes.status}`);
       }
       const user = await userRes.json();

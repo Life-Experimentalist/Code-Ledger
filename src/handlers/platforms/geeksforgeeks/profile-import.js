@@ -308,13 +308,15 @@ export async function injectProfileImportBtn(makeProblemId) {
       document.querySelector('a[href*="/profile/edit"]') ||
       document.querySelector('a[href*="profile/edit"]') ||
       [...document.querySelectorAll("a, button, span, div")].some((el) =>
-        /edit\s+profile/i.test(el.textContent)
+        /edit\s+profile/i.test(el.textContent),
       )
     );
 
     if (!hasEditProfile) {
       if (attempt === MAX_ATTEMPTS - 1) {
-        dbg.log("injectProfileImportBtn: 'Edit Profile' button not found, skipping button injection (not own profile)");
+        dbg.log(
+          "injectProfileImportBtn: 'Edit Profile' button not found, skipping button injection (not own profile)",
+        );
         return;
       }
       await new Promise((r) => setTimeout(r, RETRY_MS));

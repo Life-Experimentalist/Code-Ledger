@@ -198,7 +198,9 @@ export function AIMarkdownRenderer({ content, copyableEnabled = false }) {
 
     el.querySelectorAll("[data-mermaid-pending]").forEach((div) => {
       div.removeAttribute("data-mermaid-pending");
-      const urls = mermaidUrls((div.getAttribute("data-mermaid-src") || "").replace(/&quot;/g, '"'));
+      const urls = mermaidUrls(
+        (div.getAttribute("data-mermaid-src") || "").replace(/&quot;/g, '"'),
+      );
       if (!urls) return;
 
       const bar = document.createElement("div");

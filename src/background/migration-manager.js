@@ -456,13 +456,17 @@ export async function migrateTagsToCanonical() {
 
     if (!isDiff) continue;
 
-    await Storage.saveProblem({ ...p, tags: normalized, ...(normalizedTopic ? { topic: normalizedTopic } : {}) }).catch((e) =>
-      dbg.warn(`migrateTagsToCanonical(): failed to update ${p.id}:`, e?.message),
-    );
+    await Storage.saveProblem({
+      ...p,
+      tags: normalized,
+      ...(normalizedTopic ? { topic: normalizedTopic } : {}),
+    }).catch((e) => dbg.warn(`migrateTagsToCanonical(): failed to update ${p.id}:`, e?.message));
     changed++;
   }
 
   // Mark as done
   await Storage.setSettings({ ...settings, [MIGRATION_KEY]: true }).catch(() => {});
-  dbg.log(`migrateTagsToCanonical(): ✓ complete — ${changed}/${problems.length} problem(s) updated`);
+  dbg.log(
+    `migrateTagsToCanonical(): ✓ complete — ${changed}/${problems.length} problem(s) updated`,
+  );
 }

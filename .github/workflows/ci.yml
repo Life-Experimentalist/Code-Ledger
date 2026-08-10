@@ -1,0 +1,105 @@
+name: CI
+
+# Every gate the release workflow runs, run here too — on every push and pull
+# request. Release-time is the wrong place to discover a broken test.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, format, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Unit and worker tests
+        run: npm test
+
+      - name: Sync regression checks
+        run: npm run test:sync-regression
+
+      - name: Validate OpenAPI spec
+        run: npm run validate:openapi
+
+      # The two manifests and package.json must agree on the version, and the
+      # manifests' host_permissions are generated from the handlers' DOMAINS
+      # exports. Both drift silently, so check them rather than trusting them.
+      - name: Check manifest versions agree
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          CHROMIUM=$(node -p "require('./src/manifest-chromium.json').version")
+          FIREFOX=$(node -p "require('./src/manifest-firefox.json').version")
+          echo "package.json=$PKG chromium=$CHROMIUM firefox=$FIREFOX"
+          if [ "$PKG" != "$CHROMIUM" ] || [ "$PKG" != "$FIREFOX" ]; then
+            echo "::error::version mismatch between package.json and the manifests"
+            exit 1
+          fi
+
+      - name: Check generated host_permissions are current
+        run: |
+          node dev/generate-manifest-domains.js
+          if ! git diff --quiet -- src/manifest-chromium.json src/manifest-firefox.json; then
+            echo "::error::host_permissions are stale — run 'npm run domains:update' and commit"
+            git --no-pager diff -- src/manifest-chromium.json src/manifest-firefox.json
+            exit 1
+          fi
+
+  build:
+    name: Build packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: verify
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Proves the packaging path still works without waiting for a tag push.
+      - name: Build and package
+        run: npm run publish
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeledger-packages
+          path: releases/*/codeledger-*.zip
+          if-no-files-found: error
+          retention-days: 7

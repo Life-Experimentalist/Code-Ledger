@@ -20,16 +20,14 @@ export class Packager {
     writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
 
     const zip = new AdmZip();
-    zip.addLocalFolder(
-      resolve(this.ctx.rootDir, "src"),
-      "",
-      (name) => {
-        return name !== "manifest-chromium.json" &&
-               name !== "manifest-firefox.json" &&
-               name !== "manifest.json" &&
-               !/desktop\.ini$/i.test(name);
-      },
-    );
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", (name) => {
+      return (
+        name !== "manifest-chromium.json" &&
+        name !== "manifest-firefox.json" &&
+        name !== "manifest.json" &&
+        !/desktop\.ini$/i.test(name)
+      );
+    });
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(
@@ -57,16 +55,14 @@ export class Packager {
     writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
 
     const zip = new AdmZip();
-    zip.addLocalFolder(
-      resolve(this.ctx.rootDir, "src"),
-      "",
-      (name) => {
-        return name !== "manifest-chromium.json" &&
-               name !== "manifest-firefox.json" &&
-               name !== "manifest.json" &&
-               !/desktop\.ini$/i.test(name);
-      },
-    );
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", (name) => {
+      return (
+        name !== "manifest-chromium.json" &&
+        name !== "manifest-firefox.json" &&
+        name !== "manifest.json" &&
+        !/desktop\.ini$/i.test(name)
+      );
+    });
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(

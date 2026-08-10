@@ -68,7 +68,9 @@ const DROP_CONTENT = new Set(["script", "style", "iframe", "object", "embed", "t
 const VOID = new Set(["br", "hr", "img"]);
 
 function escapeText(value) {
-  return String(value).replace(/&(?![a-zA-Z#][a-zA-Z0-9]*;)/g, "&amp;").replace(/</g, "&lt;");
+  return String(value)
+    .replace(/&(?![a-zA-Z#][a-zA-Z0-9]*;)/g, "&amp;")
+    .replace(/</g, "&lt;");
 }
 
 function escapeAttr(value) {

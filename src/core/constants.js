@@ -442,4 +442,3 @@ export const CONSTANTS = Object.freeze({
     bash: "Bash",
   },
 });
-

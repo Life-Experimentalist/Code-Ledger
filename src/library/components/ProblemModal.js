@@ -1809,7 +1809,10 @@ function MethodCard({ method, methodIndex, problem, onUpdate }) {
     <pre
       class="text-xs leading-relaxed overflow-x-auto bg-black/50 py-3 whitespace-pre font-mono m-0 max-h-96"
       dangerouslySetInnerHTML=${{
-        __html: highlightCodeWithLines(method.code || "// (no code)", (method.language || "").toLowerCase()),
+        __html: highlightCodeWithLines(
+          method.code || "// (no code)",
+          (method.language || "").toLowerCase(),
+        ),
       }}
     ></pre>
     <div class="border-t border-white/10 p-3">

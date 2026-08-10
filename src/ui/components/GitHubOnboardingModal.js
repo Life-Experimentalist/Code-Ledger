@@ -797,7 +797,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     </p>
                   </div>
 
-                  <div class="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-lg mt-2">
+                  <div
+                    class="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-lg mt-2"
+                  >
                     <input
                       type="checkbox"
                       id="private-repo-toggle"
@@ -857,9 +859,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     </button>
                     <button
                       onClick=${createNewRepo}
-                      disabled=${busy ||
-                      !sanitize(repoName) ||
-                      nameCheck === "taken"}
+                      disabled=${busy || !sanitize(repoName) || nameCheck === "taken"}
                       class="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                     >
                       ${busy ? "Creating…" : "Create Repository"}
@@ -1143,7 +1143,7 @@ async function initializeRepository(owner, repo, token) {
         type: "blob",
         content: "node_modules/\n.env\n*.log\n.DS_Store\n",
       },
-    ]
+    ],
   };
 
   if (!isRootCommit) {
@@ -1175,14 +1175,14 @@ async function initializeRepository(owner, repo, token) {
       method: "POST",
       body: JSON.stringify({
         ref: "refs/heads/main",
-        sha: commitRes.sha
-      })
+        sha: commitRes.sha,
+      }),
     });
     // Ensure default branch is set to main
     try {
       await ghFetch(`/repos/${owner}/${repo}`, {
         method: "PATCH",
-        body: JSON.stringify({ default_branch: "main" })
+        body: JSON.stringify({ default_branch: "main" }),
       });
     } catch (_) {
       // Ignore if patching default branch fails
