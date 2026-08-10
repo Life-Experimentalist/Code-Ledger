@@ -148,6 +148,42 @@ create repo → root commit → ref creation — is the one path no test exercis
 against a live endpoint. A single opt-in integration test, gated on a PAT in the
 environment and skipped otherwise, would have caught both failures.
 
+### 9. Finish cross-browser sync through the repository
+
+Half of this already exists. `src/background/sync-engine.js` reads the remote
+`index.json` to work out what a fresh install is missing, and every commit
+writes `.codeledger/sync.json` alongside it. What is missing is the other
+direction and the settings: a second browser can reconstruct the ledger, but it
+comes up with no configuration and no gamification state, and nothing reconciles
+two devices that both solved something while offline.
+
+The repository is the right channel for this, not `chrome.storage.sync`. That
+API allows 102,400 bytes in total, 8,192 per item, 512 items, and 1,800 writes
+an hour — comfortable for a settings blob, nowhere near a ledger of solved
+problems, and it never leaves the browser it belongs to. A Chrome profile and a
+Firefox profile do not share it, which is precisely the case the feature is for.
+The repository has no size ceiling worth worrying about, is already
+authenticated, is already written on every solve, and is readable from anything
+that can make an HTTPS request.
+
+What is left to build:
+
+- Extend `.codeledger/sync.json` to carry settings, gamification state and
+  vacation ranges, not just the ledger cursor. Tokens and AI keys stay out of
+  it — the file lands in a repository that may be public.
+- A pull on startup and on demand: fetch, compare a per-key `updatedAt`,
+  last-write-wins per key rather than per file so two devices editing different
+  settings do not clobber each other.
+- Deduplicate the ledger on merge by the key `getProblemCommitKey` already
+  computes, so the same solve arriving from two devices stays one entry.
+- Mark the device that wrote each key, so a conflict can be shown as "your
+  laptop set this an hour ago" rather than a silent overwrite.
+
+`chrome.storage.sync` is still worth using for one thing: the handful of
+same-browser preferences that should follow a Chrome profile across machines
+without waiting on a repository fetch. It is a cache in front of the repository,
+never the source of truth.
+
 ---
 
 ## Applying the deletions
