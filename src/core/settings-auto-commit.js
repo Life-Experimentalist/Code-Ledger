@@ -27,11 +27,13 @@ const LAST_COMMITTED_HASH = "settings._last_committed_hash";
  */
 export async function markSettingsPendingCommit() {
   try {
-    const settings = await Storage.getSettings();
-    const hash = _hashPortableSettings(settings);
-    settings[SETTINGS_COMMIT_KEY] = true;
-    settings[LAST_COMMITTED_HASH] = hash;
-    await Storage.setSettings(settings);
+    // The hash is derived inside the lock, so it describes the settings that
+    // are actually about to be committed rather than a snapshot someone else
+    // has since changed.
+    await Storage.updateSettings((current) => ({
+      [SETTINGS_COMMIT_KEY]: true,
+      [LAST_COMMITTED_HASH]: _hashPortableSettings(current),
+    }));
     dbg.log("Settings marked for auto-commit");
   } catch (e) {
     dbg.warn("Failed to mark settings pending:", e);
@@ -81,9 +83,7 @@ export async function getConfigFileForCommit() {
 export async function clearSettingsCommitFlag() {
   dbg.log(`clearSettingsCommitFlag(): clearing auto-commit flag`);
   try {
-    const settings = await Storage.getSettings();
-    settings[SETTINGS_COMMIT_KEY] = false;
-    await Storage.setSettings(settings);
+    await Storage.updateSettings({ [SETTINGS_COMMIT_KEY]: false });
     dbg.log("Settings commit flag cleared");
   } catch (e) {
     dbg.warn("Failed to clear commit flag:", e);

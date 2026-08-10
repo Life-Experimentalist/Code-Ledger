@@ -593,7 +593,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       Storage.getSettings()
         .then((s) => {
           if (s.welcomeShown) return;
-          Storage.setSettings({ ...s, welcomeShown: true }).catch(() => {});
+          Storage.updateSettings({ welcomeShown: true }).catch(() => {});
           if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
             chrome.runtime.sendMessage({ type: "OPEN_WELCOME" });
           }

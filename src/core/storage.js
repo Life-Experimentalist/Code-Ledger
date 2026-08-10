@@ -9,7 +9,11 @@ import { createDebugger } from "../lib/debug.js";
 import { normalizeAIPrompts } from "./ai-prompts.js";
 import { normalizeTag } from "./topic-resolver.js";
 import { canonicalMapper } from "./canonical-mapper.js";
+import { withLock } from "./async-lock.js";
 const dbg = createDebugger("Storage");
+
+/** One name, so every settings writer in every context queues behind the rest. */
+const SETTINGS_LOCK = "codeledger:settings";
 
 /**
  * Unified storage abstraction.
@@ -41,10 +45,57 @@ export const Storage = {
     return s;
   },
 
+  /**
+   * Replace the entire settings object.
+   *
+   * Whole-object writes are only correct when the caller has just read the
+   * settings and is writing back everything it read. Anything narrower loses
+   * the keys it left out — silently, and permanently. Use `updateSettings`
+   * unless you genuinely mean "these are now all the settings there are".
+   *
+   * @param {Record<string, any>} settings
+   */
   async setSettings(settings) {
     dbg.log(`setSettings(): saving ${Object.keys(settings || {}).length} settings keys`);
-    const s = { ...(settings || {}), __updatedAt: new Date().toISOString() };
-    await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: s });
+    return withLock(SETTINGS_LOCK, async () => {
+      const s = { ...(settings || {}), __updatedAt: new Date().toISOString() };
+      await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: s });
+      return s;
+    });
+  },
+
+  /**
+   * Merge a patch into the stored settings, atomically with respect to every
+   * other context.
+   *
+   * The read and the write happen inside one lock, so two pages changing two
+   * different settings at the same moment both survive. The old shape —
+   * `setSettings({ ...await getSettings(), key: value })` — reads outside any
+   * lock, and whichever page wrote second erased the other's edit.
+   *
+   * Pass a function to decide the patch from the current values, for cases like
+   * appending to a list where the starting point matters. Return a falsy value
+   * from it to write nothing at all.
+   *
+   * A key set to `undefined` is removed rather than stored, which is how an
+   * unlink drops `github_repo` without having to rewrite the whole object.
+   *
+   * @param {Record<string, any> | ((current: Record<string, any>) => Record<string, any> | Promise<Record<string, any>>)} patch
+   * @returns {Promise<Record<string, any>>} the settings as they now stand
+   */
+  async updateSettings(patch) {
+    return withLock(SETTINGS_LOCK, async () => {
+      const current = await this.getSettings();
+      const delta = typeof patch === "function" ? await patch(current) : patch;
+      if (!delta || typeof delta !== "object") return current;
+      const next = { ...current, ...delta, __updatedAt: new Date().toISOString() };
+      for (const [k, v] of Object.entries(delta)) {
+        if (v === undefined) delete next[k];
+      }
+      dbg.log(`updateSettings(): merged ${Object.keys(delta).length} key(s)`);
+      await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: next });
+      return next;
+    });
   },
 
   // AI key helpers: store a mapping { providerId: [keys...] }

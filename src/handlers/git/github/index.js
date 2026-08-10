@@ -22,6 +22,7 @@ import * as api from "./api-client.js";
 import { resolveRepoTopics, buildInfraFiles } from "./infra-builder.js";
 import { buildTreeItems, buildCommitPayload } from "./commit-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
+import { withLock } from "../../../core/async-lock.js";
 
 const dbg = createDebugger("GitHubHandler");
 
@@ -215,6 +216,26 @@ export class GitHubHandler extends BaseGitHandler {
 
     dbg.log(`commit(): ${files?.length || 0} file(s) → ${owner}/${name} (${BRANCH})`);
 
+    // One commit at a time per branch. Two solves finishing together read the
+    // same branch HEAD, build two trees on the same base, and then race to move
+    // the ref — the loser gets a 422, and the tree it built no longer describes
+    // the branch it was built from. The retry loop below exists for GitHub's
+    // own ref propagation lag; it is not a substitute for not racing ourselves.
+    return withLock(`codeledger:commit:${owner}/${name}/${BRANCH}`, () =>
+      this._commitToBranch(files, message, { owner, name, token, settings, userRes, opts }),
+    );
+  }
+
+  /**
+   * The body of a commit, run while this branch's lock is held.
+   *
+   * @param {Array<{path: string, content: string}>} files
+   * @param {string} message
+   * @param {{owner: string, name: string, token: string, settings: Record<string, any>, userRes: any, opts: any}} ctx
+   */
+  async _commitToBranch(files, message, ctx) {
+    const { owner, name, token, settings, userRes, opts } = ctx;
+
     // ── Resolve branch HEAD (create repo if missing) ──────────────────────
     let latestSha;
     let isNewRepo = false;
@@ -319,16 +340,12 @@ export class GitHubHandler extends BaseGitHandler {
     // a later "remove them" would find no work to do.
     if (gamificationState) {
       try {
-        // Re-read rather than reusing `settings`: this commit may have taken
-        // seconds, and setSettings replaces the whole object rather than
-        // merging into it.
-        const fresh = await Storage.getSettings();
-        if (
+        await Storage.updateSettings((fresh) =>
           fresh.badgesPublished !== gamificationState.badgesPublished ||
           fresh.workflowPublished !== gamificationState.workflowPublished
-        ) {
-          await Storage.setSettings({ ...fresh, ...gamificationState });
-        }
+            ? gamificationState
+            : null,
+        );
       } catch (e) {
         dbg.warn(`commit(): badge state not persisted (non-fatal):`, e?.message);
       }

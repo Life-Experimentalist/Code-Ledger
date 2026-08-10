@@ -241,10 +241,7 @@ export async function migrateRepo() {
     { deletes: oldPaths },
   );
 
-  await Storage.setSettings({
-    ...settings,
-    repoLayoutVersion: LAYOUT_VERSION,
-  });
+  await Storage.updateSettings({ repoLayoutVersion: LAYOUT_VERSION });
   dbg.log(`migrateRepo(): ✓ complete — ${newFiles.length} files added, ${oldPaths.length} deleted`);
   return { migrated: newFiles.length, deleted: oldPaths.length };
 }
@@ -315,10 +312,7 @@ export async function resetRepo() {
     { deletes: strayPaths },
   );
 
-  await Storage.setSettings({
-    ...settings,
-    repoLayoutVersion: LAYOUT_VERSION,
-  });
+  await Storage.updateSettings({ repoLayoutVersion: LAYOUT_VERSION });
   dbg.log(
     `resetRepo: committed ${filesToCommit.length} files, deleted ${strayPaths.length} stray files`,
   );
@@ -381,10 +375,7 @@ export async function forceRebuildRepo() {
     await git.commitHistorical(commits);
   }
 
-  await Storage.setSettings({
-    ...settings,
-    repoLayoutVersion: LAYOUT_VERSION,
-  });
+  await Storage.updateSettings({ repoLayoutVersion: LAYOUT_VERSION });
   dbg.log(
     `forceRebuildRepo: rebuilt ${commits.length} problems, removed ${deletable.length} files`,
   );
@@ -465,7 +456,7 @@ export async function migrateTagsToCanonical() {
   }
 
   // Mark as done
-  await Storage.setSettings({ ...settings, [MIGRATION_KEY]: true }).catch(() => {});
+  await Storage.updateSettings({ [MIGRATION_KEY]: true }).catch(() => {});
   dbg.log(
     `migrateTagsToCanonical(): ✓ complete — ${changed}/${problems.length} problem(s) updated`,
   );

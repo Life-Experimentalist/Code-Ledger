@@ -37,8 +37,7 @@ export function MirrorsPanel() {
 
   const save = async (next) => {
     try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({ ...settings, git_mirrors: next });
+      await Storage.updateSettings({ git_mirrors: next });
       setMirrors(next);
       setStatus("Saved");
       setTimeout(() => setStatus(""), 2000);

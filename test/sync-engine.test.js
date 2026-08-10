@@ -66,6 +66,7 @@ beforeEach(() => {
     addScheduledBackup: Storage.addScheduledBackup,
     getSettings: Storage.getSettings,
     setSettings: Storage.setSettings,
+    updateSettings: Storage.updateSettings,
     getGitProvider: registry.getGitProvider,
     fetch: globalThis.fetch,
   };
@@ -76,6 +77,7 @@ beforeEach(() => {
   Storage.addScheduledBackup = async () => {};
   Storage.getSettings = async () => ({});
   Storage.setSettings = async () => {};
+  Storage.updateSettings = async () => ({});
 });
 
 afterEach(() => {
@@ -84,6 +86,7 @@ afterEach(() => {
   Storage.addScheduledBackup = real.addScheduledBackup;
   Storage.getSettings = real.getSettings;
   Storage.setSettings = real.setSettings;
+  Storage.updateSettings = real.updateSettings;
   registry.getGitProvider = real.getGitProvider;
   globalThis.fetch = real.fetch;
 });
@@ -126,7 +129,11 @@ describe("importFromRepo", () => {
     });
     const git = fakeGit({ "index.json": JSON.stringify({ problems: [remote] }) });
     const { remoteOnly, conflicts } = await importFromRepo("o", "r", git);
-    assert.equal(remoteOnly.length, 1, "the Java solve is new work, not a rewrite of the Python one");
+    assert.equal(
+      remoteOnly.length,
+      1,
+      "the Java solve is new work, not a rewrite of the Python one",
+    );
     assert.deepEqual(conflicts, []);
   });
 
@@ -185,7 +192,10 @@ describe("SyncEngine.performSync", () => {
   });
 
   test("saves nothing and skips the chat pass when git is turned off", async () => {
-    const git = await run({ "index.json": JSON.stringify({ problems: [] }) }, { gitEnabled: false });
+    const git = await run(
+      { "index.json": JSON.stringify({ problems: [] }) },
+      { gitEnabled: false },
+    );
     assert.deepEqual(git.asked, []);
   });
 
@@ -197,8 +207,9 @@ describe("SyncEngine.performSync", () => {
   test("records the conflict count for the settings UI instead of importing", async () => {
     let written = null;
     Storage.getAllProblems = async () => [problem({ code: "local" })];
-    Storage.setSettings = async (s) => {
-      written = s;
+    Storage.updateSettings = async (patch) => {
+      written = patch;
+      return patch;
     };
     const saved = [];
     Storage.saveProblem = async (p) => {

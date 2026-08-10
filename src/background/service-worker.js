@@ -232,7 +232,7 @@ async function init() {
     if (lastVer !== curVer) {
       const updates = { lastKnownVersion: curVer };
       if (lastVer && lastVer !== curVer) updates.extensionUpdated = true;
-      await Storage.setSettings({ ...settings, ...updates });
+      await Storage.updateSettings(updates);
       dbg.log(`init(): extension updated: ${lastVer || "first run"} → ${curVer}`);
     }
   } catch (e) {
@@ -369,7 +369,7 @@ async function applyFirstRunDefaults() {
     if (!("gamificationEnabled" in settings)) {
       updates.gamificationEnabled = true;
     }
-    await Storage.setSettings({ ...settings, ...updates });
+    await Storage.updateSettings(updates);
     dbg.log(
       `applyFirstRunDefaults(): ✓ disabled ${aiProvidersDisabled} AI provider(s), applied defaults`,
     );
@@ -944,10 +944,7 @@ async function _commitWithFailover(files, message, repoName, commitOpts, setting
       const currentKey = active ? _targetKey(_normalizeGitTarget(active) || {}) : "";
       const wonKey = _targetKey(target);
       if (currentKey !== wonKey) {
-        await Storage.setSettings({
-          ...settings,
-          git_active_primary: target,
-        }).catch(() => {});
+        await Storage.updateSettings({ git_active_primary: target }).catch(() => {});
       }
       dbg.log(
         `_commitWithFailover(): ✓ succeeded to ${target.provider}/${target.owner || ""}/${target.repo}`,
@@ -1037,8 +1034,7 @@ async function handleSolved(data) {
         return;
       }
       // Timer expired — auto-reset to off
-      await Storage.setSettings({
-        ...settings,
+      await Storage.updateSettings({
         incognitoMode: "off",
         incognitoExpiry: 0,
       }).catch(() => {});
@@ -1568,10 +1564,11 @@ async function _maybeGenerateAISummary(settings) {
   try {
     const count = (settings._commitsSinceLastSummary || 0) + 1;
     if (count < SUMMARY_EVERY_N_COMMITS) {
-      await Storage.setSettings({
-        ...settings,
-        _commitsSinceLastSummary: count,
-      });
+      // Increment from whatever is stored now, not from the snapshot this
+      // function was handed — two commits finishing together must count twice.
+      await Storage.updateSettings((cur) => ({
+        _commitsSinceLastSummary: (cur._commitsSinceLastSummary || 0) + 1,
+      }));
       return;
     }
     dbg.log(`_maybeGenerateAISummary(): ${count} commits since last summary — generating...`);
@@ -1596,8 +1593,7 @@ async function _maybeGenerateAISummary(settings) {
     );
     if (review) {
       dbg.log(`_maybeGenerateAISummary(): ✓ summary generated via ${providerId}`);
-      await Storage.setSettings({
-        ...settings,
+      await Storage.updateSettings({
         _aiSummary: review,
         _aiSummaryUpdatedAt: new Date().toISOString(),
         _commitsSinceLastSummary: 0,

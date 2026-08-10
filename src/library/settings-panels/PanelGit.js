@@ -160,12 +160,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
     )
       return;
     try {
-      const all = await Storage.getSettings();
-      await Storage.setSettings({
-        ...all,
-        github_username: "",
-        github_owner: "",
-      });
+      await Storage.updateSettings({ github_username: "", github_owner: "" });
       await Storage.setAuthToken("github", "");
       setOauthToken("");
       flash("GitHub unlinked");
@@ -396,8 +391,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
         setImportData({ remoteOnly, conflicts });
       } else {
         await applyImport(remoteOnly);
-        const s = await Storage.getSettings();
-        await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+        await Storage.updateSettings({ _pendingConflicts: 0 });
         loadSyncCount();
         if (remoteOnly.length > 0) {
           setImportMsg(
@@ -1063,8 +1057,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                 await applyImport(resolved, { fromConflictResolution: true });
                 setImportData(null);
                 setSyncNeedsPush(false);
-                const s = await Storage.getSettings();
-                await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+                await Storage.updateSettings({ _pendingConflicts: 0 });
                 onSettingsChange?.("_pendingConflicts", 0);
                 setSyncBusy(true);
                 setImportMsg(
@@ -1113,8 +1106,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                 setImportData(null);
                 setSyncNeedsPush(false);
                 const leftover = Array.isArray(remaining) ? remaining.length : 0;
-                const s = await Storage.getSettings();
-                await Storage.setSettings({ ...s, _pendingConflicts: leftover });
+                await Storage.updateSettings({ _pendingConflicts: leftover });
                 onSettingsChange?.("_pendingConflicts", leftover);
               }}
             />

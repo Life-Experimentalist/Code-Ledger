@@ -37,8 +37,7 @@ export function DifficultyMapPanel() {
 
   const save = async (map) => {
     try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({ ...settings, difficultyMap: map });
+      await Storage.updateSettings({ difficultyMap: map });
       setUserMap(map);
       setStatus("Saved");
       setTimeout(() => setStatus(""), 2000);

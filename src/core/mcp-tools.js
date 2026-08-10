@@ -486,13 +486,12 @@ export async function getKnowledgeContext() {
 
 export async function setRoadmap({ name, problems }) {
   try {
-    const settings = await Storage.getSettings();
     const roadmap = {
       name: name || "My Roadmap",
       problems: Array.isArray(problems) ? problems : [],
       createdAt: Date.now(),
     };
-    await Storage.setSettings({ ...settings, _activeRoadmap: roadmap });
+    await Storage.updateSettings({ _activeRoadmap: roadmap });
     return {
       ok: true,
       message: `Roadmap "${roadmap.name}" saved with ${roadmap.problems.length} problems.`,

@@ -181,17 +181,18 @@ export async function syncSettingsFromGitHub() {
     }
 
     // Merge settings keys
+    const delta = {};
     for (const [key, value] of Object.entries(remote)) {
       if (key === "__theme") continue;
       if (CRITICAL_KEYS.includes(key)) continue;
       if (JSON.stringify(settings[key]) !== JSON.stringify(value)) {
-        settings[key] = value;
+        delta[key] = value;
         syncedCount++;
       }
     }
 
-    if (syncedCount > 0) {
-      await Storage.setSettings(settings);
+    if (Object.keys(delta).length > 0) {
+      await Storage.updateSettings(delta);
       dbg.log(`syncSettingsFromGitHub(): ✓ applied ${syncedCount} change(s)`);
     }
 

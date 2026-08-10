@@ -313,11 +313,11 @@ function LibraryApp() {
       const hasRepo = !!(currentSettings?.github_repo || currentSettings?.gitRepo);
       dbg.log(`processOAuthToken(): hasRepo=${hasRepo}`);
 
-      const updatedSettings = { ...currentSettings, github_username: user.login };
-      if (!currentSettings?.github_owner) updatedSettings.github_owner = user.login;
+      const patch = { github_username: user.login };
+      if (!currentSettings?.github_owner) patch.github_owner = user.login;
       // avatars.githubusercontent.com is a public CDN — store URL directly, never fetch().
-      if (user.avatar_url) updatedSettings.github_avatar = user.avatar_url;
-      await Storage.setSettings(updatedSettings);
+      if (user.avatar_url) patch.github_avatar = user.avatar_url;
+      const updatedSettings = await Storage.updateSettings(patch);
       dbg.log(`processOAuthToken(): ✓ settings saved`);
 
       if (!hasRepo) {
@@ -592,7 +592,10 @@ function LibraryApp() {
   ];
 
   const handleSettingsChange = async (key, value) => {
-    const next = { ...(settings || {}), [key]: value };
+    // Only the keys this change actually touches are written. `settings` here
+    // is React state that may be minutes old, and writing all of it back would
+    // undo everything the service worker stored while this page sat open.
+    const patch = { [key]: value };
 
     if (key === "incognitoMode") {
       const durations = {
@@ -601,19 +604,22 @@ function LibraryApp() {
         "24h": 86400000,
       };
       if (value === "off") {
-        next.incognitoExpiry = 0;
+        patch.incognitoExpiry = 0;
       } else if (value === "forever") {
-        next.incognitoExpiry = -1;
+        patch.incognitoExpiry = -1;
       } else if (durations[value]) {
-        next.incognitoExpiry = Date.now() + durations[value];
+        patch.incognitoExpiry = Date.now() + durations[value];
       }
     }
 
     // When the user changes the target repo or owner, invalidate the cached
     // git_active_primary so commits go to the new repo immediately.
     if (key === "github_repo" || key === "github_owner") {
-      delete next.git_active_primary;
+      patch.git_active_primary = undefined;
     }
+
+    const next = { ...(settings || {}), ...patch };
+    if ("git_active_primary" in patch) delete next.git_active_primary;
 
     // GitHub OAuth tokens should NOT be stored in settings — they belong in auth.tokens.
     // Only update state locally for OAuth fields; actual token was saved by handleOAuth in SettingsSchema.
@@ -625,7 +631,7 @@ function LibraryApp() {
     // For other fields, save normally.
     if (!isOAuthField) {
       try {
-        await Storage.setSettings(next);
+        await Storage.updateSettings(patch);
         if (key === "debugMode") {
           await Storage.setDebugEnabled(value);
           setDebug(value); // update live state in this page without reload

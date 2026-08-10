@@ -241,10 +241,10 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   };
 
   const saveRepoConfig = async (owner, repo) => {
-    const settings = await Storage.getSettings();
-    settings.github_repo = repo;
-    settings.github_owner = owner !== username ? owner : "";
-    await Storage.setSettings(settings);
+    await Storage.updateSettings({
+      github_repo: repo,
+      github_owner: owner !== username ? owner : "",
+    });
   };
 
   // ── Repo name availability check (debounced) ──────────────────────────────
@@ -483,11 +483,11 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
   const unlinkRepo = async () => {
     try {
-      const settings = await Storage.getSettings();
-      delete settings.github_repo;
-      delete settings.github_owner;
-      delete settings.gitRepo;
-      await Storage.setSettings(settings);
+      await Storage.updateSettings({
+        github_repo: undefined,
+        github_owner: undefined,
+        gitRepo: undefined,
+      });
     } catch (_) {}
     setFinalRepo("");
     setFinalOwner("");
@@ -1257,8 +1257,7 @@ async function enableGitHubPages(owner, repo, token) {
     const pagesUrl = pagesData?.html_url || `https://${owner}.github.io/${repo}/`;
 
     // Save Pages URL to settings so infra-builder uses the real URL
-    const settings = await Storage.getSettings();
-    await Storage.setSettings({ ...settings, github_pages_url: pagesUrl });
+    await Storage.updateSettings({ github_pages_url: pagesUrl });
 
     // Set it as the repo website/homepage on GitHub
     await fetch(`https://api.github.com/repos/${owner}/${repo}`, {

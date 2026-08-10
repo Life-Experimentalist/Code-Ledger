@@ -142,12 +142,12 @@ export async function maybeCommitRollingBackup(owner, repo, git) {
 
     const interval = Math.max(1, parseInt(settings.githubBackupInterval || "10", 10));
     const keep = Math.max(1, parseInt(settings.githubBackupKeep || "10", 10));
-    const count = (settings[COMMIT_INTERVAL_KEY] || 0) + 1;
-
-    await Storage.setSettings({
-      ...settings,
-      [COMMIT_INTERVAL_KEY]: count,
-    });
+    // Increment under the lock and read the result back, so two commits landing
+    // together advance the counter twice rather than both writing the same n+1.
+    const after = await Storage.updateSettings((cur) => ({
+      [COMMIT_INTERVAL_KEY]: (cur[COMMIT_INTERVAL_KEY] || 0) + 1,
+    }));
+    const count = after[COMMIT_INTERVAL_KEY];
 
     if (count % interval === 0) {
       dbg.log(`maybeCommitRollingBackup(): triggering backup at commit #${count}`);
@@ -262,14 +262,13 @@ export async function restoreSnapshot(snapshot) {
     typeof snapshot.settings === "object" &&
     !Array.isArray(snapshot.settings)
   ) {
-    const currentSettings = await Storage.getSettings().catch(() => ({}));
     const safeSettings = Object.fromEntries(
       Object.entries(snapshot.settings).filter(
         ([k]) =>
           !k.startsWith("_") && !k.includes("token") && !k.includes("key") && !k.includes("secret"),
       ),
     );
-    await Storage.setSettings({ ...currentSettings, ...safeSettings });
+    await Storage.updateSettings(safeSettings);
   }
 
   // 5. Restore Knowledge Bank (insights)

@@ -256,10 +256,7 @@ export const SyncEngine = {
       );
 
       if (conflicts.length > 0) {
-        await Storage.setSettings({
-          ...settings,
-          _pendingConflicts: conflicts.length,
-        });
+        await Storage.updateSettings({ _pendingConflicts: conflicts.length });
         dbg.warn(
           `performSync(): ✗ ${conflicts.length} conflict(s) detected — user action required in Git settings`,
         );
@@ -269,10 +266,7 @@ export const SyncEngine = {
       await applyImport(remoteOnly);
       // Clear any stale conflict flag
       if (settings._pendingConflicts) {
-        await Storage.setSettings({
-          ...settings,
-          _pendingConflicts: 0,
-        });
+        await Storage.updateSettings({ _pendingConflicts: 0 });
       }
       dbg.log(`performSync(): ✓ sync complete — imported ${remoteOnly.length} new problems`);
 
