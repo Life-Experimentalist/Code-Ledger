@@ -22,8 +22,12 @@ import {
   buildPublishPlan,
   buildRefreshConfig,
   workflowYaml,
+  resolveBadgeStyle,
+  resolveBadgePicks,
+  readmeOptions,
 } from "../src/core/gamification-publisher.js";
 import { README_START, README_END, upsertReadmeBlock } from "../src/core/badge-svg.js";
+import { SHIELDS_PATHS } from "../src/core/badge-shields.js";
 
 const SNAPSHOT = {
   currentStreak: 5,
@@ -339,5 +343,180 @@ describe("workflowYaml", () => {
 
   test("it invokes the script it ships with", () => {
     assert.ok(workflowYaml().includes(`node ${REFRESH_SCRIPT_PATH}`));
+  });
+});
+
+describe("badge style", () => {
+  const PUBLIC = { username: "octocat", repo: "CodeLedger", branch: "main", repoPrivate: false };
+
+  test("the self-hosted SVGs are the default", () => {
+    assert.equal(resolveBadgeStyle({}, { rawBase: "https://raw.githubusercontent.com/o/r/main" }), "svg");
+  });
+
+  test("shields is honoured on a public repository", () => {
+    assert.equal(
+      resolveBadgeStyle(
+        { gamificationBadgeStyle: "shields" },
+        { rawBase: "https://raw.githubusercontent.com/o/r/main" },
+      ),
+      "shields",
+    );
+  });
+
+  test("a private repository falls back to the SVGs", () => {
+    // shields fetches the endpoint file anonymously, so a private repo would
+    // render a row of red "invalid" badges. Falling back is the honest answer.
+    assert.equal(
+      resolveBadgeStyle(
+        { gamificationBadgeStyle: "shields" },
+        { rawBase: "https://raw.githubusercontent.com/o/r/main", repoPrivate: true },
+      ),
+      "svg",
+    );
+  });
+
+  test("an unknown repo name falls back too", () => {
+    assert.equal(resolveBadgeStyle({ gamificationBadgeStyle: "shields" }, { rawBase: "" }), "svg");
+    assert.equal(resolveBadgeStyle({ gamificationBadgeStyle: "shields" }, {}), "svg");
+  });
+
+  test("readmeOptions points the badge row at shields only when shields applies", () => {
+    const shields = readmeOptions({
+      ...PUBLIC,
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgeStyle: "shields" },
+    });
+    assert.equal(typeof shields.urlFor, "function");
+    assert.match(shields.urlFor("streak"), /^https:\/\/img\.shields\.io\/endpoint\?url=/);
+
+    const svg = readmeOptions({ ...PUBLIC, snapshot: SNAPSHOT, settings: {} });
+    assert.equal(svg.urlFor, undefined);
+
+    const priv = readmeOptions({
+      ...PUBLIC,
+      repoPrivate: true,
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgeStyle: "shields" },
+    });
+    assert.equal(priv.urlFor, undefined);
+  });
+
+  test("only a shields style shields recognises reaches the URL", () => {
+    const good = readmeOptions({
+      ...PUBLIC,
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgeStyle: "shields", gamificationShieldsStyle: "for-the-badge" },
+    });
+    assert.match(good.urlFor("streak"), /&style=for-the-badge$/);
+
+    const junk = readmeOptions({
+      ...PUBLIC,
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgeStyle: "shields", gamificationShieldsStyle: "neon" },
+    });
+    assert.match(junk.urlFor("streak"), /&style=flat$/);
+  });
+
+  test("the README a plan writes uses the chosen rendering", () => {
+    const readme = "# Ledger\n";
+    const plan = buildPublishPlan({
+      ...PUBLIC,
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgeStyle: "shields" },
+      readme,
+    });
+    const written = plan.files.find((f) => f.path === "README.md").content;
+    assert.ok(written.includes("img.shields.io"), "expected shields links in the badge row");
+    // The card has no shields equivalent, so it stays a self-hosted SVG.
+    assert.ok(written.includes("card.svg"));
+  });
+
+  test("the endpoint files are written whichever style is selected", () => {
+    // Writing them only in shields mode would mean deleting them on a switch
+    // away, and a Trees deletion of a path absent from the base tree can 422 —
+    // which would cost the commit carrying the user's solution.
+    for (const settings of [{}, { gamificationBadgeStyle: "shields" }]) {
+      const plan = buildPublishPlan({ ...PUBLIC, snapshot: SNAPSHOT, settings });
+      for (const p of SHIELDS_PATHS) {
+        assert.ok(
+          plan.files.some((f) => f.path === p),
+          `${p} missing for ${JSON.stringify(settings)}`,
+        );
+      }
+    }
+  });
+
+  test("revoking removes the endpoint files as well", () => {
+    const plan = buildPublishPlan({
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadges: false, badgesPublished: true },
+    });
+    for (const p of SHIELDS_PATHS) {
+      assert.ok(plan.deletes.includes(p), `${p} left behind after revoke`);
+    }
+  });
+
+  test("the scheduled refresh is told what the extension decided", () => {
+    // The runner cannot see repository visibility, so it must not re-decide.
+    const cfg = buildRefreshConfig({
+      ...PUBLIC,
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgeStyle: "shields", gamificationShieldsStyle: "flat-square" },
+    });
+    assert.equal(cfg.badgeStyle, "shields");
+    assert.equal(cfg.shieldsStyle, "flat-square");
+    assert.equal(cfg.rawBase, "https://raw.githubusercontent.com/octocat/CodeLedger/main");
+
+    const priv = buildRefreshConfig({
+      ...PUBLIC,
+      repoPrivate: true,
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgeStyle: "shields" },
+    });
+    assert.equal(priv.badgeStyle, "svg");
+  });
+});
+
+describe("badge picks", () => {
+  test("no selection means the default set", () => {
+    assert.equal(resolveBadgePicks({}), undefined);
+    assert.equal(resolveBadgePicks({ gamificationBadgePicks: "streak" }), undefined);
+  });
+
+  test("unknown names are dropped", () => {
+    assert.deepEqual(
+      resolveBadgePicks({ gamificationBadgePicks: ["streak", "wat", "freezes"] }),
+      ["streak", "freezes"],
+    );
+  });
+
+  test("a list of nothing recognisable falls back to the defaults", () => {
+    // "No badges at all" is what turning badges off is for. Producing an empty
+    // row from a mis-saved setting would look like the feature had broken.
+    assert.equal(resolveBadgePicks({ gamificationBadgePicks: [] }), undefined);
+    assert.equal(resolveBadgePicks({ gamificationBadgePicks: ["nope"] }), undefined);
+  });
+
+  test("the selection narrows the badge row in the README", () => {
+    const plan = buildPublishPlan({
+      snapshot: SNAPSHOT,
+      settings: { gamificationBadgePicks: ["streak"] },
+      readme: "# Ledger\n",
+      pagesUrl: "https://octocat.github.io/CodeLedger",
+    });
+    const written = plan.files.find((f) => f.path === "README.md").content;
+    assert.ok(written.includes("streak.svg"));
+    assert.ok(!written.includes("points.svg"), "an unpicked badge should not be linked");
+    // Every badge file is still committed — the row is a view over them, and
+    // deleting the rest would break any link the user added by hand.
+    assert.ok(plan.files.some((f) => f.path === "badges/points.svg"));
+  });
+
+  test("the selection travels to the scheduled refresh", () => {
+    assert.deepEqual(
+      buildRefreshConfig({ settings: { gamificationBadgePicks: ["streak", "level"] } }).picks,
+      ["streak", "level"],
+    );
+    assert.equal(buildRefreshConfig({ settings: {} }).picks, null);
   });
 });

@@ -22,6 +22,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { computeSnapshot, DEFAULT_CONFIG } from "../src/core/gamification.js";
 import { buildBadgeFiles, upsertReadmeBlock } from "../src/core/badge-svg.js";
+import { buildShieldsFiles, shieldsUrl } from "../src/core/badge-shields.js";
 
 function readJson(path, fallback) {
   try {
@@ -64,15 +65,26 @@ function main() {
   });
 
   let changed = 0;
-  for (const file of buildBadgeFiles(snapshot, { username: cfg.username })) {
+  const files = [
+    ...buildBadgeFiles(snapshot, { username: cfg.username }),
+    ...buildShieldsFiles(snapshot),
+  ];
+  for (const file of files) {
     if (write(file.path, file.content)) changed++;
   }
 
   if (cfg.readme !== false && existsSync("README.md")) {
     const readme = readFileSync("README.md", "utf8");
+    // The extension already decided whether shields is usable for this repo —
+    // this runner cannot see whether it went private, so it does not re-decide.
+    const useShields = cfg.badgeStyle === "shields" && cfg.rawBase;
     const next = upsertReadmeBlock(readme, snapshot, {
       pagesUrl: cfg.pagesUrl,
       username: cfg.username,
+      picks: Array.isArray(cfg.picks) ? cfg.picks : undefined,
+      urlFor: useShields
+        ? (name) => shieldsUrl(cfg.rawBase, name, snapshot, { style: cfg.shieldsStyle })
+        : undefined,
     });
     if (write("README.md", next)) changed++;
   }

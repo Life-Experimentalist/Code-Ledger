@@ -144,74 +144,101 @@ export function asOfLabel(dayKey) {
 }
 
 /**
- * Streak badge. Turns blue on vacation and grey when the streak is zero.
+ * What every named badge says, before anything decides how to draw it.
  *
- * Carries the date it was computed. A badge is a picture committed at a moment
- * in time — it cannot recount days when someone loads the README weeks later,
- * and a bare "5 days" quietly becomes a lie the moment the user stops solving.
- * "5 days · Aug 10" stays true forever, and the reader can see for themselves
- * how old it is. The number only ever goes stale downward, because the next
- * solve regenerates it.
+ * The same six specs feed the self-hosted SVGs here and the shields.io endpoint
+ * files in `badge-shields.js`. Keeping them in one place is the only reason the
+ * two renderings cannot drift into disagreeing about the same streak.
+ *
+ * @param {object} snapshot from `computeSnapshot`
+ * @returns {Record<string, {label: string, value: string, color: string, title?: string}>}
  */
-export function streakBadge(snapshot) {
-  const n = snapshot.currentStreak || 0;
-  const asOf = asOfLabel(snapshot.today);
+export function badgeSpecs(snapshot) {
+  const s = snapshot || {};
+  const n = s.currentStreak || 0;
+  const asOf = asOfLabel(s.today);
+  // A badge is a picture committed at a moment in time — it cannot recount days
+  // when someone loads the README weeks later, and a bare "5 days" quietly
+  // becomes a lie the moment the user stops solving. "5 days · Aug 10" stays
+  // true forever, and the reader can see for themselves how old it is.
   const stamp = asOf ? ` · ${asOf}` : "";
+  const l = s.level || { level: 1, name: "Initiate" };
+  const d = s.byDifficulty || {};
+  const freezes = s.freezes || 0;
 
-  if (snapshot.vacationActive) {
-    return badge({
-      label: "streak",
-      value: `on vacation${stamp}`,
-      color: COLORS.vacation,
-    });
-  }
-  return badge({
-    label: "streak",
-    value: `${n === 1 ? "1 day" : `${n} days`}${stamp}`,
-    color: n > 0 ? COLORS.fire : COLORS.dim,
-    title: `Current solving streak: ${n} day${n === 1 ? "" : "s"}${asOf ? ` as of ${asOf}` : ""}`,
-  });
+  return {
+    streak: s.vacationActive
+      ? {
+          label: "streak",
+          value: `on vacation${stamp}`,
+          color: COLORS.vacation,
+          title: `On vacation${asOf ? ` as of ${asOf}` : ""} — the streak is held, not broken`,
+        }
+      : {
+          label: "streak",
+          value: `${n === 1 ? "1 day" : `${n} days`}${stamp}`,
+          color: n > 0 ? COLORS.fire : COLORS.dim,
+          title: `Current solving streak: ${n} day${n === 1 ? "" : "s"}${asOf ? ` as of ${asOf}` : ""}`,
+        },
+    points: {
+      label: "points",
+      value: formatCount(s.totalPoints || 0),
+      color: COLORS.points,
+    },
+    level: { label: `level ${l.level}`, value: String(l.name), color: COLORS.level },
+    solved: {
+      label: "solved",
+      value: formatCount(s.totalSolves || 0),
+      color: COLORS.slate,
+    },
+    difficulty: {
+      label: "solved",
+      value: `${d.Easy || 0} easy · ${d.Medium || 0} medium · ${d.Hard || 0} hard`,
+      color: COLORS.medium,
+    },
+    freezes: {
+      label: "freezes",
+      value: String(freezes),
+      color: freezes > 0 ? COLORS.ice : COLORS.dim,
+      title: `${freezes} streak freeze${freezes === 1 ? "" : "s"} banked`,
+    },
+  };
+}
+
+/** The badge names, in the order a README shows them. */
+export const BADGE_NAMES = Object.freeze([
+  "streak",
+  "points",
+  "level",
+  "solved",
+  "difficulty",
+  "freezes",
+]);
+
+/** Streak badge. Turns blue on vacation and grey when the streak is zero. */
+export function streakBadge(snapshot) {
+  return badge(badgeSpecs(snapshot).streak);
 }
 
 export function pointsBadge(snapshot) {
-  return badge({
-    label: "points",
-    value: formatCount(snapshot.totalPoints || 0),
-    color: COLORS.points,
-  });
+  return badge(badgeSpecs(snapshot).points);
 }
 
 export function levelBadge(snapshot) {
-  const l = snapshot.level || { level: 1, name: "Initiate" };
-  return badge({ label: `level ${l.level}`, value: l.name, color: COLORS.level });
+  return badge(badgeSpecs(snapshot).level);
 }
 
 export function solvedBadge(snapshot) {
-  return badge({
-    label: "solved",
-    value: formatCount(snapshot.totalSolves || 0),
-    color: COLORS.slate,
-  });
+  return badge(badgeSpecs(snapshot).solved);
 }
 
 /** One badge carrying the full Easy/Medium/Hard split. */
 export function difficultyBadge(snapshot) {
-  const d = snapshot.byDifficulty || {};
-  return badge({
-    label: "solved",
-    value: `${d.Easy || 0} easy · ${d.Medium || 0} medium · ${d.Hard || 0} hard`,
-    color: COLORS.medium,
-  });
+  return badge(badgeSpecs(snapshot).difficulty);
 }
 
 export function freezeBadge(snapshot) {
-  const n = snapshot.freezes || 0;
-  return badge({
-    label: "freezes",
-    value: String(n),
-    color: n > 0 ? COLORS.ice : COLORS.dim,
-    title: `${n} streak freeze${n === 1 ? "" : "s"} banked`,
-  });
+  return badge(badgeSpecs(snapshot).freezes);
 }
 
 /** `1234` → `1.2k`. Keeps badge widths stable as the ledger grows. */
@@ -349,44 +376,69 @@ export function badgeStats(snapshot) {
  */
 export function badgeUrl(baseUrl, name, snapshot) {
   const base = String(baseUrl || "").replace(/\/+$/, "");
-  // The day is part of the key because the badges carry an "as of" stamp. A
-  // vacation day regenerates identical numbers under a new date, and without
-  // the day here camo would keep serving yesterday's picture.
-  const v = [
-    snapshot.totalPoints || 0,
-    snapshot.currentStreak || 0,
-    snapshot.totalSolves || 0,
-    snapshot.today || "",
-  ].join("-");
-  return `${base}/${BADGE_DIR}/${name}.svg?v=${encodeURIComponent(v)}`;
+  return `${base}/${BADGE_DIR}/${name}.svg?v=${encodeURIComponent(cacheKey(snapshot))}`;
 }
+
+/**
+ * The value that has to change whenever a badge does.
+ *
+ * The day is part of it because the badges carry an "as of" stamp. A vacation
+ * day regenerates identical numbers under a new date, and without the day here
+ * camo would keep serving yesterday's picture with yesterday's stamp on it.
+ *
+ * @param {object} snapshot
+ * @returns {string}
+ */
+export function cacheKey(snapshot) {
+  const s = snapshot || {};
+  return [s.totalPoints || 0, s.currentStreak || 0, s.totalSolves || 0, s.today || ""].join("-");
+}
+
+/** Alt text per badge, so a reader with images off still gets the sense of it. */
+const BADGE_ALT = Object.freeze({
+  streak: "Streak",
+  points: "Points",
+  level: "Level",
+  solved: "Solved",
+  difficulty: "Solved by difficulty",
+  freezes: "Freezes",
+});
+
+/** Which badges a README shows when the user has not narrowed the list. */
+const DEFAULT_PICKS = Object.freeze(["streak", "points", "level", "difficulty", "freezes"]);
 
 /**
  * The gamification block for the ledger's README, between stable HTML comment
  * markers so it can be rewritten in place without disturbing anything the user
  * wrote around it.
  *
+ * `urlFor` is how the shields.io rendering gets in without this file having to
+ * know shields exists: pass a function and the badge row points wherever it
+ * says. The card is always the self-hosted SVG, because there is no shields
+ * equivalent of it.
+ *
  * @param {object} snapshot
- * @param {{ pagesUrl?: string, username?: string, showCard?: boolean }} [opts]
+ * @param {{ pagesUrl?: string, username?: string, showCard?: boolean,
+ *          picks?: string[], urlFor?: (name: string) => string }} [opts]
  * @returns {string}
  */
 export function badgeMarkdown(snapshot, opts = {}) {
-  const url = (n) => badgeUrl(opts.pagesUrl || ".", n, snapshot);
+  const svgUrl = (n) => badgeUrl(opts.pagesUrl || ".", n, snapshot);
+  const url = typeof opts.urlFor === "function" ? opts.urlFor : svgUrl;
   const lines = [];
 
   if (opts.showCard !== false) {
-    lines.push(`<img src="${escapeXml(url("card"))}" alt="Streak card" width="420">`, "");
+    lines.push(`<img src="${escapeXml(svgUrl("card"))}" alt="Streak card" width="420">`, "");
   }
 
-  lines.push(
-    [
-      `![Streak](${url("streak")})`,
-      `![Points](${url("points")})`,
-      `![Level](${url("level")})`,
-      `![Solved](${url("difficulty")})`,
-      `![Freezes](${url("freezes")})`,
-    ].join(" "),
+  // An unrecognised name is dropped rather than rendered: `picks` comes from
+  // stored settings, and a badge file that does not exist is a broken image.
+  const picks = (Array.isArray(opts.picks) && opts.picks.length ? opts.picks : DEFAULT_PICKS).filter(
+    (n) => BADGE_NAMES.includes(n),
   );
+  if (picks.length) {
+    lines.push(picks.map((n) => `![${BADGE_ALT[n]}](${url(n)})`).join(" "));
+  }
 
   const earned = (snapshot.achievements || []).filter((a) => a.earned);
   if (earned.length) {

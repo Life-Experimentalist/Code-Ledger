@@ -67,6 +67,11 @@ const PORTABLE_SETTINGS = [
   "iceBreakerDays",
   "gamificationBadges",
   "gamificationReadme",
+  "gamificationBadgeStyle",
+  "gamificationShieldsStyle",
+  "gamificationBadgePicks",
+  "gamificationActions",
+  "gamificationActionsHour",
 
   // Appearance / UX
   "behaviorBankEnabled",

@@ -13,7 +13,21 @@
  * is worth committing can all be tested without a network.
  */
 
-import { buildBadgeFiles, upsertReadmeBlock, README_START, README_END } from "./badge-svg.js";
+import {
+  buildBadgeFiles,
+  upsertReadmeBlock,
+  BADGE_NAMES,
+  README_START,
+  README_END,
+} from "./badge-svg.js";
+import {
+  buildShieldsFiles,
+  shieldsUrl,
+  shieldsUsable,
+  rawBaseUrl,
+  SHIELDS_PATHS,
+  SHIELDS_STYLES,
+} from "./badge-shields.js";
 import { configFromSettings } from "./gamification.js";
 import { isGamificationActive } from "./feature-flags.js";
 
@@ -28,6 +42,7 @@ export const OWNED_PATHS = Object.freeze([
   "badges/card.svg",
   "badges/stats.json",
   "badges/config.json",
+  ...SHIELDS_PATHS,
 ]);
 
 export const WORKFLOW_PATH = ".github/workflows/codeledger-badges.yml";
@@ -100,7 +115,10 @@ export function stripReadmeBlock(readme) {
  * @param {Record<string, any>} opts.settings
  * @param {string} [opts.readme] current README contents, if known
  * @param {string} [opts.pagesUrl] base URL the badges are served from
- * @param {string} [opts.username]
+ * @param {string} [opts.username] repository owner, also used as the card title
+ * @param {string} [opts.repo] repository name — needed to address the shields
+ *   endpoint files, and without it the shields style is not offered
+ * @param {string} [opts.branch]
  * @param {boolean} [opts.repoPrivate]
  * @param {string} [opts.refreshScript] contents of the Actions refresh script;
  *   omit it and no workflow is committed, because a workflow that calls a
@@ -130,13 +148,14 @@ export function buildPublishPlan(opts = {}) {
   const files = buildBadgeFiles(snapshot, { username });
   const deletes = [];
 
+  files.push(...buildShieldsFiles(snapshot));
   files.push({
     path: "badges/config.json",
     content: JSON.stringify(buildRefreshConfig(opts), null, 2),
   });
 
   if (settings.gamificationReadme !== false && typeof readme === "string") {
-    const next = upsertReadmeBlock(readme, snapshot, { pagesUrl, username });
+    const next = upsertReadmeBlock(readme, snapshot, readmeOptions(opts));
     // Skip an unchanged README rather than adding an identical blob to the
     // tree; an unchanged commit is noise in the user's history.
     if (next !== readme) files.push({ path: "README.md", content: next });
@@ -155,6 +174,61 @@ export function buildPublishPlan(opts = {}) {
 }
 
 /**
+ * Which rendering the README should use.
+ *
+ * The stored preference only wins when it can actually work. shields.io fetches
+ * the endpoint file over anonymous HTTP, so a private repository — or one whose
+ * name we do not know — falls back to the self-hosted SVGs rather than
+ * committing a README full of shields' red "invalid" badges. The settings UI
+ * says the same thing before the user picks; this is the backstop for a repo
+ * that goes private afterwards.
+ *
+ * @param {Record<string, any>} settings
+ * @param {{ repoPrivate?: boolean, rawBase?: string }} ctx
+ * @returns {"svg"|"shields"}
+ */
+export function resolveBadgeStyle(settings = {}, ctx = {}) {
+  if (settings.gamificationBadgeStyle !== "shields") return "svg";
+  return shieldsUsable(ctx) ? "shields" : "svg";
+}
+
+/**
+ * The badges the user asked to show, dropping anything unrecognised.
+ *
+ * An empty selection means "all of them" rather than "none": a README with no
+ * badge row is what turning badges off is for, and silently producing one from
+ * a mis-saved setting would look like the feature had broken.
+ *
+ * @param {Record<string, any>} settings
+ * @returns {string[]|undefined} undefined when the default set applies
+ */
+export function resolveBadgePicks(settings = {}) {
+  const picks = settings.gamificationBadgePicks;
+  if (!Array.isArray(picks)) return undefined;
+  const valid = picks.filter((n) => BADGE_NAMES.includes(n));
+  return valid.length ? valid : undefined;
+}
+
+/**
+ * Everything `upsertReadmeBlock` needs to render the block in the chosen style.
+ *
+ * @param {object} opts same shape as `buildPublishPlan`
+ * @returns {object}
+ */
+export function readmeOptions(opts = {}) {
+  const { settings = {}, snapshot, pagesUrl, username, repo, branch, repoPrivate } = opts;
+  const rawBase = rawBaseUrl(username, repo, branch);
+  const base = { pagesUrl, username, picks: resolveBadgePicks(settings) };
+
+  if (resolveBadgeStyle(settings, { repoPrivate, rawBase }) !== "shields") return base;
+
+  const style = SHIELDS_STYLES.includes(settings.gamificationShieldsStyle)
+    ? settings.gamificationShieldsStyle
+    : "flat";
+  return { ...base, urlFor: (name) => shieldsUrl(rawBase, name, snapshot, { style }) };
+}
+
+/**
  * What the scheduled refresh needs in order to reproduce the same numbers the
  * extension computes, rather than the defaults.
  *
@@ -167,13 +241,15 @@ export function buildPublishPlan(opts = {}) {
  * @returns {object}
  */
 export function buildRefreshConfig(opts = {}) {
-  const { settings = {}, snapshot, pagesUrl, username } = opts;
+  const { settings = {}, snapshot, pagesUrl, username, repo, branch, repoPrivate } = opts;
   const vacations = Array.isArray(opts.vacations) ? opts.vacations : [];
 
   const config = configFromSettings(settings);
   if (config.utcOffsetMinutes === undefined && Number.isFinite(snapshot?.utcOffsetMinutes)) {
     config.utcOffsetMinutes = snapshot.utcOffsetMinutes;
   }
+
+  const rawBase = rawBaseUrl(username, repo, branch);
 
   return {
     schema: 1,
@@ -185,6 +261,15 @@ export function buildRefreshConfig(opts = {}) {
     username: username || "",
     pagesUrl: pagesUrl || "",
     readme: settings.gamificationReadme !== false,
+    // How the README block is rendered. Resolved here rather than in the runner
+    // so the nightly refresh cannot disagree with the extension about whether
+    // shields is usable — it has no way to see whether the repo went private.
+    badgeStyle: resolveBadgeStyle(settings, { repoPrivate, rawBase }),
+    shieldsStyle: SHIELDS_STYLES.includes(settings.gamificationShieldsStyle)
+      ? settings.gamificationShieldsStyle
+      : "flat",
+    rawBase,
+    picks: resolveBadgePicks(settings) || null,
   };
 }
 

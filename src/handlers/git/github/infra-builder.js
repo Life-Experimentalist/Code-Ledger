@@ -62,7 +62,14 @@ export async function buildInfraFiles(
   const items = [];
 
   // Dynamic files — always up to date
-  const dynamic = await _buildDynamicFiles(owner, repo, token, settings, indexMetaOverride);
+  const dynamic = await _buildDynamicFiles(
+    owner,
+    repo,
+    branch,
+    token,
+    settings,
+    indexMetaOverride,
+  );
   items.push(...dynamic.items);
 
   // Bootstrap files — only on first commit so they never re-dirty the tree
@@ -142,7 +149,14 @@ jobs:
         uses: actions/deploy-pages@v4
 `;
 
-async function _buildDynamicFiles(owner, repo, token, settings, indexMetaOverride = null) {
+async function _buildDynamicFiles(
+  owner,
+  repo,
+  branch,
+  token,
+  settings,
+  indexMetaOverride = null,
+) {
   const theme = await Storage.getTheme().catch(() => null);
   const pagesTheme = _buildPagesTheme(theme);
   // Use caller-supplied meta when available (e.g. REFRESH_INFRA passes fresh local data).
@@ -179,7 +193,7 @@ async function _buildDynamicFiles(owner, repo, token, settings, indexMetaOverrid
   // Runs against the merged README rather than the stored one, so the badge
   // block and the stats block are reconciled in a single write instead of
   // fighting over the file across two commits.
-  const gami = await _buildGamificationFiles(owner, settings, merged, pagesUrl);
+  const gami = await _buildGamificationFiles(owner, repo, branch, settings, merged, pagesUrl);
   if (gami) {
     items.push(...gami.items);
     if (typeof gami.readme === "string") merged = gami.readme;
@@ -237,12 +251,14 @@ async function _buildDynamicFiles(owner, repo, token, settings, indexMetaOverrid
  * computed and no extra files touch the tree.
  *
  * @param {string} owner
+ * @param {string} repo
+ * @param {string} branch
  * @param {Record<string, any>} settings
  * @param {string} readme  README the rest of this build already merged
  * @param {string} pagesUrl
  * @returns {Promise<{items: object[], readme: string|undefined, state: {badgesPublished: boolean, workflowPublished: boolean}}|null>}
  */
-async function _buildGamificationFiles(owner, settings, readme, pagesUrl) {
+async function _buildGamificationFiles(owner, repo, branch, settings, readme, pagesUrl) {
   try {
     const problems = await Storage.getProblems().catch(() => []);
     const { vacations } = await Storage.getGamificationState().catch(() => ({ vacations: [] }));
@@ -259,6 +275,8 @@ async function _buildGamificationFiles(owner, settings, readme, pagesUrl) {
       readme,
       pagesUrl,
       username: owner,
+      repo,
+      branch,
       repoPrivate: settings?.github_repo_private === true,
       refreshScript: REFRESH_BADGES_SCRIPT,
     });
