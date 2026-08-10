@@ -6,7 +6,79 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.7] — 2026-06-26
+## [1.0.0] — 2026-08-10
+
+First public release. Everything before this was a development build; see
+[Development history](#development-history) for those notes.
+
+### Added
+
+**Solve capture**
+
+- Platform handlers for LeetCode, GeeksForGeeks, and Codeforces that detect an accepted submission and capture the code, language, difficulty, tags, and runtime/memory figures.
+- A floating stopwatch on problem pages; the elapsed time is recorded with the solve.
+- Bulk import of past solves from a LeetCode or GeeksForGeeks profile you own.
+- On-demand code recovery for solves whose source was not captured at submission time.
+- Duplicate detection, so re-submitting the same solution updates the existing entry instead of creating a second one.
+
+**GitHub**
+
+- One atomic commit per solve through the Git Trees API — solution file, README, and the repository index land together or not at all.
+- Repository setup wizard: create a new repository or link an existing one, then write the initial layout in a single commit.
+- A generated GitHub Pages dashboard in the repository showing a solve heatmap, language and topic breakdowns, and a searchable problem table.
+- Cross-device sync through the repository's `index.json`, with a conflict resolver for entries that changed in two places.
+- Mirror repositories: a commit that fails against the primary target falls through to a configured mirror rather than being lost.
+
+**AI**
+
+- Code review from Gemini, OpenAI, Claude, DeepSeek, OpenRouter, or a local Ollama model, using your own API key.
+- A review queue that retries with backoff and respects provider rate limits, so a burst of solves does not drop reviews.
+- A floating chat panel on problem pages with `/` commands for pulling in your code, the problem statement, and your errors.
+- Chat history stored locally and, optionally, synced to the repository as Markdown.
+- MCP tool support for providers that accept it.
+
+**Library**
+
+- A sidebar and full-page library listing every captured problem, with search, filters, and per-problem detail.
+- Analytics: solve heatmap, topic radar, difficulty breakdown, solve velocity, and language distribution.
+- A force-directed knowledge graph linking problems through shared topics.
+- A canonical topic map so the same concept from three platforms lands under one name.
+- Behaviour bank recording how you interact with problems, off unless you turn it on.
+- Backups: manual JSON export, scheduled snapshots, and a snapshot before any bulk import.
+
+**Both browsers**
+
+- Chrome and Firefox from one source tree, with every extension API call routed through a single compatibility shim.
+
+### Security
+
+- All third-party HTML — problem statements scraped from platform pages, AI responses, model identifiers — is reduced to an attribute-free allowlist of formatting tags before it reaches the page. Statements render inside a content script, where markup would otherwise execute in the host page's context.
+- The OAuth callback signs its `state` parameter, stores it in an `HttpOnly; Secure; SameSite=Lax` cookie with a ten-minute lifetime, and compares it in constant time.
+- The authentication worker exposes no endpoint that mints GitHub App installation tokens.
+- Repository paths built from scraped titles are constrained: no `..` segments, no leading dots, no path escapes.
+- Mermaid diagrams in AI responses are shown as source with a **Render diagram** button. The diagram is only sent to `mermaid.ink` when you press it, because that source describes your problem and your solution.
+
+### Changed
+
+- The default OAuth scope is `public_repo,workflow`. Creating a private repository needs the wider `repo` scope, which the settings panel offers as an explicit one-click upgrade rather than requesting up front.
+- GitLab and Bitbucket are no longer offered in the interface. Their handlers were stubs that threw on every call, so presenting them as options meant offering a provider that could not commit.
+
+### Known limitations
+
+- GitHub is the only working repository provider.
+- The library runs inside the extension. It is not currently served as a standalone web application.
+- Telemetry is off unless you turn it on, and sends only the extension version and which platform a solve came from.
+
+---
+
+## Development history
+
+The entries below cover builds released on GitHub during development, before
+any public listing. They used their own `1.0.0`–`1.4.7` numbering, which the
+public 1.0.0 above supersedes. They are kept because the reasoning in them is
+still useful, not because they describe shipped releases.
+
+### [1.4.7] — 2026-06-26
 
 ### Added
 
@@ -22,7 +94,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Compliance: Privacy Policy Clarified** — Rewrote `PRIVACY.md` to fully declare data collection, handling, storage, and sharing details to fully satisfy Chrome Web Store User Data Privacy requirements.
 - **Build: Release zips no longer duplicated in releases root** — `packager.js`, `package-chrome.js`, and `package-firefox.js` were writing zips to both `releases/` (root) and `releases/{version}/`. Zips now go only to the versioned subdirectory. Existing stray `codeledger-chromium-v1.4.7.zip` and `codeledger-firefox-v1.4.7.zip` from the root have been removed.
 
-## [1.4.6] — 2026-06-18
+### [1.4.6] — 2026-06-18
 
 ### Fixed
 
@@ -53,7 +125,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.5] — 2026-06-15
+### [1.4.5] — 2026-06-15
 
 ### Fixed
 
@@ -71,7 +143,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.4] — 2026-06-11 (resubmission)
+### [1.4.4] — 2026-06-11 (resubmission)
 
 ### Fixed
 
@@ -87,7 +159,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.4] — 2026-06-06
+### [1.4.4] — 2026-06-06
 
 ### Fixed
 
@@ -107,7 +179,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.3] — 2026-06-05
+### [1.4.3] — 2026-06-05
 
 ### Fixed
 
@@ -115,7 +187,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.2] — 2026-06-02
+### [1.4.2] — 2026-06-02
 
 ### Added
 
@@ -139,7 +211,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **AI prompts: chatMode respected** — `buildConversationSystemPrompt()` now switches to the direct-answer prompt when `context.chatMode === "direct"`, preventing Socratic rules from leaking into Direct mode sessions.
 - **Floating AI: DOM line sort** — View-lines are now sorted by `style.top` before joining, fixing incorrect line ordering when code spans the visible scroll window.
 
-## [1.4.1] — 2026-05-21
+### [1.4.1] — 2026-05-21
 
 ### Added
 
@@ -158,7 +230,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Codeforces: Title prefix stripped** — CF problem titles like "A. Theatre Square" are stored as "Theatre Square" (letter prefix removed).
 - **Codeforces: Language prefix matching** — verbose CF lang strings ("GNU G++17 7.3.0") resolved by keyword prefix so future compiler bumps don't break detection.
 
-## [1.4.0] — 2026-05-21
+### [1.4.0] — 2026-05-21
 
 ### Added
 
@@ -185,7 +257,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.3.1] — 2026-05-19
+### [1.3.1] — 2026-05-19
 
 ### Fixed
 
@@ -202,7 +274,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.3.0] — 2026-05-17
+### [1.3.0] — 2026-05-17
 
 ### Added
 
@@ -243,7 +315,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **AI review batch size** — background queue processes 2 items per alarm tick (was 10) to avoid rate-limiting AI providers during backfill.
 - **On-demand AI review no longer commits immediately** — `handleRegenerateAIReview` marks the problem as pending for the MAINTENANCE_COMMIT batch instead of making an individual commit per review.
 
-## [1.2.0] — 2026-05-13
+### [1.2.0] — 2026-05-13
 
 ### Added
 
@@ -322,7 +394,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.1.0] — 2026-05-07
+### [1.1.0] — 2026-05-07
 
 ### Added
 
@@ -361,7 +433,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.0.0] — 2026-04 (Initial Release)
+### [1.0.0] — 2026-04 (Initial Release)
 
 ### Added
 
@@ -386,16 +458,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <!-- Add new releases above this line -->
 
-[Unreleased]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.6...HEAD
-[1.4.6]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.5...v1.4.6
-[1.4.5]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.4...v1.4.5
-[1.4.4]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.3...v1.4.4
-[1.4.3]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.2...v1.4.3
-[1.4.2]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.1...v1.4.2
-[1.4.1]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.0...v1.4.1
-[1.4.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.3.1...v1.4.0
-[1.3.1]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.3.0...v1.3.1
-[1.3.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/Life-Experimentalist/Code-Ledger/releases/tag/v1.0.0
+Release tags and their attached builds: <https://github.com/Life-Experimentalist/CodeLedger/releases>

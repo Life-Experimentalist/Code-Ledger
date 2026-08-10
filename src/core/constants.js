@@ -52,8 +52,22 @@ export const FEATURE_STATUS_META = Object.freeze({
   },
 });
 
+/**
+ * The running extension's version, read from the manifest so it cannot drift
+ * from what was actually packaged. Falls back to the literal only outside an
+ * extension context, where there is no manifest to read.
+ */
+function readVersion() {
+  try {
+    const rt = globalThis.chrome?.runtime ?? globalThis.browser?.runtime;
+    return rt?.getManifest?.()?.version || "1.0.0";
+  } catch {
+    return "1.0.0";
+  }
+}
+
 export const CONSTANTS = Object.freeze({
-  VERSION: "1.0.0",
+  VERSION: readVersion(),
   EXTENSION_NAME: "CodeLedger",
   DEBUG_DEFAULT: false,
   DEBUG_OVERRIDE: null, // null = use stored setting; true/false = force override (dev use)
@@ -272,7 +286,9 @@ export const CONSTANTS = Object.freeze({
     AI_KEYS: "ai.keys",
     AI_KEY_INDICES: "ai.key.indices",
     AI_ENDPOINT_OVERRIDES: "ai.endpoint.overrides",
-    TELEMETRY_OPT_IN: "telemetry.optIn",
+    // Must match the settingKey the Advanced panel writes; a differing value
+    // here reads as authoritative and silently disconnects the toggle.
+    TELEMETRY_OPT_IN: "telemetryOptIn",
     INCOGNITO_MODE: "incognito.mode",
     DISABLED_PLATFORMS: "platforms.disabled",
     CANONICAL_MAP_CACHE: "canonical.map.cache",

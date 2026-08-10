@@ -46,7 +46,7 @@ We process your data strictly to provide the extension's core features:
 - **Git Commits**: To automatically commit your solved problems, readme files, and notes to your designated GitHub repository.
 - **AI Reviews & Chat**: To submit your code to your configured AI model (Gemini, Claude, etc.) to receive automated code analysis and answer your follow-up questions.
 - **Local Dashboard**: To build your library search index, activity heatmaps, language breakdowns, and solve history in the Library sidebar.
-- **Opt-in Telemetry**: If you explicitly opt-in to "Anonymous Usage Stats" in settings, the extension sends a minimal payload containing `{ platform: "chrome" | "firefox", version: "1.4.7" }` to our telemetry endpoint to help us track active installations. **No personal details, tokens, repository names, or code are ever sent.** Telemetry is off by default.
+- **Opt-in Telemetry**: If you explicitly opt-in to "Anonymous Usage Stats" in settings, the extension sends a minimal payload containing `{ platform: "leetcode" | "geeksforgeeks" | "codeforces", version: "<extension version>" }` to a hit counter at `counter.vkrishna04.me` to help us track active installations. **No personal details, tokens, repository names, or code are ever sent.** Telemetry is off by default.
 
 ---
 
