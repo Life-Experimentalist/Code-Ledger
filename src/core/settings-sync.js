@@ -72,6 +72,11 @@ const PORTABLE_SETTINGS = [
   "gamificationBadgePicks",
   "gamificationActions",
   "gamificationActionsHour",
+  // Party: a list of public repository references. It carries no credentials
+  // and nothing about the people it names beyond what they already publish, so
+  // it travels with the rest of the settings rather than being re-typed on the
+  // second device.
+  "partyFriends",
 
   // Appearance / UX
   "behaviorBankEnabled",

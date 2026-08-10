@@ -233,6 +233,11 @@
       Catch-all, registered last. Serves `worker/public/` through the `ASSETS`
       binding. There is no `/library` route — the extension's library UI is not
       deployed as a hosted web app.
+
+      `/compare` is one of these static pages rather than an endpoint. It takes
+      a `?repos=owner/repo,owner/repo` list, and reads each repository's public
+      `badges/stats.json` from `raw.githubusercontent.com` in the browser. The
+      worker never sees the list and stores nothing: the URL is the state.
     parameters:
       - in: path
         name: path

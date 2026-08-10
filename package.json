@@ -56,6 +56,7 @@
     "test:sync-regression": "node dev/test-sync-regression.js",
     "lint": "node dev/typecheck.js",
     "sync:manifests": "node dev/sync-manifests.js",
+    "sync:party": "node dev/sync-party-module.js",
     "domains:update": "node dev/generate-manifest-domains.js",
     "validate:openapi": "node dev/validate-openapi.js",
     "deploy:worker": "cd worker && npx wrangler deploy",

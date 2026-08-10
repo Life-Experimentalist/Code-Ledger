@@ -131,6 +131,27 @@ describe("disclosures", () => {
     assert.equal(privacyTier(s).tier, "private");
   });
 
+  test("party is listed as off until somebody is actually added", () => {
+    assert.equal(byId(REPO).party.on, false);
+    assert.equal(byId({ ...REPO, partyFriends: [] }).party.on, false);
+    assert.equal(
+      byId({ ...REPO, partyFriends: [{ owner: "a", repo: "b" }] }).party.on,
+      true,
+      "reading a friend's repository is a request leaving this browser",
+    );
+  });
+
+  test("party moves a private setup off the private headline", () => {
+    // Nothing of the user's is uploaded, but a host that was silent now hears
+    // from them on every visit to the view. Calling that "private" would be
+    // the kind of technically-true that the tier labels exist to avoid.
+    assert.equal(privacyTier(PRIVATE_REPO).tier, "private");
+    assert.equal(
+      privacyTier({ ...PRIVATE_REPO, partyFriends: [{ owner: "a", repo: "b" }] }).tier,
+      "shared",
+    );
+  });
+
   test("the anonymous counter is off unless explicitly switched on", () => {
     assert.equal(byId(REPO).telemetry.on, false);
     assert.equal(byId({ ...REPO, telemetryOptIn: true }).telemetry.on, true);

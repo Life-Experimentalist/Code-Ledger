@@ -193,6 +193,18 @@ export function disclosures(settings) {
   });
 
   out.push({
+    id: "party",
+    // The list lives in settings, so "has the user added anyone" is a question
+    // this module can answer honestly without guessing.
+    on: Array.isArray(s.partyFriends) && s.partyFriends.length > 0,
+    required: false,
+    tier: "shared",
+    destination: "raw.githubusercontent.com",
+    what: "A request for each added repository's public badge file, sent without your token.",
+    note: "Nothing of yours is uploaded and the people you add are not told. What leaves is the request itself — GitHub sees your IP address asking for their file. Removing everyone from the list stops it.",
+  });
+
+  out.push({
     id: "telemetry",
     // Read through the constant: the toggle once wrote `telemetryEnabled` while
     // the sender read `telemetryOptIn`, so the switch did nothing for a release.

@@ -48,9 +48,17 @@ Chrome Web Store requires each upload to exceed the last.
 - Behaviour bank recording how you interact with problems, off unless you turn it on.
 - Backups: manual JSON export, scheduled snapshots, and a snapshot before any bulk import.
 
+**Party**
+
+- A **Party** tab that lines your ledger up against other people's. You add somebody by writing down their public repository — `owner/repo` or a pasted link — and the extension reads the `badges/stats.json` their own copy commits. There is no server, no account, and no request to be accepted.
+- Rank by points, current streak, longest streak, solves, or level. Opening one friend pulls their full ledger and shows platforms, difficulty spread, top topics, and — the part worth having — the topics they cover that you do not.
+- A share button mints a `codeledger.vkrishna04.me/compare?repos=…` link. The link carries the list and nothing else, so whoever opens it sees exactly what you saw without installing anything.
+- The tab says plainly what it is: one-sided, since adding somebody does not add you to their list and they are never told; and self-reported, since the file lives in a repository its owner controls.
+- Your friend list travels with the rest of your settings, so a second device does not start from an empty list.
+
 **Privacy**
 
-- A **Settings → Privacy** page that names every destination your data can reach: your GitHub repository, the sign-in relay, anyone with the link if the repository is public, the badge SVGs, the generated Pages site, `shields.io` if you pick that badge style, each AI provider you have configured, `mermaid.ink` when you press Render on a diagram, and the anonymous solve counter.
+- A **Settings → Privacy** page that names every destination your data can reach: your GitHub repository, the sign-in relay, anyone with the link if the repository is public, the badge SVGs, the generated Pages site, `shields.io` if you pick that badge style, each AI provider you have configured, `mermaid.ink` when you press Render on a diagram, the repositories you add to Party, and the anonymous solve counter.
 - The page opens with the tier your current setup is actually in — Private, Shared, Public, or Code leaves — followed by what is live now and what is available but switched off. Every row says what leaves, where it goes, and links to the panel that turns it off.
 - The list is computed from your settings rather than written down, so it cannot fall out of step with what the extension does. The welcome page shows the same summary during setup.
 

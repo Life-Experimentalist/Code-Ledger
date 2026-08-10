@@ -24,6 +24,8 @@ import { SettingsPageView } from "./views/SettingsPageView.js";
 import { CanonicalView } from "./views/CanonicalView.js";
 import { AIChatsView } from "./views/AIChatsView.js";
 import { BehaviourBankView } from "./views/BehaviourBankView.js";
+import { PartyView } from "./views/PartyView.js";
+import { isGamificationActive } from "/core/feature-flags.js";
 import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
 import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js";
 import {
@@ -260,6 +262,7 @@ function LibraryApp() {
       "ai-chats",
       "behaviour-bank",
       "canonical",
+      "party",
       "settings",
       "search",
     ]);
@@ -588,6 +591,9 @@ function LibraryApp() {
     { id: "ai-chats", label: "AI Chats", icon: "🤖" },
     { id: "behaviour-bank", label: "Behaviour Bank", icon: "🧠" },
     { id: "canonical", label: "Canonical", icon: "🔀" },
+    // Party compares streaks and points, so it has nothing to show when the
+    // streak system is off. The tab is hidden rather than shown-and-empty.
+    ...(isGamificationActive(settings) ? [{ id: "party", label: "Party", icon: "🎉" }] : []),
     { id: "settings", label: "Settings", icon: "⚙️" },
   ];
 
@@ -690,6 +696,12 @@ function LibraryApp() {
     if (activeTab === "behaviour-bank")
       return html`<${BehaviourBankView} problems=${enrichedProblems} onNavigate=${setActiveTab} />`;
     if (activeTab === "canonical") return html`<${CanonicalView} problems=${enrichedProblems} />`;
+    if (activeTab === "party")
+      return html`<${PartyView}
+        problems=${enrichedProblems}
+        settings=${settings}
+        onSettingsChange=${handleSettingsChange}
+      />`;
     if (activeTab === "settings")
       return html`<${SettingsPageView}
         settings=${settings}

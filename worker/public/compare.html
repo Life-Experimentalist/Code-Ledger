@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Compare Ledgers — CodeLedger</title>
+    <meta
+      name="description"
+      content="Put CodeLedger practice ledgers side by side. Reads the public badge files each repository publishes — no account, no extension required."
+    />
+    <link rel="canonical" href="https://codeledger.vkrishna04.me/compare" />
+    <link rel="icon" href="/assets/icon-128.png" type="image/png" />
+    <link rel="stylesheet" href="/assets/landing.css" />
+    <!-- This page reads other people's public files and shows numbers. It has no
+         reason to be indexed under a particular list of repositories, and a
+         crawler following shared links would create pages about strangers. -->
+    <meta name="robots" content="noindex, follow" />
+    <style>
+      .page-content {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 48px 24px 80px;
+      }
+      .page-content h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #06b6d4, #a855f7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .lede {
+        color: var(--subtle);
+        line-height: 1.75;
+        margin-bottom: 28px;
+      }
+      .compare-form {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .compare-form input {
+        flex: 1 1 260px;
+        padding: 11px 14px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 14px;
+        font-family: inherit;
+      }
+      .compare-form input:focus {
+        outline: none;
+        border-color: var(--border-glow);
+      }
+      .compare-form button {
+        padding: 11px 20px;
+        border-radius: var(--radius);
+        border: 1px solid rgba(6, 182, 212, 0.3);
+        background: var(--accent-dim);
+        color: var(--accent);
+        font-size: 14px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .compare-form button:hover {
+        background: rgba(6, 182, 212, 0.2);
+      }
+      .metrics {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 20px 0 18px;
+      }
+      .metrics button {
+        padding: 7px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted);
+        font-size: 12.5px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .metrics button[aria-pressed="true"] {
+        border-color: rgba(6, 182, 212, 0.3);
+        background: var(--accent-dim);
+        color: var(--accent);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.02);
+        margin-bottom: 8px;
+      }
+      .row .rank {
+        width: 26px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .row .who {
+        flex: 1;
+        min-width: 0;
+      }
+      .row .who a {
+        color: var(--text);
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .row .who a:hover {
+        color: var(--accent);
+      }
+      .row .sub {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 5px;
+      }
+      .row .bar {
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .row .bar > i {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #06b6d4, #a855f7);
+      }
+      .row .value {
+        text-align: right;
+        min-width: 76px;
+      }
+      .row .value b {
+        display: block;
+        font-size: 19px;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+      .row .value span {
+        font-size: 10.5px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .row.bad .sub {
+        color: #fbbf24;
+      }
+      .note {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.02);
+        padding: 18px 20px;
+        margin: 28px 0;
+      }
+      .note h2 {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 10px;
+      }
+      .note li {
+        color: var(--subtle);
+        font-size: 13px;
+        line-height: 1.7;
+        margin-bottom: 5px;
+      }
+      .note ul {
+        padding-left: 18px;
+        margin: 0;
+      }
+      .note strong {
+        color: var(--text);
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      .share {
+        display: flex;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      .share input {
+        flex: 1;
+        padding: 10px 12px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.25);
+        color: var(--muted);
+        font-size: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .share button {
+        padding: 10px 16px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--subtle);
+        font-size: 13px;
+        font-family: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a class="nav-brand" href="/">
+        <img src="/assets/icon-128.png" alt="" width="28" height="28" />
+        CodeLedger
+      </a>
+      <div class="nav-links">
+        <a href="/#features"><span>Features</span></a>
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
+          >⭐ <span>GitHub</span></a
+        >
+      </div>
+    </nav>
+
+    <div class="page-content">
+      <h1>Compare ledgers</h1>
+      <p class="lede">
+        Every CodeLedger repository publishes a small
+        <code>badges/stats.json</code> alongside its badges. This page reads those files straight
+        from GitHub and lines them up. Nothing is stored here, there is no account, and you do not
+        need the extension installed to use it.
+      </p>
+
+      <form class="compare-form" id="add-form">
+        <input
+          id="add-input"
+          placeholder="owner/repo or a github.com link"
+          aria-label="Repository to add"
+        />
+        <button type="submit">Add</button>
+      </form>
+      <p class="empty" id="add-error" hidden></p>
+
+      <div class="metrics" id="metrics" role="group" aria-label="Sort by"></div>
+
+      <div id="rows"></div>
+
+      <div class="share" id="share" hidden>
+        <input id="share-url" readonly aria-label="Link to this comparison" />
+        <button id="share-copy" type="button">Copy link</button>
+      </div>
+
+      <div class="note">
+        <h2>Worth knowing</h2>
+        <ul>
+          <li>
+            <strong>The numbers are self-reported.</strong> Each file is written by the extension
+            running on that person's machine, into a repository they control. Anyone can edit their
+            own.
+          </li>
+          <li>
+            <strong>Only public repositories work.</strong> A repository that is private, renamed,
+            or not publishing badges reads the same from here: not found.
+          </li>
+          <li>
+            <strong>Nobody is notified.</strong> Reading a public file leaves no trace the owner can
+            see. This is a comparison, not a request to be compared.
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>
+      <span
+        >CodeLedger — Apache 2.0 · Built by
+        <a href="https://github.com/VKrishna04" style="color: var(--accent); text-decoration: none"
+          >VKrishna04</a
+        ></span
+      >
+      <div class="footer-links">
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
+          >GitHub</a
+        >
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/support">Support</a>
+      </div>
+    </footer>
+
+    <script type="module" src="/assets/compare.js"></script>
+  </body>
+</html>
