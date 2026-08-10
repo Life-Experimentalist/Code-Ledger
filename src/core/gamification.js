@@ -258,10 +258,11 @@ export function isVacationDay(key, vacations) {
  * @param {object} config
  * @param {Array<{start:string,end?:string|null}>} vacations
  * @param {string} todayKey
+ * @param {string} [floorDay] no streak accounting before this day — see below
  * @returns {{ current: number, longest: number, freezes: number, freezesSpent: number,
  *   frozenDays: string[], penaltyDays: string[], brokenAt: string|null, timeline: Array<object> }}
  */
-export function computeStreak(days, config, vacations, todayKey) {
+export function computeStreak(days, config, vacations, todayKey, floorDay) {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const target = Math.max(1, Math.round(cfg.dailyTargetPoints));
   const freezeAt = target * cfg.freezeEarnMultiplier;
@@ -281,7 +282,14 @@ export function computeStreak(days, config, vacations, todayKey) {
     };
   }
 
-  const first = keys[0];
+  // Streak accounting starts at the later of the first solve and the floor.
+  //
+  // The floor is the install day. Importing years of LeetCode history should
+  // credit every point and every topic, but it must not manufacture a 400-day
+  // streak the user never lived through, and it must not open with a wall of
+  // missed days from the gaps in that history. Points are lifetime; streaks
+  // start when the extension does.
+  const first = floorDay && floorDay > keys[0] ? floorDay : keys[0];
   const last = todayKey > first ? todayKey : first;
 
   let current = 0;
@@ -412,6 +420,7 @@ export const ACHIEVEMENTS = Object.freeze([
  * @param {object} [options.config] partial config merged over DEFAULT_CONFIG
  * @param {Array<{start:string,end?:string|null}>} [options.vacations]
  * @param {number} [options.now] epoch ms, for deterministic tests
+ * @param {string} [options.streakFloorDay] install day — streaks do not predate it
  * @returns {object}
  */
 export function computeSnapshot(problems, options = {}) {
@@ -422,7 +431,7 @@ export function computeSnapshot(problems, options = {}) {
 
   const events = scoreEvents(problems, cfg);
   const days = buildDailyPoints(problems, cfg);
-  const streak = computeStreak(days, cfg, vacations, today);
+  const streak = computeStreak(days, cfg, vacations, today, options.streakFloorDay);
 
   let totalPoints = 0;
   let totalRecalls = 0;

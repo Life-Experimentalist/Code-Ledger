@@ -594,6 +594,71 @@ describe("computeSnapshot", () => {
   });
 });
 
+describe("streak floor (imported history)", () => {
+  const base = { config: { ...UTC, dailyTargetPoints: 25 } };
+
+  /** Two years of imported solves, then a fresh install today. */
+  function imported() {
+    return [
+      ...pointsOn("2024-05-01", 50),
+      ...pointsOn("2024-05-02", 50),
+      ...pointsOn("2025-01-15", 50),
+      ...pointsOn("2026-03-01", 50),
+    ];
+  }
+
+  test("imported history awards points but never a streak the user did not live", () => {
+    const withFloor = computeSnapshot(imported(), {
+      ...base,
+      now: at("2026-03-01"),
+      streakFloorDay: "2026-03-01",
+    });
+    const withoutFloor = computeSnapshot(imported(), { ...base, now: at("2026-03-01") });
+
+    assert.equal(withFloor.totalPoints, withoutFloor.totalPoints, "points are lifetime");
+    assert.equal(withFloor.totalSolves, withoutFloor.totalSolves);
+    assert.equal(withFloor.currentStreak, 1);
+    assert.equal(withFloor.longestStreak, 1, "no historical streak is manufactured");
+  });
+
+  test("the floor also suppresses the wall of missed days a gappy import creates", () => {
+    const s = computeSnapshot(imported(), {
+      ...base,
+      now: at("2026-03-01"),
+      streakFloorDay: "2026-03-01",
+    });
+    assert.equal(s.timeline.length, 1);
+    assert.ok(!s.timeline.some((t) => t.status === "missed"));
+  });
+
+  test("a floor earlier than the first solve changes nothing", () => {
+    const problems = pointsOn("2026-03-05", 25);
+    const a = computeSnapshot(problems, { ...base, now: at("2026-03-05") });
+    const b = computeSnapshot(problems, {
+      ...base,
+      now: at("2026-03-05"),
+      streakFloorDay: "2020-01-01",
+    });
+    assert.equal(a.currentStreak, b.currentStreak);
+    assert.equal(a.timeline.length, b.timeline.length);
+  });
+
+  test("solves after the floor still build a real streak", () => {
+    const problems = [
+      ...pointsOn("2020-01-01", 50),
+      ...pointsOn("2026-03-01", 25),
+      ...pointsOn("2026-03-02", 25),
+      ...pointsOn("2026-03-03", 25),
+    ];
+    const s = computeSnapshot(problems, {
+      ...base,
+      now: at("2026-03-03"),
+      streakFloorDay: "2026-03-01",
+    });
+    assert.equal(s.currentStreak, 3);
+  });
+});
+
 describe("describeStreak", () => {
   const base = { config: { ...UTC, dailyTargetPoints: 25 } };
 
