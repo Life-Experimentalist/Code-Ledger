@@ -49,7 +49,9 @@ export class GitHubHandler extends BaseGitHandler {
           type: "oauth",
           provider: "github",
           default: "",
-          description: 'Authenticate with GitHub to sync code. Requires "repo" scope.',
+          description:
+            'Authenticate with GitHub to sync code. Grants "public_repo" by default; ' +
+            "private repositories need the wider “repo” scope.",
         },
         {
           key: "github_repo",
@@ -70,8 +72,12 @@ export class GitHubHandler extends BaseGitHandler {
           key: "github_repo_private",
           label: "Create as Private Repository",
           type: "toggle",
-          default: true,
-          description: "When auto-creating the repository, make it private instead of public.",
+          // Off by default: the default OAuth scope is public_repo, which cannot
+          // create a private repository. Defaulting this on made the very first
+          // commit fail with a 403 that read as a permissions problem.
+          default: false,
+          description:
+            "When auto-creating the repository, make it private. Requires the wider “repo” scope.",
           advanced: true,
         },
         {
@@ -198,10 +204,14 @@ export class GitHubHandler extends BaseGitHandler {
     const userRes = await api.getCurrentUser(token);
 
     const owner = opts.ownerOverride?.trim() || settings["github_owner"]?.trim() || userRes.login;
-    const name = (repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME).replace(
-      /\s+/g,
-      "-",
-    );
+    // gitRepo is the legacy camelCase key. Omitting it here silently committed a
+    // legacy user's solutions to the default repository name instead of theirs.
+    const name = (
+      repoName ||
+      settings["github_repo"] ||
+      settings["gitRepo"] ||
+      CONSTANTS.DEFAULT_REPO_NAME
+    ).replace(/\s+/g, "-");
 
     dbg.log(`commit(): ${files?.length || 0} file(s) → ${owner}/${name} (${BRANCH})`);
 
@@ -225,17 +235,22 @@ export class GitHubHandler extends BaseGitHandler {
 
         dbg.log(`commit(): repo not found — creating ${owner}/${name}…`);
         const isOrg = owner !== userRes.login;
-        const isPrivate = settings["github_repo_private"] !== false; // Default to true
+        // Opt-in, not opt-out: the default OAuth scope cannot create a private repo.
+        const isPrivate = settings["github_repo_private"] === true;
         await api.createRepository(name, token, isOrg ? owner : null, isPrivate);
         isNewRepo = true;
 
-        // GitHub needs a moment after auto_init to create the initial commit
-        await _sleep(NEW_REPO_WAIT_MS);
-        await this._configureRepo(owner, name, token, settings);
-
-        const ref = await api.getRepoRef(owner, name, BRANCH, token);
-        latestSha = ref.object.sha;
+        // auto_init's first commit is not visible immediately and the delay is
+        // not fixed, so poll rather than sleep a guessed interval.
+        latestSha = await this._awaitInitialCommit(owner, name, token);
         dbg.log(`commit(): new repo HEAD = ${latestSha.slice(0, 7)}`);
+
+        // Cosmetic — a failure here must not lose the user's solution.
+        try {
+          await this._configureRepo(owner, name, token, settings);
+        } catch (cfgErr) {
+          dbg.warn(`commit(): repo configuration failed (non-fatal):`, cfgErr.message);
+        }
       }
     }
 
@@ -348,6 +363,26 @@ export class GitHubHandler extends BaseGitHandler {
 
     await api.setRepositoryTopics(owner, name, resolveRepoTopics(settings), token);
     dbg.log(`ensureRepoTopics(): updated topics for ${owner}/${name}`);
+  }
+
+  /**
+   * Wait for a freshly auto_init'd repository to expose its first commit.
+   * Returns the branch HEAD sha; throws the last 404 if it never appears.
+   */
+  async _awaitInitialCommit(owner, name, token) {
+    let lastErr;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await _sleep(attempt === 0 ? NEW_REPO_WAIT_MS : 1500);
+      try {
+        const ref = await api.getRepoRef(owner, name, BRANCH, token);
+        return ref.object.sha;
+      } catch (err) {
+        if (err.status !== 404) throw err;
+        lastErr = err;
+        dbg.warn(`_awaitInitialCommit(): ${BRANCH} not ready yet (attempt ${attempt + 1})`);
+      }
+    }
+    throw lastErr;
   }
 
   async _configureRepo(owner, name, token, settings) {

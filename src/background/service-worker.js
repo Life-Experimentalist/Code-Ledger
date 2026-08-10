@@ -934,11 +934,17 @@ async function _commitWithFailover(files, message, repoName, commitOpts, setting
       return { handler, target, newSha };
     } catch (e) {
       lastErr = e;
-      if (e.status === 401) await _broadcastAuthExpired().catch(() => {});
       dbg.warn(
         `_commitWithFailover(): ✗ target ${target.provider}/${target.owner ? target.owner + "/" : ""}${target.repo} failed:`,
         e.message,
       );
+      // A rejected token is rejected for every target, and _broadcastAuthExpired
+      // has just cleared it — continuing would fire the remaining attempts with
+      // no credentials and bury the real cause behind their errors.
+      if (e.status === 401) {
+        await _broadcastAuthExpired().catch(() => {});
+        throw e;
+      }
     }
   }
 
