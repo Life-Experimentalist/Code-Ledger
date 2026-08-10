@@ -394,8 +394,13 @@ export function cacheKey(snapshot) {
   return [s.totalPoints || 0, s.currentStreak || 0, s.totalSolves || 0, s.today || ""].join("-");
 }
 
-/** Alt text per badge, so a reader with images off still gets the sense of it. */
-const BADGE_ALT = Object.freeze({
+/**
+ * Alt text per badge, so a reader with images off still gets the sense of it.
+ *
+ * Exported because the settings UI labels its badge checkboxes from here. A
+ * separate label list would be a second place to forget when a badge is added.
+ */
+export const BADGE_ALT = Object.freeze({
   streak: "Streak",
   points: "Points",
   level: "Level",
@@ -404,8 +409,20 @@ const BADGE_ALT = Object.freeze({
   freezes: "Freezes",
 });
 
-/** Which badges a README shows when the user has not narrowed the list. */
-const DEFAULT_PICKS = Object.freeze(["streak", "points", "level", "difficulty", "freezes"]);
+/**
+ * Which badges a README shows when the user has not narrowed the list.
+ *
+ * Exported so the settings UI can tick the same boxes this renderer would use.
+ * Hardcoding the default there instead would let the checkboxes disagree with
+ * what actually gets committed.
+ */
+export const DEFAULT_PICKS = Object.freeze([
+  "streak",
+  "points",
+  "level",
+  "difficulty",
+  "freezes",
+]);
 
 /**
  * The gamification block for the ledger's README, between stable HTML comment

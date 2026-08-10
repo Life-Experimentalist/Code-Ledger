@@ -16,6 +16,7 @@ import { PanelGeneral } from "../settings-panels/PanelGeneral.js";
 import { PanelAI } from "../settings-panels/PanelAI.js";
 import { PanelGit } from "../settings-panels/PanelGit.js";
 import { PanelPlatforms } from "../settings-panels/PanelPlatforms.js";
+import { PanelGamification } from "../settings-panels/PanelGamification.js";
 import { PanelBackups } from "../settings-panels/PanelBackups.js";
 import { PanelBehaviorBank } from "../settings-panels/PanelBehaviorBank.js";
 import { PanelAdvanced } from "../settings-panels/PanelAdvanced.js";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { id: "ai", emoji: "🤖", label: "AI" },
   { id: "git", emoji: "🔗", label: "Git" },
   { id: "platforms", emoji: "🌐", label: "Platforms" },
+  { id: "streaks", emoji: "🔥", label: "Streaks" },
   { id: "backups", emoji: "💾", label: "Backups" },
   { id: "bank", emoji: "🧠", label: "Behaviour Bank" },
   { id: "advanced", emoji: "⚙️", label: "Advanced" },
@@ -36,6 +38,7 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
     "ai",
     "git",
     "platforms",
+    "streaks",
     "backups",
     "bank",
     "advanced",
@@ -56,6 +59,8 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
         return html`<${PanelGit} ...${props} />`;
       case "platforms":
         return html`<${PanelPlatforms} ...${props} />`;
+      case "streaks":
+        return html`<${PanelGamification} ...${props} />`;
       case "backups":
         return html`<${PanelBackups} ...${props} />`;
       case "bank":
