@@ -20,12 +20,14 @@ X.Y.Z
 
 ## Version Sources of Truth
 
-Both files must match exactly before release:
+All three files must match exactly before release:
 
-- src/manifest.json
-- package.json
+- package.json (the source of truth)
+- src/manifest-chromium.json
+- src/manifest-firefox.json
 
-If they differ, release must fail.
+`node dev/sync-manifests.js` propagates the package.json version to both
+manifests. If they differ, release must fail.
 
 ## Required Release Gates
 

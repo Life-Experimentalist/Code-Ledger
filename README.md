@@ -129,7 +129,7 @@ Or install directly from the **[Chrome Web Store →](https://chrome.google.com/
 ### Firefox
 
 ```
-about:debugging  →  Load Temporary Add-on  →  select src/manifest.json
+about:debugging  →  Load Temporary Add-on  →  select dist/firefox/manifest.json
 ```
 
 Or install from **[Firefox Add-ons (AMO) →](https://addons.mozilla.org/en-US/firefox/addon/codeledger/)**

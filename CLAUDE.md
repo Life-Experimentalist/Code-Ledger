@@ -11,7 +11,10 @@ A **Manifest V3 browser extension** (Chrome + Firefox) that automatically commit
 - **Domain:** `codeledger.vkrishna04.me`
 - **Auth worker:** `https://codeledger.vkrishna04.me/api`
 - **Extension root:** `src/` — this is the directory loaded unpacked in Chrome
-- **Stack:** Pure ES6 modules, no bundler, no transpiler. Preact + htm from CDN. Tailwind CSS for the compiled stylesheet only.
+- **Stack:** Pure ES6 modules, no bundler and no transpiler for our own code.
+  Preact + htm are vendored into `src/vendor/` as committed esbuild bundles built
+  from npm — nothing is fetched from a CDN at runtime. Tailwind CSS compiles the
+  stylesheet only.
 
 ---
 
@@ -24,8 +27,18 @@ npm install
 npm run build:css        # Tailwind → src/ui/styles/compiled.css (run after CSS changes)
 npm run build            # CSS + dist packaging
 npm run watch            # rebuild on file changes (dev mode)
-npm run lint             # tsc --noEmit (type-check only, no transpile)
+npm run lint             # type gate — fails on undefined names, see below
+npm test                 # node:test suites under test/ and worker/test/
 ```
+
+`npm run lint` runs `dev/typecheck.js`, which type-checks **every** file with
+`tsc --checkJs` and fails the build on the four errors that are never a false
+positive on untyped JS: TS2304 / TS2552 (a name that does not exist), TS2349
+(calling something that is not a function), TS1117 (a duplicate key in an object
+literal). Structural complaints about untyped object literals are printed as a
+count only; read them with `npm run lint:all`. Plain `tsc --noEmit` is not enough
+— it only reads files carrying a `@ts-check` pragma, which was 11 of 153, and
+four crashing bugs shipped through that gap.
 
 Load the extension unpacked from `src/` in `chrome://extensions`.
 
@@ -38,7 +51,8 @@ npx wrangler deploy      # deploy to production
 cd .. && npm run deploy:worker   # shorthand from root
 ```
 
-`worker/wrangler.toml` is git-ignored — create it from the template in `CODELEDGER_EXECUTION_GUIDE.md`.
+`worker/wrangler.toml` is git-ignored — copy `worker/wrangler.toml.example` to
+`worker/wrangler.toml`. Secrets never go in that file; see Worker Secrets below.
 
 ### Dev utilities
 
@@ -80,27 +94,29 @@ curl -sf https://codeledger.vkrishna04.me/api/health
 ### Extension layers (all in `src/`)
 
 ```
-manifest.json
-├── background/service-worker.js      — SW: init, event bus, handles problem:solved
-│   ├── git-engine.js                 — atomic GitHub Tree API commits
+manifest-chromium.json / manifest-firefox.json   — the build emits one manifest.json per target
+├── background/service-worker.js      — SW: init, event bus, handles problem:solved, commits
 │   ├── sync-engine.js                — cross-device sync via repo index.json
-│   └── alarm-manager.js             — chrome.alarms for reminders/sync
+│   ├── migration-manager.js          — versioned storage migrations run on install/update
+│   └── alarm-manager.js              — chrome.alarms for reminders/sync
 ├── content/handler-loader.js         — matches hostname → dynamically imports platform handler
 │   ├── heartbeat.js                  — SW keepalive port
 │   └── presence-marker.js            — injects #codeledger-present on landing page
 ├── handlers/
 │   ├── _base/BasePlatformHandler.js  — safeQuery(), MutationObserver lifecycle
 │   ├── platforms/{leetcode,geeksforgeeks,codeforces}/index.js
-│   ├── ai/{gemini,openai,claude,deepseek,ollama}/index.js
-│   └── git/{github,gitlab,bitbucket}/index.js
+│   ├── ai/{gemini,openai,claude,deepseek,ollama,openrouter}/index.js
+│   └── git/github/index.js           — the only implemented git provider (see below)
 ├── core/
 │   ├── constants.js                  — SINGLE SOURCE OF TRUTH for all URLs, keys, storage key names
 │   ├── storage.js                    — unified storage abstraction (wraps browser-compat)
 │   ├── event-bus.js                  — typed pub/sub (problem:solved → service-worker)
+│   ├── handler-registry.js           — resolves a provider name to its handler instance
 │   ├── canonical-mapper.js           — resolves platform problem → canonical ID
 │   └── ai-prompts.js                 — prompt templates + normalizeAIPrompts()
 ├── lib/
 │   ├── browser-compat.js             — THE ONLY FILE that uses chrome.* or browser.*
+│   ├── sanitize-html.js              — the allow-list sanitiser every rendered HTML string goes through
 │   └── debug.js                      — createDebugger() with console.bind() trick
 ├── ui/
 │   ├── components/SettingsSchema.js  — schema-driven settings renderer (Preact + htm)
@@ -110,26 +126,44 @@ manifest.json
     └── welcome.js                    — onboarding checklist page (auto-opened on first repo link)
 ```
 
+`src/handlers/git/gitlab/` and `src/handlers/git/bitbucket/` exist but every method
+throws `"not yet implemented"`. They are not registered in the provider picker;
+GitHub is the only working target. Do not describe them as supported.
+
 ### Data flow for a solve event
 
 1. Content script (`handler-loader.js`) → imports platform handler → calls `handler.init()`
 2. Platform handler detects accepted submission (DOM / GraphQL / REST)
 3. Fires `eventBus.emit("problem:solved", data)` → caught by service-worker
-4. SW saves to IndexedDB, optionally calls AI review, then calls `git-engine.js`
-5. `git-engine.js` calls GitHub Tree API for a single atomic commit
+4. SW saves to IndexedDB, optionally calls AI review, then calls `_commitWithFailover()`
+5. `_commitWithFailover()` resolves the ordered target list (primary, then any
+   configured mirrors) and calls `handler.commit()` on each until one succeeds
+6. `src/handlers/git/github/index.js` `commit()` builds a single atomic commit
+   through the GitHub Trees API (`POST /git/trees` → `POST /git/commits` →
+   `PATCH /git/refs/heads/{branch}`)
 
 ### Cloudflare Worker (`worker/src/index.js`)
 
 - Built with **Hono** framework
-- Routes: `/api/health`, `/api/auth/github`, `/api/auth/github/callback`, `/api/webhook/github`, `/api/admin/canonical`, `/api/data/canonical-map.json`
-- Serves static landing page from `worker/public/`
+- Routes: `GET /api/health`, `GET /api/auth/:provider`, `GET /api/auth/github/callback`, `POST /api/webhook/github`, `GET /api/data/canonical-map.json`, `POST /api/admin/canonical`
+- `GET /*` serves the static landing page from `worker/public/`
 - OAuth callback posts `{ type: 'CODELEDGER_AUTH', provider, token }` — the extension listens for exactly this message type
+- `GET /api/auth/:provider` mints an HMAC-signed `state` (10-minute TTL) into an
+  `HttpOnly; Secure; SameSite=Lax` cookie; the callback verifies it in constant
+  time before exchanging the code. A missing or stale cookie is a hard failure,
+  not a warning.
+- Every route is documented in `docs/OPENAPI.yaml`. Adding or changing one means
+  changing the spec in the same commit.
 
-### Library / Web App (`src/library/`)
+### Library (`src/library/`)
 
-- Shared HTML + Preact components used both inside the extension sidebar and at `codeledger.vkrishna04.me/library`
-- Auto-detects context: `IS_EXTENSION = !!chrome.runtime?.id`
-- Extension mode: reads IndexedDB; Web app mode: reads GitHub API via OAuth token
+- The extension's own full-page UI (sidebar and the expanded library tab), built
+  from the same Preact components.
+- Reads solve data from IndexedDB through `src/core/storage.js`.
+- The code carries an `IS_EXTENSION = !!chrome.runtime?.id` branch for a
+  GitHub-API-backed web build. **That build is not deployed** — the worker serves
+  no `/library` route, so the branch is currently dead. Do not describe the
+  library as a hosted web app.
 
 ---
 
@@ -153,9 +187,9 @@ dbg.log("message"); // shows at the correct source location in DevTools
 
 The extension root is `src/`. `chrome.runtime.getURL('handlers/...')` — no `src/` prefix in the path. This is a common bug source.
 
-### UI: Preact + htm, no build step
+### UI: Preact + htm, vendored locally
 
-All UI files import Preact and htm from `https://esm.sh`. No JSX. No webpack. No transpilation. Every UI file starts with:
+No JSX. No webpack. No transpilation of our own code. Every UI file starts with:
 
 ```js
 import { h, render } from "../../vendor/preact-bundle.js";
@@ -164,7 +198,13 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 ```
 
-`src/vendor/preact-bundle.js` is a CDN re-export shim — all UI files import from this single path.
+`src/vendor/preact-bundle.js` is a **generated file committed to the repo** — an
+esbuild bundle of the `preact` and `htm` packages installed from npm, produced by
+`npm run vendor:preact`. It is not a CDN shim, and nothing at runtime fetches a
+remote script: MV3's `script-src 'self'` would block that anyway, and a store
+reviewer must be able to read every line that executes. `chart-bundle.js` is
+built the same way. Never reintroduce an `https://esm.sh` (or any remote) import
+— regenerate the bundle instead.
 
 ### OAuth message contract
 
@@ -316,7 +356,7 @@ Before reading or writing a storage key, validate it exists in `CONSTANTS.SK`; i
   import { BasePlatformHandler } from "../_base/BasePlatformHandler.js";
   ```
 
-- **In manifest.json paths**: Use paths relative to `src/`, without `src/` prefix
+- **In the manifest paths**: Use paths relative to `src/`, without `src/` prefix
 
   ```json
   "background": { "service_worker": "background/service-worker.js" }
@@ -372,15 +412,42 @@ const repo = settings.github_repo || settings.gitRepo;
 
 ## Worker Secrets (Wrangler)
 
-| Secret name                        | Source                                                       |
-| ---------------------------------- | ------------------------------------------------------------ |
-| `CODELEDGER_GH_APP_PRIVATE_KEY`    | PKCS#8 PEM file (convert PKCS#1 with `openssl pkcs8 -topk8`) |
-| `CODELEDGER_GH_APP_ID`             | GitHub App numeric ID                                        |
-| `CODELEDGER_GH_APP_CLIENT_ID`      | GitHub App Client ID                                         |
-| `CODELEDGER_GH_APP_CLIENT_SECRET`  | GitHub App client secret                                     |
-| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | `openssl rand -hex 32`                                       |
-| `CANONICAL_UPLOAD_TOKEN`           | `openssl rand -hex 32`                                       |
-| `SESSION_SECRET`                   | `openssl rand -hex 32`                                       |
+Auth uses a **classic GitHub OAuth App**, not a GitHub App. This is load-bearing:
+GitHub Apps silently ignore the `scope` parameter and issue expiring
+user-to-server tokens that get `403 Resource not accessible by integration` on
+`POST /user/repos` — which is exactly the "permission denied while creating the
+repository" a store reviewer hit. The callback detects an App-shaped token
+response (`expires_in`/`refresh_token` present, `scope` absent) and reports the
+misconfiguration at sign-in rather than letting it surface as a later 403.
+
+| Secret name                        | Required | Source                                                      |
+| ---------------------------------- | -------- | ----------------------------------------------------------- |
+| `CODELEDGER_OAUTH_CLIENT_ID`       | yes      | OAuth App Client ID (`Iv23li…`; `Ov23li…` is a GitHub App)  |
+| `CODELEDGER_OAUTH_CLIENT_SECRET`   | yes      | OAuth App client secret                                     |
+| `SESSION_SECRET`                   | yes      | 32 random bytes — signs the OAuth `state` cookie            |
+| `CANONICAL_UPLOAD_TOKEN`           | no       | 32 random bytes — guards `POST /api/admin/canonical`        |
+| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | no       | 32 random bytes — HMAC for `POST /api/webhook/github`       |
+
+The worker also accepts the older `CODELEDGER_GH_APP_CLIENT_ID` /
+`CODELEDGER_GH_APP_CLIENT_SECRET` names as fallbacks so an existing deployment
+keeps working; new setups should use the `CODELEDGER_OAUTH_*` names.
+
+**Sign-in returns 500 until `SESSION_SECRET` is set** — the state cookie cannot be
+signed without it, and an unsigned state is not accepted.
+
+Set each one interactively (the command takes the name only and prompts for the
+value — never pass the secret as an argument, it lands in shell history):
+
+```bash
+cd worker && npx wrangler secret put CODELEDGER_OAUTH_CLIENT_ID
+```
+
+Generate the random ones locally. `openssl` is not on PATH in a default Windows
+PowerShell; this works anywhere Node does:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 ---
 
@@ -390,7 +457,7 @@ const repo = settings.github_repo || settings.gitRepo;
 2. Create `dom-selectors.js` with versioned `SELECTORS`, `LEGACY_SELECTORS`, and `DOMAINS` export
 3. Create `page-detector.js` with `detectPage()` and `isSolveCapablePage()`
 4. Add hostname match in `src/content/handler-loader.js`
-5. Run `node dev/generate-manifest-domains.js` to update `manifest.json` host_permissions
+5. Run `node dev/generate-manifest-domains.js` to update host_permissions in both manifests
 6. See `docs/ADDING_PLATFORM_HANDLER.md` for full contract
 
 ## Adding a New AI Provider
@@ -440,17 +507,19 @@ The `files` array drives the git commit. If absent, SW builds a fallback single-
 
 ## Versioning & Changelog
 
-Version is canonical in **two places that must always match**:
+Version is canonical in **three places that must always match**:
 
-- `src/manifest.json` → `"version"`
 - `package.json` → `"version"`
+- `src/manifest-chromium.json` → `"version"`
+- `src/manifest-firefox.json` → `"version"`
 
-**Source of truth for releases:** `package.json`. The CI release pipeline validates they match before tagging.
+**Source of truth for releases:** `package.json`. `node dev/sync-manifests.js` copies
+it into both manifests, and the CI release pipeline validates they match before tagging.
 
 ### Release checklist
 
 1. Add a `## [x.y.z] — YYYY-MM-DD` section to `docs/CHANGELOG.md` (Added / Fixed / Changed / Removed / Security).
-2. Bump version in **both** `src/manifest.json` and `package.json` to the same version.
+2. Bump `package.json`, then run `node dev/sync-manifests.js` to carry the version into both manifests.
 3. Run `npm run release` (validates, builds, commits, tags, pushes all at once).
    - Or `npm run release -- --dry-run` to preview first.
 4. GitHub Actions (`.github/workflows/release.yml`) triggers automatically on tag push → creates GitHub Release with attached zips.

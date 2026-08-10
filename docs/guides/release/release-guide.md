@@ -37,10 +37,14 @@ See the section landing page at [Release Guides](./README.md).
 
 ### 2. Bump version
 
-Update **both** to the same version:
+Update `package.json` → `"version": "X.Y.Z"`, then run:
 
-- `src/manifest.json` → `"version": "X.Y.Z"`
-- `package.json` → `"version": "X.Y.Z"`
+```bash
+node dev/sync-manifests.js
+```
+
+which copies it into `src/manifest-chromium.json` and `src/manifest-firefox.json`.
+All three must match or the release is refused.
 
 ### 3. Preview the release (optional)
 
@@ -50,7 +54,7 @@ npm run release -- --dry-run
 
 This validates everything without making any git changes. You'll see:
 
-- Version check (manifest ↔ package.json)
+- Version check (both manifests ↔ package.json)
 - Changelog entry validation
 - Sync regression check
 - Working directory status
@@ -65,7 +69,7 @@ npm run release
 
 This does **everything automatically**:
 
-1. ✅ Validates versions match (`package.json` ↔ `src/manifest.json`)
+1. ✅ Validates versions match (`package.json` ↔ both platform manifests)
 2. ✅ Checks `docs/CHANGELOG.md` has an entry for the version
 3. ✅ Runs sync regression checks
 4. ✅ Builds CSS + extension distributions

@@ -19,6 +19,14 @@ function implToSpecPath(impl) {
 function readSpec(specPath) {
   const raw = fs.readFileSync(specPath, "utf8");
   const doc = yaml.load(raw);
+  // `paths:` is a single `$ref` to docs/openapi/paths/worker.yaml. Without
+  // following it the only "path" this validator sees is the literal key
+  // "$ref", so every real route reads as undocumented and the check fails
+  // regardless of what the spec says.
+  const ref = doc?.paths?.$ref;
+  if (typeof ref === "string") {
+    doc.paths = yaml.load(fs.readFileSync(path.resolve(path.dirname(specPath), ref), "utf8"));
+  }
   return doc;
 }
 
@@ -52,8 +60,9 @@ function compare(spec, implRoutes) {
 
   const missingImpl = [];
   for (const sp of specPaths) {
-    // ignore generic server root or wildcard
-    if (sp === "/" || sp.includes("*")) continue;
+    // ignore generic server root, wildcards, and the documented catch-all —
+    // extractWorkerRoutes() skips `app.get("/*")`, so it has no impl entry
+    if (sp === "/" || sp === "/{path}" || sp.includes("*")) continue;
     if (!implRoutes[sp]) missingImpl.push(sp);
   }
 

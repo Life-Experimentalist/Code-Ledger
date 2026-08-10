@@ -85,20 +85,19 @@ This session focused on connecting the git system with GitHub as default and OAu
 ### Git Provider System Flow
 
 ```
-Problem Submission (LeetCode)
+Problem Submission (LeetCode / GeeksForGeeks / Codeforces)
     ↓
 eventBus.emit('problem:solved', data)
     ↓
-Service Worker: git-engine.js
+Service Worker: _commitWithFailover(files, message, ...)
     ↓
-getActiveGitProvider(settings) - checks priority order
+resolves the ordered target list — primary repo, then any mirrors
     ↓
-GitHub enabled? YES → use GitHub handler
-        NO → check GitLab → check Bitbucket
+registry.getGitProvider('github') → src/handlers/git/github/index.js
     ↓
 handler.commit(files, message, repoName)
     ↓
-GitHub API / GitLab API / Bitbucket API
+GitHub Trees API — one atomic commit for the whole file set
     ↓
 Repository synced with solution files
 ```
@@ -136,13 +135,13 @@ Before OAuth testing, ensure:
 ### ⚠️ Deployment Level (needed for full testing)
 
 - [ ] Cloudflare Worker secrets set:
-  - CODELEDGER_GH_APP_PRIVATE_KEY (PKCS#8)
-  - CODELEDGER_GH_APP_ID
-  - CODELEDGER_GH_APP_CLIENT_ID
-  - CODELEDGER_GH_APP_CLIENT_SECRET
-  - CODELEDGER_GH_APP_WEBHOOK_SECRET
-  - SESSION_SECRET
-- [ ] GitHub App created and configured
+  - CODELEDGER_OAUTH_CLIENT_ID
+  - CODELEDGER_OAUTH_CLIENT_SECRET
+  - SESSION_SECRET (required — sign-in returns 500 without it)
+  - CANONICAL_UPLOAD_TOKEN (optional)
+  - CODELEDGER_GH_APP_WEBHOOK_SECRET (optional)
+- [ ] Classic **OAuth App** registered — not a GitHub App; see CLAUDE.md,
+      "Worker Secrets", for why the distinction matters
 - [ ] Worker deployed: `npx wrangler deploy`
 - [ ] Health check passes: `curl https://codeledger.vkrishna04.me/api/health`
 

@@ -367,7 +367,7 @@ async function getQueueStats() {
 
 **Purpose:** Create atomic, multi-file commits to GitHub using Trees API
 
-**File:** `src/handlers/git/github/index.js` + `src/background/git-engine.js`
+**File:** `src/handlers/git/github/index.js`, called through `_commitWithFailover()` in `src/background/service-worker.js`
 
 #### Commit Flow
 

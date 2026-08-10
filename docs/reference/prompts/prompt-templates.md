@@ -1,5 +1,19 @@
 # CodeLedger — AI Studio Generation Prompt v2
 
+> **This is a historical artifact, not documentation of the shipped code.**
+>
+> It is the original generation brief that produced the first draft of
+> CodeLedger, kept for provenance. The codebase has moved on: files named here
+> no longer exist (`git-engine.js`, `src/manifest.json`), dependencies are no
+> longer loaded from `esm.sh` (Preact, htm and Chart.js are vendored into
+> `src/vendor/` as committed esbuild bundles built from npm), features sketched
+> here were never built (the hosted `/library` web app, gamification, the
+> portfolio view), and the structure differs throughout.
+>
+> **Do not treat anything below as a description of the current system.** The
+> accurate sources are `CLAUDE.md`, `docs/architecture/system-architecture.md`,
+> and `docs/OPENAPI.yaml`.
+
 # Paste into Google AI Studio with Gemini 2.5 Pro, 1M token context window.
 
 # Generate one top-level directory at a time if context is tight.

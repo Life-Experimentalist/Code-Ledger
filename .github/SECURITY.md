@@ -20,10 +20,10 @@ Use the subject line: `[CodeLedger Security] <brief description>`
 
 ### What to include
 
-- **Component**: which part of the extension or worker is affected (e.g., OAuth handler, git-engine, storage)
+- **Component**: which part of the extension or worker is affected (e.g., OAuth callback, the GitHub handler, storage)
 - **Reproduction steps**: minimal, step-by-step instructions to trigger the issue
 - **Impact**: what an attacker could achieve (data exfiltration, token theft, commit injection, etc.)
-- **Affected version**: extension version from `src/manifest.json`
+- **Affected version**: extension version, shown in the extension's settings and in `package.json`
 - **Suggested fix** _(optional)_: if you have a patch or a mitigation in mind
 
 ### What to expect
@@ -46,7 +46,7 @@ Security reports are especially relevant for:
 - **Git commit pipeline** — tree API calls, commit integrity, ability to forge commits or modify other repos
 - **Worker endpoints** — Cloudflare Worker routes (`/api/auth/*`, `/api/webhook/*`, `/api/admin/*`)
 - **Content script isolation** — XSS from problem pages injected into extension UI
-- **Supply chain** — compromised CDN dependencies (`esm.sh`, `mermaid.ink`)
+- **Supply chain** — the vendored bundles under `src/vendor/` (regenerated from npm by `npm run vendor:preact`), and `mermaid.ink`, the one remote service the UI can call and only after an explicit click
 - **Cross-origin message handling** — `postMessage` validation for OAuth callback
 
 ## Out of Scope

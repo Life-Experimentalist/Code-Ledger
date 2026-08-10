@@ -1,9 +1,5 @@
 components:
   securitySchemes:
-    app_jwt:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
     canonical_token:
       type: apiKey
       in: header
