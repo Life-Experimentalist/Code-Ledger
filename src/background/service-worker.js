@@ -57,6 +57,7 @@ import {
   clearCompletedReviews,
   removeQueueItem,
   getAllQueueItems,
+  reclaimStaleProcessing,
   RATE_LIMIT_DELAY_MS_EXPORT as REVIEW_RATE_LIMIT_MS,
 } from "../core/ai-review-queue.js";
 import {
@@ -2748,6 +2749,12 @@ async function processAIReviewQueue(options = {}) {
     dbg.log(
       `[CodeLedger:SnailMode] 🐢 Starting batch${force ? " (forced)" : ""} (size: ${BATCH_SIZE}, interval: ${Math.round(BATCH_INTERVAL_MS / 60000)}min, total processed: ${state.totalProcessed}, errors: ${state.totalErrors})`,
     );
+
+    // An evicted service worker leaves whatever it was reviewing stuck in
+    // "processing", where nothing will ever pick it up again. Reclaim those
+    // before selecting work, so a lost attempt costs one batch interval rather
+    // than the review entirely.
+    await reclaimStaleProcessing().catch(() => 0);
 
     // Reset consecutive error counter at start of new batch
     let batchErrors = 0;
