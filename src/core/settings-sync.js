@@ -58,6 +58,16 @@ const PORTABLE_SETTINGS = [
   "deduplicationEnabled",
   "deduplicationAutoResolve",
 
+  // Gamification
+  "gamificationEnabled",
+  "dailyTargetPoints",
+  "freezeEarnMultiplier",
+  "maxFreezes",
+  "penaltyMultiplier",
+  "iceBreakerDays",
+  "gamificationBadges",
+  "gamificationReadme",
+
   // Appearance / UX
   "behaviorBankEnabled",
   "telemetryEnabled",

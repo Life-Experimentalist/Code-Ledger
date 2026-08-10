@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Code Ledger",
-    "version": "1.0.0",
+    "version": "1.7.0",
     "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
     "author": "VKrishna04",
     "homepage_url": "https://codeledger.vkrishna04.me",

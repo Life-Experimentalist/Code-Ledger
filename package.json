@@ -1,6 +1,6 @@
 {
   "name": "codeledger",
-  "version": "1.0.0",
+  "version": "1.7.0",
   "displayName": "CodeLedger",
   "description": "Your DSA journey, committed. Track and commit all your solved DSA problems to GitHub automatically.",
   "author": "VKrishna04",

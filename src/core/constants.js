@@ -303,6 +303,11 @@ export const CONSTANTS = Object.freeze({
     // Optional per-user difficulty mapping for non-standard difficulty labels.
     // Stored shape: { "extra hard": "Hard", "school": "Easy" }
     DIFFICULTY_MAP: "difficulty.map",
+    // Gamification state that cannot be derived from the ledger: declared
+    // vacation ranges and which achievement toasts have already been shown.
+    // Streaks, points and freezes are always recomputed, never stored.
+    // Shape: { vacations: [{ start, end, note }], seenAchievements: string[] }
+    GAMIFICATION: "gamification.state",
   },
 
   IDB_NAME: "codeledger",

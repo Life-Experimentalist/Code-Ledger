@@ -6,10 +6,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.0.0] — 2026-08-10
+## [1.7.0] — 2026-08-10
 
-First public release. Everything before this was a development build; see
-[Development history](#development-history) for those notes.
+First public release. Versions up to 1.4.7 were development and store-review
+builds; see [Development history](#development-history) for those notes. The
+version does not restart at 1.0.0 because a `v1.0.0` tag already exists and the
+Chrome Web Store requires each upload to exceed the last.
 
 ### Added
 

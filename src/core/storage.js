@@ -93,6 +93,53 @@ export const Storage = {
     await this.setBehaviorBank(bank);
   },
 
+  // ── Gamification state ──────────────────────────────────────────────────
+  // Only the parts that cannot be derived from the ledger live here. See
+  // src/core/gamification.js for why streaks are never stored.
+  async getGamificationState() {
+    const res = await browserStorage.local.get(CONSTANTS.SK.GAMIFICATION);
+    const s = res[CONSTANTS.SK.GAMIFICATION] || {};
+    return {
+      vacations: Array.isArray(s.vacations) ? s.vacations : [],
+      seenAchievements: Array.isArray(s.seenAchievements) ? s.seenAchievements : [],
+    };
+  },
+
+  async setGamificationState(state) {
+    await browserStorage.local.set({ [CONSTANTS.SK.GAMIFICATION]: state });
+  },
+
+  async addVacation(start, end = null, note = "") {
+    const state = await this.getGamificationState();
+    state.vacations.push({ start, end, note });
+    await this.setGamificationState(state);
+    return state.vacations;
+  },
+
+  /** Close the open-ended vacation, if there is one. Returns the updated list. */
+  async endVacation(endDay) {
+    const state = await this.getGamificationState();
+    const open = state.vacations.filter((v) => v && !v.end);
+    for (const v of open) v.end = endDay;
+    await this.setGamificationState(state);
+    return state.vacations;
+  },
+
+  async deleteVacation(start) {
+    const state = await this.getGamificationState();
+    state.vacations = state.vacations.filter((v) => v?.start !== start);
+    await this.setGamificationState(state);
+    return state.vacations;
+  },
+
+  /** Record achievements as announced so the same toast never fires twice. */
+  async markAchievementsSeen(ids) {
+    const state = await this.getGamificationState();
+    state.seenAchievements = [...new Set([...state.seenAchievements, ...ids])];
+    await this.setGamificationState(state);
+    return state.seenAchievements;
+  },
+
   // ── Roadmaps store: Array<Roadmap> ──────────────────────────────────────
   async getRoadmaps() {
     const res = await browserStorage.local.get(CONSTANTS.SK.ROADMAPS);
