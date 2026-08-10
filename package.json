@@ -54,7 +54,7 @@
     "format": "npx prettier --write \"src/**/*.js\" \"dev/**/*.js\" \"worker/src/**/*.js\" \"worker/public/assets/**/*.js\"",
     "release": "node dev/v2/cli.js release",
     "test:sync-regression": "node dev/test-sync-regression.js",
-    "lint": "tsc --noEmit",
+    "lint": "node dev/typecheck.js",
     "sync:manifests": "node dev/sync-manifests.js",
     "domains:update": "node dev/generate-manifest-domains.js",
     "validate:openapi": "node dev/validate-openapi.js",
@@ -64,7 +64,8 @@
     "emoji:repair": "node dev/emoji-tools.js repair",
     "vendor:preact": "node dev/generate-preact-vendor.js",
     "test": "node --test --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\"",
-    "test:watch": "node --test --watch --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\""
+    "test:watch": "node --test --watch --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\"",
+    "lint:all": "tsc --noEmit --checkJs"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",

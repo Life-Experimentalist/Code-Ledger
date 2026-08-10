@@ -4,6 +4,7 @@
  */
 
 import { initDebug, coreDebug, setDebug, createDebugger } from "../lib/debug.js";
+import { storage as browserStorage } from "../lib/browser-compat.js";
 import { registry } from "../core/handler-registry.js";
 import { eventBus } from "../core/event-bus.js";
 import { Storage } from "../core/storage.js";
@@ -3335,7 +3336,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await Promise.all(
           INFRA_FILES.map(async (f) => {
             try {
-              await getContents(owner, repo, f, token);
+              await git.getContents(owner, repo, f);
               checks.infraStatus[f] = "ok";
             } catch (e) {
               checks.infraStatus[f] = e?.status === 404 ? "missing" : "error";
@@ -3346,7 +3347,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // 3. Old-layout path detection — look for topics/* or problems/* top-level dirs
         try {
-          const rootListing = await getContents(owner, repo, "", token).catch(() => []);
+          const rootListing = await git.getContents(owner, repo, "").catch(() => []);
           const rootNames = Array.isArray(rootListing) ? rootListing.map((f) => f.name) : [];
           checks.hasOldTopicsDir = rootNames.includes("topics");
           checks.hasOldProblemsDir = rootNames.includes("problems");
@@ -3361,7 +3362,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // 5. Committed count (from index.json)
         try {
-          const indexFile = await getContents(owner, repo, "index.json", token);
+          const indexFile = await git.getContents(owner, repo, "index.json");
           const indexRaw = indexFile?.content ? atob(indexFile.content.replace(/\n/g, "")) : "{}";
           const index = JSON.parse(indexRaw);
           checks.committedProblemCount = Array.isArray(index.problems) ? index.problems.length : 0;

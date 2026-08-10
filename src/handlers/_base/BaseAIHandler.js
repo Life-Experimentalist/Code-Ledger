@@ -103,7 +103,7 @@ export class BaseAIHandler {
     try {
       return await fetchModelsForProvider(this.id);
     } catch (e) {
-      this.dbg("getAvailableModels failed", e);
+      this.dbg.warn("getAvailableModels failed", e);
       return [];
     }
   }

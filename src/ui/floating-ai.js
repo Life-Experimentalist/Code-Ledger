@@ -1089,10 +1089,9 @@ export function createFloatingAI(slug = "", opts = {}) {
           : [],
         surface: "floating-panel",
         requestType: context.requestType || "",
-        usedCommands: context.usedCommands || [],
         requestTemplate: text,
         summary: text.slice(0, 120),
-        usedCommands, // include detected commands from this message
+        usedCommands, // detected commands from this message
       };
       if (chatId) {
         await updateAIChat(chatId, messages, problemRecord).catch(() => {});
