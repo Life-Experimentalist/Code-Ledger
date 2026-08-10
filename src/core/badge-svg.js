@@ -315,7 +315,10 @@ export function buildBadgeFiles(snapshot, opts = {}) {
 export function badgeStats(snapshot) {
   return {
     schema: 1,
-    generatedAt: new Date().toISOString(),
+    // A day, not a timestamp. The scheduled refresh rewrites this file every
+    // night; a wall-clock stamp would differ on every run and produce a commit
+    // saying nothing changed when nothing did.
+    asOf: snapshot.today || "",
     currentStreak: snapshot.currentStreak || 0,
     longestStreak: snapshot.longestStreak || 0,
     freezes: snapshot.freezes || 0,

@@ -14,6 +14,7 @@
  */
 
 import { buildBadgeFiles, upsertReadmeBlock, README_START, README_END } from "./badge-svg.js";
+import { configFromSettings } from "./gamification.js";
 import { isGamificationActive } from "./feature-flags.js";
 
 /** Every path the feature writes. Nothing outside this list is ever deleted. */
@@ -26,6 +27,7 @@ export const OWNED_PATHS = Object.freeze([
   "badges/freezes.svg",
   "badges/card.svg",
   "badges/stats.json",
+  "badges/config.json",
 ]);
 
 export const WORKFLOW_PATH = ".github/workflows/codeledger-badges.yml";
@@ -128,6 +130,11 @@ export function buildPublishPlan(opts = {}) {
   const files = buildBadgeFiles(snapshot, { username });
   const deletes = [];
 
+  files.push({
+    path: "badges/config.json",
+    content: JSON.stringify(buildRefreshConfig(opts), null, 2),
+  });
+
   if (settings.gamificationReadme !== false && typeof readme === "string") {
     const next = upsertReadmeBlock(readme, snapshot, { pagesUrl, username });
     // Skip an unchanged README rather than adding an identical blob to the
@@ -145,6 +152,40 @@ export function buildPublishPlan(opts = {}) {
   }
 
   return { files, deletes, badgesPublished: true, intent };
+}
+
+/**
+ * What the scheduled refresh needs in order to reproduce the same numbers the
+ * extension computes, rather than the defaults.
+ *
+ * Vacation notes are dropped. The dates have to travel — a vacation day is not
+ * a missed day, and the refresh would otherwise break a streak the extension
+ * considers intact — but whatever the user typed about why they were away has
+ * no business in a file that may be world-readable.
+ *
+ * @param {object} opts same shape as `buildPublishPlan`
+ * @returns {object}
+ */
+export function buildRefreshConfig(opts = {}) {
+  const { settings = {}, snapshot, pagesUrl, username } = opts;
+  const vacations = Array.isArray(opts.vacations) ? opts.vacations : [];
+
+  const config = configFromSettings(settings);
+  if (config.utcOffsetMinutes === undefined && Number.isFinite(snapshot?.utcOffsetMinutes)) {
+    config.utcOffsetMinutes = snapshot.utcOffsetMinutes;
+  }
+
+  return {
+    schema: 1,
+    config,
+    vacations: vacations
+      .filter((v) => v && v.start)
+      .map((v) => ({ start: v.start, end: v.end || v.start })),
+    installDay: settings.installDay || "",
+    username: username || "",
+    pagesUrl: pagesUrl || "",
+    readme: settings.gamificationReadme !== false,
+  };
 }
 
 /**

@@ -34,6 +34,7 @@ import {
   computeIceBreaker,
   recallCandidates,
   describeStreak,
+  configFromSettings,
 } from "../src/core/gamification.js";
 
 const UTC = { utcOffsetMinutes: 0 };
@@ -656,6 +657,41 @@ describe("streak floor (imported history)", () => {
       streakFloorDay: "2026-03-01",
     });
     assert.equal(s.currentStreak, 3);
+  });
+});
+
+describe("configFromSettings", () => {
+  test("picks the tunables out of a flat settings bag", () => {
+    const cfg = configFromSettings({
+      dailyTargetPoints: 40,
+      maxFreezes: 2,
+      github_repo: "ledger",
+      aiEnabled: true,
+    });
+    assert.deepEqual(cfg, { dailyTargetPoints: 40, maxFreezes: 2 });
+  });
+
+  test("a cleared field falls back to the default instead of poisoning the maths", () => {
+    // A schema-driven number input hands back "" when emptied. Passing that
+    // through would make every points total NaN.
+    const cfg = configFromSettings({ dailyTargetPoints: "", maxFreezes: NaN });
+    assert.deepEqual(cfg, {});
+  });
+
+  test("the master switch is not a scoring tunable", () => {
+    assert.equal("enabled" in configFromSettings({ enabled: 1 }), false);
+  });
+
+  test("nothing to read is not an error", () => {
+    assert.deepEqual(configFromSettings(undefined), {});
+    assert.deepEqual(configFromSettings(null), {});
+  });
+});
+
+describe("day boundary travels with the snapshot", () => {
+  test("the offset used is echoed back so a UTC runner can reproduce it", () => {
+    const s = computeSnapshot([], { config: { utcOffsetMinutes: 330 } });
+    assert.equal(s.utcOffsetMinutes, 330);
   });
 });
 

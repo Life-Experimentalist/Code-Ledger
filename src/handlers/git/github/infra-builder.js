@@ -27,6 +27,9 @@ import { createDebugger } from "../../../lib/debug.js";
 import { getPagesHtml, getRepoReadme } from "./pages-template.js";
 import { getCommitHistory, getContents, listDirectory, createBlob } from "./api-client.js";
 import { DEFAULT_THEME, getThemePalette } from "../../../core/theme-engine.js";
+import { computeSnapshot, configFromSettings } from "../../../core/gamification.js";
+import { buildPublishPlan } from "../../../core/gamification-publisher.js";
+import { REFRESH_BADGES_SCRIPT } from "../../../vendor/refresh-badges-source.js";
 
 const dbg = createDebugger("GitHubInfra");
 
@@ -41,7 +44,11 @@ const dbg = createDebugger("GitHubInfra");
  * @param {string}  token
  * @param {object}  settings   Extension settings object
  * @param {boolean} isNewRepo  True when the repo was just created
- * @returns {Promise<object[]>} Tree items (path / mode / type / content)
+ * @returns {Promise<{items: object[], gamification: {badgesPublished: boolean, workflowPublished: boolean}|null}>}
+ *   `items` are tree items (path / mode / type / content, or sha:null to delete).
+ *   `gamification` is what the caller must persist *after* the commit lands —
+ *   recording it before would leave the badges orphaned in the repository if
+ *   the push failed, with nothing left to tell a later commit to remove them.
  */
 export async function buildInfraFiles(
   owner,
@@ -56,7 +63,7 @@ export async function buildInfraFiles(
 
   // Dynamic files — always up to date
   const dynamic = await _buildDynamicFiles(owner, repo, token, settings, indexMetaOverride);
-  items.push(...dynamic);
+  items.push(...dynamic.items);
 
   // Bootstrap files — only on first commit so they never re-dirty the tree
   if (isNewRepo) {
@@ -64,7 +71,7 @@ export async function buildInfraFiles(
   }
 
   dbg.log(`buildInfraFiles(): ${items.length} infra file(s) (isNewRepo=${isNewRepo})`);
-  return items;
+  return { items, gamification: dynamic.gamification };
 }
 
 // ── Dynamic files (index.html + README.md + deploy workflow) ─────────────────
@@ -158,29 +165,31 @@ async function _buildDynamicFiles(owner, repo, token, settings, indexMetaOverrid
   // ── README: read-before-write so user content outside the markers is kept ──
   const pagesUrl = settings?.github_pages_url || `https://${owner}.github.io/${repo}/`;
   const newStatsBlock = getRepoReadme(owner, repo, pagesUrl, pagesTheme, settings, indexMeta);
+  let currentText = null;
+  let merged = newStatsBlock;
   try {
     const existing = await getContents(owner, repo, "README.md", token);
-    const currentText = existing?.content ? _decodeContent(existing.content) : null;
-    const merged = currentText ? _mergeReadme(currentText, newStatsBlock) : newStatsBlock;
-    if (merged !== currentText) {
-      items.push({
-        path: "README.md",
-        mode: "100644",
-        type: "blob",
-        content: merged,
-      });
-      dbg.log("_buildDynamicFiles(): README updated (stats section changed)");
-    } else {
-      dbg.log("_buildDynamicFiles(): README unchanged — skipping");
-    }
+    currentText = existing?.content ? _decodeContent(existing.content) : null;
+    if (currentText) merged = _mergeReadme(currentText, newStatsBlock);
   } catch (_) {
     // 404 or network error — write fresh
-    items.push({
-      path: "README.md",
-      mode: "100644",
-      type: "blob",
-      content: newStatsBlock,
-    });
+  }
+
+  // ── Gamification badges ───────────────────────────────────────────────────
+  // Runs against the merged README rather than the stored one, so the badge
+  // block and the stats block are reconciled in a single write instead of
+  // fighting over the file across two commits.
+  const gami = await _buildGamificationFiles(owner, settings, merged, pagesUrl);
+  if (gami) {
+    items.push(...gami.items);
+    if (typeof gami.readme === "string") merged = gami.readme;
+  }
+
+  if (merged !== currentText) {
+    items.push({ path: "README.md", mode: "100644", type: "blob", content: merged });
+    dbg.log("_buildDynamicFiles(): README updated");
+  } else {
+    dbg.log("_buildDynamicFiles(): README unchanged — skipping");
   }
 
   // ── deploy-pages.yml: keep current so existing repos get path-filter fix ──
@@ -216,7 +225,80 @@ async function _buildDynamicFiles(owner, repo, token, settings, indexMetaOverrid
     // Not present — nothing to do
   }
 
-  return items;
+  return { items, gamification: gami ? gami.state : null };
+}
+
+/**
+ * Badge SVGs, the refresh config, and the scheduled workflow — or the deletions
+ * that remove them once the user switches the feature off.
+ *
+ * Returns null when the feature has never published anything and is switched
+ * off, which is the common case for anyone who does not want it: no snapshot is
+ * computed and no extra files touch the tree.
+ *
+ * @param {string} owner
+ * @param {Record<string, any>} settings
+ * @param {string} readme  README the rest of this build already merged
+ * @param {string} pagesUrl
+ * @returns {Promise<{items: object[], readme: string|undefined, state: {badgesPublished: boolean, workflowPublished: boolean}}|null>}
+ */
+async function _buildGamificationFiles(owner, settings, readme, pagesUrl) {
+  try {
+    const problems = await Storage.getProblems().catch(() => []);
+    const { vacations } = await Storage.getGamificationState().catch(() => ({ vacations: [] }));
+    const snapshot = computeSnapshot(problems, {
+      config: configFromSettings(settings),
+      vacations,
+      streakFloorDay: settings?.installDay || undefined,
+    });
+
+    const plan = buildPublishPlan({
+      snapshot,
+      settings,
+      vacations,
+      readme,
+      pagesUrl,
+      username: owner,
+      repoPrivate: settings?.github_repo_private === true,
+      refreshScript: REFRESH_BADGES_SCRIPT,
+    });
+
+    if (plan.intent === "idle") return null;
+
+    const items = [];
+    let nextReadme;
+    for (const file of plan.files) {
+      if (file.path === "README.md") {
+        nextReadme = file.content;
+        continue; // folded into the single README write above
+      }
+      items.push({ path: file.path, mode: "100644", type: "blob", content: file.content });
+    }
+    for (const path of plan.deletes) {
+      items.push({ path, mode: "100644", type: "blob", sha: null });
+    }
+
+    dbg.log(
+      `_buildGamificationFiles(): ${plan.intent} — ${items.length} item(s), ` +
+        `streak ${snapshot.currentStreak}d`,
+    );
+
+    return {
+      items,
+      readme: nextReadme,
+      state: {
+        badgesPublished: plan.badgesPublished,
+        // Mirrors the same condition buildPublishPlan used, so a later revoke
+        // knows whether there is a workflow to remove.
+        workflowPublished: plan.files.some((f) => f.path.startsWith(".github/workflows/codeledger")),
+      },
+    };
+  } catch (e) {
+    // Badges are decoration. A failure here must never cost the user a commit
+    // that carries their solution.
+    dbg.warn("_buildGamificationFiles(): skipped (non-fatal):", e?.message);
+    return null;
+  }
 }
 
 // ── Bootstrap files (LICENSE / .gitignore / config / images) ─────────────────

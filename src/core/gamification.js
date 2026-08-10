@@ -64,6 +64,32 @@ export const DEFAULT_CONFIG = Object.freeze({
   utcOffsetMinutes: -new Date().getTimezoneOffset(),
 });
 
+/** The tunable keys, stored flat in settings alongside everything else. */
+export const CONFIG_KEYS = Object.freeze(
+  Object.keys(DEFAULT_CONFIG).filter((k) => k !== "enabled"),
+);
+
+/**
+ * Pull the scoring config out of a settings object.
+ *
+ * Settings are a flat bag written by a schema-driven UI, so a value that was
+ * cleared can come back as "" or NaN. Anything that is not a finite number is
+ * left out entirely so the default applies rather than the scoring maths
+ * silently producing NaN points.
+ *
+ * @param {Record<string, any>} [settings]
+ * @returns {Record<string, number>}
+ */
+export function configFromSettings(settings) {
+  const out = {};
+  if (!settings || typeof settings !== "object") return out;
+  for (const key of CONFIG_KEYS) {
+    const value = settings[key];
+    if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+  }
+  return out;
+}
+
 /**
  * Level thresholds in cumulative points. Gaps widen so early levels arrive fast
  * (the first week is when people quit) and later ones stay meaningful.
@@ -483,6 +509,10 @@ export function computeSnapshot(problems, options = {}) {
     enabled: cfg.enabled !== false,
     dailyTargetPoints: cfg.dailyTargetPoints,
     effectiveTarget,
+    // The day boundary this snapshot was computed against. It has to travel:
+    // a GitHub Actions runner is on UTC, so a refresh that fell back to its own
+    // offset would roll the day over at the wrong hour for everyone else.
+    utcOffsetMinutes: cfg.utcOffsetMinutes,
 
     totalPoints,
     totalSolves: events.filter((e) => !e.recall).length,

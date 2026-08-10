@@ -261,6 +261,7 @@ export class GitHubHandler extends BaseGitHandler {
     const treeItems = buildTreeItems(files, opts.deletes);
 
     // Add infrastructure files unless this is a mirror commit or explicitly skipped
+    let gamificationState = null;
     if (!opts.isMirror && !opts.skipInfra) {
       const infra = await buildInfraFiles(
         owner,
@@ -271,8 +272,9 @@ export class GitHubHandler extends BaseGitHandler {
         isNewRepo,
         opts.indexMetaOverride ?? null,
       );
-      treeItems.push(...infra);
-      dbg.log(`commit(): +${infra.length} infra file(s) (isNewRepo=${isNewRepo})`);
+      treeItems.push(...infra.items);
+      gamificationState = infra.gamification;
+      dbg.log(`commit(): +${infra.items.length} infra file(s) (isNewRepo=${isNewRepo})`);
     }
 
     // ── Create tree → commit → update ref ────────────────────────────────
@@ -311,6 +313,26 @@ export class GitHubHandler extends BaseGitHandler {
     }
 
     dbg.log(`commit(): ✅ ${owner}/${name} @ ${BRANCH}`);
+
+    // Only now that the ref moved. Recording this before the push would leave
+    // the badges in the repository with nothing left to say they are there, so
+    // a later "remove them" would find no work to do.
+    if (gamificationState) {
+      try {
+        // Re-read rather than reusing `settings`: this commit may have taken
+        // seconds, and setSettings replaces the whole object rather than
+        // merging into it.
+        const fresh = await Storage.getSettings();
+        if (
+          fresh.badgesPublished !== gamificationState.badgesPublished ||
+          fresh.workflowPublished !== gamificationState.workflowPublished
+        ) {
+          await Storage.setSettings({ ...fresh, ...gamificationState });
+        }
+      } catch (e) {
+        dbg.warn(`commit(): badge state not persisted (non-fatal):`, e?.message);
+      }
+    }
 
     // Enable Pages on new repo — fire-and-forget
     if (isNewRepo && settings["github_pages"] !== false) {

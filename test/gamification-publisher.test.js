@@ -20,6 +20,7 @@ import {
   shouldPublishWorkflow,
   stripReadmeBlock,
   buildPublishPlan,
+  buildRefreshConfig,
   workflowYaml,
 } from "../src/core/gamification-publisher.js";
 import { README_START, README_END, upsertReadmeBlock } from "../src/core/badge-svg.js";
@@ -254,6 +255,60 @@ describe("buildPublishPlan", () => {
     assert.ok(plan.deletes.includes(WORKFLOW_PATH));
     assert.ok(plan.deletes.includes(REFRESH_SCRIPT_PATH));
     assert.ok(plan.files.some((f) => f.path === "badges/streak.svg"), "badges stay");
+  });
+});
+
+describe("buildRefreshConfig", () => {
+  test("carries the settings the refresh needs to match the extension", () => {
+    const cfg = buildRefreshConfig({
+      settings: { dailyTargetPoints: 40, maxFreezes: 3, installDay: "2026-01-05" },
+      username: "octocat",
+      pagesUrl: "https://octocat.github.io/CodeLedger",
+    });
+    assert.equal(cfg.config.dailyTargetPoints, 40);
+    assert.equal(cfg.config.maxFreezes, 3);
+    assert.equal(cfg.installDay, "2026-01-05");
+    assert.equal(cfg.username, "octocat");
+  });
+
+  test("vacation dates travel but the notes do not", () => {
+    // The dates have to go: a vacation day is not a missed day, and a refresh
+    // without them would break a streak the extension considers intact. What
+    // the user typed about why they were away is nobody else's business.
+    const cfg = buildRefreshConfig({
+      vacations: [{ start: "2026-07-01", end: "2026-07-10", note: "hospital" }],
+    });
+    assert.deepEqual(cfg.vacations, [{ start: "2026-07-01", end: "2026-07-10" }]);
+    assert.ok(!JSON.stringify(cfg).includes("hospital"));
+  });
+
+  test("the day boundary travels even when the user never set one", () => {
+    // Otherwise the Actions runner computes days in UTC while the extension
+    // computes them in local time, and the two disagree about "today".
+    const cfg = buildRefreshConfig({ snapshot: { ...SNAPSHOT, utcOffsetMinutes: 330 } });
+    assert.equal(cfg.config.utcOffsetMinutes, 330);
+  });
+
+  test("junk settings are dropped rather than published as-is", () => {
+    const cfg = buildRefreshConfig({
+      settings: { dailyTargetPoints: "lots", maxFreezes: NaN },
+      vacations: [null, { end: "2026-01-01" }],
+    });
+    assert.equal(cfg.config.dailyTargetPoints, undefined);
+    assert.equal(cfg.config.maxFreezes, undefined);
+    assert.deepEqual(cfg.vacations, []);
+  });
+
+  test("a one-day vacation needs no end date", () => {
+    const cfg = buildRefreshConfig({ vacations: [{ start: "2026-07-01" }] });
+    assert.deepEqual(cfg.vacations, [{ start: "2026-07-01", end: "2026-07-01" }]);
+  });
+
+  test("publishing writes it alongside the badges", () => {
+    const plan = buildPublishPlan({ snapshot: SNAPSHOT, settings: {} });
+    const file = plan.files.find((f) => f.path === "badges/config.json");
+    assert.ok(file);
+    assert.equal(JSON.parse(file.content).schema, 1);
   });
 });
 

@@ -63,6 +63,7 @@
     "emoji:scan": "node dev/emoji-tools.js scan",
     "emoji:repair": "node dev/emoji-tools.js repair",
     "vendor:preact": "node dev/generate-preact-vendor.js",
+    "vendor:refresh-script": "node dev/generate-refresh-script.js",
     "test": "node --test --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\"",
     "test:watch": "node --test --watch --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\"",
     "lint:all": "tsc --noEmit --checkJs"
