@@ -119,8 +119,8 @@ Required to display the CodeLedger Library panel — a full-page view of the use
 
 - `*://*.leetcode.com/*`, `*://*.geeksforgeeks.org/*`, `*://*.codeforces.com/*` — Content scripts observe DOM changes on these platforms to detect when a submission is accepted. The only data read from these pages is the user's own submitted code and problem metadata (title, difficulty, tags), which is then committed to the user's own GitHub repo.
 - `https://api.github.com/*` — Required to commit solutions to the user's GitHub repository via the Trees API, read repository state for cross-device sync, and look up repository/user metadata during onboarding.
-- `https://api.gitlab.com/*` — Required for users who configure GitLab as their git provider instead of GitHub. Only contacted when the user has set up a GitLab repository.
-- `https://api.openai.com/*`, `https://api.anthropic.com/*`, `https://generativelanguage.googleapis.com/*`, `https://api.deepseek.com/*` — Required to call AI providers for optional AI code review. Each endpoint is only contacted if the user has explicitly configured and enabled that provider. API keys are stored locally via `chrome.storage.local` and never transmitted to the extension developer.
+- `*://codeledger.vkrishna04.me/*` — Required for the GitHub sign-in flow. The extension opens this page to start OAuth and listens for the resulting token message; it also fetches the shared canonical problem-ID map from this origin.
+- `https://api.openai.com/*`, `https://api.anthropic.com/*`, `https://generativelanguage.googleapis.com/*`, `https://api.deepseek.com/*`, `https://openrouter.ai/*` — Required to call AI providers for optional AI code review. Each endpoint is only contacted if the user has explicitly configured and enabled that provider. API keys are stored locally via `chrome.storage.local` and never transmitted to the extension developer.
 - `http://localhost:11434/*` — Required to call a locally-running Ollama instance for users who opt for a fully local AI provider. Only contacted when Ollama is selected and a local server is running.
 
 ---
@@ -238,13 +238,29 @@ If you choose to enable AI reviews and provide your own API key, CodeLedger make
 - **Data Sent**: The code and description of the solved problem.
 - **Local Alternative**: You can use Ollama (`http://localhost:11434`) to run models locally on your machine, preventing any code from being sent to external AI servers.
 
+### D. shields.io (Optional, Off by Default)
+
+Streak and progress badges are generated as SVG files committed to your own repository, so by default no third party is involved in rendering them.
+
+- **If you switch the badge style to shields** under **Settings → Streaks**, your README loads badge images from `shields.io`, which reads the numbers from a small JSON file in your repository.
+- **Data Sent**: Your repository URL, and one request each time somebody views your README. No code, no tokens, no problem content.
+- **Reversible**: Switching back to the self-hosted style stops it, and the SVG badges are always committed regardless of which style you use.
+
+---
+
+## 2b. Public Repositories
+
+If the ledger repository you commit to is **public** — which is what most people want, since it doubles as a portfolio — then your solutions, your solve history, your streak badges, and the generated GitHub Pages site can be read by anyone with the link. This is a property of the repository you chose, not something CodeLedger transmits anywhere extra. Making the repository private keeps all of it visible only to you and anyone you invite.
+
+The extension shows this same list live under **Settings → Privacy**, computed from your actual configuration rather than written down, so it cannot fall out of date with what the extension does.
+
 ---
 
 ## 3. Telemetry (Optional, Opt-In Only)
 
 CodeLedger includes anonymous usage telemetry which is **disabled by default** (`telemetryOptIn` is set to `false`).
 
-If and only if you explicitly opt-in under **Settings → General → Anonymous Usage Stats**:
+If and only if you explicitly opt-in under **Settings → Advanced → Anonymous telemetry**:
 
 - The extension sends a POST request to `https://counter.vkrishna04.me/api/v1/counter/solve/hit`.
 - **Payload sent**: `{ event: "solve", platform: "leetcode", version: "x.y.z" }`

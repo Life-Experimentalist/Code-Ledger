@@ -39,7 +39,7 @@ Solve a problem on LeetCode. The instant it's accepted, Code Ledger commits it t
 
 Your code and GitHub tokens are never stored on our servers. OAuth is handled via a Cloudflare Worker proxy (`codeledger.vkrishna04.me`) — the token passes through and is stored only in local extension storage; the server does not log or retain it.
 
-The extension includes **optional, opt-in anonymous usage telemetry** (disabled by default). If you enable it in Settings → General → Anonymous Usage Stats, it sends only `{ event: "solve", platform: "leetcode", version: "x.y.z" }` to `counter.vkrishna04.me` when a problem is solved. No code, no tokens, no problem data, no identifiers. You can verify this in the open source at github.com/Life-Experimentalist/Code-Ledger (`src/core/telemetry.js`).
+The extension includes **optional, opt-in anonymous usage telemetry** (disabled by default). If you enable it in Settings → Advanced → Anonymous telemetry, it sends only `{ event: "solve", platform: "leetcode", version: "x.y.z" }` to `counter.vkrishna04.me` when a problem is solved. No code, no tokens, no problem data, no identifiers. You can verify this in the open source at github.com/Life-Experimentalist/Code-Ledger (`src/core/telemetry.js`).
 
 ---
 
@@ -61,10 +61,13 @@ Thank you for reviewing CodeLedger.
 - **OAuth Security:** GitHub OAuth token is exchanged via a Cloudflare Worker proxy (`codeledger.vkrishna04.me`) and returned directly to the browser. Tokens are saved only in local extension storage and never stored on the worker.
 - **Strict Permission Scopes:**
   - `storage`: Persists settings, OAuth token, and IndexedDB solve cache locally.
-  - `tabs` & `scripting`: Detects supported problem page URLs and checks solve status.
+  - `alarms`: Schedules the periodic sync check and the nightly badge refresh.
+  - `tabs`: Detects the OAuth callback URL and refreshes open library tabs after a commit. The extension does not request `scripting`; content scripts are declared statically in the manifest.
   - Host permissions (`leetcode.com`, `geeksforgeeks.org`, `codeforces.com`): Observes DOM on coding platforms.
   - Host permission `api.github.com`: Commits files directly to the user's repo.
-- **Opt-In Telemetry:** Disabled by default. If enabled under Settings → General, it sends only `{ version: "x.y.z", platform: "leetcode" }` to `counter.vkrishna04.me`. No code, tokens, or identifiers are included. Reviewers can verify in `src/core/telemetry.js`.
+  - Host permission `codeledger.vkrishna04.me`: Starts the OAuth sign-in flow and serves the shared canonical problem-ID map.
+  - Host permissions for AI providers (`api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `openrouter.ai`, `localhost:11434`): Contacted only for the provider the user configured a key for.
+- **Opt-In Telemetry:** Disabled by default. If enabled under Settings → Advanced → Anonymous telemetry, it sends only `{ version: "x.y.z", platform: "leetcode" }` to `counter.vkrishna04.me`. No code, tokens, or identifiers are included. Reviewers can verify in `src/core/telemetry.js`.
 
 ---
 
@@ -149,13 +152,29 @@ If you choose to enable AI reviews and provide your own API key, CodeLedger make
 - **Data Sent**: The code and description of the solved problem.
 - **Local Alternative**: You can use Ollama (`http://localhost:11434`) to run models locally on your machine, preventing any code from being sent to external AI servers.
 
+### D. shields.io (Optional, Off by Default)
+
+Streak and progress badges are generated as SVG files committed to your own repository, so by default no third party is involved in rendering them.
+
+- **If you switch the badge style to shields** under **Settings → Streaks**, your README loads badge images from `shields.io`, which reads the numbers from a small JSON file in your repository.
+- **Data Sent**: Your repository URL, and one request each time somebody views your README. No code, no tokens, no problem content.
+- **Reversible**: Switching back to the self-hosted style stops it, and the SVG badges are always committed regardless of which style you use.
+
+---
+
+## 2b. Public Repositories
+
+If the ledger repository you commit to is **public** — which is what most people want, since it doubles as a portfolio — then your solutions, your solve history, your streak badges, and the generated GitHub Pages site can be read by anyone with the link. This is a property of the repository you chose, not something CodeLedger transmits anywhere extra. Making the repository private keeps all of it visible only to you and anyone you invite.
+
+The extension shows this same list live under **Settings → Privacy**, computed from your actual configuration rather than written down, so it cannot fall out of date with what the extension does.
+
 ---
 
 ## 3. Telemetry (Optional, Opt-In Only)
 
 CodeLedger includes anonymous usage telemetry which is **disabled by default** (`telemetryOptIn` is set to `false`).
 
-If and only if you explicitly opt-in under **Settings → General → Anonymous Usage Stats**:
+If and only if you explicitly opt-in under **Settings → Advanced → Anonymous telemetry**:
 
 - The extension sends a POST request to `https://counter.vkrishna04.me/api/v1/counter/solve/hit`.
 - **Payload sent**: `{ event: "solve", platform: "leetcode", version: "x.y.z" }`

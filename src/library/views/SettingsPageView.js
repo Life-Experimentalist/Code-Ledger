@@ -17,6 +17,7 @@ import { PanelAI } from "../settings-panels/PanelAI.js";
 import { PanelGit } from "../settings-panels/PanelGit.js";
 import { PanelPlatforms } from "../settings-panels/PanelPlatforms.js";
 import { PanelGamification } from "../settings-panels/PanelGamification.js";
+import { PanelPrivacy } from "../settings-panels/PanelPrivacy.js";
 import { PanelBackups } from "../settings-panels/PanelBackups.js";
 import { PanelBehaviorBank } from "../settings-panels/PanelBehaviorBank.js";
 import { PanelAdvanced } from "../settings-panels/PanelAdvanced.js";
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { id: "git", emoji: "🔗", label: "Git" },
   { id: "platforms", emoji: "🌐", label: "Platforms" },
   { id: "streaks", emoji: "🔥", label: "Streaks" },
+  { id: "privacy", emoji: "🔒", label: "Privacy" },
   { id: "backups", emoji: "💾", label: "Backups" },
   { id: "bank", emoji: "🧠", label: "Behaviour Bank" },
   { id: "advanced", emoji: "⚙️", label: "Advanced" },
@@ -39,6 +41,7 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
     "git",
     "platforms",
     "streaks",
+    "privacy",
     "backups",
     "bank",
     "advanced",
@@ -47,6 +50,13 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
   const [activePanel, setActivePanel] = useState(
     VALID_PANELS.has(initPanel) ? initPanel : "general",
   );
+
+  /** Jump to the panel that owns a setting — used by the privacy disclosure list. */
+  function goToPanel(id) {
+    if (!VALID_PANELS.has(id)) return;
+    setActivePanel(id);
+    updateQueryParams({ settingsTab: id });
+  }
 
   function renderPanel() {
     const props = { settings, onSettingsChange, onSetupRepo, onConnect };
@@ -61,6 +71,8 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
         return html`<${PanelPlatforms} ...${props} />`;
       case "streaks":
         return html`<${PanelGamification} ...${props} />`;
+      case "privacy":
+        return html`<${PanelPrivacy} ...${props} onGoToPanel=${goToPanel} />`;
       case "backups":
         return html`<${PanelBackups} ...${props} />`;
       case "bank":
@@ -80,10 +92,7 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
           ({ id, emoji, label }) => html`
             <button
               key=${id}
-              onClick=${() => {
-                setActivePanel(id);
-                updateQueryParams({ settingsTab: id });
-              }}
+              onClick=${() => goToPanel(id)}
               class="flex items-center gap-1.5 px-3 py-2.5 rounded-t-lg text-sm font-medium whitespace-nowrap transition-colors border-b-2
               ${activePanel === id
                 ? "border-cyan-500 text-cyan-200 bg-cyan-500/5"
