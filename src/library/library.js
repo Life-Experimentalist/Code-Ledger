@@ -11,6 +11,7 @@ const html = htm.bind(h);
 import { Storage } from "/core/storage.js";
 import { CONSTANTS } from "/core/constants.js";
 import { initDebug, setDebug, createDebugger, rawError } from "/lib/debug.js";
+import { trustedAuthOrigins, isTrustedAuthMessage } from "/lib/oauth-message.js";
 const dbg = createDebugger("LibraryApp");
 import { applyThemeFromStorage, setupThemeListener } from "/core/theme-engine.js";
 import { getQueryParam, updateQueryParams } from "/core/url-state.js";
@@ -287,7 +288,7 @@ function LibraryApp() {
   // change listener (COOP relay path via service worker).
   const processOAuthToken = useCallback(async (token, provider = "github") => {
     if (!token || provider !== "github") return;
-    dbg.log(`processOAuthToken(): received ${provider} token (${token.slice(0, 7)}...)`);
+    dbg.log(`processOAuthToken(): received ${provider} token`);
     try {
       dbg.log(`processOAuthToken(): saving token to storage...`);
       await Storage.setAuthToken("github", token);
@@ -339,23 +340,11 @@ function LibraryApp() {
 
   // Listen for OAuth messages from Worker (popup path, non-COOP browsers)
   useEffect(() => {
+    const allowedOrigins = trustedAuthOrigins(CONSTANTS.URLS.AUTH_WORKER, window.location.origin);
     const handleOAuthMessage = async (event) => {
-      // Strict origin allowlist. Origin "null" must NOT be accepted: it is what
-      // sandboxed iframes, data: and file: documents report, so allowing it lets
-      // any web page the user visits inject an attacker-controlled GitHub token
-      // and silently redirect the user's ledger to a repository they do not own.
-      const allowedOrigins = [new URL(CONSTANTS.URLS.AUTH_WORKER).origin, window.location.origin];
-      if (!allowedOrigins.includes(event.origin)) return;
-      const data = event.data;
-      if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") return;
-      dbg.log(
-        `handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}, token ${data.token ? "present" : "MISSING"}`,
-      );
-      if (!data.token) {
-        dbg.error("handleOAuthMessage(): OAuth error:", data.error);
-        return;
-      }
-      await processOAuthToken(data.token, data.provider);
+      if (!isTrustedAuthMessage(event, allowedOrigins, "github")) return;
+      dbg.log(`handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}`);
+      await processOAuthToken(event.data.token, event.data.provider);
     };
     window.addEventListener("message", handleOAuthMessage);
     return () => window.removeEventListener("message", handleOAuthMessage);

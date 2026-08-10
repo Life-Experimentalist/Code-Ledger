@@ -63,7 +63,8 @@
     "emoji:scan": "node dev/emoji-tools.js scan",
     "emoji:repair": "node dev/emoji-tools.js repair",
     "vendor:preact": "node dev/generate-preact-vendor.js",
-    "test": "node --test --test-reporter=spec worker/test/auth.test.js"
+    "test": "node --test --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\"",
+    "test:watch": "node --test --watch --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\""
   },
   "dependencies": {
     "@google/genai": "^1.31.0",

@@ -61,12 +61,18 @@ function renderTable(block) {
 }
 
 function _safeLink(_, label, url) {
+  // Every caller hands us text that has already been HTML-escaped once, so a
+  // URL like ?a=1&b=2 arrives as ?a=1&amp;b=2. Undo just that one entity before
+  // re-escaping, otherwise the href ships as &amp;amp; and the link is broken.
+  // Only "&" is decoded — < > and " stay encoded, so no markup can be rebuilt.
+  const decoded = String(url).replace(/&amp;/g, "&");
+
   // Two separate concerns, both required:
   //  1. Scheme allowlist — blocks javascript:, data:, vbscript: URLs.
   //  2. Attribute escaping — a URL may pass the scheme test and still contain a
   //     quote, e.g. https://x" onmouseover="…, which would break out of the
   //     href attribute and inject an event handler.
-  const safeUrl = /^https?:\/\//i.test(url) ? escapeHtml(url) : "#";
+  const safeUrl = /^https?:\/\//i.test(decoded) ? escapeHtml(decoded) : "#";
   return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline">${label}</a>`;
 }
 

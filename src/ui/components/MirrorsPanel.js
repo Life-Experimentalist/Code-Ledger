@@ -17,11 +17,10 @@ const dbg = createDebugger("MirrorsPanel");
 
 import { Storage } from "../../core/storage.js";
 
-const PROVIDERS = [
-  { id: "github", label: "GitHub" },
-  { id: "gitlab", label: "GitLab" },
-  { id: "bitbucket", label: "Bitbucket" },
-];
+// GitHub only. The GitLab and Bitbucket handlers are still stubs whose write
+// paths throw, so offering them here produced a mirror that silently failed on
+// every commit. Re-add an entry the moment its handler can actually push.
+const PROVIDERS = [{ id: "github", label: "GitHub" }];
 
 const EMPTY_MIRROR = { provider: "github", repo: "", owner: "" };
 
@@ -115,17 +114,22 @@ export function MirrorsPanel() {
       <div class="flex flex-col gap-2">
         <div class="text-[10px] text-slate-600 uppercase tracking-wider">Add mirror</div>
         <div class="flex items-center gap-2 flex-wrap">
-          <select
-            value=${draft.provider}
-            onChange=${(e) =>
-              setDraft((d) => ({
-                ...d,
-                provider: e.target.value,
-              }))}
-            class="bg-[#0d1117] border border-white/10 text-xs text-slate-300 px-2 py-1.5 rounded-lg"
-          >
-            ${PROVIDERS.map((p) => html`<option value=${p.id}>${p.label}</option>`)}
-          </select>
+          ${PROVIDERS.length > 1
+            ? html`<select
+                value=${draft.provider}
+                onChange=${(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    provider: e.target.value,
+                  }))}
+                class="bg-[#0d1117] border border-white/10 text-xs text-slate-300 px-2 py-1.5 rounded-lg"
+              >
+                ${PROVIDERS.map((p) => html`<option value=${p.id}>${p.label}</option>`)}
+              </select>`
+            : html`<span
+                class="text-[10px] font-medium text-cyan-400 uppercase tracking-wider px-2 py-1.5"
+                >${PROVIDERS[0].label}</span
+              >`}
           <input
             type="text"
             placeholder="Owner / org (optional)"

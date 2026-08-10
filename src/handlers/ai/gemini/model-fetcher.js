@@ -12,8 +12,9 @@ export async function fetchGeminiModels(apiKey) {
   if (_cache) return _cache;
   dbg.log("Fetching Gemini models from API");
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
-    headers: { "Content-Type": "application/json" },
+  // Key goes in a header, not the query string — see gemini/index.js.
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
   });
   if (!res.ok) throw new Error(`Gemini models fetch failed: ${res.status}`);
 

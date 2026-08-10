@@ -7,6 +7,36 @@ import { CONSTANTS } from "../../../core/constants.js";
 import { CHART_JS_INLINE } from "../../../vendor/chart-source.js";
 
 /**
+ * Escapes a value for interpolation into HTML text or a double-quoted attribute.
+ *
+ * Everything embedded at generation time — asset URLs, report image paths,
+ * commit metadata — originates in the user's repository or settings, and the
+ * generated page is published publicly. An unescaped value here is stored XSS
+ * against everyone who visits the user's Pages site, not just the owner.
+ */
+function esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Collapses anything that is not an http(s) URL to "#" before escaping it. */
+function safeHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || "")) ? esc(value) : "#";
+}
+
+/**
+ * Turns a repository-relative path into a same-origin URL.
+ * Leading slashes are stripped first: "//host" is a protocol-relative URL, so a
+ * path beginning with a slash would silently point at a different origin.
+ */
+function assetPath(value) {
+  return "/" + esc(String(value || "").replace(/^\/+/, ""));
+}
+
+/**
  * Returns a self-contained HTML stats page for GitHub Pages.
  * The page fetches ./index.json at runtime and renders a full dashboard.
  */
@@ -45,7 +75,7 @@ export function getPagesHtml(opts = {}) {
   <meta name="description" content="DSA problem solutions tracked by CodeLedger — GitHub-backed, AI-reviewed, owned by you." />
   <meta property="og:title" content="CodeLedger — DSA Stats" />
   <meta property="og:description" content="DSA solutions committed automatically to GitHub." />
-  <meta property="og:image" content="${ASSETS.social}" />
+  <meta property="og:image" content="${safeHttpUrl(ASSETS.social)}" />
   <meta property="og:type" content="website" />
   <script>${CHART_JS_INLINE}</script>
   <style>
@@ -176,11 +206,11 @@ export function getPagesHtml(opts = {}) {
   <header>
     <div class="hdr">
       <div class="logo">
-        <img src="${ASSETS.iconTransparent}" alt="logo" style="width:28px;height:28px;border-radius:6px;margin-right:.5rem;object-fit:contain" />
+        <img src="${safeHttpUrl(ASSETS.iconTransparent)}" alt="logo" style="width:28px;height:28px;border-radius:6px;margin-right:.5rem;object-fit:contain" />
         <div class="logo-text">Code<b>Ledger</b></div>
       </div>
       <div style="display:flex;align-items:center;gap:.5rem">
-        ${commitSummary && settings.pages_show_verification ? `<div class="repo-pill" style="margin-right:.5rem">Verified: ${commitSummary.verified} / ${commitSummary.total}</div>` : ""}
+        ${commitSummary && settings.pages_show_verification ? `<div class="repo-pill" style="margin-right:.5rem">Verified: ${Number(commitSummary.verified) || 0} / ${Number(commitSummary.total) || 0}</div>` : ""}
         <a id="repo-link" class="repo-pill" href="#" target="_blank" rel="noreferrer">—</a>
         <button class="theme-toggle" id="theme-btn" title="Toggle light/dark mode" aria-label="Toggle theme">☀</button>
       </div>
@@ -266,11 +296,11 @@ export function getPagesHtml(opts = {}) {
     <div class="g2">
       <div class="card">
         <div class="card-label">Commit Verification</div>
-        <div id="commit-panel" style="font-size:.9rem;color:var(--muted);margin-bottom:.6rem">${commitSummary ? `Verified ${commitSummary.verified} of ${commitSummary.total} recent commits` : "Commit verification not enabled"}</div>
+        <div id="commit-panel" style="font-size:.9rem;color:var(--muted);margin-bottom:.6rem">${commitSummary ? `Verified ${Number(commitSummary.verified) || 0} of ${Number(commitSummary.total) || 0} recent commits` : "Commit verification not enabled"}</div>
       </div>
       <div class="card">
         <div class="card-label">Report Images</div>
-        <div id="report-images" style="display:flex;gap:.5rem;flex-wrap:wrap">${reportImages.length ? reportImages.map((p) => `<a href="/${p}" target="_blank"><img src="/${p}" style="width:120px;height:auto;border-radius:8px;border:1px solid rgba(255,255,255,.04)"></a>`).join("") : '<div style="color:var(--muted)">No report images found</div>'}</div>
+        <div id="report-images" style="display:flex;gap:.5rem;flex-wrap:wrap">${reportImages.length ? reportImages.map((p) => `<a href="${assetPath(p)}" target="_blank"><img src="${assetPath(p)}" alt="report image" style="width:120px;height:auto;border-radius:8px;border:1px solid rgba(255,255,255,.04)"></a>`).join("") : '<div style="color:var(--muted)">No report images found</div>'}</div>
       </div>
     </div>
 
@@ -312,7 +342,7 @@ export function getPagesHtml(opts = {}) {
     <div class="card" style="padding: .5rem;">
       <div class="card-label">Report Images</div>
       <div style="display:flex;flex-direction:column;gap:.5rem">
-        ${reportImages.map((img) => `<a href="/${img}" target="_blank" style="display:block"><img src="/${img}" alt="report image" style="width:100%;height:auto;border-radius:8px;border:1px solid rgba(255,255,255,.04)"></a>`).join("")}
+        ${reportImages.map((img) => `<a href="${assetPath(img)}" target="_blank" style="display:block"><img src="${assetPath(img)}" alt="report image" style="width:100%;height:auto;border-radius:8px;border:1px solid rgba(255,255,255,.04)"></a>`).join("")}
       </div>
     </div>
   </div>
@@ -795,7 +825,13 @@ export function getPagesHtml(opts = {}) {
   </script>
   <script>
     // Inject server-provided commit list for client-side rendering
-    window.SERVER_COMMIT_LIST = ${JSON.stringify(commitList || []).replace(/</g, "\\u003c")};
+    // "<" is escaped so a commit message containing "</script>" cannot close this
+    // block; U+2028/U+2029 are escaped because JSON.stringify emits them raw and
+    // they are line terminators to any parser predating ES2019.
+    window.SERVER_COMMIT_LIST = ${JSON.stringify(commitList || [])
+      .replace(/</g, "\\u003c")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029")};
     (function renderServerCommits() {
       try {
         var list = window.SERVER_COMMIT_LIST || [];
@@ -806,11 +842,15 @@ export function getPagesHtml(opts = {}) {
         for (var i = 0; i < list.length; i++) {
           var c = list[i];
           var color = c.verified ? '#10b981' : '#ef4444';
-          var msg = c.message || (c.sha ? c.sha.substring(0,7) : 'commit');
+          var msg = c.message || (c.sha ? String(c.sha).substring(0,7) : 'commit');
+          // Commit message, author and URL are repository content: on a public
+          // repo anyone who lands a commit controls them, so all three are
+          // escaped and the URL is restricted to http(s).
+          var url = /^https?:\/\//i.test(String(c.url || '')) ? escHtml(c.url) : '#';
           html += '<div style="display:flex;align-items:center;gap:.6rem;padding:.25rem 0;border-bottom:1px solid rgba(255,255,255,.02)">'
                + '<div style="width:10px;height:10px;border-radius:50%;background:' + color + '"></div>'
-               + '<a href="' + (c.url || '#') + '" target="_blank" rel="noreferrer" style="color:var(--text);text-decoration:none">' + (msg) + '</a>'
-               + '<span style="color:var(--muted);font-size:.75rem;margin-left:auto">' + (c.author || '') + '</span>'
+               + '<a href="' + url + '" target="_blank" rel="noreferrer" style="color:var(--text);text-decoration:none">' + escHtml(msg) + '</a>'
+               + '<span style="color:var(--muted);font-size:.75rem;margin-left:auto">' + escHtml(c.author || '') + '</span>'
                + '</div>';
         }
         panel.innerHTML = html;

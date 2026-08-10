@@ -803,6 +803,36 @@ async function commitUpdatedProblem(problem, settings) {
   return { committed: 1, repo: repoName };
 }
 
+// Match patterns for the tabs our content scripts are actually injected into.
+// Derived from CONSTANTS so it cannot drift from the manifest.
+const _CONTENT_SCRIPT_MATCHES = [
+  ...new Set(
+    Object.values(CONSTANTS.PLATFORMS).flatMap((p) =>
+      // "*.host" already covers the bare host and every subdomain, so the
+      // www./practice. variants collapse into one pattern.
+      (p.domains || []).map((d) => `*://*.${d.replace(/^(www|practice)\./, "")}/*`),
+    ),
+  ),
+];
+
+/**
+ * Send a message to every tab running one of our content scripts.
+ *
+ * Deliberately filtered rather than `tabs.query({})`: an unfiltered query
+ * enumerates every tab the user has open — including their URLs and titles —
+ * for no benefit, since sendMessage only ever reaches our own content scripts.
+ */
+function _broadcastToContentScripts(message) {
+  chrome.tabs.query({ url: [..._CONTENT_SCRIPT_MATCHES] }, (matched) => {
+    void chrome.runtime.lastError;
+    for (const tab of matched || []) {
+      chrome.tabs.sendMessage(tab.id, message, () => {
+        void chrome.runtime.lastError; // suppress "no receiver" for tabs mid-navigation
+      });
+    }
+  });
+}
+
 /**
  * Broadcast GITHUB_REAUTH_REQUIRED to all extension pages.
  * Called whenever a GitHub API call returns 401 so the UI can prompt
@@ -811,13 +841,7 @@ async function commitUpdatedProblem(problem, settings) {
 async function _broadcastAuthExpired() {
   await Storage.setAuthToken("github", "").catch(() => {});
   dbg.warn("_broadcastAuthExpired(): OAuth token rejected — cleared, notifying tabs");
-  chrome.tabs.query({}, (allTabs) => {
-    for (const tab of allTabs || []) {
-      chrome.tabs.sendMessage(tab.id, { type: "GITHUB_REAUTH_REQUIRED" }, () => {
-        void chrome.runtime.lastError;
-      });
-    }
-  });
+  _broadcastToContentScripts({ type: "GITHUB_REAUTH_REQUIRED" });
   chrome.runtime.sendMessage({ type: "GITHUB_REAUTH_REQUIRED" }, () => {
     void chrome.runtime.lastError;
   });
@@ -2262,20 +2286,7 @@ async function handleBulkImport(problems = []) {
     missingDifficulty,
   };
   dbg.log(`handleBulkImport(): complete — ${JSON.stringify(report)}`);
-  chrome.tabs.query({}, (allTabs) => {
-    for (const tab of allTabs || []) {
-      chrome.tabs.sendMessage(
-        tab.id,
-        {
-          type: "CODELEDGER_IMPORT_COMPLETE",
-          ...report,
-        },
-        () => {
-          void chrome.runtime.lastError;
-        },
-      ); // suppress "no receiver" errors
-    }
-  });
+  _broadcastToContentScripts({ type: "CODELEDGER_IMPORT_COMPLETE", ...report });
 
   return report;
 }
@@ -3067,8 +3078,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: false });
       return true;
     }
+    // Log presence, never content — debug logs end up in bug reports.
     dbg.log(
-      `CODELEDGER_AUTH_RELAY: received from ${senderHost}, provider=${msg.provider}, token=${msg.token ? msg.token.slice(0, 7) + "..." : "MISSING"}`,
+      `CODELEDGER_AUTH_RELAY: received from ${senderHost}, provider=${msg.provider}, token=${msg.token ? "present" : "MISSING"}`,
     );
     if (msg.token && msg.provider) {
       Storage.setAuthToken(msg.provider, msg.token)

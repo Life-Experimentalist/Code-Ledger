@@ -9,6 +9,7 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { createDebugger } from "../../lib/debug.js";
+import { trustedAuthOrigins, isTrustedAuthMessage } from "../../lib/oauth-message.js";
 
 const dbg = createDebugger("SettingsSchema");
 
@@ -806,13 +807,20 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
         return;
       }
 
+      // Only the auth worker may deliver a token. The popup we open hands its
+      // `window.opener` to every page it navigates through, so without this
+      // check any of them — or any page that obtains a handle to this view —
+      // can post a CODELEDGER_AUTH message and swap in an attacker's GitHub
+      // token, silently redirecting the user's ledger to a repo they do not own.
+      const allowedOrigins = trustedAuthOrigins(
+        CONSTANTS.URLS.AUTH_WORKER,
+        window.location.origin,
+      );
+
       const receiveMessage = async (ev) => {
         try {
-          const data = ev && ev.data;
-          if (!data) return;
-          if (data.type !== "CODELEDGER_AUTH") return;
-          if (data.provider !== provider) return;
-          if (!data.token) return;
+          if (!isTrustedAuthMessage(ev, allowedOrigins, provider)) return;
+          const data = ev.data;
           await Storage.setAuthToken(provider, data.token);
           onChange(key, data.token);
           setTestResults((s) => ({ ...s, [key]: "OK" }));

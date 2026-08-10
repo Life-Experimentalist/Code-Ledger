@@ -11,6 +11,9 @@
         "48": "assets/images/icon-48.png",
         "128": "assets/images/icon-128.png"
     },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'"
+    },
     "permissions": [
         "storage",
         "alarms",
@@ -23,11 +26,11 @@
         "*://*.geeksforgeeks.org/*",
         "*://*.codeforces.com/*",
         "https://api.github.com/*",
-        "https://api.gitlab.com/*",
         "https://api.openai.com/*",
         "https://api.anthropic.com/*",
         "https://generativelanguage.googleapis.com/*",
         "https://api.deepseek.com/*",
+        "https://openrouter.ai/*",
         "http://localhost:11434/*"
     ],
     "background": {

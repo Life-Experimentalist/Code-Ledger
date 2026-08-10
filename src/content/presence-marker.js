@@ -88,9 +88,7 @@
       );
       return;
     }
-    console.log(
-      `[CodeLedger:PresenceMarker] writeAuthToken(): dispatching relay for ${provider} (${token.slice(0, 7)}...)`,
-    );
+    console.log(`[CodeLedger:PresenceMarker] writeAuthToken(): dispatching relay for ${provider}`);
 
     // Primary: sendMessage to SW — Chrome puts this in the IPC queue synchronously,
     // so delivery is guaranteed even if this popup window closes right after.
@@ -167,9 +165,9 @@
       );
       return;
     }
-    console.log(
-      `[CodeLedger:PresenceMarker] OAuth relay (DOM): provider=${authData.provider}, token=${authData.token.slice(0, 7)}...`,
-    );
+    // Never log any part of the token — this page is the OAuth callback and its
+    // console is readable by anything with devtools access to the tab.
+    console.log(`[CodeLedger:PresenceMarker] OAuth relay (DOM): provider=${authData.provider}`);
     writeAuthToken(authData.provider, authData.token);
   }
   relayAuthFromDOM();
@@ -215,7 +213,11 @@
   // event.source !== window guards against cross-frame injection.
   window.addEventListener("message", (event) => {
     if (!event.data || event.data.type !== "CODELEDGER_AUTH") return;
+    // Same document only, and belt-and-braces on the origin. event.source ===
+    // window already implies this page posted it, but an explicit origin check
+    // means a future refactor that relaxes the source check cannot open a hole.
     if (event.source !== window) return;
+    if (event.origin !== window.location.origin) return;
     if (!event.data.token) return;
     if (document.getElementById("codeledger-auth-result")) {
       console.log(

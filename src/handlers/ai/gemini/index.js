@@ -87,10 +87,12 @@ export class GeminiHandler extends BaseAIHandler {
 
       try {
         dbg.log(`review(): attempt ${attempt + 1}/${keyCount}, calling Gemini API...`);
-        const url = `${endpoint}/models/${model}:generateContent?key=${key}`;
+        // Send the key as a header, not ?key=. A query string is recorded by
+        // proxies, devtools request lists and error reporters; a header is not.
+        const url = `${endpoint}/models/${model}:generateContent`;
         const res = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
           }),
