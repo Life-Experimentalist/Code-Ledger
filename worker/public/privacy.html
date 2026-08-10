@@ -6,7 +6,7 @@
     <title>Privacy Policy — CodeLedger</title>
     <meta name="description" content="CodeLedger privacy policy. Your data stays yours — no servers, no telemetry, no tracking." />
     <link rel="canonical" href="https://codeledger.vkrishna04.me/privacy" />
-    <link rel="icon" href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" />
+    <link rel="icon" href="/assets/icon-128.png" type="image/png" />
     <link rel="stylesheet" href="/assets/landing.css" />
     <style>
       .page-content {
@@ -72,26 +72,26 @@
   <body>
     <nav>
       <a class="nav-brand" href="/">
-        <img src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" alt="CodeLedger logo" />
+        <img src="/assets/icon-128.png" alt="" width="28" height="28" />
         CodeLedger
       </a>
       <div class="nav-links">
         <a href="/#features"><span>Features</span></a>
-        <a href="/library">📚 <span>Library</span></a>
         <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">⭐ <span>GitHub</span></a>
       </div>
     </nav>
 
     <div class="page-content">
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: June 2026</p>
+      <p class="updated">Last updated: August 2026</p>
 
       <div class="highlight-box">
         <p>TL;DR — CodeLedger never sees your code, your AI keys, or your GitHub token. Everything lives in your browser and your own GitHub repo.</p>
       </div>
 
       <h2>1. Data Collection</h2>
-      <p><strong>We collect nothing on our servers.</strong> CodeLedger does not operate any analytics, telemetry, logging, or tracking infrastructure. The extension runs entirely inside your browser.</p>
+      <p><strong>By default, nothing is collected on our servers.</strong> CodeLedger runs entirely inside your browser. There is no account, no profile, and no advertising or tracking infrastructure.</p>
+      <p>There is exactly one thing that can be sent to us, and it is off unless you turn it on. If you enable <strong>Anonymous Usage Stats</strong> in Settings → Advanced, then each time a solved problem is committed the extension sends a single counter hit to <code>counter.vkrishna04.me</code> containing only the platform name and the extension version — for example <code>{ "platform": "leetcode", "version": "1.0.0" }</code>. It carries no code, no problem, no token, no account, and no identifier of any kind, and nothing is sent while the setting is off.</p>
       <p>The extension stores the following data <strong>only in your browser's local storage and IndexedDB</strong>:</p>
       <ul>
         <li>Your GitHub OAuth access token (used to push commits to your repo)</li>
@@ -105,7 +105,7 @@
       <p>Your data is processed strictly to provide the extension's core functionality: pushing code to your GitHub repo and requesting AI code reviews using your provided API keys. CodeLedger does not track your browsing activity, sell your data, or use advertising SDKs.</p>
 
       <h2>3. Data Storage & Security</h2>
-      <p>All data remains on your device under your control. It is protected by your browser's encryption and security boundaries. You can delete all data at any time by uninstalling the extension or clearing the extension's local data.</p>
+      <p>All data remains on your device under your control, isolated by the browser's extension storage boundary — other sites and other extensions cannot read it. It is not separately encrypted at rest, so anyone with access to your operating system profile can read it, exactly as with the rest of your browser profile. You can delete all of it at any time by uninstalling the extension or clearing its local data.</p>
 
       <h2>4. Data Sharing & Third-Party Disclosure</h2>
       <p>We do not sell or share your data. Data is only transmitted to the third parties you explicitly configure:</p>
@@ -113,6 +113,7 @@
         <li><strong>GitHub</strong>: Your solution code and metadata are sent directly to your own repository using the GitHub API.</li>
         <li><strong>AI Providers (Optional)</strong>: Your code and metadata are sent to the provider you select using your own API key. You are subject to their respective privacy policies.</li>
         <li><strong>Cloudflare Worker</strong>: Used exclusively to relay the GitHub OAuth code exchange. No tokens or personal data are stored or logged on the worker.</li>
+        <li><strong>Anonymous counter (opt-in, off by default)</strong>: If you enable Anonymous Usage Stats, a platform name and version number are sent to <code>counter.vkrishna04.me</code> as described in section 1. Disabling the setting stops it immediately.</li>
       </ul>
 
       <h2>5. Children's privacy</h2>
@@ -129,7 +130,6 @@
       <span>CodeLedger — Apache 2.0 · Built by <a href="https://github.com/VKrishna04" style="color:var(--accent);text-decoration:none">VKrishna04</a></span>
       <div class="footer-links">
         <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">GitHub</a>
-        <a href="/library">Library</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
         <a href="/support">Support</a>

@@ -124,16 +124,8 @@ nav {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(
-      ellipse 60% 40% at 50% -10%,
-      rgba(6, 182, 212, 0.18) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 40% 30% at 80% 50%,
-      rgba(168, 85, 247, 0.08) 0%,
-      transparent 60%
-    );
+    radial-gradient(ellipse 60% 40% at 50% -10%, rgba(6, 182, 212, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 80% 50%, rgba(168, 85, 247, 0.08) 0%, transparent 60%);
   pointer-events: none;
 }
 
@@ -377,11 +369,7 @@ section {
 
 /* ── BYOK callout ── */
 .byok {
-  background: linear-gradient(
-    135deg,
-    rgba(168, 85, 247, 0.08),
-    rgba(6, 182, 212, 0.06)
-  );
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(6, 182, 212, 0.06));
   border: 1px solid rgba(168, 85, 247, 0.2);
   border-radius: var(--radius-lg);
   padding: 48px;
@@ -486,6 +474,483 @@ hr {
   border-top: 1px solid var(--border);
 }
 
+/* ── Accessibility ── */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  padding: 10px 18px;
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+  border-radius: 0 0 var(--radius) 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── Reading-progress bar ── */
+#scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  z-index: 300;
+  pointer-events: none;
+}
+
+/* ── Scroll reveal ──
+   Only armed once JS sets .js on <html>. Without scripting every element stays
+   at its final state, so the page reads identically to a crawler or a reader
+   with JS disabled — nothing here hides content. */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.js .reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.js .reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.js .reveal-stagger.is-visible > * {
+  opacity: 1;
+  transform: none;
+}
+
+.js .reveal-stagger.is-visible > *:nth-child(1) {
+  transition-delay: 0ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(2) {
+  transition-delay: 60ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(3) {
+  transition-delay: 120ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(4) {
+  transition-delay: 180ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(5) {
+  transition-delay: 240ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(6) {
+  transition-delay: 300ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(7) {
+  transition-delay: 360ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(8) {
+  transition-delay: 420ms;
+}
+.js .reveal-stagger.is-visible > *:nth-child(n + 9) {
+  transition-delay: 480ms;
+}
+
+/* ── Hero ambience ── */
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  opacity: 0.4;
+  animation: drift 18s ease-in-out infinite alternate;
+}
+
+.hero-orb.one {
+  width: 340px;
+  height: 340px;
+  background: rgba(6, 182, 212, 0.35);
+  top: -120px;
+  left: 8%;
+}
+
+.hero-orb.two {
+  width: 300px;
+  height: 300px;
+  background: rgba(168, 85, 247, 0.28);
+  top: 40px;
+  right: 6%;
+  animation-delay: -7s;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(28px, 34px, 0) scale(1.12);
+  }
+}
+
+.hero > *:not(.hero-orb) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Section heading helper (centred variants) ── */
+.section-head {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.section-head .section-sub {
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0;
+}
+
+/* ── Pipeline diagram ── */
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  counter-reset: pipe;
+}
+
+.pipe-step {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  transition: border-color 0.25s;
+}
+
+.pipe-step:hover {
+  border-color: var(--border-glow);
+}
+
+.pipe-step .pipe-icon {
+  font-size: 1.3rem;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.pipe-step h3 {
+  color: #fff;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+
+.pipe-step p {
+  color: var(--subtle);
+  font-size: 0.83rem;
+  line-height: 1.6;
+}
+
+.pipe-step code {
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+/* ── Screenshot showcase ── */
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.shot {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition:
+    border-color 0.25s,
+    transform 0.25s;
+}
+
+.shot:hover {
+  border-color: var(--border-glow);
+  transform: translateY(-3px);
+}
+
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.shot figcaption {
+  padding: 16px 20px 20px;
+}
+
+.shot figcaption strong {
+  display: block;
+  color: #fff;
+  font-size: 0.98rem;
+  margin-bottom: 6px;
+}
+
+.shot figcaption span {
+  color: var(--subtle);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+/* ── Repo layout / code block ── */
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.code-card {
+  background: #08080e;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.code-card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.code-card header::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f87171;
+  box-shadow:
+    16px 0 0 #fbbf24,
+    32px 0 0 #34d399;
+  margin-right: 32px;
+}
+
+.code-card pre {
+  margin: 0;
+  padding: 20px;
+  overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.75;
+  color: var(--subtle);
+}
+
+.code-card pre .c-dir {
+  color: var(--accent);
+}
+.code-card pre .c-key {
+  color: var(--purple);
+}
+.code-card pre .c-str {
+  color: #6ee7b7;
+}
+.code-card pre .c-dim {
+  color: var(--muted);
+}
+
+/* ── Comparison / support table ── */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+table.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 520px;
+}
+
+table.matrix th,
+table.matrix td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+table.matrix thead th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+table.matrix tbody th {
+  color: #fff;
+  font-weight: 600;
+}
+
+table.matrix td {
+  color: var(--subtle);
+}
+
+table.matrix tbody tr:last-child th,
+table.matrix tbody tr:last-child td {
+  border-bottom: none;
+}
+
+table.matrix tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tag-yes {
+  color: var(--green);
+  font-weight: 700;
+}
+.tag-no {
+  color: var(--muted);
+}
+
+/* ── Privacy ledger ── */
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.ledger-col {
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.ledger-col.stays {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.06), transparent);
+}
+
+.ledger-col.leaves {
+  border-color: rgba(168, 85, 247, 0.22);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.06), transparent);
+}
+
+.ledger-col h3 {
+  color: #fff;
+  font-size: 1rem;
+  margin-bottom: 14px;
+}
+
+.ledger-col ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ledger-col li {
+  color: var(--subtle);
+  font-size: 0.87rem;
+  line-height: 1.6;
+  padding-left: 22px;
+  position: relative;
+}
+
+.ledger-col li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.ledger-col.stays li::before {
+  content: "✓";
+  color: var(--green);
+}
+
+.ledger-col.leaves li::before {
+  content: "→";
+  color: var(--purple);
+}
+
+/* ── Contributor cards ── */
+.link-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.link-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  text-decoration: none;
+  transition:
+    border-color 0.25s,
+    transform 0.2s;
+}
+
+.link-card:hover {
+  border-color: var(--border-glow);
+  transform: translateY(-2px);
+}
+
+.link-card strong {
+  display: block;
+  color: #fff;
+  font-size: 0.98rem;
+  margin-bottom: 6px;
+}
+
+.link-card span {
+  color: var(--subtle);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.link-card .arrow {
+  color: var(--accent);
+  font-size: 0.86rem;
+  display: inline-block;
+  margin-top: 12px;
+  transition: transform 0.2s;
+}
+
+.link-card:hover .arrow {
+  transform: translateX(4px);
+}
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   nav {
@@ -506,5 +971,50 @@ hr {
   footer {
     justify-content: center;
     text-align: center;
+  }
+  .hero-orb {
+    display: none;
+  }
+}
+
+/* ── Motion preferences ──
+   Everything above is decoration. Someone who has asked their system for less
+   motion gets the final state immediately rather than a shortened animation. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .js .reveal,
+  .js .reveal-stagger > * {
+    opacity: 1;
+    transform: none;
+  }
+  .btn:hover,
+  .feature:hover,
+  .shot:hover,
+  .link-card:hover {
+    transform: none;
+  }
+}
+
+/* ── Print ── */
+@media print {
+  nav,
+  #scroll-progress,
+  .hero-orb,
+  .hero-actions,
+  .browser-badges {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
   }
 }

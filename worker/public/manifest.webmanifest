@@ -1,22 +1,20 @@
 {
   "name": "CodeLedger",
   "short_name": "CodeLedger",
-  "start_url": "/library",
+  "description": "Auto-commit every solved LeetCode, GeeksForGeeks, and Codeforces problem to your own GitHub repository.",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#050508",
   "theme_color": "#06b6d4",
   "icons": [
+    { "src": "/assets/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "/assets/icon-288.png", "sizes": "288x288", "type": "image/png" },
     {
-      "src": "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png",
-      "sizes": "192x192",
+      "src": "/assets/icon-1024.png",
+      "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any maskable"
-    },
-    {
-      "src": "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-dark-bg.png",
-      "sizes": "512x512",
-      "type": "image/png"
     }
   ]
 }
