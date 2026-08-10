@@ -10,6 +10,7 @@ import { h, useState } from "../../../vendor/preact-bundle.js";
 import { htm } from "../../../vendor/preact-bundle.js";
 import { modalTabRegistry } from "../../../core/modal-tab-registry.js";
 import { highlightCode } from "../../../lib/syntax-highlight.js";
+import { sanitizeHtml } from "../../../lib/sanitize-html.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 
@@ -121,7 +122,10 @@ const universalTabs = [
               <div
                 class="text-sm text-slate-300 leading-relaxed lc-content"
                 dangerouslySetInnerHTML=${{
-                  __html: problem.problemStatement,
+                  // The statement is scraped markup. It renders both in the host
+                  // page's world and in the extension's own library page, so it
+                  // is reduced to attribute-free formatting tags first.
+                  __html: sanitizeHtml(problem.problemStatement),
                 }}
               ></div>
             `
