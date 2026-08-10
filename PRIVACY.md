@@ -63,6 +63,8 @@ We maintain a strict **zero-sharing policy**. We do not sell, rent, trade, or sh
 - **GitHub API**: Used to push commits directly to your personal repository. [GitHub Privacy Policy](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement).
 - **AI Providers (Optional)**: If you choose to enable AI Reviews, your code and problem statements are sent to your selected provider (e.g., Google, OpenAI, Anthropic) using your personal API key. Your data is subject to the privacy terms of the specific provider you select.
 - **Ollama (Optional)**: If you use Ollama, data is processed locally on your own machine.
+- **mermaid.ink (Optional)**: When an AI response contains a Mermaid diagram, the extension shows the diagram's source code and a **Render diagram** button. Only if you press that button is the diagram source sent to `mermaid.ink` to be drawn as an image. Nothing is sent otherwise. [Mermaid Live Editor](https://mermaid.live).
+- **CodeLedger authentication service**: `codeledger.vkrishna04.me` performs the GitHub OAuth exchange. It receives the temporary authorization code GitHub issues, exchanges it for your access token, and returns that token to the extension. The token is stored on your device only — the service does not retain it, and no solve data ever passes through it.
 
 ---
 
