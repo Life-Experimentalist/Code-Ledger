@@ -11,6 +11,7 @@ const html = htm.bind(h);
 import { Storage } from "../core/storage.js";
 import { createDebugger } from "../lib/debug.js";
 import { CONSTANTS } from "../core/constants.js";
+import { privacyTier } from "../core/privacy-disclosure.js";
 
 const dbg = createDebugger("WelcomePage");
 
@@ -167,6 +168,10 @@ function WelcomeApp() {
   const requiredDone = STEPS.filter((s) => s.required).every((s) => !!checks[s.id]);
   const allDone = STEPS.every((s) => !!checks[s.id]);
   const doneCount = STEPS.filter((s) => !!checks[s.id]).length;
+
+  // Read from the settings that are loaded already, so this says what the setup
+  // in front of the user actually does rather than what the average one does.
+  const privacy = privacyTier(settings);
 
   const repoUrl = (() => {
     const repo = settings.github_repo || settings.gitRepo;
@@ -443,10 +448,39 @@ function WelcomeApp() {
             : ""}
         </div>
 
+        <!-- What this setup currently sends, computed rather than promised -->
+        <div class="mb-8 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3.5">
+          <div class="flex items-center gap-2">
+            <span class="h-2 w-2 rounded-full bg-cyan-400" aria-hidden="true"></span>
+            <h3 class="text-xs font-semibold text-slate-300">${privacy.name}</h3>
+          </div>
+          <p class="mt-1 text-[11px] leading-snug text-slate-500">${privacy.summary}</p>
+          ${privacy.active.length > 0
+            ? html`
+                <ul class="mt-2 space-y-0.5">
+                  ${privacy.active.map(
+                    (d) => html`
+                      <li key=${d.id} class="text-[11px] leading-snug text-slate-500">
+                        <span class="text-slate-400">${d.destination}</span> — ${d.what}
+                      </li>
+                    `,
+                  )}
+                </ul>
+              `
+            : ""}
+          <button
+            onClick=${() => openExtTab("library/library.html?tab=settings&settingsTab=privacy")}
+            class="mt-2.5 text-[11px] text-cyan-400/80 hover:text-cyan-300 transition-colors"
+          >
+            See every option and what it costs →
+          </button>
+        </div>
+
         <!-- Footer -->
         <p class="mt-4 text-[11px] text-slate-700 text-center max-w-sm">
-          This page can be reopened from the extension popup at any time. Your data is stored
-          locally and synced to your own GitHub — never shared with third parties.
+          This page can be reopened from the extension popup at any time. Nothing above is sent
+          anywhere you have not switched on, and the list stays accurate because it is read from
+          your settings rather than written down.
         </p>
       </div>
     </div>

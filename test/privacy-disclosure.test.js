@@ -114,6 +114,23 @@ describe("disclosures", () => {
     assert.equal(privacyTier({ ...PRIVATE_REPO, ollama_enabled: true }).tier, "private");
   });
 
+  test("the diagram renderer is listed whenever its button can appear", () => {
+    // It has no setting — it is a Render button on each diagram — so the
+    // honest thing a settings object can report is whether it is reachable,
+    // which is exactly when AI can produce a diagram to render.
+    assert.equal(byId(REPO).mermaid.on, false);
+    assert.equal(byId({ ...REPO, gemini_enabled: true }).mermaid.on, true);
+    assert.equal(byId({ ...REPO, gemini_enabled: true, aiEnabled: false }).mermaid.on, false);
+    assert.match(byId(REPO).mermaid.note, /press/i, "it must say a click is required");
+  });
+
+  test("a click-only destination is listed but does not set the headline", () => {
+    const s = { ...PRIVATE_REPO, ollama_enabled: true };
+    assert.equal(byId(s).mermaid.on, true, "the Render button is reachable, so say so");
+    // ...but nothing has been sent, so the headline must not claim a ping.
+    assert.equal(privacyTier(s).tier, "private");
+  });
+
   test("the anonymous counter is off unless explicitly switched on", () => {
     assert.equal(byId(REPO).telemetry.on, false);
     assert.equal(byId({ ...REPO, telemetryOptIn: true }).telemetry.on, true);

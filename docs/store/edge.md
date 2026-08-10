@@ -16,7 +16,7 @@ CodeLedger detects accepted DSA submissions on LeetCode, GeeksForGeeks, and Code
 
 **Permission notes:**
 
-- storage: persists settings, OAuth token, and problem cache locally. The only external call is opt-in anonymous telemetry (disabled by default) — sends { platform, version } to counter.vkrishna04.me only if user enables "Anonymous Usage Stats" in Settings → General.
+- storage: persists settings, OAuth token, and problem cache locally. The only external call not covered by a host permission above is opt-in anonymous telemetry (disabled by default) — sends { platform, version } to counter.vkrishna04.me only if the user enables "Anonymous telemetry" in Settings → Advanced.
 - alarms: periodic cross-device sync every 30 min and AI review rate-limiting.
 - sidePanel: CodeLedger Library panel (solve history, analytics, knowledge graph).
 - Host permissions: leetcode/gfg/codeforces for content scripts; api.github.com for commits; AI provider APIs only contacted when user has configured that provider with their own key; localhost:11434 for local Ollama only.
@@ -63,12 +63,12 @@ A force-directed graph linking all your solves by topic. Spot coverage gaps inst
 **💬 AI chat panel**
 Floating AI assistant on every problem page with slash commands (/mycode, /problem, /errors).
 
-**🔒 100% yours**
-Data goes to your GitHub repo only. No external dashboards, no scraping, open-source Apache 2.0.
+**🔒 Private by default**
+Out of the box your code goes to your GitHub repo and nowhere else. No external dashboards, no scraping, open-source Apache 2.0.
 
 **PRIVACY**
 
-CodeLedger never stores your code or GitHub token externally. OAuth is handled via a transparent Cloudflare Worker proxy — the token goes directly to your browser. Full source at github.com/Life-Experimentalist/Code-Ledger.
+CodeLedger never stores your code or GitHub token externally. OAuth is handled via a transparent Cloudflare Worker proxy — the token goes directly to your browser. Everything beyond your own repo is a choice you make: AI review sends your solution to the provider you picked with your own key, and shields.io badges are an opt-in alternative to the self-hosted ones. Settings → Privacy lists every destination live, computed from your own configuration. Full source at github.com/Life-Experimentalist/Code-Ledger.
 
 **SETUP (2 MINUTES)**
 
@@ -245,6 +245,14 @@ Streak and progress badges are generated as SVG files committed to your own repo
 - **If you switch the badge style to shields** under **Settings → Streaks**, your README loads badge images from `shields.io`, which reads the numbers from a small JSON file in your repository.
 - **Data Sent**: Your repository URL, and one request each time somebody views your README. No code, no tokens, no problem content.
 - **Reversible**: Switching back to the self-hosted style stops it, and the SVG badges are always committed regardless of which style you use.
+
+### E. mermaid.ink (Optional, One Click at a Time)
+
+When an AI review contains a diagram, the extension displays its source together with a **Render diagram** button rather than drawing it automatically.
+
+- **Purpose**: Turns a diagram's source into an image without loading any external script, which the extension's Content Security Policy would block in any case.
+- **Data Sent**: The source of the single diagram you pressed Render on. It describes the shape of your solution but is not the solution code, and no token or account is involved.
+- **Never automatic**: Nothing reaches `mermaid.ink` unless you press the button on that specific diagram.
 
 ---
 

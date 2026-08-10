@@ -49,8 +49,8 @@ Your entire history synced via your own GitHub repo on every startup. Always cur
 💾 Rolling backups
 Automatic snapshots of your problems and settings committed to your repo. Full restore in one click.
 
-🔒 100% yours
-Your data goes to your GitHub repo, period. No sign-ups, no dashboards on our servers, no scraping. You own everything — plain files, Apache 2.0.
+🔒 Private by default
+Out of the box your data goes to your GitHub repo and nowhere else. No sign-ups, no dashboards on our servers, no scraping. Everything past that is a choice you make and can see: Settings → Privacy lists every destination live, computed from your own configuration. You own everything — plain files, Apache 2.0.
 
 ---
 
@@ -267,6 +267,14 @@ Streak and progress badges are generated as SVG files committed to your own repo
 - **If you switch the badge style to shields** under **Settings → Streaks**, your README loads badge images from `shields.io`, which reads the numbers from a small JSON file in your repository.
 - **Data Sent**: Your repository URL, and one request each time somebody views your README. No code, no tokens, no problem content.
 - **Reversible**: Switching back to the self-hosted style stops it, and the SVG badges are always committed regardless of which style you use.
+
+### E. mermaid.ink (Optional, One Click at a Time)
+
+When an AI review contains a diagram, the extension displays its source together with a **Render diagram** button rather than drawing it automatically.
+
+- **Purpose**: Turns a diagram's source into an image without loading any external script, which the extension's Content Security Policy would block in any case.
+- **Data Sent**: The source of the single diagram you pressed Render on. It describes the shape of your solution but is not the solution code, and no token or account is involved.
+- **Never automatic**: Nothing reaches `mermaid.ink` unless you press the button on that specific diagram.
 
 ---
 

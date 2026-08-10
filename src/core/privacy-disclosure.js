@@ -175,6 +175,24 @@ export function disclosures(settings) {
   }
 
   out.push({
+    id: "mermaid",
+    // There is no setting for this one: it is a button on each diagram. What a
+    // settings object can honestly say is whether it is *reachable*, which is
+    // exactly when AI reviews can produce a diagram in the first place. Listing
+    // it as off while a Render button sits there would be the wrong answer.
+    on: isAIActive(s),
+    // Reachable, but never automatic — it waits for a click on one diagram.
+    // `privacyTier` skips these, so somebody running a local model is not told
+    // they are pinging a service when nothing has been sent.
+    manual: true,
+    required: false,
+    tier: "shared",
+    destination: "mermaid.ink",
+    what: "The source of one diagram, and only when you press Render on it.",
+    note: "AI replies that contain a diagram are shown as source with a Render button. Pressing it sends that diagram's source — which describes the shape of your solution, though not the code — to mermaid.ink to be drawn. Nothing is sent if you never press it.",
+  });
+
+  out.push({
     id: "telemetry",
     // Read through the constant: the toggle once wrote `telemetryEnabled` while
     // the sender read `telemetryOptIn`, so the switch did nothing for a release.
@@ -201,6 +219,11 @@ export function privacyTier(settings) {
   const active = disclosures(settings).filter((d) => d.on);
   let rank = 0;
   for (const d of active) {
+    // A destination that only fires on an explicit click is listed but does not
+    // set the headline: nothing has been sent, and saying otherwise would push
+    // somebody running a local model out of "private" for a button they may
+    // never press.
+    if (d.manual) continue;
     const i = TIERS.indexOf(d.tier);
     if (i > rank) rank = i;
   }

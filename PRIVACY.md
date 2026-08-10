@@ -65,6 +65,11 @@ We maintain a strict **zero-sharing policy**. We do not sell, rent, trade, or sh
 - **Ollama (Optional)**: If you use Ollama, data is processed locally on your own machine.
 - **mermaid.ink (Optional)**: When an AI response contains a Mermaid diagram, the extension shows the diagram's source code and a **Render diagram** button. Only if you press that button is the diagram source sent to `mermaid.ink` to be drawn as an image. Nothing is sent otherwise. [Mermaid Live Editor](https://mermaid.live).
 - **CodeLedger authentication service**: `codeledger.vkrishna04.me` performs the GitHub OAuth exchange. It receives the temporary authorization code GitHub issues, exchanges it for your access token, and returns that token to the extension. The token is stored on your device only — the service does not retain it, and no solve data ever passes through it.
+- **shields.io (Optional, off by default)**: Streak badges are generated as SVG files committed to your own repository, with nothing in the middle. If you switch the badge style to shields under Settings → Streaks, your README loads badge images from `shields.io`, which reads the numbers from a small JSON file in your repository — so shields learns your repository URL and sees one request per README view. It receives no code and no token, and switching back stops it. [Shields privacy](https://github.com/badges/shields/blob/master/PRIVACY.md).
+
+Separately from any third party: if your ledger repository is **public**, then your solutions, your solve history, your streak badges and the generated GitHub Pages site can be read by anyone with the link. That is a property of the repository you chose rather than anything the extension transmits elsewhere, and making the repository private keeps all of it to you and anyone you invite.
+
+The extension shows this same list live under **Settings → Privacy**, computed from your actual configuration rather than written down, so it cannot fall out of date with what the code does.
 
 ---
 

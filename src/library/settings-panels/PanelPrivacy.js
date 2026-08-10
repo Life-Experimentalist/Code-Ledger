@@ -41,6 +41,7 @@ const OWNED_BY = {
   pages: "git",
   badges: "streaks",
   shields: "streaks",
+  mermaid: "ai",
   telemetry: "advanced",
 };
 
@@ -80,6 +81,9 @@ function DisclosureRow({ entry, onGoToPanel }) {
           </p>
           ${entry.required && entry.on
             ? html`<span class="text-[10px] uppercase tracking-wide text-slate-500">required</span>`
+            : null}
+          ${entry.manual && entry.on
+            ? html`<span class="text-[10px] uppercase tracking-wide text-slate-500">only when you ask</span>`
             : null}
           ${!entry.on
             ? html`<span class="text-[10px] uppercase tracking-wide text-slate-600">not enabled</span>`
@@ -135,7 +139,7 @@ export function PanelPrivacy({ settings, onGoToPanel }) {
       <!-- Everything currently live -->
       <div class="space-y-2">
         <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Leaving this browser (${on.length})
+          Live in this setup (${on.length})
         </h4>
         ${on.length === 0
           ? html`
