@@ -139,7 +139,9 @@ export function getPagesHtml(opts = {}) {
     .hm-outer { margin-bottom: 1rem; width: 100% }
     .hm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .hm-wrap { display: flex; gap: 4px; align-items: flex-start; }
-    .hm-side { display: grid; grid-template-rows: repeat(7,var(--hm-cell,11px)); gap: 3px; font-size: .55rem; color: var(--muted); padding-right: 6px; padding-top: 20px; text-align: right; }
+    /* padding-top must equal .hm-months min-height (18px) + .hm-main gap (4px),
+       or the weekday labels drift out of line with the rows they name. */
+    .hm-side { display: grid; grid-template-rows: repeat(7,var(--hm-cell,11px)); gap: 3px; font-size: .55rem; color: var(--muted); padding-right: 6px; padding-top: 22px; text-align: right; }
     .hm-main { display: flex; flex-direction: column; gap: 4px; }
     .hm-months { display: flex; gap: 3px; font-size: .58rem; color: var(--muted); min-height: 18px; align-items: flex-end; }
     .hm-months span { min-width: var(--hm-cell,11px); white-space: nowrap; }
@@ -152,6 +154,10 @@ export function getPagesHtml(opts = {}) {
     .hm-cell.l4 { background: rgba(6,182,212,.9); }
     .hm-legend { display: flex; align-items: center; gap: .5rem; margin-top: .625rem; font-size: .6rem; color: var(--muted); }
     .hm-swatches { display: flex; gap: 3px; }
+    .hm-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+    .hm-range { background: var(--card, #0d1117); color: var(--fg, #e2e8f0); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px; font-size: .65rem; padding: .2rem .4rem; cursor: pointer; font-family: inherit; }
+    .hm-range:hover { border-color: rgba(255,255,255,.24); }
 
     /* Bars */
     .bar-row { display: flex; align-items: center; gap: .625rem; margin-bottom: .55rem; }
@@ -231,7 +237,10 @@ export function getPagesHtml(opts = {}) {
     </div>
 
     <div class="card hm-outer">
-      <div class="card-label" id="hm-label">Activity</div>
+      <div class="hm-head">
+        <div class="card-label" id="hm-label">Activity</div>
+        <select class="hm-range" id="hm-range" aria-label="Heatmap range"></select>
+      </div>
       <div class="hm-scroll">
         <div class="hm-wrap">
           <div class="hm-side">
@@ -468,8 +477,46 @@ export function getPagesHtml(opts = {}) {
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
-    function buildHeatmap(problems) {
+    // Rolling windows are anchored on today, not on Jan 1. "12m" walks the
+    // calendar back a year and forward a day, so it covers exactly 365 days in
+    // an ordinary year and 366 across a leap day -- whichever the window
+    // actually spans, rather than a hardcoded count that drifts every fourth
+    // year. A four-digit value selects that calendar year instead.
+    var HM_RANGES = [
+      { id: '30d',  label: 'Last 30 days' },
+      { id: '90d',  label: 'Last 90 days' },
+      { id: '6m',   label: 'Last 6 months' },
+      { id: '12m',  label: 'Last 12 months' },
+      { id: '24m',  label: 'Last 2 years' },
+      { id: 'all',  label: 'All time' }
+    ];
+
+    function hmWindow(range, firstDayKey) {
+      var now = new Date();
+      var end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var start = new Date(end);
+
+      if (/^\d{4}$/.test(range)) {
+        var y = parseInt(range, 10);
+        start = new Date(y, 0, 1);
+        if (y !== end.getFullYear()) end = new Date(y, 11, 31);
+        return { start: start, end: end };
+      }
+      if (range === '30d') start.setDate(start.getDate() - 29);
+      else if (range === '90d') start.setDate(start.getDate() - 89);
+      else if (range === '6m') { start.setMonth(start.getMonth() - 6); start.setDate(start.getDate() + 1); }
+      else if (range === '24m') { start.setFullYear(start.getFullYear() - 2); start.setDate(start.getDate() + 1); }
+      else if (range === 'all') {
+        var parts = (firstDayKey || '').split('-');
+        if (parts.length === 3) start = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+        else { start.setFullYear(start.getFullYear() - 1); start.setDate(start.getDate() + 1); }
+      } else { start.setFullYear(start.getFullYear() - 1); start.setDate(start.getDate() + 1); }
+      return { start: start, end: end };
+    }
+
+    function buildHeatmap(problems, range) {
       var dayMap = {};
+      var firstKey = null;
       for (var i = 0; i < problems.length; i++) {
         var p = problems[i];
         if (!p.timestamp) continue;
@@ -477,12 +524,12 @@ export function getPagesHtml(opts = {}) {
         var tsMs = (typeof ts === 'number' && ts < 1e10) ? ts * 1000 : ts;
         var k = dayKey(new Date(tsMs));
         dayMap[k] = (dayMap[k] || 0) + 1;
+        if (!firstKey || k < firstKey) firstKey = k;
       }
 
-      var now = new Date();
-      var rangeEnd = new Date(now);
-      var rangeStart = new Date(now);
-      rangeStart.setFullYear(rangeStart.getFullYear() - 1); // exactly 1 year back (leap-year aware)
+      var win = hmWindow(range || '12m', firstKey);
+      var rangeStart = win.start;
+      var rangeEnd = win.end;
 
       var cur = new Date(rangeStart);
       cur.setDate(cur.getDate() - cur.getDay()); // snap to Sunday
@@ -497,36 +544,44 @@ export function getPagesHtml(opts = {}) {
       var monthSpans = [];
 
       while (cur <= rangeEnd) {
-        if (cur.getDay() === 0) {
+        if (cur.getDay() === 0 || !colEl) {
           colEl = document.createElement('div');
           colEl.className = 'hm-col';
           grid.appendChild(colEl);
-
-          var mon = cur.getMonth();
-          if (mon !== prevMonth && cur >= rangeStart) {
-            prevMonth = mon;
-            monthSpans.push({ idx: grid.children.length - 1, label: MONTH_NAMES[mon] });
-          }
         }
 
-        if (colEl) {
-          var k2 = dayKey(cur);
-          var cnt = dayMap[k2] || 0;
-          var inRange = cur >= rangeStart && cur <= rangeEnd;
-          var cell = document.createElement('div');
-          var cls = 'hm-cell';
-          if (inRange && cnt > 0) cls += cnt >= 4 ? ' l4' : cnt >= 3 ? ' l3' : cnt >= 2 ? ' l2' : ' l1';
-          cell.className = cls;
-          if (!inRange) cell.style.visibility = 'hidden';
-          cell.title = k2 + ': ' + cnt + ' solve' + (cnt !== 1 ? 's' : '');
-          colEl.appendChild(cell);
+        var inRange = cur >= rangeStart && cur <= rangeEnd;
+        // The month a column belongs to is decided by its first *in-range* day.
+        // Reading it off the Sunday would mislabel the leading column whenever
+        // the window opens mid-week, which every rolling range does.
+        if (inRange && cur.getMonth() !== prevMonth) {
+          prevMonth = cur.getMonth();
+          monthSpans.push({ idx: grid.children.length - 1, label: MONTH_NAMES[prevMonth] });
         }
+
+        var k2 = dayKey(cur);
+        var cnt = dayMap[k2] || 0;
+        var cell = document.createElement('div');
+        var cls = 'hm-cell';
+        if (inRange && cnt > 0) cls += cnt >= 4 ? ' l4' : cnt >= 3 ? ' l3' : cnt >= 2 ? ' l2' : ' l1';
+        cell.className = cls;
+        if (!inRange) cell.style.visibility = 'hidden';
+        cell.title = k2 + ': ' + cnt + ' solve' + (cnt !== 1 ? 's' : '');
+        colEl.appendChild(cell);
 
         cur.setDate(cur.getDate() + 1);
       }
 
+      // Two labels can land on the same column when a short window straddles a
+      // month boundary; the later one wins so the label sits over real cells.
+      var uniq = [];
+      for (var m = 0; m < monthSpans.length; m++) {
+        if (uniq.length && uniq[uniq.length - 1].idx === monthSpans[m].idx) uniq.pop();
+        uniq.push(monthSpans[m]);
+      }
+
       // Store month data globally so renderMonthLabels() can recompute widths after resize
-      hmMonthSpans = monthSpans;
+      hmMonthSpans = uniq;
       hmTotalCols = grid.children.length;
       renderMonthLabels();
     }
@@ -722,20 +777,70 @@ export function getPagesHtml(opts = {}) {
         document.getElementById('sn-ms').textContent = streakData.max + 'd';
 
         // Heatmap
-        buildHeatmap(problems);
-        var hmlEl = document.getElementById('hm-label');
-        if (hmlEl) hmlEl.textContent = 'Activity — Last 12 Months';
         function resizeHeatmap() {
           var outer = document.querySelector('.hm-outer');
           var cols = document.querySelectorAll('.hm-col').length;
           if (!outer || !cols) return;
           var sideW = outer.querySelector('.hm-side') ? outer.querySelector('.hm-side').offsetWidth + 8 : 44;
           var avail = outer.clientWidth - sideW - cols * 3;
-          var cell = Math.max(8, Math.floor(avail / cols));
+          // Capped both ways: below 8px the cells stop reading as a calendar,
+          // and above 20px a 30-day window would blow up into coloured tiles.
+          var cell = Math.min(20, Math.max(8, Math.floor(avail / cols)));
           document.documentElement.style.setProperty('--hm-cell', cell + 'px');
           renderMonthLabels();
         }
-        resizeHeatmap();
+
+        var hmYears = {};
+        for (var hy = 0; hy < problems.length; hy++) {
+          var hts = problems[hy].timestamp;
+          if (!hts) continue;
+          hmYears[new Date((typeof hts === 'number' && hts < 1e10) ? hts * 1000 : hts).getFullYear()] = 1;
+        }
+        var hmYearList = Object.keys(hmYears).sort().reverse();
+
+        var hmSel = document.getElementById('hm-range');
+        var hmlEl = document.getElementById('hm-label');
+        var hmLabels = {};
+        if (hmSel) {
+          for (var hr = 0; hr < HM_RANGES.length; hr++) {
+            var o = document.createElement('option');
+            o.value = HM_RANGES[hr].id;
+            o.textContent = HM_RANGES[hr].label;
+            hmLabels[HM_RANGES[hr].id] = HM_RANGES[hr].label;
+            hmSel.appendChild(o);
+          }
+          for (var hyy = 0; hyy < hmYearList.length; hyy++) {
+            var oy = document.createElement('option');
+            oy.value = hmYearList[hyy];
+            oy.textContent = hmYearList[hyy];
+            hmLabels[hmYearList[hyy]] = hmYearList[hyy];
+            hmSel.appendChild(oy);
+          }
+          hmSel.value = '12m';
+        }
+
+        function drawHeatmap(range) {
+          buildHeatmap(problems, range);
+          if (hmlEl) hmlEl.textContent = 'Activity — ' + (hmLabels[range] || 'Last 12 months');
+          resizeHeatmap();
+        }
+
+        // The choice is remembered per browser. It is a view preference, so it
+        // lives in localStorage rather than in the committed report.
+        var hmSaved = null;
+        try { hmSaved = localStorage.getItem('cl-hm-range'); } catch (e) {}
+        if (hmSaved && hmSel) {
+          for (var hs = 0; hs < hmSel.options.length; hs++) {
+            if (hmSel.options[hs].value === hmSaved) { hmSel.value = hmSaved; break; }
+          }
+        }
+        drawHeatmap(hmSel ? hmSel.value : '12m');
+        if (hmSel) {
+          hmSel.addEventListener('change', function () {
+            try { localStorage.setItem('cl-hm-range', hmSel.value); } catch (e) {}
+            drawHeatmap(hmSel.value);
+          });
+        }
         window.addEventListener('resize', resizeHeatmap);
 
         // Velocity + difficulty charts
