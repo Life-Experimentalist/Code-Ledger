@@ -316,29 +316,35 @@ All handlers live in `src/handlers/` and follow a strict structure:
 
 ### Naming Style Summary
 
-| Category            | Style             | Examples                                                     | Notes                               |
-| ------------------- | ----------------- | ------------------------------------------------------------ | ----------------------------------- |
-| Handler directories | kebab-case        | `leetcode`, `gemini`, `github`                               | All handlers indexed by name        |
-| Handler files       | `index.js`        | `index.js`                                                   | Standard entry point                |
-| Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `graphql-queries.js` | Clear purpose from name             |
-| Components          | PascalCase        | `SettingsSchema.js`, `ModelSelector.js`                      | React/Preact convention             |
-| Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                         | Distinguish from generic components |
-| Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                   | Lowercase for utility modules       |
-| Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.GITHUB_REPO`                                   | Via `CONSTANTS.SK.*` export only    |
-| CSS files           | kebab-case        | `floating-timer.css`                                         | Tailwind input files or compiled    |
-| Data files          | kebab-case        | `canonical-map.json`, `metadata.json`                        | In `src/data/`                      |
+| Category            | Style             | Examples                                                     | Notes                                      |
+| ------------------- | ----------------- | ------------------------------------------------------------ | ------------------------------------------ |
+| Handler directories | kebab-case        | `leetcode`, `gemini`, `github`                               | All handlers indexed by name               |
+| Handler files       | `index.js`        | `index.js`                                                   | Standard entry point                       |
+| Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `graphql-queries.js` | Clear purpose from name                    |
+| Components          | PascalCase        | `SettingsSchema.js`, `ModelSelector.js`                      | React/Preact convention                    |
+| Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                         | Distinguish from generic components        |
+| Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                   | Lowercase for utility modules              |
+| Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.TELEMETRY_OPT_IN`                              | Via `CONSTANTS.SK.*` where it has an entry |
+| CSS files           | kebab-case        | `floating-timer.css`                                         | Tailwind input files or compiled           |
+| Data files          | kebab-case        | `canonical-map.json`, `metadata.json`                        | In `src/data/`                             |
 
 ### Storage Key Conventions
 
-**Never hardcode storage keys.** Always use `CONSTANTS.SK.*` from `src/core/constants.js`:
+**Prefer `CONSTANTS.SK.*` from `src/core/constants.js` over a bare string** — but only
+where the key has an entry there. `SK` covers the keys the extension itself
+namespaces (`TELEMETRY_OPT_IN`, `SYNC_STATE`, `BEHAVIOR_BANK`, …). It has **no**
+`GITHUB_REPO`, `GITHUB_OWNER` or `GITHUB_TOKEN` entry, and the GitHub settings
+are read as plain keys off the settings map with a legacy fallback:
 
 ```js
-// ✅ Correct
-const repo = settings[CONSTANTS.SK.GITHUB_REPO] || settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
+// ✅ Correct — these three have no SK entry; the fallback is the compatibility path
+const repo = settings.github_repo || settings.gitRepo;
 
-// ❌ Wrong
-const repo = settings["github_repo"];
-const repo = settings.github_repo;
+// ✅ Correct — this one does have an SK entry, so use it
+const optIn = settings[CONSTANTS.SK.TELEMETRY_OPT_IN] === true;
+
+// ❌ Wrong — invents an SK member that does not exist and reads undefined
+const repo = settings[CONSTANTS.SK.GITHUB_REPO];
 ```
 
 **Canonical storage paths** (must never vary across modules):
@@ -508,7 +514,18 @@ The `problem:solved` event payload (emitted by platform handlers, consumed by se
 }
 ```
 
-The `files` array drives the git commit. If absent, SW builds a fallback single-file path: `topics/{topic}/{titleSlug}/{lang}.{ext}`. The SW always appends `index.json` as the last file in the commit.
+The `files` array drives the git commit. If absent, the SW builds the path through
+`src/core/path-builder.js`, which is the single authority on layout:
+
+```
+with a canonical match:  problems/{canonicalId}/{platform}/{platformId}.{ext}
+without one:             problems/{platformId}/{platformId}.{ext}
+```
+
+The `topics/{topic}/…` layout is the **pre-1.5 one**. It survives only in
+`migration-manager.js` and the old-layout detection in `service-worker.js`, which
+exist to move a repository off it — never write a new path in that shape. The SW
+always appends `index.json` as the last file in the commit.
 
 ---
 
