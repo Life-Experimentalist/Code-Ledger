@@ -261,13 +261,54 @@ export function getTopicWeight(topic) {
 }
 
 /**
- * Gets all known topics in priority order
+ * Gets all known topics in priority order, with any of the user's own after them.
+ *
+ * The built-ins are ordered by weight because that order is what
+ * `resolvePrimaryTopic` picks from. A topic the user invented has no weight, so
+ * it goes on the end alphabetically rather than pretending to a rank.
+ *
+ * @param {string[]} [extra] topics the user has created — see `customTopicsFromMappings`
  * @returns {string[]}
  */
-export function getKnownTopics() {
-  return Object.entries(TOPIC_WEIGHTS)
+export function getKnownTopics(extra = []) {
+  const ordered = Object.entries(TOPIC_WEIGHTS)
     .sort(([, a], [, b]) => a - b)
     .map(([topic]) => topic);
+
+  const seen = new Set(ordered.map((t) => t.toLowerCase()));
+  for (const t of extra || []) {
+    const name = typeof t === "string" ? t.trim() : "";
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    ordered.push(name);
+  }
+  return ordered;
+}
+
+/**
+ * The canonical topics the user has invented, read back out of their own mappings.
+ *
+ * There is deliberately no second list to keep in sync: a topic exists because
+ * something maps to it, and stops existing when the last mapping to it is
+ * deleted. A target that already has a built-in name is not a new topic — it is
+ * that one, which is why the comparison is case-insensitive.
+ *
+ * @param {Record<string,string>} [mappings] `settings.topicMappings`
+ * @returns {string[]} sorted, deduplicated
+ */
+export function customTopicsFromMappings(mappings = {}) {
+  const builtIn = new Set(Object.keys(TOPIC_WEIGHTS).map((t) => t.toLowerCase()));
+  const seen = new Set();
+  const out = [];
+  for (const target of Object.values(mappings || {})) {
+    const name = typeof target === "string" ? target.trim() : "";
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (builtIn.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out.sort((a, b) => a.localeCompare(b));
 }
 
 export { RAW_MAPPINGS };

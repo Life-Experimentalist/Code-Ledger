@@ -12,7 +12,12 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("PanelPlatforms");
 
 import { CONSTANTS } from "../../core/constants.js";
-import { RAW_MAPPINGS, getKnownTopics } from "../../core/topic-resolver.js";
+import {
+  RAW_MAPPINGS,
+  customTopicsFromMappings,
+  getKnownTopics,
+  normalizeTag,
+} from "../../core/topic-resolver.js";
 import { classifyTopic, KIND, KIND_LABEL } from "../../core/topic-taxonomy.js";
 
 const PLATFORMS = Object.values(CONSTANTS.PLATFORMS);
@@ -41,19 +46,40 @@ const PLATFORM_SYNC_URLS = {
 export function PanelPlatforms({ settings, onSettingsChange }) {
   const [importMsg, setImportMsg] = useState({});
   const [newTagFrom, setNewTagFrom] = useState("");
-  const knownTopics = getKnownTopics();
-  const [newTagTo, setNewTagTo] = useState(knownTopics[0] || "");
+  const [newTagTo, setNewTagTo] = useState("");
+  const [tagError, setTagError] = useState("");
 
   const customMappings = settings?.topicMappings || {};
+  /** Topics the user has invented, derived from the mappings themselves. */
+  const customTopics = customTopicsFromMappings(customMappings);
+  const knownTopics = getKnownTopics(customTopics);
+  const isCustomTopic = (topic) => customTopics.some((t) => t === topic);
 
   const addCustomMapping = () => {
-    if (!newTagFrom.trim() || !newTagTo.trim()) return;
-    onSettingsChange("topicMappings", {
-      ...customMappings,
-      [newTagFrom.trim()]: newTagTo.trim(),
-    });
+    const from = newTagFrom.trim();
+    const typed = newTagTo.trim();
+    if (!from || !typed) {
+      setTagError("Both a tag and a topic are needed.");
+      return;
+    }
+    // Fold the target through the same normaliser every stored tag goes through.
+    // Typing "arrays" then links to the existing Array node instead of standing a
+    // second one up beside it, and a genuinely new name arrives spelled like the
+    // built-ins. An umbrella name comes back empty — those are dropped from every
+    // problem, so a topic named that would never have anything in it.
+    const to = normalizeTag(typed);
+    if (!to) {
+      setTagError(`"${typed}" is dropped as a catch-all tag. Pick something more specific.`);
+      return;
+    }
+    if (from.toLowerCase() === to.toLowerCase()) {
+      setTagError(`"${from}" already resolves to ${to}.`);
+      return;
+    }
+    setTagError("");
+    onSettingsChange("topicMappings", { ...customMappings, [from]: to });
     setNewTagFrom("");
-    setNewTagTo(knownTopics[0] || "");
+    setNewTagTo("");
   };
 
   const deleteCustomMapping = (fromKey) => {
@@ -441,7 +467,9 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
           <h3 class="text-sm font-semibold text-white mb-1">Tag & Topic Normalization</h3>
           <p class="text-xs text-slate-500">
             Map different tag names (e.g. platform-specific names like "Arrays" or "hashing") to a
-            single canonical topic node (e.g. "Array" or "Hash Table") in the graph.
+            single canonical topic node (e.g. "Array" or "Hash Table") in the graph. The topic does
+            not have to be one of the built-in ones — type a name of your own and it becomes a topic
+            like any other, with its own axis, its own node and its own place in the gap report.
           </p>
         </div>
 
@@ -464,15 +492,17 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
               <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold"
                 >Canonical Topic (Target Node)</label
               >
-              <select
+              <input
+                type="text"
+                list="cl-canonical-topics"
+                placeholder="Pick one, or type a new topic"
                 value=${newTagTo}
-                onChange=${(e) => setNewTagTo(e.target.value)}
-                class="w-full bg-slate-900 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/40"
-              >
-                ${knownTopics.map(
-                  (topic) => html`<option key=${topic} value=${topic}>${topic}</option>`,
-                )}
-              </select>
+                onInput=${(e) => setNewTagTo(e.target.value)}
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/40"
+              />
+              <datalist id="cl-canonical-topics">
+                ${knownTopics.map((topic) => html`<option key=${topic} value=${topic}></option>`)}
+              </datalist>
             </div>
             <button
               onClick=${addCustomMapping}
@@ -481,6 +511,8 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
               Add Link
             </button>
           </div>
+
+          ${tagError && html`<p class="text-xs text-rose-400">${tagError}</p>`}
 
           <!-- Existing Mappings List -->
           ${Object.keys(customMappings).length === 0
@@ -527,34 +559,48 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
             <span class="flex items-center gap-2">
               <span class="group-open:hidden">▸</span>
               <span class="hidden group-open:inline">▾</span>
-              View Predefined Canonical Topics & Aliases
+              View Canonical Topics & Aliases
             </span>
             <span class="text-[10px] text-slate-500 font-normal">Show built-in rules</span>
           </summary>
           <div class="p-4 border-t border-white/5 bg-black/40 space-y-4">
             <p class="text-xs text-slate-400">
-              Below is the reference guide of standard canonical topics, the axis each one sits on
-              (data structure, algorithm, or neither), and the predefined aliases that automatically
-              map to them. Click an axis badge to overrule the built-in call — analytics, the gap
-              report and the graph all follow yours. Click through to cycle back to the built-in.
+              Every canonical topic, the axis each one sits on (data structure, algorithm, or
+              neither), and the aliases that map to it. Click an axis badge to overrule the built-in
+              call — analytics, the gap report and the graph all follow yours. Click through to
+              cycle back to the built-in. Topics you created are marked
+              <span class="text-cyan-300">yours</span>; they behave exactly like the built-in ones
+              and disappear when the last tag mapped to them is removed.
             </p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
               ${knownTopics.map((topic) => {
                 const kind = classifyTopic(topic, topicKinds).kind || KIND.DOMAIN;
                 const overridden = Object.prototype.hasOwnProperty.call(topicKinds, topic);
-                const aliases = RAW_MAPPINGS[topic] || [];
+                const aliases = [
+                  ...(RAW_MAPPINGS[topic] || []),
+                  ...Object.keys(customMappings).filter((from) => customMappings[from] === topic),
+                ];
                 return html`
                   <div
                     key=${topic}
                     class="p-3 bg-white/2 border border-white/5 rounded-lg space-y-2"
                   >
-                    <div class="flex items-center justify-between">
-                      <span class="text-xs font-medium text-slate-200">${topic}</span>
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-xs font-medium text-slate-200 truncate"
+                        >${topic}${isCustomTopic(topic)
+                          ? html`<span
+                              class="ml-1.5 text-[9px] uppercase tracking-wider text-cyan-400"
+                              >yours</span
+                            >`
+                          : ""}</span
+                      >
                       <button
                         onClick=${() => cycleTopicKind(topic)}
                         title=${overridden
                           ? `Your call. Click to cycle; keep clicking to go back to the built-in.`
-                          : `Built-in. Click to set your own.`}
+                          : isCustomTopic(topic)
+                            ? `Guessed from the name. Click to set your own.`
+                            : `Built-in. Click to set your own.`}
                         class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded hover:brightness-125 transition
                         ${KIND_BADGE_CLASS[kind]}"
                       >
@@ -567,9 +613,9 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                             >No aliases defined</span
                           >`
                         : aliases.map(
-                            (alias) => html`
+                            (alias, i) => html`
                               <span
-                                key=${alias}
+                                key=${`${alias}-${i}`}
                                 class="text-[10px] font-mono px-1.5 py-0.5 bg-white/5 text-slate-400 rounded"
                               >
                                 ${alias}
