@@ -1393,7 +1393,7 @@ async function handleSolved(data) {
 
 /**
  * Pushes the same files+message to all mirrors listed in settings.git_mirrors.
- * Each mirror entry: { provider: "github"|"gitlab", repo: string, owner?: string }
+ * Each mirror entry: { provider: "github", repo: string, owner?: string }
  * Failures are logged but never thrown — mirrors are best-effort.
  */
 async function pushToMirrors(files, message, commitOpts, settings, skipTargetKey = "") {

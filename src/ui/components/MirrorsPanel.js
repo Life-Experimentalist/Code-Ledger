@@ -17,9 +17,10 @@ const dbg = createDebugger("MirrorsPanel");
 
 import { Storage } from "../../core/storage.js";
 
-// GitHub only. The GitLab and Bitbucket handlers are still stubs whose write
-// paths throw, so offering them here produced a mirror that silently failed on
-// every commit. Re-add an entry the moment its handler can actually push.
+// GitHub only. The GitLab and Bitbucket handlers were stubs whose write paths
+// threw, so offering them here produced a mirror that failed on every commit;
+// they have since been deleted. Re-add an entry when a handler can actually
+// push.
 const PROVIDERS = [{ id: "github", label: "GitHub" }];
 
 const EMPTY_MIRROR = { provider: "github", repo: "", owner: "" };

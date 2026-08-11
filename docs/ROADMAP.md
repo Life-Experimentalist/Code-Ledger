@@ -61,17 +61,23 @@ the module graph.
 Follows the file above. It was referenced only by the dead module.
 `HEARTBEAT_INTERVAL_MS` sat next to it with no reader at all and went with it.
 
-### 3. The GitLab and Bitbucket handler stubs — decide, don't leave
+### 3. The GitLab and Bitbucket handler stubs — **applied (deleted)**
 
-`src/handlers/git/gitlab/` and `src/handlers/git/bitbucket/` are registered in
-`init.js` but every method throws `"not yet implemented"`. They are already
-hidden from the provider picker and off the landing page, so no user can reach
-them. Either delete them or keep them and add a `docs/` note that they are
-scaffolding. Leaving live registrations for handlers that can only throw is the
-worst of the three.
+`src/handlers/git/gitlab/` and `src/handlers/git/bitbucket/` were registered in
+`init.js` with every method throwing `"not yet implemented"`, which meant the
+registry could hand a caller a provider that could only fail.
 
-Recommendation: delete. Re-adding a provider is a day's work; carrying a
-throwing registration to 1.0.0 is a permanent footnote.
+Deleting the handlers turned out to be the smaller half. They were still named
+in four places a user could reach: the provider chips in `PanelGit` (drawn from
+`CONSTANTS.GIT_PROVIDERS`, where both carried an `underConstruction` status),
+the mirror-target picker in the same panel, and the `@gitlab` / `@bitbucket`
+chat mentions in `chat-variables.js` — each offering context for a provider
+that had none. All four are gone, along with the two OAuth base URLs in
+`CONSTANTS.URLS` that nothing read.
+
+Re-adding a provider is a day's work. The `gitlab_token` and `bitbucket_token`
+entries stay in the settings-sync denylist: a denylist costs nothing and a
+future provider should not have to remember to add itself to one.
 
 ---
 

@@ -487,11 +487,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
     setShowAddMirror(false);
   };
 
-  const MIRROR_PROVIDERS = [
-    { id: "github", label: "GitHub", ready: true },
-    { id: "gitlab", label: "GitLab", ready: false },
-    { id: "bitbucket", label: "Bitbucket", ready: false },
-  ];
+  const MIRROR_PROVIDERS = [{ id: "github", label: "GitHub", ready: true }];
 
   const repoUrl = repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}` : "";
 
@@ -531,8 +527,8 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Git Provider</h3>
         <p class="text-[11px] text-slate-500">
-          Only GitHub is fully supported right now. GitLab and Bitbucket are marked under
-          construction and stay disabled until they are ready.
+          GitHub is the only repository provider. Others will appear here if and when they can
+          actually commit.
         </p>
         <div class="flex gap-2">
           ${GIT_PROVIDERS.length
@@ -751,12 +747,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                       class="flex items-center gap-2 p-2.5 rounded-lg bg-white/3 border border-white/8"
                     >
                       <span
-                        class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${m.provider ===
-                        "github"
-                          ? "bg-slate-800 border-slate-600 text-slate-300"
-                          : m.provider === "gitlab"
-                            ? "bg-orange-900/30 border-orange-700/40 text-orange-300"
-                            : "bg-blue-900/30 border-blue-700/40 text-blue-300"}"
+                        class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border bg-slate-800 border-slate-600 text-slate-300"
                       >
                         ${m.provider}
                       </span>

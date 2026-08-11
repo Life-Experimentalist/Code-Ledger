@@ -146,18 +146,6 @@ export const AI_MENTION_OPTIONS = [
     kind: "git",
   },
   {
-    id: "gitlab",
-    label: "@gitlab",
-    description: "GitLab sync / repo context",
-    kind: "git",
-  },
-  {
-    id: "bitbucket",
-    label: "@bitbucket",
-    description: "Bitbucket sync / repo context",
-    kind: "git",
-  },
-  {
     id: "gemini",
     label: "@gemini",
     description: "Google Gemini provider",

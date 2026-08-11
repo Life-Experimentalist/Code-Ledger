@@ -96,8 +96,6 @@ export const CONSTANTS = Object.freeze({
     CANONICAL_MAP_SCHEMA:
       "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/data/schema/canonical-map.schema.json",
     GITHUB_OAUTH_BASE: "https://github.com/login/oauth",
-    GITLAB_OAUTH_BASE: "https://gitlab.com/oauth",
-    BITBUCKET_OAUTH_BASE: "https://bitbucket.org/site/oauth2",
   },
 
   // ── AI Providers ──
@@ -173,22 +171,6 @@ export const CONSTANTS = Object.freeze({
       status: FEATURE_STATUS.STABLE,
       apiBase: "https://api.github.com",
       oauthBase: "https://github.com/login/oauth",
-      clientId: "",
-    },
-    gitlab: {
-      id: "gitlab",
-      name: "GitLab",
-      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
-      apiBase: "https://gitlab.com/api/v4",
-      oauthBase: "https://gitlab.com/oauth",
-      clientId: "",
-    },
-    bitbucket: {
-      id: "bitbucket",
-      name: "Bitbucket",
-      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
-      apiBase: "https://api.bitbucket.org/2.0",
-      oauthBase: "https://bitbucket.org/site/oauth2",
       clientId: "",
     },
   },
