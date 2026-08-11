@@ -229,6 +229,10 @@ Be concise. Max 200 words.`;
           ? { id: canonical.canonicalId, title: canonical.canonicalTitle }
           : null,
         readmeContent: readmeFile?.content || null,
+        // The statement is on screen whenever the solve is detected from the
+        // problem page. Not recording it left the library blank and had the AI
+        // reviewer describing a problem whose text was right there.
+        problemStatement: meta.description || null,
         code,
         files,
         lang: { name: lang.name, ext: lang.ext, slug: lang.slug },

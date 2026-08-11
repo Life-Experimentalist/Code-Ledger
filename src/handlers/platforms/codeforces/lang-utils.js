@@ -19,7 +19,10 @@ export function resolveLang(rawLang) {
   const l = rawLang.toLowerCase();
   let ext = "txt";
 
-  if (/\bc\b/.test(l) && !/c\+\+|c#|csharp|cpp/.test(l)) ext = "c";
+  // Codeforces names the C compiler "GNU C11", so the standard suffix has to
+  // be part of the match — a bare \bc\b never fired and C solutions committed
+  // as .txt.
+  if (/\bc\d*\b/.test(l) && !/c\+\+|c#|csharp|cpp/.test(l)) ext = "c";
   else if (/c\+\+|cpp|g\+\+|clang\+\+|msvc/.test(l)) ext = "cpp";
   else if (/c#|csharp/.test(l)) ext = "cs";
   else if (/\bjava\b/.test(l) && !/javascript/.test(l)) ext = "java";
@@ -47,7 +50,9 @@ export function resolveLang(rawLang) {
  * Returns "Unknown" for unrated or non-numeric input.
  */
 export function normalizeCFRating(rating) {
-  if (rating === null || rating === undefined || isNaN(+rating)) return "Unknown";
+  // "" coerces to 0, which would report an unrated problem as Easy — an empty
+  // rating element is exactly what an unrated problem renders.
+  if (rating === null || rating === undefined || rating === "" || isNaN(+rating)) return "Unknown";
   const r = +rating;
   if (r <= 1200) return "Easy";
   if (r <= 1900) return "Medium";

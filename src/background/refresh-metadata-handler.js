@@ -6,6 +6,7 @@
 import { createDebugger } from "../lib/debug.js";
 import { CONSTANTS } from "../core/constants.js";
 import { cleanGfgSlug } from "../core/gfg-utils.js";
+import { cfProblemUrl } from "../core/cf-utils.js";
 import { Storage } from "../core/storage.js";
 import { fetchGFGProblemData } from "./gfg-api.js";
 
@@ -175,14 +176,17 @@ export async function handleRefreshMetadata(problems = []) {
           return null;
         }
         const lc = CONSTANTS.PLATFORMS.leetcode;
-        const cf = CONSTANTS.PLATFORMS.codeforces;
         const base = {
           leetcode: `${lc.problemsBase}${titleSlug}/`,
-          codeforces: `${cf.problemsBase}${titleSlug}`,
+          // A CF slug is contest + letter glued together; problemsBase + "4A"
+          // opens a 404, so the refresh tab would never see a problem page.
+          codeforces: cfProblemUrl(titleSlug),
         }[platform];
 
         if (!base) {
-          dbg.warn(`handleRefreshMetadata(): unknown platform=${platform}`);
+          dbg.warn(
+            `handleRefreshMetadata(): no refresh URL for platform=${platform} slug=${titleSlug}`,
+          );
           return null;
         }
         const url = new URL(base);

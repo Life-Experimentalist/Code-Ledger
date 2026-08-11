@@ -19,6 +19,7 @@ import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
+import { cfProblemUrl } from "../../core/cf-utils.js";
 import { isAIActive } from "../../core/feature-flags.js";
 
 const PLATFORMS = [
@@ -404,7 +405,7 @@ export function ProblemsView({
     const base = {
       leetcode: CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/",
       geeksforgeeks: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + cleanSlug + "/1",
-      codeforces: CONSTANTS.PLATFORMS.codeforces.problemsBase + problem.titleSlug,
+      codeforces: cfProblemUrl(problem.titleSlug),
     }[problem.platform];
     return base ? base + suffix : null;
   };

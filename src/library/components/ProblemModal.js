@@ -22,6 +22,7 @@ import { isAIActive } from "../../core/feature-flags.js";
 import { expandChatVariables } from "../../lib/chat-variables.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
+import { cfProblemUrl } from "../../core/cf-utils.js";
 // Side-effect: registers LeetCode tabs into modalTabRegistry
 import "../../handlers/platforms/leetcode/modal-tabs.js";
 
@@ -113,7 +114,7 @@ export const PLATFORM_META = {
     favicon: "https://codeforces.com/favicon.ico",
     label: "Codeforces",
     color: CONSTANTS.PLATFORMS.codeforces.color,
-    url: (slug) => CONSTANTS.PLATFORMS.codeforces.problemsBase + slug,
+    url: (slug) => cfProblemUrl(slug) || CONSTANTS.PLATFORMS.codeforces.problemsetUrl,
   },
 };
 

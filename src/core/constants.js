@@ -25,6 +25,7 @@
  */
 
 import { createDebugger } from "../lib/debug.js";
+import { cfProblemUrl } from "./cf-utils.js";
 
 export const FEATURE_STATUS = Object.freeze({
   STABLE: "stable",
@@ -217,6 +218,9 @@ export const CONSTANTS = Object.freeze({
       color: "#1F8ACB",
       domains: ["codeforces.com"],
       baseUrl: "https://codeforces.com",
+      // Unlike the other platforms this is NOT problemsBase + slug: a
+      // Codeforces problem is addressed by contest and letter, so the slug has
+      // to be split first. Use makeProblemUrl() or cfProblemUrl().
       problemsBase: "https://codeforces.com/problemset/problem/",
       problemsetUrl: "https://codeforces.com/problemset/",
       apiBase: "https://codeforces.com/api",
@@ -367,6 +371,11 @@ export const CONSTANTS = Object.freeze({
     if (!p?.problemsBase) return "#";
     if (platform === "geeksforgeeks") {
       return p.problemsBase + titleSlug + "/1";
+    }
+    // Codeforces addresses a problem by contest and letter, so the slug has to
+    // be split apart again — problemsBase + "4A" is a 404.
+    if (platform === "codeforces") {
+      return cfProblemUrl(titleSlug) || "#";
     }
     return p.problemsBase + titleSlug + "/";
   },

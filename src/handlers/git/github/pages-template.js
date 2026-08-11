@@ -496,7 +496,10 @@ export function getPagesHtml(opts = {}) {
       var end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       var start = new Date(end);
 
-      if (/^\d{4}$/.test(range)) {
+      // Backslashes are doubled here: this script is written out through a
+      // template literal, which eats a lone "\" — /^\d{4}$/ reached the page
+      // as /^d{4}$/ and no year option ever matched.
+      if (/^\\d{4}$/.test(range)) {
         var y = parseInt(range, 10);
         start = new Date(y, 0, 1);
         if (y !== end.getFullYear()) end = new Date(y, 11, 31);
@@ -652,7 +655,15 @@ export function getPagesHtml(opts = {}) {
       var pl = (p.platform || '').toLowerCase();
       if (pl === 'leetcode' && p.titleSlug) return 'https://leetcode.com/problems/' + p.titleSlug + '/';
       if (pl === 'geeksforgeeks' && p.titleSlug) return 'https://www.geeksforgeeks.org/problems/' + p.titleSlug + '/';
-      if (pl === 'codeforces' && p.titleSlug) return 'https://codeforces.com/problemset/problem/' + p.titleSlug;
+      if (pl === 'codeforces' && p.titleSlug) {
+        // A Codeforces slug is contest and letter glued together ("4A",
+        // "gym100500B"); the URL needs them apart again, and gym contests
+        // live under a different path.
+        var m = /^(gym)?(\\d+)([A-Za-z][A-Za-z0-9]*)$/.exec(p.titleSlug);
+        if (!m) return 'https://codeforces.com/problemset';
+        if (m[1] || Number(m[2]) >= 100000) return 'https://codeforces.com/gym/' + m[2] + '/problem/' + m[3];
+        return 'https://codeforces.com/problemset/problem/' + m[2] + '/' + m[3];
+      }
       return '#';
     }
 
@@ -1006,7 +1017,10 @@ export function getPagesHtml(opts = {}) {
           // Commit message, author and URL are repository content: on a public
           // repo anyone who lands a commit controls them, so all three are
           // escaped and the URL is restricted to http(s).
-          var url = /^https?:\/\//i.test(String(c.url || '')) ? escHtml(c.url) : '#';
+          // Doubled backslashes — see hmWindow(). Written singly this reached
+          // the page as /^https?:// followed by a line comment, which deleted
+          // both the escaping and the scheme check below it.
+          var url = /^https?:\\/\\//i.test(String(c.url || '')) ? escHtml(c.url) : '#';
           html += '<div style="display:flex;align-items:center;gap:.6rem;padding:.25rem 0;border-bottom:1px solid rgba(255,255,255,.02)">'
                + '<div style="width:10px;height:10px;border-radius:50%;background:' + color + '"></div>'
                + '<a href="' + url + '" target="_blank" rel="noreferrer" style="color:var(--text);text-decoration:none">' + escHtml(msg) + '</a>'

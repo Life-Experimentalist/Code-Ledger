@@ -10,6 +10,7 @@ const html = htm.bind(h);
 import { createDebugger } from "../../lib/debug.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
+import { cfProblemUrl } from "../../core/cf-utils.js";
 
 const dbg = createDebugger("ProblemCard");
 
@@ -30,7 +31,7 @@ const PLATFORM_META = {
     favicon: "https://codeforces.com/favicon.ico",
     label: "Codeforces",
     color: CONSTANTS.PLATFORMS.codeforces.color,
-    url: (slug) => CONSTANTS.PLATFORMS.codeforces.problemsBase + slug,
+    url: (slug) => cfProblemUrl(slug) || CONSTANTS.PLATFORMS.codeforces.problemsetUrl,
   },
 };
 
