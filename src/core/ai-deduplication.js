@@ -4,6 +4,7 @@
  */
 
 import { registry } from "./handler-registry.js";
+import { getProfileContext } from "./behavior-profile.js";
 import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("AIDeduplication");
@@ -99,6 +100,17 @@ export async function mergeSolutions(providerId, solutions = [], lang = null) {
     promptParts.push(
       "Create a single canonical solution that is correct, idiomatic, and documents any important differences or assumptions. Return ONLY the merged source code, without extra explanation.",
     );
+    // The merged version is what replaces the originals in the learner's own
+    // repository, so it is worth spending the tokens to have it close the gaps
+    // their reviews keep reopening. compareSolutions() deliberately gets none of
+    // this: whether two solutions are the same approach is a fact about the
+    // code, and colouring that judgement with who wrote it would only add noise.
+    const profile = await getProfileContext().catch(() => "");
+    if (profile) {
+      promptParts.push(
+        `${profile}\n\nWhere the solutions differ, prefer the variant that does not repeat a recurring flag above.`,
+      );
+    }
     promptParts.push("---");
     solutions.forEach((s, idx) => {
       promptParts.push(`// --- Solution ${idx + 1} ---`);

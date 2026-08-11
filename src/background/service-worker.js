@@ -93,6 +93,7 @@ import {
   recordAIInsights,
   autoPopulateFromHistory,
 } from "../core/behavior-bank.js";
+import { getProfileContext } from "../core/behavior-profile.js";
 
 // Lazy reference to topic-resolver (populated on first use)
 let _topicResolver = { normalizeTag: (t) => t };
@@ -624,14 +625,20 @@ async function generateAIReview(problem = {}, settings = null) {
   const providers = _buildAIReviewProviders(currentSettings);
   dbg.log(`generateAIReview(): ${providers.length} provider(s) in fallback chain`);
 
-  // Inject behavior bank context so the AI is aware of solve history / past struggles
-  const behaviorStats = await getProblemStats(
-    problem.titleSlug || problem.id || "",
-    problem.platform || "",
-  ).catch(() => null);
-  const behaviorContext = _buildBehaviorContext(behaviorStats);
+  // Inject behavior bank context so the AI is aware of solve history / past struggles.
+  // Two scales: this problem's own record, and the aggregate profile — the
+  // second is what lets the review say "this is the fourth time off-by-one has
+  // come up" instead of treating every solve as the learner's first.
+  const [behaviorStats, profileContext] = await Promise.all([
+    getProblemStats(problem.titleSlug || problem.id || "", problem.platform || "").catch(
+      () => null,
+    ),
+    getProfileContext().catch(() => ""),
+  ]);
+  const problemContext = _buildBehaviorContext(behaviorStats);
+  const behaviorContext = [problemContext, profileContext].filter(Boolean).join("\n\n");
   if (behaviorContext)
-    dbg.log(`generateAIReview(): injecting behavior context: ${behaviorContext}`);
+    dbg.log(`generateAIReview(): injecting behavior context (${behaviorContext.length} chars)`);
 
   let inferredTags = null;
   let hasRateLimitErrors = false;
@@ -2458,6 +2465,12 @@ async function handleAIChat(messages, context = {}) {
     );
     if (chatBehavior) contextParts.push(`Learner history:\n${chatBehavior}`);
   }
+
+  // The aggregate profile is not tied to a problem, so unlike the block above it
+  // applies to every chat — including the library chat, which has no problem at
+  // all and until now started from nothing each time.
+  const chatProfile = await getProfileContext().catch(() => "");
+  if (chatProfile) contextParts.push(chatProfile);
 
   dbg.log(`handleAIChat(): prepared ${contextParts.length} context part(s)`);
 

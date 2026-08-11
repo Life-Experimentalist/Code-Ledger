@@ -19,10 +19,17 @@ import {
   BUILTIN_SKILLS,
 } from "../../core/ai/skills-registry.js";
 import { Storage } from "../../core/storage.js";
+import { getAllEntries, getChatStats } from "../../core/behavior-bank.js";
+import {
+  buildBehaviorProfile,
+  formatProfileForPrompt,
+  MIN_PROBLEMS_FOR_PROFILE,
+} from "../../core/behavior-profile.js";
 
 const dbg = createDebugger("BehaviourBankView");
 
 const TABS = [
+  { id: "behaviour", label: "Behaviour" },
   { id: "insights", label: "Insights" },
   { id: "roadmap", label: "Roadmap" },
   { id: "skills", label: "Skills" },
@@ -872,10 +879,247 @@ function SkillsSection() {
   `;
 }
 
+// ── Behaviour section ─────────────────────────────────────────────────────────
+//
+// The page has been called the Behaviour Bank since it replaced the settings
+// stub, but its three tabs read the knowledge bank, the roadmap and the skills
+// registry — none of which is the behaviour bank. The bank itself (solve times,
+// attempt counts, hint views, what reviews keep flagging) had no surface at all:
+// getAllEntries() existed with no callers anywhere.
+//
+// It matters that this is visible, because the derived profile is injected into
+// every AI review and every chat. Anything shaping the model's answers should be
+// something the learner can read, and delete.
+
+function formatDuration(seconds) {
+  if (!seconds) return "—";
+  if (seconds >= 3600) return `${(seconds / 3600).toFixed(1)}h`;
+  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
+  return `${Math.round(seconds)}s`;
+}
+
+function StatTile({ label, value, hint }) {
+  return html`
+    <div class="p-3 bg-white/3 border border-white/8 rounded-xl">
+      <div class="text-lg font-light text-white">${value}</div>
+      <div class="text-[11px] text-slate-400">${label}</div>
+      ${hint && html`<div class="text-[10px] text-slate-500 mt-0.5">${hint}</div>`}
+    </div>
+  `;
+}
+
+function BehaviourSection() {
+  const [entries, setEntries] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [promptBlock, setPromptBlock] = useState("");
+  const [enabled, setEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [expanded, setExpanded] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [all, chatStats, settings] = await Promise.all([
+          getAllEntries(),
+          getChatStats(),
+          Storage.getSettings(),
+        ]);
+        const built = buildBehaviorProfile(all, chatStats);
+        setEntries(all);
+        setProfile(built);
+        setPromptBlock(formatProfileForPrompt(built));
+        setEnabled(settings?.behaviorBankEnabled !== false);
+      } catch (e) {
+        dbg.error("BehaviourSection load:", e?.message);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return html`<p class="text-xs text-slate-500">Loading…</p>`;
+
+  const shortfall = MIN_PROBLEMS_FOR_PROFILE - entries.length;
+
+  return html`
+    <div class="flex flex-col gap-4">
+      ${!enabled &&
+      html`<p
+        class="text-xs text-amber-300 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl"
+      >
+        Recording is off in Settings → Advanced. What is shown below was recorded before it was
+        turned off; nothing new is being added.
+      </p>`}
+      ${!entries.length &&
+      html`<p class="text-xs text-slate-400">
+        Nothing recorded yet. Solve a problem and its time, attempts and anything the AI review
+        flags will land here.
+      </p>`}
+      ${entries.length > 0 &&
+      html`
+        <!-- What the AI is told -->
+        <div class="p-4 bg-white/3 border border-white/8 rounded-xl flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 class="text-sm text-slate-200">What the AI is told about you</h2>
+              <p class="text-[11px] text-slate-500">
+                Derived from the records below and added to every review and chat.
+              </p>
+            </div>
+            ${promptBlock &&
+            html`<button
+              onClick=${() => setShowPrompt((v) => !v)}
+              class="shrink-0 px-3 py-1.5 text-[11px] rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white"
+            >
+              ${showPrompt ? "Hide" : "Show exact text"}
+            </button>`}
+          </div>
+
+          ${!promptBlock &&
+          html`<p class="text-xs text-slate-400">
+            Nothing yet — a profile needs at least ${MIN_PROBLEMS_FOR_PROFILE} recorded problems
+            before a handful of entries can look like a
+            trend.${shortfall > 0 ? ` ${shortfall} to go.` : ""}
+          </p>`}
+          ${promptBlock &&
+          html`
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <${StatTile} label="Problems recorded" value=${profile.problemCount} />
+              <${StatTile}
+                label="Views hints on"
+                value=${`${Math.round(profile.hintRate * 100)}%`}
+                hint=${`${profile.hintTotal} in total`}
+              />
+              <${StatTile}
+                label="Resubmits on"
+                value=${`${Math.round(profile.resubmitRate * 100)}%`}
+              />
+              <${StatTile} label="Usual language" value=${profile.topLanguage || "—"} />
+            </div>
+
+            ${profile.recurringWeakAreas.length > 0 &&
+            html`<div>
+              <div class="text-[11px] text-slate-400 mb-1.5">
+                Flagged again and again — a label counts only once it appears on two different
+                problems
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                ${profile.recurringWeakAreas.map(
+                  (w) =>
+                    html`<span
+                      key=${w.label}
+                      class="px-2 py-1 text-[11px] rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300"
+                      >${w.label} · ${w.problems}</span
+                    >`,
+                )}
+              </div>
+            </div>`}
+            ${profile.topicsUnderStrain.length > 0 &&
+            html`<div>
+              <div class="text-[11px] text-slate-400 mb-1.5">
+                Topics you needed help on — hints, resubmits or a flagged review, not just the ones
+                you do most
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                ${profile.topicsUnderStrain.map(
+                  (t) =>
+                    html`<span
+                      key=${t.label}
+                      class="px-2 py-1 text-[11px] rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300"
+                      >${t.label} · ${t.problems}</span
+                    >`,
+                )}
+              </div>
+            </div>`}
+            ${Object.keys(profile.paceByDifficulty).length > 0 &&
+            html`<div>
+              <div class="text-[11px] text-slate-400 mb-1.5">
+                Median of your timed solves — solves with the timer unused are left out
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                ${Object.entries(profile.paceByDifficulty).map(
+                  ([difficulty, p]) =>
+                    html`<span
+                      key=${difficulty}
+                      class="px-2 py-1 text-[11px] rounded-lg bg-white/5 border border-white/10 text-slate-300"
+                      >${difficulty} · ${formatDuration(p.medianSeconds)}
+                      <span class="text-slate-500">(${p.samples})</span></span
+                    >`,
+                )}
+              </div>
+            </div>`}
+            ${showPrompt &&
+            html`<pre
+              class="text-[11px] text-slate-400 whitespace-pre-wrap bg-black/30 border border-white/8 rounded-lg p-3 overflow-x-auto"
+            >
+${promptBlock}</pre
+            >`}
+          `}
+        </div>
+
+        <!-- Raw records -->
+        <div class="p-4 bg-white/3 border border-white/8 rounded-xl">
+          <h2 class="text-sm text-slate-200 mb-1">Records (${entries.length})</h2>
+          <p class="text-[11px] text-slate-500 mb-3">
+            Clear them any time from Settings → Advanced.
+          </p>
+          <div class="flex flex-col gap-1.5">
+            ${entries.map((e) => {
+              const key = `${e.platform}::${e.slug}`;
+              const solves = e.solves || [];
+              const timed = solves.map((s) => s.elapsedSeconds || 0).filter((s) => s > 0);
+              const flags = (e.aiInsights || []).flatMap((i) => i.weakAreas || []);
+              return html`
+                <div key=${key} class="bg-white/3 border border-white/8 rounded-lg">
+                  <button
+                    onClick=${() => setExpanded(expanded === key ? null : key)}
+                    class="flex items-center justify-between gap-3 w-full text-left px-3 py-2"
+                  >
+                    <span class="text-xs text-slate-200 truncate">${e.slug}</span>
+                    <span class="shrink-0 flex items-center gap-2 text-[10px] text-slate-500">
+                      ${solves.length > 1 &&
+                      html`<span class="text-amber-400">${solves.length}×</span>`}
+                      ${e.hintViews > 0 &&
+                      html`<span class="text-cyan-400">${e.hintViews} hint</span>`}
+                      ${flags.length > 0 &&
+                      html`<span class="text-rose-400">${flags.length} ⚑</span>`}
+                      <span>${e.platform}</span>
+                      <span>${expanded === key ? "▲" : "▼"}</span>
+                    </span>
+                  </button>
+                  ${expanded === key &&
+                  html`<div
+                    class="px-3 pb-3 pt-1 text-[11px] text-slate-400 flex flex-col gap-1 border-t border-white/5"
+                  >
+                    <div>
+                      Difficulty: ${e.difficulty || "—"} · Solves: ${solves.length} · Timed:
+                      ${timed.length ? timed.map(formatDuration).join(", ") : "none"}
+                    </div>
+                    ${e.tags?.length > 0 && html`<div>Tags: ${e.tags.join(", ")}</div>`}
+                    ${flags.length > 0 &&
+                    html`<div class="text-rose-300">Reviews flagged: ${flags.join(", ")}</div>`}
+                    ${(e.aiInsights || [])
+                      .slice(-1)
+                      .map(
+                        (i) =>
+                          i.summary &&
+                          html`<div class="text-slate-500 italic">“${i.summary}”</div>`,
+                      )}
+                  </div>`}
+                </div>
+              `;
+            })}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+}
+
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 export function BehaviourBankView({ problems = [], onNavigate }) {
-  const [tab, setTab] = useState("insights");
+  const [tab, setTab] = useState("behaviour");
 
   return html`
     <div class="flex flex-col gap-6 w-full max-w-3xl mx-auto">
@@ -883,8 +1127,8 @@ export function BehaviourBankView({ problems = [], onNavigate }) {
       <div>
         <h1 class="text-2xl font-light text-white mb-1">Behaviour Bank</h1>
         <p class="text-sm text-slate-400">
-          Persistent AI memory — insights, roadmap, and custom skills that shape how the AI assists
-          you.
+          Persistent AI memory — what your solving looks like, plus the insights, roadmap and custom
+          skills that shape how the AI assists you.
         </p>
       </div>
 
@@ -906,6 +1150,7 @@ export function BehaviourBankView({ problems = [], onNavigate }) {
       </div>
 
       <!-- Content -->
+      ${tab === "behaviour" && html`<${BehaviourSection} />`}
       ${tab === "insights" && html`<${InsightsSection} />`}
       ${tab === "roadmap" &&
       html`<${RoadmapSection} problems=${problems} onNavigate=${onNavigate} />`}
