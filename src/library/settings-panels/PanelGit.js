@@ -390,12 +390,26 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
       if (conflicts.length > 0) {
         setImportData({ remoteOnly, conflicts });
       } else {
+        const staleCount = Number(settings._pendingConflicts) || 0;
         await applyImport(remoteOnly);
         await Storage.updateSettings({ _pendingConflicts: 0 });
+        // Tell the parent too, not just storage. The warning banner reads the
+        // count off props, so clearing only storage left "86 conflicts detected"
+        // on screen above the message saying there were none — the reader has
+        // no way to tell which of the two is true.
+        onSettingsChange?.("_pendingConflicts", 0);
         loadSyncCount();
         if (remoteOnly.length > 0) {
           setImportMsg(
             `Imported ${remoteOnly.length} new problem${remoteOnly.length !== 1 ? "s" : ""}.`,
+          );
+        } else if (staleCount > 0) {
+          // Answer the question the stale banner raised, rather than leaving
+          // two statements that contradict each other.
+          setImportMsg(
+            `Re-checked: the ${staleCount} conflict${staleCount !== 1 ? "s" : ""} ` +
+              `reported earlier ${staleCount !== 1 ? "are" : "is"} gone — your library and the ` +
+              `repository now agree. Nothing to resolve.`,
           );
         } else {
           setImportMsg("Repository is already in sync — no new problems found.");

@@ -148,6 +148,47 @@ describe("importFromRepo", () => {
     assert.deepEqual(conflicts, [], "the local resolution is newer than the remote copy");
   });
 
+  test("a field the older record simply never had is not a conflict", async () => {
+    // Every one of these is the same statement written two ways. Comparing the
+    // raw values called all of them disagreements, so a library that had never
+    // been touched on a second device could report that every problem in it
+    // needed manual review — the "86 conflicts detected" with nothing to fix.
+    Storage.getAllProblems = async () => [
+      problem({ tags: [], isDuplicate: false, duplicateOf: null, notes: "", aiReview: undefined }),
+    ];
+    const remote = problem();
+    delete remote.tags;
+    const git = fakeGit({ "index.json": JSON.stringify({ problems: [remote] }) });
+    const { remoteOnly, conflicts } = await importFromRepo("o", "r", git);
+    assert.deepEqual(remoteOnly, []);
+    assert.deepEqual(conflicts, []);
+  });
+
+  test("a flag that is genuinely set is still a conflict", async () => {
+    Storage.getAllProblems = async () => [problem({ isDuplicate: true, duplicateOf: "lc-3sum" })];
+    const git = fakeGit({ "index.json": JSON.stringify({ problems: [problem()] }) });
+    const { conflicts } = await importFromRepo("o", "r", git);
+    assert.equal(conflicts.length, 1);
+  });
+
+  test("a non-empty tag list is still compared", async () => {
+    Storage.getAllProblems = async () => [problem({ tags: ["array"] })];
+    const git = fakeGit({
+      "index.json": JSON.stringify({ problems: [problem({ tags: ["dp"] })] }),
+    });
+    const { conflicts } = await importFromRepo("o", "r", git);
+    assert.equal(conflicts.length, 1);
+  });
+
+  test("trailing whitespace on a field is not a disagreement", async () => {
+    Storage.getAllProblems = async () => [problem({ notes: "check the edge case\n" })];
+    const git = fakeGit({
+      "index.json": JSON.stringify({ problems: [problem({ notes: "check the edge case" })] }),
+    });
+    const { conflicts } = await importFromRepo("o", "r", git);
+    assert.deepEqual(conflicts, []);
+  });
+
   test("a remote entry missing a platform-scoped id gets one", async () => {
     const legacy = { ...problem(), id: "two-sum" };
     const git = fakeGit({ "index.json": JSON.stringify({ problems: [legacy] }) });

@@ -36,12 +36,33 @@ function _syncCommitKey(problem = {}) {
   return `${id}::${lang}`;
 }
 
+/**
+ * Reduce one comparable field to a string, with every way of saying "nothing"
+ * reduced to the same one.
+ *
+ * This is what a conflict is decided on, so the bar is: would a person looking
+ * at these two records say they disagree? A record saved before `tags` existed
+ * has no `tags`; the same record saved today has `tags: []`. `isDuplicate:
+ * false` and no `isDuplicate` at all both mean the problem is not a duplicate.
+ * Comparing the raw values called each of those a conflict, which is how a
+ * library that had never been edited on a second device could report that every
+ * single problem in it needed manual review.
+ */
+function _comparable(v) {
+  if (v === null || v === undefined) return "";
+  if (Array.isArray(v)) return v.length ? JSON.stringify(v) : "";
+  if (typeof v === "object") {
+    const json = JSON.stringify(v);
+    return json === "{}" ? "" : json;
+  }
+  // `false` is the absence of the flag, not a value that disagrees with it.
+  if (v === false) return "";
+  if (typeof v === "string") return v.trim();
+  return String(v);
+}
+
 function _fieldsEqual(a, b) {
-  return COMPARE_FIELDS.every((k) => {
-    const av = typeof a[k] === "object" ? JSON.stringify(a[k]) : String(a[k] ?? "");
-    const bv = typeof b[k] === "object" ? JSON.stringify(b[k]) : String(b[k] ?? "");
-    return av === bv;
-  });
+  return COMPARE_FIELDS.every((k) => _comparable(a[k]) === _comparable(b[k]));
 }
 
 /**
