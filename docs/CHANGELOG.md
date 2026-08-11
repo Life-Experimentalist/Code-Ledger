@@ -6,6 +6,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Every AI surface now sees an aggregate picture of how you solve, not just how the problem in front of it went. The behaviour bank has recorded solve times, resubmits, hint views and what reviews flagged since it shipped, but nothing ever read more than one problem back at a time — so the review of your fourth off-by-one bug knew nothing about the first three, and the library chat started from zero every session. Reviews, all three chat surfaces and the solution merger now receive which review flags recur across separate problems, which topics you needed help on, your median pace per difficulty, and your hint and resubmit rates. A flag has to appear on two different problems to count, unstarted timers are not read as fast solves, and below five recorded problems nothing is claimed at all.
+- A **Behaviour** tab in the library's Behaviour Bank page — which until now showed insights, roadmap and skills, none of which is the behaviour bank. It shows the derived profile, the exact prompt text the model receives, and the raw per-problem records. Anything shaping the model's answers should be something you can read, and clear.
+
+### Changed
+
+- AI reviews now name what they flagged in their metadata block instead of leaving it to a keyword scan that recognised seven fixed phrases. A review that flagged an unnecessary sort or a mutated input used to write nothing back to the behaviour bank; now it does. The keyword scan remains as a fallback for models that drop the block.
+
+### Fixed
+
+- Sign-in failing with "The client_id and/or client_secret passed are incorrect" after the credentials were set. Two causes: whitespace left by pasting a value into `wrangler secret put` survived into the stored secret, and the authorize step trimmed it while the token exchange did not — so sign-in appeared to work and then failed at the last step. And the client ID and the client secret resolve through separate lists of accepted variable names, so setting the ID under one name while an older secret remained under another paired two different applications' halves. Both values are trimmed now, and a rejected pair reports which variable supplied each half.
+
+---
+
 ## [1.7.0] — 2026-08-11
 
 First public release. Versions up to 1.4.7 were development and store-review
