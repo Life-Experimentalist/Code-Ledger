@@ -21,11 +21,7 @@ async function startServer() {
   app.get("/auth/github/callback", (req, res) => {
     const rawCode = req.query.code;
     const code =
-      typeof rawCode === "string"
-        ? rawCode
-        : Array.isArray(rawCode)
-          ? (rawCode[0] ?? "")
-          : "";
+      typeof rawCode === "string" ? rawCode : Array.isArray(rawCode) ? (rawCode[0] ?? "") : "";
     const safeCodeLiteral = JSON.stringify(code);
 
     res.send(`<html><body><script>

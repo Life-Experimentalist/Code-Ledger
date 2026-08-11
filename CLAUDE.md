@@ -10,7 +10,9 @@ A **Manifest V3 browser extension** (Chrome + Firefox) that automatically commit
 
 - **Domain:** `codeledger.vkrishna04.me`
 - **Auth worker:** `https://codeledger.vkrishna04.me/api`
-- **Extension root:** `src/` — this is the directory loaded unpacked in Chrome
+- **Extension root:** `src/` — every import path is relative to it. You load
+  `dist/chromium` (or `dist/firefox`) unpacked, not `src/`: the build is what
+  picks one of the two source manifests and writes it out as `manifest.json`.
 - **Stack:** Pure ES6 modules, no bundler and no transpiler for our own code.
   Preact + htm are vendored into `src/vendor/` as committed esbuild bundles built
   from npm — nothing is fetched from a CDN at runtime. Tailwind CSS compiles the
@@ -40,7 +42,9 @@ count only; read them with `npm run lint:all`. Plain `tsc --noEmit` is not enoug
 — it only reads files carrying a `@ts-check` pragma, which was 11 of 153, and
 four crashing bugs shipped through that gap.
 
-Load the extension unpacked from `src/` in `chrome://extensions`.
+`npm run build:fast` skips the Tailwind step and is the fast inner loop; run
+`npm run build:css` after touching a class or the new utility silently does
+nothing. Then load `dist/chromium` unpacked in `chrome://extensions`.
 
 ### Worker (Cloudflare)
 
@@ -124,9 +128,10 @@ manifest-chromium.json / manifest-firefox.json   — the build emits one manifes
     └── welcome.js                    — onboarding checklist page (auto-opened on first repo link)
 ```
 
-`src/handlers/git/gitlab/` and `src/handlers/git/bitbucket/` exist but every method
-throws `"not yet implemented"`. They are not registered in the provider picker;
-GitHub is the only working target. Do not describe them as supported.
+GitHub is the only git provider. The GitLab and Bitbucket handlers were deleted
+in 1.7.0 — every method on them threw, and they were still reachable from the
+provider chips, the mirror picker and the `@gitlab`/`@bitbucket` chat mentions.
+Do not reintroduce a provider anywhere in the UI before its `commit()` works.
 
 ### Data flow for a solve event
 
@@ -287,7 +292,7 @@ All handlers live in `src/handlers/` and follow a strict structure:
 
 - **Git repository handlers**: `src/handlers/git/{name}/`
   - `index.js` — Git handler class extending `BaseGitHandler`
-  - Examples: `github/`, `gitlab/`, `bitbucket/`
+  - `github/` is the only one
 
 ### UI Components & Views
 
@@ -311,17 +316,17 @@ All handlers live in `src/handlers/` and follow a strict structure:
 
 ### Naming Style Summary
 
-| Category            | Style             | Examples                                                   | Notes                               |
-| ------------------- | ----------------- | ---------------------------------------------------------- | ----------------------------------- |
-| Handler directories | kebab-case        | `leetcode`, `gemini`, `github`                             | All handlers indexed by name        |
-| Handler files       | `index.js`        | `index.js`                                                 | Standard entry point                |
-| Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `graphql-queries.js` | Clear purpose from name           |
-| Components          | PascalCase        | `SettingsSchema.js`, `ModelSelector.js`                    | React/Preact convention             |
-| Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                       | Distinguish from generic components |
-| Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                 | Lowercase for utility modules       |
-| Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.GITHUB_REPO`                                 | Via `CONSTANTS.SK.*` export only    |
-| CSS files           | kebab-case        | `floating-timer.css`                                       | Tailwind input files or compiled    |
-| Data files          | kebab-case        | `canonical-map.json`, `metadata.json`                      | In `src/data/`                      |
+| Category            | Style             | Examples                                                     | Notes                               |
+| ------------------- | ----------------- | ------------------------------------------------------------ | ----------------------------------- |
+| Handler directories | kebab-case        | `leetcode`, `gemini`, `github`                               | All handlers indexed by name        |
+| Handler files       | `index.js`        | `index.js`                                                   | Standard entry point                |
+| Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `graphql-queries.js` | Clear purpose from name             |
+| Components          | PascalCase        | `SettingsSchema.js`, `ModelSelector.js`                      | React/Preact convention             |
+| Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                         | Distinguish from generic components |
+| Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                   | Lowercase for utility modules       |
+| Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.GITHUB_REPO`                                   | Via `CONSTANTS.SK.*` export only    |
+| CSS files           | kebab-case        | `floating-timer.css`                                         | Tailwind input files or compiled    |
+| Data files          | kebab-case        | `canonical-map.json`, `metadata.json`                        | In `src/data/`                      |
 
 ### Storage Key Conventions
 
@@ -329,9 +334,7 @@ All handlers live in `src/handlers/` and follow a strict structure:
 
 ```js
 // ✅ Correct
-const repo =
-  settings[CONSTANTS.SK.GITHUB_REPO] ||
-  settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
+const repo = settings[CONSTANTS.SK.GITHUB_REPO] || settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
 
 // ❌ Wrong
 const repo = settings["github_repo"];
@@ -420,13 +423,13 @@ repository" a store reviewer hit. The callback detects an App-shaped token
 response (`expires_in`/`refresh_token` present, `scope` absent) and reports the
 misconfiguration at sign-in rather than letting it surface as a later 403.
 
-| Secret name                        | Required | Source                                                      |
-| ---------------------------------- | -------- | ----------------------------------------------------------- |
-| `CODELEDGER_OAUTH_CLIENT_ID`       | yes      | OAuth App Client ID (`Iv23li…`; `Ov23li…` is a GitHub App)  |
-| `CODELEDGER_OAUTH_CLIENT_SECRET`   | yes      | OAuth App client secret                                     |
-| `SESSION_SECRET`                   | yes      | 32 random bytes — signs the OAuth `state` cookie            |
-| `CANONICAL_UPLOAD_TOKEN`           | no       | 32 random bytes — guards `POST /api/admin/canonical`        |
-| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | no       | 32 random bytes — HMAC for `POST /api/webhook/github`       |
+| Secret name                        | Required | Source                                                     |
+| ---------------------------------- | -------- | ---------------------------------------------------------- |
+| `CODELEDGER_OAUTH_CLIENT_ID`       | yes      | OAuth App Client ID (`Iv23li…`; `Ov23li…` is a GitHub App) |
+| `CODELEDGER_OAUTH_CLIENT_SECRET`   | yes      | OAuth App client secret                                    |
+| `SESSION_SECRET`                   | yes      | 32 random bytes — signs the OAuth `state` cookie           |
+| `CANONICAL_UPLOAD_TOKEN`           | no       | 32 random bytes — guards `POST /api/admin/canonical`       |
+| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | no       | 32 random bytes — HMAC for `POST /api/webhook/github`      |
 
 The worker also accepts the older `CODELEDGER_GH_APP_CLIENT_ID` /
 `CODELEDGER_GH_APP_CLIENT_SECRET` names as fallbacks so an existing deployment

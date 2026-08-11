@@ -38,11 +38,11 @@ async function checkHandler(handlerPath) {
     issues.push("No exported class found");
   }
 
-  // Check for init method (platforms & ai providers)
-  if (handlerPath.includes("platforms") || handlerPath.includes("ai")) {
-    if (!content.includes("init()")) {
-      issues.push("Missing init() method");
-    }
+  // Only platform handlers have an init() — they are the ones a content script
+  // starts. AI handlers are called on demand and never had one, so asking for
+  // it here reported six problems that were not problems.
+  if (handlerPath.includes("platforms") && !content.includes("init()")) {
+    issues.push("Missing init() method");
   }
 
   // Check for settings schema
@@ -107,17 +107,22 @@ async function checkAllHandlers() {
 
   console.log(`Summary: ${totalOk} OK, ${totalIssues} with issues\n`);
 
-  // Check OAuth setup
-  console.log("🔐 OAuth Configuration:");
+  // Check the landing page's link config. This used to read `github.app_slug`
+  // and `oauth_url`, neither of which the file has ever contained, so it
+  // printed "NOT SET" twice on a healthy checkout.
+  console.log("🔗 Landing page links (worker/public/config.json):");
   const workerConfig = path.join(__dirname, "..", "worker", "public", "config.json");
   if (fs.existsSync(workerConfig)) {
     const config = JSON.parse(fs.readFileSync(workerConfig, "utf-8"));
-    console.log(`   ✅ Worker config found`);
-    console.log(`      • GitHub App: ${config.github?.app_slug || "NOT SET"}`);
-    console.log(`      • OAuth URL: ${config.oauth_url || "NOT SET"}`);
+    for (const key of ["github_repo", "chrome_store", "firefox_store"]) {
+      console.log(config[key] ? `   ✅ ${key}` : `   ⚠️  ${key} — not set`);
+    }
   } else {
-    console.log(`   ❌ Worker config NOT found`);
+    console.log(`   ❌ config.json NOT found`);
   }
+
+  // The OAuth secrets live in Wrangler, never in the repo, so there is nothing
+  // here to check. `npx wrangler secret list` from worker/ is the real answer.
 
   // Check storage constants
   console.log("\n💾 Storage Configuration:");

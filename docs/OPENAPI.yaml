@@ -48,17 +48,7 @@ x-extension-urls:
   params:
     tab:
       values:
-        [
-          solutions,
-          analytics,
-          graph,
-          ai-chats,
-          behaviour-bank,
-          canonical,
-          party,
-          settings,
-          search,
-        ]
+        [solutions, analytics, graph, ai-chats, behaviour-bank, canonical, party, settings, search]
       description: Active top-level view
     settingsTab:
       values: [general, ai, git, platforms, backups, advanced]

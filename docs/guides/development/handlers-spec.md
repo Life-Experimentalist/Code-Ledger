@@ -8,7 +8,7 @@ Overview
 - Each handler type extends one of the base classes in `src/handlers/_base/`:
   - `BasePlatformHandler` — platform-specific page integrations (LeetCode, GFG, Codeforces).
   - `BaseAIHandler` — AI providers (Gemini, OpenAI, Claude, etc.).
-  - `BaseGitHandler` — Git providers (GitHub, GitLab, Bitbucket).
+  - `BaseGitHandler` — Git providers. GitHub is the only implementation.
 
 Registration
 

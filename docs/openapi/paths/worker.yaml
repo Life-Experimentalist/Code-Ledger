@@ -44,7 +44,7 @@
         description: Requested OAuth scope. Unrecognised values silently become the default.
         schema:
           type: string
-          enum: [public_repo,workflow, repo,workflow]
+          enum: [public_repo, workflow, repo, workflow]
           default: public_repo,workflow
     responses:
       "302":

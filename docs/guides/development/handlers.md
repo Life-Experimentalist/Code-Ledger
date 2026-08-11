@@ -14,28 +14,33 @@ This document describes the three handler types in CodeLedger and the current ve
 src/handlers/
   _base/                 # base classes (BaseAIHandler, BaseGitHandler, BasePlatformHandler)
   ai/                    # AI provider adapters (gemini, openai, claude, ...)
-  git/                   # Git provider adapters (github, gitlab, bitbucket)
+  git/                   # Git provider adapter (github — the only one)
   platforms/             # Platform handlers (leetcode, geeksforgeeks, codeforces)
 ```
 
-## Verified vs Beta
+## What ships
 
-As of this snapshot the following handlers are verified and working in local dev runs:
+Every handler listed here is registered in `src/handlers/init.js` and reachable
+from the UI. There is no "beta" tier: a handler that could not do its job was
+deleted rather than shipped behind a label.
 
-- **AI:** `gemini` — verified
-- **Git:** `github` — verified (Trees API commit flow)
-- **Platform:** `leetcode` — verified
+- **Platform:** `leetcode`, `geeksforgeeks`, `codeforces`
+- **Git:** `github` — the only one. The GitLab and Bitbucket adapters were
+  removed in 1.7.0; every method on them threw.
+- **AI:** `gemini`, `openai`, `claude`, `deepseek`, `ollama`, `openrouter`
 
-Remaining handlers are under construction or beta and should be considered non-production until verified:
+## How far each is exercised
 
-- **AI:** `claude`, `deepseek`, `ollama`, `openai`, `openrouter` (beta/under construction)
-- **Git:** `gitlab`, `bitbucket` (beta/under construction)
-- **Platform:** `geeksforgeeks`, `codeforces` (beta/under construction)
+- `leetcode`, `github` and `gemini` have been run end to end — an accepted
+  submission through to a commit with an AI review attached.
+- `geeksforgeeks` and `codeforces` are exercised by the unit suite and by hand,
+  but their DOM selectors are the part of the codebase most likely to rot; a
+  platform refresh breaks detection before it breaks anything else.
+- The other five AI adapters are covered by the suite against recorded
+  responses. A live run needs that provider's key.
 
-## How verification was determined
-
-- `gemini`, `github`, and `leetcode` were exercised end-to-end in dev runs and confirmed to produce commits, AI reviews, and UI integration with the library dashboard.
-- Other adapters compile and are wired but either lack live integration tests or require provider secrets for a full verification run.
+Nothing here is gated on a live integration test, because there isn't one — see
+"An end-to-end test against a real repository" in `docs/ROADMAP.md`.
 
 ## Developer notes
 
@@ -54,5 +59,3 @@ node dev/diagnose.js
 - Keep vendor bundles out of handler detection logic; prefer explicit selectors and GraphQL when available.
 - Use `createDebugger()` from `src/lib/debug.js` instead of `console.log` for all handler logging.
 - Add unit tests for any new handler logic and a small end-to-end smoke test that exercises commit creation to a test repository.
-
-If you'd like, I can add smoke-test scripts that run the verified handlers against a disposable test repo and publish results to CI.

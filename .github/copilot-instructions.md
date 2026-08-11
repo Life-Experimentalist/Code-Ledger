@@ -62,7 +62,10 @@ CodeLedger is a **Manifest V3 Chrome/Firefox extension** that automatically comm
 
 ## Stack
 
-- **Extension**: Pure ES6 modules, Preact v10 + htm (CDN re-export via `src/vendor/preact-bundle.js`)
+- **Extension**: Pure ES6 modules, Preact v10 + htm. `src/vendor/preact-bundle.js`
+  is a committed esbuild bundle built from npm — not a CDN shim. Nothing is
+  fetched at runtime; MV3's `script-src 'self'` would block it. Regenerate with
+  `npm run vendor:preact`, never reintroduce a remote import.
 - **Styling**: Tailwind CSS (pre-compiled to `src/ui/styles/compiled.css`) — no runtime
 - **Backend**: Cloudflare Worker (Hono framework) for GitHub OAuth
 - **Storage**: IndexedDB (via `Storage` abstraction) + `chrome.storage.local` for settings
@@ -111,7 +114,12 @@ Never write `settings.gitRepo` in new code. Never save an OAuth token to setting
 
 When creating/initialising a repo (e.g., `GitHubOnboardingModal`):
 
-- Create repo with `auto_init: true` (ensures a base branch + commit SHA exists)
+- `GitHubOnboardingModal` creates the repo with `auto_init: false` and writes the
+  first commit itself, so the ledger has no GitHub-generated README. An empty
+  repo has no ref to patch: `initializeRepository()` builds a **root commit** —
+  no `base_tree`, no `parents` — and creates `refs/heads/main` rather than
+  patching it. (`api-client.js` `createRepo()` still passes `auto_init: true` on
+  the non-onboarding path; both work, the two paths differ.)
 - Use `POST /git/trees` + `POST /git/commits` + `PATCH /git/refs/heads/main` for all file creation
 - Never use `PUT /contents/{path}` for initial setup — it creates one commit per file and requires `btoa()` which breaks on non-ASCII content
 - If a GitHub request fails, check for rate limiting or a transient 5xx first, retry once with backoff when safe, and fall back to the mirror or alternate target path when one exists.
@@ -130,8 +138,8 @@ src/
 ├── handlers/
 │   ├── _base/BasePlatformHandler.js
 │   ├── platforms/{leetcode,geeksforgeeks,codeforces}/index.js
-│   ├── ai/{gemini,openai,claude,deepseek,ollama}/index.js
-│   └── git/{github,gitlab,bitbucket}/index.js
+│   ├── ai/{gemini,openai,claude,deepseek,ollama,openrouter}/index.js
+│   └── git/github/index.js       ← the only git provider
 ├── core/
 │   ├── constants.js     ← SINGLE SOURCE OF TRUTH for URLs, keys, storage keys
 │   ├── storage.js       ← unified storage abstraction
@@ -198,13 +206,14 @@ All handlers live in `src/handlers/` and follow a strict structure:
   - Examples: `leetcode/`, `geeksforgeeks/`, `codeforces/`
 
 - **AI provider handlers**: `src/handlers/ai/{name}/`
-  - `index.js` — AI handler class extending `BaseAIHandler`
-  - `model-fetcher.js` — fetch live models or static list
+  - `index.js` — AI handler class extending `BaseAIHandler`; the only required
+    file. Model listing is centralised in `src/core/model-fetch.js`, which reads
+    the provider's entry in `CONSTANTS.AI_PROVIDERS`.
   - Examples: `gemini/`, `openai/`, `claude/`, `deepseek/`, `ollama/`, `openrouter/`
 
 - **Git repository handlers**: `src/handlers/git/{name}/`
   - `index.js` — Git handler class extending `BaseGitHandler`
-  - Examples: `github/`, `gitlab/`, `bitbucket/`
+  - `github/` is the only one
 
 ### UI Components & Views
 
@@ -246,9 +255,7 @@ All handlers live in `src/handlers/` and follow a strict structure:
 
 ```js
 // ✅ Correct
-const repo =
-  settings[CONSTANTS.SK.GITHUB_REPO] ||
-  settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
+const repo = settings[CONSTANTS.SK.GITHUB_REPO] || settings[CONSTANTS.SK.GITHUB_REPO_LEGACY];
 
 // ❌ Wrong
 const repo = settings["github_repo"];

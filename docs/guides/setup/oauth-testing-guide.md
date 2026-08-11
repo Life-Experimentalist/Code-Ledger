@@ -6,23 +6,11 @@
 
 # OAuth & Git Provider Testing Guide
 
-## Setup Status
-
-### ✅ Completed
-
-- [x] Git provider fallback system (GitHub → GitLab → Bitbucket)
-- [x] OAuth message listener in library.js
-- [x] SettingsView cleaned (removed duplicate navigation)
-- [x] Connect button enhanced with provider indicator
-- [x] Worker config updated with OAuth URLs
-- [x] All handlers properly initialized (LeetCode ✅, GitHub ✅)
-- [x] Build passing without errors
-
-### ⚠️ Prerequisites for OAuth to Work
+## Prerequisites
 
 Before testing OAuth, you need:
 
-**Worker Secrets (in wrangler.toml):**
+**Worker secrets:**
 
 ```
 CODELEDGER_OAUTH_CLIENT_ID=<OAuth App client ID, starts with Iv23li>
@@ -58,8 +46,9 @@ npm run build:fast
 **Step 1c: Verify git provider detection**
 
 - Settings → Git section
-- Should see "GitHub" as active provider by default
-- Can toggle enable/disable and see fallback work
+- GitHub is the only provider and is shown as such
+- If mirrors are configured they are listed in order; the primary is tried
+  first and a mirror only after it throws
 
 ### Phase 2: Manual PAT Testing (Before OAuth)
 
@@ -138,7 +127,7 @@ npx wrangler deploy
 node dev/diagnose.js
 ```
 
-Expected: LeetCode ✅, GitHub ✅
+Expected: three platform handlers, one git provider, six AI providers, no issues.
 
 ### Verify build output
 
@@ -152,12 +141,10 @@ ls dist/chromium/handlers/git/github/
 
 ```javascript
 // Run in DevTools console of library page
-await chrome.storage.local.get(null, (items) => {
-  console.log("All storage:", items);
-  console.log("Git providers:", items["git.providers"]);
-  console.log("Auth tokens:", items["auth.tokens"]);
-  console.log("Settings:", items["settings"]);
-});
+const items = await chrome.storage.local.get(null);
+console.log("Auth tokens:", items["auth.tokens"]);
+console.log("AI keys:", items["ai.keys"]);
+console.log("Settings:", items.settings);
 ```
 
 ## Troubleshooting

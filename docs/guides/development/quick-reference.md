@@ -1,143 +1,97 @@
-# Quick Reference: OAuth & Git Integration Testing
+# Quick reference
 
-## What Was Fixed
+The commands and storage paths you reach for most often. Everything here was
+checked against the tree, not copied from an older note.
 
-✅ **Git Provider System**: GitHub → GitLab → Bitbucket (auto-fallback)
-✅ **OAuth Listener**: Token saved to Storage automatically
-✅ **Connect Button**: Enhanced with provider indicator
-✅ **SettingsView**: Removed duplicate navigation tabs
-✅ **All Handlers**: GitHub ✅, LeetCode ✅, GitLab ✅, Bitbucket ✅, Codeforces ✅
+## Commands
 
----
+```bash
+npm run build:fast      # dist only, skips the Tailwind step — the fast inner loop
+npm run watch           # rebuild on change
+npm run lint            # type gate: fails on TS2304/TS2552/TS2349/TS1117 only
+npm test                # the node:test suites under test/ and worker/test/
+npm run format:check    # prettier, read-only
+node dev/diagnose.js    # which handlers are present and wired
+```
 
-## To Test OAuth (After Worker Deploy)
+`npm run lint` prints a count of structural advisories and exits 0 on them.
+`npm run lint:all` shows them.
 
-### Step 1: Load Extension Locally
+## Load the extension
 
 ```bash
 npm run build:fast
-# Chrome → chrome://extensions → Load unpacked
-# Choose: v:\Code\ProjectCode\CodeLedger\dist\chromium
 ```
 
-### Step 2: Check Settings
+Then `chrome://extensions` → Developer mode → **Load unpacked** →
+`dist/chromium`. Firefox uses `dist/firefox` via `about:debugging`.
 
-- Open CodeLedger Library view
-- Settings tab → should see Git providers listed
-- All three (GitHub, GitLab, Bitbucket) should be shown
+Load from `dist/`, not from `src/`. `src/` holds `manifest-chromium.json` and
+`manifest-firefox.json`; the build picks one and writes it out as
+`manifest.json`, which is the name the browser looks for.
 
-### Step 3: Test Connect Button
+Run `npm run build:css` after touching a Tailwind class — `build:fast` skips it,
+so a new utility class will silently do nothing until you do.
 
-- Header top-right → "Connect" button
-- Should show GitHub label next to it
-- Click → Opens GitHub OAuth in new tab
-- Authenticate → should redirect back with token
+## Handlers that exist
 
-### Step 4: Verify Token Saved
+| Kind     | Registered                                                       |
+| -------- | ---------------------------------------------------------------- |
+| Platform | `leetcode`, `geeksforgeeks`, `codeforces`                        |
+| Git      | `github` — the only one                                          |
+| AI       | `gemini`, `openai`, `claude`, `deepseek`, `ollama`, `openrouter` |
 
-**In Chrome DevTools (on library page):**
+Registration happens in `src/handlers/init.js`. If a handler is not in one of
+those three arrays, nothing can reach it.
+
+## Where things are stored
+
+| What            | Path                    | Read with                        |
+| --------------- | ----------------------- | -------------------------------- |
+| OAuth token     | `auth.tokens[provider]` | `Storage.getAuthToken("github")` |
+| AI API keys     | `ai.keys[provider]`     | `Storage.getAIKeys()`            |
+| Settings        | `settings`              | `Storage.getSettings()`          |
+| Solved problems | IndexedDB               | `Storage.getAllProblems()`       |
+
+Inspect them from the DevTools console of the library page:
 
 ```javascript
-// DevTools Console
-const storage = await chrome.storage.local.get(null);
-console.log(storage["auth.tokens"]); // Should show { github: 'ghu_...' }
+const all = await chrome.storage.local.get(null);
+console.log(all["auth.tokens"], all["ai.keys"], all.settings);
 ```
 
-### Step 5: Test LeetCode Integration
+Never hardcode a settings key — use `CONSTANTS.SK.*` from
+`src/core/constants.js`.
 
-- Go to LeetCode.com
-- Solve any problem
-- Submit solution
-- CodeLedger should detect and commit
+## Files worth knowing
 
----
+| File                               | Purpose                                              |
+| ---------------------------------- | ---------------------------------------------------- |
+| `src/core/constants.js`            | Every URL, storage key name and provider config      |
+| `src/background/service-worker.js` | Solve → commit pipeline, alarms, queues              |
+| `src/handlers/init.js`             | The registration arrays                              |
+| `src/handlers/git/github/index.js` | The commit itself (Trees API)                        |
+| `src/library/library.js`           | OAuth message listener, onboarding trigger           |
+| `src/lib/browser-compat.js`        | The only file allowed to touch `chrome.*`            |
+| `docs/OPENAPI.yaml`                | The worker's contract — change it in the same commit |
 
-## Diagnostic Commands
+## Troubleshooting
 
-```bash
-# Check all handlers
-node dev/diagnose.js
+- **Sign-in returns 500** — `SESSION_SECRET` is not set on the worker. The state
+  cookie cannot be signed without it.
+- **`403 Resource not accessible by integration`** — the OAuth app is registered
+  as a GitHub App. Client IDs start `Iv23li` for OAuth Apps, `Ov23li` for GitHub
+  Apps.
+- **Token not saving** — the worker's `postMessage` type must be exactly
+  `CODELEDGER_AUTH`.
+- **LeetCode not detecting** — selectors moved. Check
+  `src/handlers/platforms/leetcode/dom-selectors.js` and the observer errors in
+  the page console.
+- **Commit failing** — the handler logs status, message and headers on every
+  failure. Read the service worker console.
 
-# Check handler status by category
-node dev/diagnose.js | Select-String "✅|⚠️"
+## See also
 
-# Verify build
-npm run build:fast
-```
-
----
-
-## Files You Need to Know
-
-| File                                | Purpose                         |
-| ----------------------------------- | ------------------------------- |
-| `src/core/git-provider-selector.js` | Handles provider fallback logic |
-| `src/library/library.js`            | OAuth message listener + header |
-| `src/library/views/SettingsView.js` | Settings UI (cleaned)           |
-| `worker/public/config.json`         | OAuth URLs configuration        |
-| `dev/diagnose.js`                   | Handler status diagnostic tool  |
-| `OAUTH_TESTING_GUIDE.md`            | Comprehensive testing guide     |
-| `GIT_INTEGRATION_SETUP.md`          | Architecture documentation      |
-
----
-
-## Before Full Testing (Prerequisites)
-
-The code is ready, but to test OAuth end-to-end you need:
-
-**Worker secrets** (set with `npx wrangler secret put NAME` from `worker/`,
-never written into `wrangler.toml`):
-
-```
-CODELEDGER_OAUTH_CLIENT_ID       # OAuth App client ID, starts with Iv23li
-CODELEDGER_OAUTH_CLIENT_SECRET   # OAuth App client secret
-SESSION_SECRET                   # random hex, 32 bytes — signs the state cookie
-CANONICAL_UPLOAD_TOKEN           # random hex, 32 bytes — admin upload bearer
-```
-
-**Deploy Worker:**
-
-```bash
-cd worker
-npx wrangler deploy
-```
-
----
-
-## Fallback Provider Logic
-
-If GitHub is disabled in settings:
-
-```javascript
-// Settings has github_enabled = false
-// getActiveGitProvider() will return "gitlab"
-// If gitlab_enabled = false too, returns "bitbucket"
-```
-
-Test by:
-
-1. Settings → GitHub → toggle off
-2. Solve LeetCode problem
-3. Should attempt GitLab commit instead
-
----
-
-## Known Good Status
-
-✅ All 3 platform handlers: LeetCode, GeeksForGeeks, Codeforces
-✅ All 3 git providers: GitHub, GitLab, Bitbucket
-✅ OAuth listener integrated
-✅ Settings properly configured
-✅ Build passing without errors
-✅ Git provider selector working
-
----
-
-## Troubleshooting Quick Links
-
-- **OAuth not opening?** → Check worker secrets are set
-- **Token not saving?** → Check browser console for CORS errors
-- **LeetCode not detecting?** → Check DOM selectors (run `node dev/generate-manifest-domains.js`)
-- **GitHub commit failing?** → Check token has "repo" scope
-
-See `OAUTH_TESTING_GUIDE.md` for detailed troubleshooting.
+- [Git integration](../setup/git-integration-setup.md)
+- [OAuth testing guide](../setup/oauth-testing-guide.md)
+- [Handlers overview](handlers.md)
