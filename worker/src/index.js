@@ -75,6 +75,43 @@ function env(c, key) {
   return undefined;
 }
 
+/**
+ * Describe a secret's shape without printing it.
+ *
+ * Used when a configured value fails its format check and the operator needs to
+ * know how. Reports length and character classes only — enough to tell a typo
+ * from a failed paste from a value set on the wrong worker, and not enough to
+ * reconstruct anything.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+export function describeSecretShape(value) {
+  const s = String(value ?? "");
+  if (s.length === 0) return "empty";
+
+  const printable = [...s].filter((ch) => {
+    const cp = ch.codePointAt(0);
+    return cp >= 0x20 && cp !== 0x7f;
+  }).length;
+  const unprintable = s.length - printable;
+  const plural = (n, one) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+  if (unprintable === s.length) {
+    return (
+      `${plural(s.length, "non-printable character")} — this is what a terminal that ` +
+      "cannot handle Ctrl+V records when you try to paste"
+    );
+  }
+
+  const parts = [plural(s.length, "character")];
+  if (unprintable > 0) parts.push(`${unprintable} of them non-printable`);
+  if (/\s/.test(s)) parts.push("with whitespace inside it");
+  if (/^[A-Za-z0-9._-]+$/.test(s)) parts.push("too short to be a client ID");
+  else parts.push("containing characters a client ID never has");
+  return parts.join(", ");
+}
+
 /* ── Encoding helpers ─────────────────────────────────────────────── */
 
 /** Escapes text for interpolation into HTML text nodes and quoted attributes. */
@@ -226,9 +263,18 @@ app.get("/api/auth/:provider", async (c) => {
   // GitHub's IDs are 20 characters of `Iv23li…`/`Ov23li…`; anything that is not
   // plausibly one of those is a misconfiguration, and should say so here.
   if (!/^[A-Za-z0-9._-]{10,}$/.test(clientId)) {
+    // Say what arrived, not just that it was wrong. The first time this fired,
+    // the stored value was a single 0x16 byte and the message alone was not
+    // enough to work out that the re-set had failed the same way again. A
+    // client ID is public — it goes out in the authorize URL to every user —
+    // so describing its shape here leaks nothing, and the description is what
+    // tells you whether you typed a bad value, set the wrong secret, or set
+    // the right secret on the wrong worker.
     return c.text(
       "GitHub OAuth is misconfigured: CODELEDGER_OAUTH_CLIENT_ID is set but is not a " +
-        "client ID. Re-set it with `wrangler secret put CODELEDGER_OAUTH_CLIENT_ID` and " +
+        `client ID. It is ${describeSecretShape(clientId)}; a client ID is 20 characters ` +
+        "of letters and digits, beginning `Iv23li` for an OAuth App or `Ov23li` for a " +
+        "GitHub App. Re-set it with `wrangler secret put CODELEDGER_OAUTH_CLIENT_ID` and " +
         "type or right-click-paste the value — Ctrl+V does not paste in that prompt.",
       500,
     );

@@ -93,6 +93,25 @@ describe("OAuth authorize redirect", () => {
     assert.match(await res.text(), /not a client ID/i);
   });
 
+  // Saying only "that is not a client ID" was not enough: the value was re-set,
+  // failed the same way, and the message read identically both times. It has to
+  // describe what arrived or an operator cannot tell a bad paste from a secret
+  // set on the wrong worker.
+  test("says what the malformed client ID actually was", async () => {
+    const res = await req("/api/auth/github", {}, { ...ENV, CODELEDGER_OAUTH_CLIENT_ID: "\x16" });
+    const body = await res.text();
+    assert.match(body, /1 non-printable character/);
+    assert.match(body, /Ctrl\+V/);
+    assert.equal(body.includes("\x16"), false, "the raw value must not be echoed back");
+  });
+
+  test("never echoes a well-formed-looking but rejected value", async () => {
+    const res = await req("/api/auth/github", {}, { ...ENV, CODELEDGER_OAUTH_CLIENT_ID: "zqzqz" });
+    const body = await res.text();
+    assert.match(body, /5 characters/);
+    assert.equal(body.includes("zqzqz"), false, "the raw value must not be echoed back");
+  });
+
   test("does not redirect to GitHub with a malformed client ID", async () => {
     const res = await req(
       "/api/auth/github",
@@ -160,9 +179,12 @@ describe("OAuth callback — credential type", () => {
           })
         : realFetch(url, init);
     try {
-      const res = await req(`/api/auth/github/callback?code=abc&state=${encodeURIComponent(state)}`, {
-        headers: { cookie },
-      });
+      const res = await req(
+        `/api/auth/github/callback?code=abc&state=${encodeURIComponent(state)}`,
+        {
+          headers: { cookie },
+        },
+      );
       return await res.text();
     } finally {
       globalThis.fetch = realFetch;
