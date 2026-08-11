@@ -91,6 +91,72 @@ export async function saveInsight({ topic, content, tags = [], type = "insight" 
 }
 
 /**
+ * Create or update an insight identified by a caller-supplied stable `key`.
+ *
+ * Derived insights are recomputed every time a review lands, so `saveInsight`
+ * would pile up a fresh copy of the same observation on every solve. Matching
+ * is done by scanning rather than by an index because this object store shares
+ * its database version with the rest of the extension — adding an index here
+ * means an upgrade transaction every other module has to survive, for a store
+ * that holds a few hundred rows at most.
+ *
+ * @param {object} entry - { key, topic, content, tags?, type?, meta? }
+ * @returns {Promise<{id: string, created: boolean}>}
+ */
+export async function upsertInsight({ key, topic, content, tags = [], type = "insight", meta }) {
+  if (!key) throw new Error("upsertInsight requires a stable key");
+  const existing = (await getAllInsights()).find((i) => i.key === key);
+  const now = Date.now();
+
+  if (!existing) {
+    const id = await saveInsight({ topic, content, tags, type });
+    const db = await _openDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction([STORE], "readwrite");
+      const store = tx.objectStore(STORE);
+      const req = store.get(id);
+      req.onsuccess = () => store.put({ ...req.result, key, meta: meta || undefined });
+      tx.oncomplete = () => {
+        db.close();
+        res();
+      };
+      tx.onerror = () => {
+        db.close();
+        rej(tx.error);
+      };
+    });
+    dbg.log(`upsertInsight: created ${id} key=${key}`);
+    return { id, created: true };
+  }
+
+  // Unchanged content must not bump updatedAt — otherwise every solve reshuffles
+  // the whole list and nothing ever looks new.
+  if (existing.content === content) return { id: existing.id, created: false };
+
+  const db = await _openDB();
+  await new Promise((res, rej) => {
+    const tx = db.transaction([STORE], "readwrite");
+    tx.objectStore(STORE).put({
+      ...existing,
+      content,
+      tags,
+      meta: meta || existing.meta,
+      updatedAt: now,
+    });
+    tx.oncomplete = () => {
+      db.close();
+      res();
+    };
+    tx.onerror = () => {
+      db.close();
+      rej(tx.error);
+    };
+  });
+  dbg.log(`upsertInsight: updated ${existing.id} key=${key}`);
+  return { id: existing.id, created: false };
+}
+
+/**
  * Get insights, optionally filtered by topic.
  * @param {string} [topic]
  * @param {number} [limit]
@@ -195,11 +261,20 @@ export async function buildKnowledgeJson() {
 /**
  * Build a compact context string for inclusion in AI system prompts.
  * Returns top N recent insights summarised by topic.
+ *
+ * Derived insights are left out. They are recomputed from the behaviour bank,
+ * and the learner profile already puts the same statistics in front of the
+ * model in a denser form — including them would spend tokens saying it twice,
+ * and would let a stale copy contradict the live profile. They exist for the
+ * human reading the Insights tab.
+ *
  * @param {number} [limit=20]
  * @returns {Promise<string>}
  */
 export async function buildKnowledgeContext(limit = 20) {
-  const items = await getInsights(null, limit);
+  const items = (await getInsights(null, limit * 2))
+    .filter((i) => i?.type !== "derived")
+    .slice(0, limit);
   if (!items.length) return "";
   const byTopic = {};
   items.forEach((item) => {

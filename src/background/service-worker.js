@@ -12,7 +12,11 @@ import { Storage } from "../core/storage.js";
 import { Telemetry } from "../core/telemetry.js";
 import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
-import { buildConversationSystemPrompt, parseWeakAreas } from "../core/ai-prompts.js";
+import {
+  buildConversationSystemPrompt,
+  parseTakeaway,
+  parseWeakAreas,
+} from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
 import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
 import { triggerCodeRecovery } from "./code-recovery-handler.js";
@@ -80,6 +84,7 @@ import {
 import { initMCPConfig, shouldUseToolsForAI } from "../core/mcp-config.js";
 import { buildSkillsSystemPrompt, getAutoToolIds } from "../core/ai/skills-registry.js";
 import { buildKnowledgeContext } from "../core/memory/knowledge-bank.js";
+import { synthesizeInsights } from "../core/memory/insight-synthesis.js";
 import {
   maybeCommitRollingBackup,
   listBackups,
@@ -102,6 +107,7 @@ import {
   autoPopulateFromHistory,
 } from "../core/behavior-bank.js";
 import { getProfileContext } from "../core/behavior-profile.js";
+import { getRoadmapContext } from "../core/roadmap-progress.js";
 
 // Lazy reference to topic-resolver (populated on first use)
 let _topicResolver = { normalizeTag: (t) => t };
@@ -718,6 +724,7 @@ async function generateAIReview(problem = {}, settings = null) {
       // Parse AI-inferred metadata
       let inferredMetadata = null;
       let reviewerWeakAreas = [];
+      let reviewerTakeaway = "";
       if (review) {
         const metaRegex = /METADATA\s*\n([\s\S]*?)\n\s*END_METADATA/i;
         const blockMatch = review.match(metaRegex);
@@ -730,7 +737,11 @@ async function generateAIReview(problem = {}, settings = null) {
           const lines = review.split("\n");
           const keptLines = [];
           for (const line of lines) {
-            if (/^(TAGS|TOPIC|PATTERN|DIFFICULTY|WEAK_AREAS|METADATA|END_METADATA):/i.test(line)) {
+            if (
+              /^(TAGS|TOPIC|PATTERN|DIFFICULTY|WEAK_AREAS|TAKEAWAY|METADATA|END_METADATA):/i.test(
+                line,
+              )
+            ) {
               blockText += line + "\n";
             } else {
               keptLines.push(line);
@@ -745,6 +756,8 @@ async function generateAIReview(problem = {}, settings = null) {
         const diffMatch = blockText.match(/DIFFICULTY:\s*(.+)/i);
         const weakMatch = blockText.match(/WEAK_AREAS:\s*(.+)/i);
         if (weakMatch) reviewerWeakAreas = parseWeakAreas(weakMatch[1]);
+        const takeawayMatch = blockText.match(/TAKEAWAY:\s*(.+)/i);
+        if (takeawayMatch) reviewerTakeaway = parseTakeaway(takeawayMatch[1]);
 
         const meta = {};
         if (tagsMatch) {
@@ -773,12 +786,22 @@ async function generateAIReview(problem = {}, settings = null) {
       // Write back insights to behavior bank (non-blocking). The reviewer's own
       // WEAK_AREAS line is authoritative when present — it knows what it flagged.
       // The keyword scan stays as the fallback for models that drop the block.
+      // The summary falls back to the head of the review only when the model
+      // dropped the TAKEAWAY line. That fallback is close to useless — the first
+      // 200 characters of a review are its heading — so it is a last resort, not
+      // the normal path.
+      // Chained rather than run alongside: synthesis reads the bank back, so it
+      // has to see the flags this review just wrote or the counts lag a solve
+      // behind. Both are fire-and-forget — a memo failing must not fail a review.
       recordAIInsights({
         slug: problem.titleSlug || problem.id || "",
         platform: problem.platform || "",
         weakAreas: reviewerWeakAreas.length ? reviewerWeakAreas : _extractWeakAreas(review),
-        summary: review.slice(0, 200),
-      }).catch(() => {});
+        summary: reviewerTakeaway || review.slice(0, 200),
+        hasTakeaway: !!reviewerTakeaway,
+      })
+        .then(() => synthesizeInsights())
+        .catch(() => {});
 
       const modelId = provider.model || CONSTANTS.AI_PROVIDERS[providerId]?.defaultModel || "";
       return { review, providerId, modelId, inferredTags, inferredMetadata };
@@ -2531,6 +2554,12 @@ async function handleAIChat(messages, context = {}) {
   // all and until now started from nothing each time.
   const chatProfile = await getProfileContext().catch(() => "");
   if (chatProfile) contextParts.push(chatProfile);
+
+  // Where they are heading, not just where they have been. Without this the
+  // assistant cannot see a roadmap the learner is staring at in the next tab,
+  // and every "what should I do next" gets answered from tag counts alone.
+  const chatRoadmap = await getRoadmapContext().catch(() => "");
+  if (chatRoadmap) contextParts.push(chatRoadmap);
 
   dbg.log(`handleAIChat(): prepared ${contextParts.length} context part(s)`);
 

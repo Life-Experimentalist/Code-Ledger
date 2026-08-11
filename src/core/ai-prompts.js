@@ -175,7 +175,7 @@ export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) 
   // learner's recurring-flag profile. A keyword scan over the prose used to
   // guess it and could only ever recognise seven fixed phrases; the reviewer
   // already knows what it flagged, so it may as well say so.
-  const metadataInstruction = `\n\nAt the very end of your response, you MUST output a metadata block in exactly this format (no other text on these lines):\nMETADATA\nTAGS: Tag One, Tag Two  ← use ONLY from this canonical list: ${CANONICAL_TOPICS}${sparseTagHint}\nTOPIC: Primary Topic\nPATTERN: Optional Pattern Name\nDIFFICULTY: Easy/Medium/Hard\nWEAK_AREAS: short, lowercase labels for what this solution actually got wrong or handled poorly, comma-separated (e.g. off-by-one, edge cases, space complexity). Reuse the same wording across reviews so repeats are recognisable. Leave empty if the solution was sound.\nEND_METADATA`;
+  const metadataInstruction = `\n\nAt the very end of your response, you MUST output a metadata block in exactly this format (no other text on these lines):\nMETADATA\nTAGS: Tag One, Tag Two  ← use ONLY from this canonical list: ${CANONICAL_TOPICS}${sparseTagHint}\nTOPIC: Primary Topic\nPATTERN: Optional Pattern Name\nDIFFICULTY: Easy/Medium/Hard\nWEAK_AREAS: short, lowercase labels for what this solution actually got wrong or handled poorly, comma-separated (e.g. off-by-one, edge cases, space complexity). Reuse the same wording across reviews so repeats are recognisable. Leave empty if the solution was sound.\nTAKEAWAY: one plain sentence naming the single most useful thing about THIS solution, written so it still makes sense months later with the code out of view. Plain text only — no markdown, no LaTeX, no headings. Say what was done and what it cost, e.g. "Sorted both arrays and walked them with two pointers, which is optimal but makes the O(n log n) sort the floor." Not a grade, not encouragement.\nEND_METADATA`;
 
   const behaviorSection = problemContext._behaviorContext
     ? `\n\n## Learner History:\n${problemContext._behaviorContext}`
@@ -210,6 +210,41 @@ export function parseWeakAreas(raw = "") {
     if (seen.size >= MAX_LABELS) break;
   }
   return [...seen];
+}
+
+/**
+ * Parse the reviewer's TAKEAWAY line into the one sentence the Behaviour tab
+ * shows under a problem.
+ *
+ * What it replaces is the point of it: the summary used to be `review.slice(0,
+ * 200)` — the first 200 characters of the review, which is its heading and the
+ * opening of a complexity table, cut mid-word. It read as "### Analysis **1.
+ * Complexity** * **Time Complexity:** $O(N \log N…" and told the learner
+ * nothing, because the first 200 characters of a review are never the part
+ * worth keeping.
+ *
+ * Markdown and LaTeX are stripped rather than rendered: this line appears in a
+ * dense list of records, so it has to survive as one plain sentence.
+ *
+ * @param {string} raw the text following "TAKEAWAY:"
+ * @returns {string} a single plain sentence, or "" if there is nothing usable
+ */
+export function parseTakeaway(raw = "") {
+  const MAX_CHARS = 240;
+  let s = String(raw || "")
+    .split("\n")[0]
+    .trim();
+  if (!s) return "";
+  s = s
+    .replace(/\$+([^$]*)\$+/g, "$1") // $O(n \log n)$ → O(n \log n)
+    .replace(/\\(?:log|max|min|sqrt|cdot|times|le|ge|approx)\b/g, (m) => m.slice(1))
+    .replace(/`+/g, "")
+    .replace(/\*\*?([^*]+)\*\*?/g, "$1")
+    .replace(/^#+\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/^(none|n\/a|na|-|—)$/i.test(s)) return "";
+  return s.length > MAX_CHARS ? s.slice(0, MAX_CHARS - 1).trimEnd() + "…" : s;
 }
 
 export function buildConversationSystemPrompt(context = {}) {

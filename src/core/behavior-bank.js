@@ -144,9 +144,18 @@ export async function recordAIReview({ slug, platform, providerId, reviewLength 
 /**
  * Store a brief AI-review insight snapshot for a problem.
  * `weakAreas` is a string[] of short issue labels (e.g. "edge case", "O(n²)").
- * `summary` is the first ~200 chars of the review.
+ * `summary` is the reviewer's own one-sentence takeaway; when the model dropped
+ * that line it is instead the head of the review, and `hasTakeaway` is false so
+ * the UI can show it as the raw excerpt it is rather than passing it off as a
+ * summary.
  */
-export async function recordAIInsights({ slug, platform, weakAreas = [], summary = "" }) {
+export async function recordAIInsights({
+  slug,
+  platform,
+  weakAreas = [],
+  summary = "",
+  hasTakeaway = false,
+}) {
   dbg.log(`recordAIInsights(): entering for ${platform}::${slug}`);
   if (!(await isEnabled())) return;
   const bank = await load();
@@ -154,7 +163,7 @@ export async function recordAIInsights({ slug, platform, weakAreas = [], summary
   const entry = bank[key] || { slug, platform };
   entry.aiInsights = [
     ...(entry.aiInsights || []),
-    { ts: Date.now(), weakAreas, summary: summary.slice(0, 200) },
+    { ts: Date.now(), weakAreas, summary: summary.slice(0, 280), hasTakeaway },
   ].slice(-3);
   bank[key] = entry;
   await save(bank);

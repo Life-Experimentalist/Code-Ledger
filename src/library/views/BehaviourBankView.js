@@ -11,7 +11,9 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { createDebugger } from "../../lib/debug.js";
+import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { getInsights, saveInsight, deleteInsight } from "../../core/memory/knowledge-bank.js";
+import { synthesizeInsights } from "../../core/memory/insight-synthesis.js";
 import {
   getAllSkills,
   saveUserSkill,
@@ -25,6 +27,12 @@ import {
   formatProfileForPrompt,
   MIN_PROBLEMS_FOR_PROFILE,
 } from "../../core/behavior-profile.js";
+import { countMilestoneSolves } from "../../core/roadmap-progress.js";
+import {
+  ROADMAP_TEMPLATES,
+  buildWeakAreaRoadmap,
+  instantiateTemplate,
+} from "../../core/roadmap-templates.js";
 
 const dbg = createDebugger("BehaviourBankView");
 
@@ -55,6 +63,10 @@ function InsightsSection() {
 
   const load = async () => {
     try {
+      // Recompute before reading. The review path keeps these current as new
+      // problems land, but someone who solved 283 problems before the feature
+      // existed would otherwise sit on an empty tab until their next review.
+      await synthesizeInsights();
       const items = await getInsights(null, 100);
       setInsights(items);
     } catch (e) {
@@ -206,7 +218,9 @@ function InsightsSection() {
         ? html`<p class="text-xs text-slate-500 py-4">Loading...</p>`
         : insights.length === 0
           ? html`<p class="text-xs text-slate-500 py-4">
-              No insights yet. The AI will add insights here as you chat and solve problems.
+              Nothing yet. Insights appear once a pattern has repeated across at least three
+              problems — the AI writes them from your chats and reviews, and CodeLedger adds its own
+              from your solve history. You can also add one yourself.
             </p>`
           : Object.entries(byTopic).map(
               ([topic, items]) => html`
@@ -223,6 +237,11 @@ function InsightsSection() {
                         >
                           <div class="flex-1 min-w-0">
                             <p class="text-xs text-slate-300 leading-relaxed">${item.content}</p>
+                            ${item.type === "derived" &&
+                            html`<p class="text-xs text-slate-600 mt-1">
+                              Counted from your solve history — updates itself, so deleting it would
+                              only bring it back.
+                            </p>`}
                             ${item.tags?.length > 0 &&
                             html`
                               <div class="flex flex-wrap gap-1 mt-1.5">
@@ -238,13 +257,14 @@ function InsightsSection() {
                               </div>
                             `}
                           </div>
-                          <button
+                          ${item.type !== "derived" &&
+                          html`<button
                             onClick=${() => handleDelete(item.id)}
                             class="text-slate-600 hover:text-rose-400 text-xs opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
                             title="Delete"
                           >
                             ✕
-                          </button>
+                          </button>`}
                         </div>
                       `,
                     )}
@@ -264,19 +284,9 @@ const DIFFICULTY_COLORS = {
   Hard: "text-rose-400 bg-rose-500/10 border-rose-500/20",
 };
 
-function calcProgress(milestone, problems) {
-  if (!Array.isArray(problems) || !problems.length) return 0;
-  const targets = new Set([
-    (milestone.topic || "").toLowerCase(),
-    ...(milestone.subtopics || []).map((s) => s.toLowerCase()),
-  ]);
-  const matched = problems.filter((p) => {
-    const pTags = (p.tags || []).map((t) => String(t).toLowerCase());
-    const pTopic = String(p.topic || "").toLowerCase();
-    return pTags.some((t) => targets.has(t)) || targets.has(pTopic);
-  });
-  return matched.length;
-}
+// Scoring lives in core/roadmap-progress.js so the tab and the AI cannot drift
+// apart on what counts as progress — they used to read different stores entirely.
+const calcProgress = countMilestoneSolves;
 
 function MilestoneCard({ milestone, problems, onNavigate }) {
   const solved = calcProgress(milestone, problems);
@@ -338,6 +348,30 @@ function MilestoneCard({ milestone, problems, onNavigate }) {
   `;
 }
 
+function TemplateShelf({ templates, onPick }) {
+  return html`
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      ${templates.map(
+        (t) => html`
+          <button
+            key=${t.id}
+            onClick=${() => onPick(t)}
+            class="text-left p-4 bg-white/3 hover:bg-white/6 border border-white/8 hover:border-cyan-500/30 rounded-xl transition-colors"
+          >
+            <div class="flex items-baseline justify-between gap-2 mb-1">
+              <span class="text-sm font-medium text-slate-200">${t.title}</span>
+              <span class="text-[10px] text-slate-600 flex-shrink-0"
+                >${t.milestones.length} milestones · ${t.timeframe}</span
+              >
+            </div>
+            <p class="text-xs text-slate-500 leading-relaxed">${t.blurb}</p>
+          </button>
+        `,
+      )}
+    </div>
+  `;
+}
+
 function RoadmapSection({ problems, onNavigate }) {
   const [roadmaps, setRoadmaps] = useState([]);
   const [active, setActive] = useState(null); // active roadmap id
@@ -349,6 +383,7 @@ function RoadmapSection({ problems, onNavigate }) {
     topics: "",
   });
   const [msg, setMsg] = useState("");
+  const [templates, setTemplates] = useState(ROADMAP_TEMPLATES);
 
   useEffect(() => {
     Storage.getRoadmaps()
@@ -357,9 +392,32 @@ function RoadmapSection({ problems, onNavigate }) {
         if (list?.length) setActive(list[list.length - 1].id);
       })
       .catch((e) => dbg.error("RoadmapSection load:", e?.message));
+
+    // The personalised template goes first when there is enough history to
+    // build one honestly; below that threshold it simply is not offered.
+    buildBehaviorProfile()
+      .then((profile) => {
+        const mine = buildWeakAreaRoadmap(profile?.topicsUnderStrain || []);
+        if (mine) setTemplates([mine, ...ROADMAP_TEMPLATES]);
+      })
+      .catch(() => {});
   }, []);
 
   const currentRoadmap = roadmaps.find((r) => r.id === active) || null;
+
+  const handlePickTemplate = async (template) => {
+    try {
+      const roadmap = instantiateTemplate(template);
+      await Storage.saveRoadmap(roadmap);
+      const updated = await Storage.getRoadmaps();
+      setRoadmaps(updated);
+      setActive(roadmap.id);
+      setScreen("list");
+      setMsg("");
+    } catch (e) {
+      setMsg("Failed: " + (e?.message || String(e)));
+    }
+  };
 
   const handleGenerate = async () => {
     if (!form.goal.trim()) {
@@ -440,9 +498,23 @@ function RoadmapSection({ problems, onNavigate }) {
           >
             ← Back
           </button>
-          <h3 class="text-sm font-medium text-slate-200">Create Roadmap with AI</h3>
+          <h3 class="text-sm font-medium text-slate-200">New roadmap</h3>
         </div>
         ${msg && html`<p class="text-xs text-rose-400">${msg}</p>`}
+
+        <div class="flex flex-col gap-2">
+          <p class="text-xs text-slate-500">
+            Start from a ready-made plan — no AI provider needed, and you can swap it later.
+          </p>
+          <${TemplateShelf} templates=${templates} onPick=${handlePickTemplate} />
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+          <div class="h-px flex-1 bg-white/8"></div>
+          <span class="text-[10px] uppercase tracking-widest text-slate-600">or build your own</span>
+          <div class="h-px flex-1 bg-white/8"></div>
+        </div>
+
         <div class="flex flex-col gap-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -589,13 +661,22 @@ function RoadmapSection({ problems, onNavigate }) {
             </div>
           `
         : html`
-            <div class="p-8 bg-white/3 border border-white/8 rounded-xl text-center">
-              <p class="text-2xl mb-3">🗺️</p>
-              <p class="text-sm font-medium text-slate-300 mb-1">No roadmap yet</p>
-              <p class="text-xs text-slate-500 max-w-sm mx-auto">
-                Create an AI-powered study roadmap tailored to your goals. Progress auto-updates as
-                you solve problems.
-              </p>
+            <div class="flex flex-col gap-4">
+              <div class="p-6 bg-white/3 border border-white/8 rounded-xl text-center">
+                <p class="text-2xl mb-3">🗺️</p>
+                <p class="text-sm font-medium text-slate-300 mb-1">Pick a plan to work toward</p>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto">
+                  Progress fills in by itself as you solve, and the AI will point its suggestions at
+                  whichever milestone you are on.
+                </p>
+              </div>
+              <${TemplateShelf} templates=${templates} onPick=${handlePickTemplate} />
+              <button
+                onClick=${() => setScreen("wizard")}
+                class="self-center text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+              >
+                Or describe your own goal and let the AI build one →
+              </button>
             </div>
           `}
     </div>
@@ -1098,13 +1179,26 @@ ${promptBlock}</pre
                     ${e.tags?.length > 0 && html`<div>Tags: ${e.tags.join(", ")}</div>`}
                     ${flags.length > 0 &&
                     html`<div class="text-rose-300">Reviews flagged: ${flags.join(", ")}</div>`}
-                    ${(e.aiInsights || [])
-                      .slice(-1)
-                      .map(
-                        (i) =>
-                          i.summary &&
-                          html`<div class="text-slate-500 italic">“${i.summary}”</div>`,
-                      )}
+                    ${(e.aiInsights || []).slice(-1).map((i) => {
+                      if (!i.summary) return "";
+                      // A takeaway is one plain sentence and reads as one. The
+                      // fallback is the head of a review — markdown, LaTeX and
+                      // all — so it gets rendered rather than quoted raw, and
+                      // labelled as the excerpt it is instead of posing as a
+                      // summary the reviewer never wrote.
+                      return i.hasTakeaway
+                        ? html`<div class="text-slate-400">
+                            <span class="text-slate-600">Takeaway: </span>${i.summary}
+                          </div>`
+                        : html`<div>
+                            <div class="text-slate-600 mb-1">
+                              Start of the review — this one predates one-line takeaways
+                            </div>
+                            <div class="opacity-80">
+                              <${AIMarkdownRenderer} content=${i.summary} />
+                            </div>
+                          </div>`;
+                    })}
                   </div>`}
                 </div>
               `;

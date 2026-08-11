@@ -17,6 +17,7 @@ import {
   buildKnowledgeContext,
 } from "./memory/knowledge-bank.js";
 import { getAllChats, deleteChat, getChatsByProblem } from "./ai-chat-storage.js";
+import { pickActiveRoadmap, summarizeRoadmap } from "./roadmap-progress.js";
 
 const dbg = createDebugger("MCPTools");
 
@@ -484,17 +485,39 @@ export async function getKnowledgeContext() {
 
 // ── Roadmap tools ─────────────────────────────────────────────────────────────
 
-export async function setRoadmap({ name, problems }) {
+/**
+ * Save a roadmap the AI built during a conversation.
+ *
+ * Writes to `Storage.saveRoadmap` — the same store the Roadmap tab reads — so a
+ * roadmap the assistant proposes shows up on the tab with progress bars, rather
+ * than into `settings._activeRoadmap` where nothing would ever read it again.
+ */
+export async function setRoadmap({ title, goal, milestones }) {
   try {
+    const list = Array.isArray(milestones) ? milestones : [];
+    if (!list.length) return { ok: false, error: "A roadmap needs at least one milestone." };
     const roadmap = {
-      name: name || "My Roadmap",
-      problems: Array.isArray(problems) ? problems : [],
+      id: `rm-${Date.now()}`,
+      title: title || "My Roadmap",
+      goal: goal || "",
       createdAt: Date.now(),
+      source: "chat",
+      milestones: list.map((m, i) => ({
+        id: m.id || `m${i + 1}`,
+        topic: m.topic || `Milestone ${i + 1}`,
+        subtopics: Array.isArray(m.subtopics) ? m.subtopics : [],
+        difficulty: m.difficulty || "Medium",
+        targetCount: Number(m.targetCount) || 5,
+        week: m.week || i + 1,
+        description: m.description || "",
+      })),
     };
-    await Storage.updateSettings({ _activeRoadmap: roadmap });
+    await Storage.saveRoadmap(roadmap);
     return {
       ok: true,
-      message: `Roadmap "${roadmap.name}" saved with ${roadmap.problems.length} problems.`,
+      message:
+        `Roadmap "${roadmap.title}" saved with ${roadmap.milestones.length} milestones. ` +
+        `It is now on their Roadmap tab and progress will track automatically as they solve.`,
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -503,33 +526,17 @@ export async function setRoadmap({ name, problems }) {
 
 export async function getRoadmapProgress() {
   try {
-    const settings = await Storage.getSettings();
-    const roadmap = settings._activeRoadmap;
+    const roadmap = pickActiveRoadmap(await Storage.getRoadmaps());
     if (!roadmap)
       return {
         ok: true,
         roadmap: null,
-        message: "No active roadmap set. Share one with 'set-roadmap'.",
+        message:
+          "No roadmap yet. Offer to build one with 'set-roadmap', or point them at the " +
+          "Roadmap tab in the library where they can pick a ready-made one.",
       };
-    const allProblems = await Storage.getAllProblems();
-    const solvedSlugs = new Set(allProblems.map((p) => p.titleSlug || p.id));
-    const total = roadmap.problems.length;
-    const done = roadmap.problems.filter((p) => {
-      const slug = typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
-      return solvedSlugs.has(slug);
-    }).length;
-    const nextProblem = roadmap.problems.find((p) => {
-      const slug = typeof p === "string" ? p : p.slug || p.titleSlug || p.id || "";
-      return !solvedSlugs.has(slug);
-    });
-    return {
-      ok: true,
-      roadmap: roadmap.name,
-      total,
-      done,
-      remaining: total - done,
-      nextProblem: nextProblem || null,
-    };
+    const summary = summarizeRoadmap(roadmap, await Storage.getAllProblems());
+    return { ok: true, ...summary };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -711,7 +718,18 @@ export const MCP_TOOLS = [
   {
     id: "remember",
     name: "Remember Insight",
-    description: "Save a note, preference, or observation to the user's persistent knowledge bank",
+    // Written as an instruction rather than a label because a passive
+    // description is why this tool was never called: nothing told the model
+    // when to reach for it, so the knowledge bank stayed empty.
+    description:
+      "Save something durable about this learner to their knowledge bank. Call this without being " +
+      "asked whenever the conversation reveals something that would still be useful weeks from " +
+      "now: a misconception you had to correct, a technique that finally landed, a stated goal or " +
+      "deadline, or a preference about how they want to be taught. Prefer one specific sentence " +
+      "over a general one — 'confuses the two-pointer and sliding-window templates on substring " +
+      "problems' is worth saving, 'is learning arrays' is not. Check what you already know before " +
+      "saving so you add rather than repeat. Do not save the answer to the problem at hand, " +
+      "anything they will not care about tomorrow, or praise.",
     parameters: {
       type: "object",
       properties: {
@@ -769,24 +787,37 @@ export const MCP_TOOLS = [
   {
     id: "set-roadmap",
     name: "Set Roadmap",
-    description: "Save a DSA study roadmap (list of problem slugs or objects with slug/title)",
+    description:
+      "Save a study roadmap as milestones. Use this when the user asks for a study plan, or " +
+      "agrees to one you proposed — it puts the plan on their Roadmap tab, where progress fills " +
+      "in by itself as they solve. Build 5-8 milestones in increasing difficulty. Milestones are " +
+      "scored by tag, so subtopics must be real lowercase-hyphenated platform tags " +
+      "('two-pointers', 'hash-table'), not prose.",
     parameters: {
       type: "object",
       properties: {
-        name: { type: "string", description: "Roadmap name" },
-        problems: {
+        title: { type: "string", description: "Short roadmap title" },
+        goal: {
+          type: "string",
+          description: "The user's stated goal, in their own words where possible",
+        },
+        milestones: {
           type: "array",
-          description: "Array of problem slugs or {slug, title, difficulty} objects",
+          description:
+            "Ordered milestones: {topic, subtopics[], difficulty (Easy|Medium|Hard), " +
+            "targetCount (number of problems), week, description}",
         },
       },
-      required: ["problems"],
+      required: ["milestones"],
     },
     handler: (args) => setRoadmap(args),
   },
   {
     id: "get-roadmap-progress",
     name: "Get Roadmap Progress",
-    description: "Get progress on the active DSA roadmap: how many done, what's next",
+    description:
+      "Read the user's active roadmap: every milestone, how many problems they have solved " +
+      "toward each, and which one they are on now. Call this before recommending what to work on.",
     parameters: { type: "object", properties: {} },
     handler: () => getRoadmapProgress(),
   },
