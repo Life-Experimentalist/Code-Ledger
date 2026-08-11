@@ -62,6 +62,28 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
     onSettingsChange("topicMappings", next);
   };
 
+  /** The user's own calls on which axis a topic sits, keyed on canonical name. */
+  const topicKinds = settings?.topicKinds || {};
+
+  /**
+   * Cycle a topic through the three axes and back to the built-in call.
+   *
+   * The built-in table is a set of judgement calls — Binary Search is a
+   * technique, Binary Search Tree is a structure — and some of them are worth
+   * arguing with. Cycling back to unset rather than pinning the built-in value
+   * matters: an override recorded as agreement would silently outlive a future
+   * correction to the table.
+   */
+  const cycleTopicKind = (topic) => {
+    const order = [KIND.DS, KIND.ALGO, KIND.DOMAIN];
+    const current = topicKinds[topic];
+    const next = current === undefined ? order[0] : order[order.indexOf(current) + 1];
+    const map = { ...topicKinds };
+    if (next === undefined) delete map[topic];
+    else map[topic] = next;
+    onSettingsChange("topicKinds", map);
+  };
+
   const isPlatformEnabled = (pid) => {
     const key = `${pid}_enabled`;
     if (settings?.[key] !== undefined) {
@@ -513,11 +535,13 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
             <p class="text-xs text-slate-400">
               Below is the reference guide of standard canonical topics, the axis each one sits on
               (data structure, algorithm, or neither), and the predefined aliases that automatically
-              map to them:
+              map to them. Click an axis badge to overrule the built-in call — analytics, the gap
+              report and the graph all follow yours. Click through to cycle back to the built-in.
             </p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
               ${knownTopics.map((topic) => {
-                const kind = classifyTopic(topic).kind || KIND.DOMAIN;
+                const kind = classifyTopic(topic, topicKinds).kind || KIND.DOMAIN;
+                const overridden = Object.prototype.hasOwnProperty.call(topicKinds, topic);
                 const aliases = RAW_MAPPINGS[topic] || [];
                 return html`
                   <div
@@ -526,12 +550,16 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-xs font-medium text-slate-200">${topic}</span>
-                      <span
-                        class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded
+                      <button
+                        onClick=${() => cycleTopicKind(topic)}
+                        title=${overridden
+                          ? `Your call. Click to cycle; keep clicking to go back to the built-in.`
+                          : `Built-in. Click to set your own.`}
+                        class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded hover:brightness-125 transition
                         ${KIND_BADGE_CLASS[kind]}"
                       >
-                        ${KIND_LABEL[kind]}
-                      </span>
+                        ${KIND_LABEL[kind]}${overridden ? " •" : ""}
+                      </button>
                     </div>
                     <div class="flex flex-wrap gap-1">
                       ${aliases.length === 0

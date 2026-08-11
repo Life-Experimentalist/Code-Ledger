@@ -46,7 +46,7 @@ Chrome Web Store requires each upload to exceed the last.
 - Analytics: solve heatmap, topic radar, difficulty breakdown, solve velocity, and language distribution.
 - A force-directed knowledge graph linking problems through shared topics.
 - A canonical topic map so the same concept from three platforms lands under one name.
-- Topics are split onto two axes — data structures and algorithms — everywhere they are counted, because ranking them together lets Array bury Dynamic Programming. You can overrule the built-in call on any topic from Settings → Platforms.
+- Topics are split onto two axes — data structures and algorithms — everywhere they are counted, because ranking them together lets Array bury Dynamic Programming. Which axis a topic sits on is a judgement call — Binary Search is a technique, Binary Search Tree is a structure — so the canonical topic list in Settings → Platforms lets you overrule any of them, and everything that counts topics follows your call instead.
 - A **Where the gaps are** panel in Analytics that ranks topics by how well you hold them rather than by how often they turn up: solve count saturates, time since the last solve decays, and the two multiply. Structures and algorithms are ranked in separate columns, well-known topics with no solves at all are listed as blind spots, and one number up top says what share of your solves needed a technique rather than just a structure. Any row opens the solves behind it.
 - Behaviour bank recording how you interact with problems, off unless you turn it on.
 - Backups: manual JSON export, scheduled snapshots, and a snapshot before any bulk import.
