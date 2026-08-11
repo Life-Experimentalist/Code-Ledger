@@ -76,7 +76,8 @@ function UniversalCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                 : ""}
               <p class="text-slate-600 text-[10px] max-w-xs">
                 Opens a background tab to fetch your latest accepted submission. Make sure you are
-                logged into ${platformLabel} first.
+                logged into ${platformLabel} first. The fetch finishes on its own — you can close
+                this window and the code will be here when you come back.
               </p>
             `
           : html`<p class="text-slate-600 text-xs">
@@ -149,9 +150,13 @@ const universalTabs = [
                       ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 cursor-wait"
                       : "bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20"}"
                   >
-                    ${refreshing ? "⏳ Fetching…" : "📥 Fetch Description"}
+                    ${refreshing ? "⏳ Fetching…" : "🔄 Refresh problem data"}
                   </button>
                 </div>
+                <p class="text-slate-600 text-[10px] max-w-xs">
+                  Fetches the description, tags and missing code in one go. It runs in the
+                  background and saves as it lands — closing this window does not stop it.
+                </p>
               </div>
             `}
         ${problem.constraints

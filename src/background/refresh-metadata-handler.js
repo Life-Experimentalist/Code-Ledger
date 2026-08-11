@@ -209,62 +209,7 @@ export async function handleRefreshMetadata(problems = []) {
   };
 }
 
-/**
- * Refresh a SINGLE GFG problem via the API.
- * Used by the modal's "Fetch Description" button for GFG problems.
- *
- * @param {string} problemId  - Storage ID (e.g. "gfg-compare-two-fractions4438")
- * @param {string} titleSlug  - GFG slug (e.g. "compare-two-fractions4438")
- * @returns {Promise<{ok: boolean, data?: object, error?: string}>}
- */
-export async function refreshSingleGFGProblem(problemId, titleSlug) {
-  try {
-    const slug = cleanGfgSlug(titleSlug || problemId?.replace(/^gfg-/, "") || "");
-    if (!slug) return { ok: false, error: "Could not determine problem slug" };
-
-    dbg.log(`refreshSingleGFGProblem(): fetching slug=${slug}`);
-    const apiData = await fetchGFGProblemData(slug);
-
-    if (!apiData) {
-      return { ok: false, error: `GFG API returned no data for slug: ${slug}` };
-    }
-
-    const existing = await Storage.getProblem(problemId).catch(() => null);
-    if (!existing) {
-      return { ok: false, error: `Problem not found in storage: ${problemId}` };
-    }
-
-    const updated = {
-      ...existing,
-      title:
-        existing.title && existing.title !== slug
-          ? existing.title
-          : apiData.title || existing.title,
-      difficulty: existing.difficulty || apiData.difficulty || null,
-      tags: apiData.tags?.length ? apiData.tags : existing.tags || [],
-      problemStatement: apiData.problemStatement || existing.problemStatement || null,
-    };
-
-    await Storage.saveProblem(updated);
-
-    // Notify any open library pages
-    try {
-      chrome.runtime.sendMessage({
-        type: "REFRESH_METADATA_DONE",
-        platform: "geeksforgeeks",
-        slug,
-        problemId,
-      });
-    } catch (_) {}
-
-    dbg.log(`refreshSingleGFGProblem(): ✓ saved slug=${slug}`, {
-      tags: updated.tags.length,
-      hasStatement: !!updated.problemStatement,
-    });
-
-    return { ok: true, data: updated };
-  } catch (e) {
-    dbg.error(`refreshSingleGFGProblem(): ✗ error:`, e?.message);
-    return { ok: false, error: e?.message || "Unknown error" };
-  }
-}
+// Refreshing one problem on request now goes through `refreshEntireProblem` in
+// the service worker, which handles every platform the same way and repairs the
+// missing code in the same press. The GFG-only version that used to live here
+// had no callers left.

@@ -134,6 +134,18 @@ export async function triggerCodeRecovery(problem) {
               const normLang = String(langRaw).toLowerCase().replace(/\s+/g, "");
               const key = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
               if (key) await Storage.markPendingProblemKey(key).catch(() => {});
+              // Tell any open library page. Recovery outlives the modal that
+              // asked for it, so the modal has to be told when it lands rather
+              // than sitting on a promise it may no longer be waiting on.
+              try {
+                runtime.sendMessage?.({
+                  type: "REFRESH_METADATA_DONE",
+                  platform: updated.platform,
+                  slug: updated.titleSlug,
+                  problemId: updated.id,
+                  fields: ["code"],
+                });
+              } catch (_) {}
             });
           })
           .then(() => {

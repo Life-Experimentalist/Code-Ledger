@@ -415,6 +415,12 @@ Return ONLY a JSON array of objects representing suggestions where the current m
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
           Background Operations
         </h3>
+        <${ToggleRow}
+          settingKey="selfHealEnabled"
+          label="Auto-repair incomplete problems"
+          desc="Quietly refetches missing descriptions and tags for LeetCode and GeeksForGeeks problems, a couple every few minutes. Never overwrites anything you have already written."
+          defaultOn=${true}
+        />
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="text-sm text-slate-300">Code Recovery Queue</p>

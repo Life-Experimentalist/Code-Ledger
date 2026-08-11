@@ -13,12 +13,18 @@ import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
 import { buildConversationSystemPrompt, parseWeakAreas } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
-import {
-  handleRefreshMetadata,
-  completeRefreshMetadata,
-  refreshSingleGFGProblem,
-} from "./refresh-metadata-handler.js";
+import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
 import { triggerCodeRecovery } from "./code-recovery-handler.js";
+import { fetchGFGProblemData } from "./gfg-api.js";
+import { fetchLeetCodeProblemData } from "./leetcode-api.js";
+import {
+  HEAL_STATE_KEY,
+  healProblem,
+  healStatus,
+  isHealable,
+  missingParts,
+  runSelfHeal,
+} from "./self-heal.js";
 import {
   buildProblemFiles,
   problemBase,
@@ -210,6 +216,7 @@ async function getAIReviewQueueStatus() {
 const QUEUE_ALARMS = {
   AI_REVIEW: { name: "AI_REVIEW_QUEUE", periodInMinutes: 5 },
   CODE_RECOVERY: { name: "CODE_RECOVERY_QUEUE", periodInMinutes: 1 },
+  SELF_HEAL: { name: "SELF_HEAL_QUEUE", periodInMinutes: 5 },
 };
 
 /**
@@ -263,11 +270,31 @@ async function refreshCodeRecoveryAlarm(settings = null) {
   await _setQueueAlarm(QUEUE_ALARMS.CODE_RECOVERY, eligible);
 }
 
-/** Both of the above. Called at startup and on every maintenance tick. */
+/**
+ * Arm the self-heal alarm iff something is incomplete and fetchable.
+ *
+ * Unlike the two above this is on by default, because the work it does is a
+ * plain HTTPS GET for public problem metadata — no tab, no window, nothing the
+ * user would notice except the gap in their library closing on its own.
+ */
+async function refreshSelfHealAlarm(settings = null) {
+  const s = settings || (await Storage.getSettings().catch(() => ({})));
+  if (s.selfHealEnabled === false) {
+    await _setQueueAlarm(QUEUE_ALARMS.SELF_HEAL, false);
+    return;
+  }
+  const all = await Storage.getAllProblems().catch(() => []);
+  const state = await _loadHealState();
+  const { waiting } = healStatus(all, state);
+  await _setQueueAlarm(QUEUE_ALARMS.SELF_HEAL, waiting > 0);
+}
+
+/** All three of the above. Called at startup and on every maintenance tick. */
 async function refreshQueueAlarms() {
   await Promise.all([
     refreshAIReviewAlarm().catch(() => {}),
     refreshCodeRecoveryAlarm().catch(() => {}),
+    refreshSelfHealAlarm().catch(() => {}),
   ]);
 }
 
@@ -365,6 +392,8 @@ async function init() {
           processCodeRecoveryQueue().catch((e) =>
             dbg.warn("Code recovery queue processing failed:", e.message),
           );
+        } else if (alarm?.name === "SELF_HEAL_QUEUE") {
+          runSelfHealTick().catch((e) => dbg.warn("Self-heal tick failed:", e.message));
         } else if (alarm?.name === "MAINTENANCE_COMMIT") {
           (async () => {
             const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
@@ -2798,6 +2827,132 @@ async function handleQueueAllAIReviews(missingOnly = false) {
 }
 
 // ============================================================================
+// Self-Heal — repair incomplete problems in the background
+// ============================================================================
+
+/** The per-problem attempt bookkeeping, kept out of the problem records. */
+async function _loadHealState() {
+  const res = await browserStorage.local.get(HEAL_STATE_KEY).catch(() => ({}));
+  const state = res?.[HEAL_STATE_KEY];
+  return state && typeof state === "object" ? state : {};
+}
+
+async function _saveHealState(state) {
+  await browserStorage.local.set({ [HEAL_STATE_KEY]: state || {} }).catch(() => {});
+}
+
+/**
+ * Mark a repaired problem for the next batched commit, and tell any open page.
+ *
+ * The commit is deliberately not immediate: healing a stalled import can touch
+ * dozens of problems in an hour, and one commit each would bury the user's real
+ * solve history under maintenance noise. MAINTENANCE_COMMIT sweeps them up
+ * every ten minutes as a single commit.
+ */
+function _afterHeal(problem, fields) {
+  const slug = String(problem.titleSlug || problem.id || "").trim();
+  const langRaw = problem.lang?.name || problem.lang?.slug || problem.lang?.ext || "";
+  const normLang = String(langRaw).toLowerCase().replace(/\s+/g, "");
+  const key = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+  if (key) Storage.markPendingProblemKey(key).catch(() => {});
+  try {
+    chrome.runtime.sendMessage({
+      type: "REFRESH_METADATA_DONE",
+      platform: problem.platform,
+      slug: problem.titleSlug,
+      problemId: problem.id,
+      fields,
+    });
+  } catch (_) {
+    // Nothing is listening — the data is in storage either way, which is the
+    // whole point of doing this out here instead of inside the modal.
+  }
+}
+
+const _healDeps = {
+  getAllProblems: () => Storage.getAllProblems(),
+  saveProblem: (p) => Storage.saveProblem(p),
+  loadState: _loadHealState,
+  saveState: _saveHealState,
+  notify: _afterHeal,
+  fetchers: {
+    leetcode: fetchLeetCodeProblemData,
+    geeksforgeeks: fetchGFGProblemData,
+  },
+};
+
+let _selfHealBusy = false;
+
+async function runSelfHealTick() {
+  if (_selfHealBusy) return;
+  const settings = await Storage.getSettings().catch(() => ({}));
+  if (settings.selfHealEnabled === false) return;
+  try {
+    _selfHealBusy = true;
+    const summary = await runSelfHeal(_healDeps, { limit: 2 });
+    if (summary.attempted) {
+      dbg.log(
+        `runSelfHealTick(): attempted ${summary.attempted}, repaired ${summary.healed}` +
+          (summary.changed.length
+            ? ` — ${summary.changed.map((c) => `${c.id}(${c.fields.join("+")})`).join(", ")}`
+            : ""),
+      );
+    }
+  } catch (e) {
+    dbg.warn(`runSelfHealTick(): ${e?.message}`);
+  } finally {
+    _selfHealBusy = false;
+    await refreshSelfHealAlarm().catch(() => {});
+  }
+}
+
+/**
+ * Repair one problem now, on request, ignoring its backoff.
+ *
+ * This is what the modal's single "Refresh all data" button calls. It returns
+ * as soon as the metadata is written; the code recovery it may also start is
+ * left running, because that one needs a tab and the user should not be held at
+ * a spinner waiting for it.
+ *
+ * @param {string} problemId
+ * @param {{ withCode?: boolean }} [opts]
+ */
+async function refreshEntireProblem(problemId, { withCode = true } = {}) {
+  const problem = await Storage.getProblem(problemId).catch(() => null);
+  if (!problem) return { ok: false, error: `Problem not found: ${problemId}` };
+
+  const before = missingParts(problem);
+  let result = { ok: true, changed: [], stillMissing: before };
+  if (before.length && isHealable(problem)) {
+    result = await healProblem(problem, _healDeps);
+    // Clear the backoff either way: an attempt the user asked for should not
+    // leave the problem parked for a week because a background one failed.
+    const state = await _loadHealState();
+    if (result.ok && result.stillMissing.length === 0) delete state[problemId];
+    else if (state[problemId]) state[problemId] = { ...state[problemId], nextAt: 0 };
+    await _saveHealState(state);
+  }
+
+  let codeQueued = false;
+  if (withCode && !String(problem.code || "").trim()) {
+    codeQueued = true;
+    // Fire and forget — see above. It saves to storage itself when it lands.
+    triggerCodeRecovery(problem)
+      .then((r) => dbg.log(`refreshEntireProblem(): code recovery ok=${r?.ok} for ${problemId}`))
+      .catch((e) => dbg.warn(`refreshEntireProblem(): code recovery failed: ${e?.message}`));
+  }
+
+  return {
+    ok: result.ok || result.changed.length > 0,
+    changed: result.changed,
+    stillMissing: result.stillMissing,
+    codeQueued,
+    healable: isHealable(problem),
+    error: result.error,
+  };
+}
+
+// ============================================================================
 // Code Recovery Background Queue
 // ============================================================================
 
@@ -3953,20 +4108,6 @@ try {
       return true;
     }
 
-    if (msg && msg.type === "REFRESH_GFG_PROBLEM") {
-      dbg.log(`onMessage(REFRESH_GFG_PROBLEM): fetching data for problemId=${msg.problemId}`);
-      refreshSingleGFGProblem(msg.problemId, msg.titleSlug)
-        .then((result) => {
-          dbg.log(`onMessage(REFRESH_GFG_PROBLEM): result ok=${result.ok}`);
-          sendResponse(result);
-        })
-        .catch((e) => {
-          dbg.error(`onMessage(REFRESH_GFG_PROBLEM): failed:`, e?.message);
-          sendResponse({ ok: false, error: e?.message || "Unknown error" });
-        });
-      return true; // async response
-    }
-
     if (msg && msg.type === "AI_CHAT") {
       dbg.log(`onMessage(AI_CHAT): chat with ${(msg.messages || []).length} message(s)...`);
       try {
@@ -4167,6 +4308,31 @@ try {
         } catch (e) {
           dbg.error(`onMessage(TRIGGER_CODE_RECOVERY): failed:`, e?.message);
           sendResponse({ ok: false, error: e?.message || "Recovery failed" });
+        }
+      })();
+      return true;
+    }
+
+    if (msg && msg.type === "REFRESH_PROBLEM_ALL") {
+      dbg.log(`onMessage(REFRESH_PROBLEM_ALL): problemId=${msg.problemId}`);
+      (async () => {
+        try {
+          sendResponse(await refreshEntireProblem(msg.problemId, { withCode: msg.withCode }));
+        } catch (e) {
+          dbg.error(`onMessage(REFRESH_PROBLEM_ALL): failed:`, e?.message);
+          sendResponse({ ok: false, error: e?.message || "Refresh failed" });
+        }
+      })();
+      return true;
+    }
+
+    if (msg && msg.type === "GET_HEAL_STATUS") {
+      (async () => {
+        try {
+          const [all, state] = await Promise.all([Storage.getAllProblems(), _loadHealState()]);
+          sendResponse({ ok: true, ...healStatus(all, state) });
+        } catch (e) {
+          sendResponse({ ok: false, error: e?.message || "Status unavailable" });
         }
       })();
       return true;

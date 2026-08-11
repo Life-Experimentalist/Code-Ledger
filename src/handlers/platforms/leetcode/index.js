@@ -209,18 +209,27 @@ Be concise. Max 200 words.`;
       if (!params.get("codeledger_fetch")) return false;
       const slug = page.slug || params.get("cl_fetch_id") || params.get("slug");
       if (!slug) return false;
-      const existing = await Storage.getProblem(String(slug)).catch(() => null);
+      // By id, not by slug: records are stored as `lc-two-sum`, so looking up
+      // `two-sum` never found one. Every field below then fell through to its
+      // "no existing record" branch — which stamped `timestamp` with the moment
+      // of the *refresh*, moving a solve from the day it happened to today, and
+      // emptied `tags` whenever the fetch came back without any.
+      const id = this.makeProblemId(slug);
+      const existing = await Storage.getProblem(id).catch(() => null);
       const meta = await this._fetchMetadata(slug);
+      const fetchedTags = (meta?.topicTags || []).map((t) => t.name).filter(Boolean);
       const merged = {
         ...(existing || {}),
         platform: "leetcode",
-        id: this.makeProblemId(slug),
+        id,
         title: meta?.title || existing?.title || slug,
         titleSlug: slug,
         difficulty: normalizeDifficulty(meta?.difficulty || existing?.difficulty || ""),
-        tags: (meta?.topicTags || []).map((t) => t.name),
+        tags: fetchedTags.length ? fetchedTags : existing?.tags || [],
         problemStatement: meta?.content || existing?.problemStatement || null,
-        timestamp: existing?.timestamp || Date.now(),
+        // A solve with no date is left with no date. Writing `Date.now()` here
+        // would claim it was solved during the refresh.
+        ...(existing?.timestamp ? {} : { timestamp: null }),
       };
       await Storage.saveProblem(merged).catch(() => {});
       await new Promise((resolve) => {

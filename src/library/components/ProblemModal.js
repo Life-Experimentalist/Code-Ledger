@@ -382,101 +382,60 @@ export function ProblemModal({
     return sameSlug || sameCanonical;
   });
 
-  // Handle refresh of problem statement from handler
+  /**
+   * Refetch everything this problem is missing — statement, tags, difficulty,
+   * and the code if it was never captured — in one press.
+   *
+   * The work happens in the service worker and is written straight to storage,
+   * so closing this modal does not cancel it and does not lose the result. That
+   * was the old behaviour: a popup window, a thirty-second polling loop living
+   * inside this component, and "Refresh timeout" if the user looked away.
+   */
   const handleRefreshData = useCallback(async () => {
     if (refreshing) return;
+    if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+      setChatError("Refreshing needs the extension — open this problem in CodeLedger.");
+      setTimeout(() => setChatError(""), 6000);
+      return;
+    }
     setRefreshing(true);
-
     try {
-      // GFG: use the direct API call (no background tab needed)
-      if (
-        problem.platform === "geeksforgeeks" &&
-        typeof chrome !== "undefined" &&
-        chrome.runtime?.id
-      ) {
-        const result = await new Promise((resolve) => {
-          try {
-            chrome.runtime.sendMessage(
-              {
-                type: "REFRESH_GFG_PROBLEM",
-                problemId: problem.id,
-                titleSlug: problem.titleSlug,
-              },
-              (resp) => {
-                if (chrome.runtime.lastError) {
-                  resolve({ ok: false, error: chrome.runtime.lastError.message });
-                } else {
-                  resolve(resp || { ok: false, error: "No response" });
-                }
-              },
-            );
-          } catch (e) {
-            resolve({ ok: false, error: e?.message || "Extension context error" });
-          }
-        });
-
-        if (result.ok && result.data) {
-          onUpdate?.(result.data);
-        } else {
-          setChatError("Fetch failed: " + (result.error || "Unknown error"));
-          setTimeout(() => setChatError(""), 6000);
+      const res = await new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: "REFRESH_PROBLEM_ALL", problemId: problem.id },
+            (resp) => {
+              if (chrome.runtime.lastError) {
+                resolve({ ok: false, error: chrome.runtime.lastError.message });
+              } else {
+                resolve(resp || { ok: false, error: "No response from the background worker" });
+              }
+            },
+          );
+        } catch (e) {
+          resolve({ ok: false, error: e?.message || "Extension context error" });
         }
-        return;
-      }
+      });
 
-      // LeetCode / Codeforces: open a background tab with ?codeledger_fetch=1
-      let fetched = false;
+      const updated = await Storage.getProblem(problem.id).catch(() => null);
+      if (updated) onUpdate?.(updated);
 
-      const onMessageListener = (msg) => {
-        if (msg && msg.type === "REFRESH_METADATA_DONE" && msg.slug === problem.titleSlug) {
-          fetched = true;
-        }
-      };
-
-      if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
-        chrome.runtime.onMessage.addListener(onMessageListener);
-      }
-
-      try {
-        const id = encodeURIComponent(problem.titleSlug || problem.id || "");
-        const url = `${problemUrl}${problemUrl.includes("?") ? "&" : "?"}codeledger_fetch=1&cl_fetch_id=${id}`;
-        window.open(url, "_blank", "noopener,noreferrer,width=800,height=600");
-
-        for (let i = 0; i < 30; i++) {
-          await new Promise((r) => setTimeout(r, 500));
-          try {
-            const updated = await Storage.getProblem(problem.id || problem.titleSlug);
-            const tagsChanged = JSON.stringify(updated?.tags) !== JSON.stringify(problem.tags);
-            const diffChanged = updated?.difficulty !== problem.difficulty;
-            const descChanged =
-              updated?.problemStatement && updated.problemStatement !== problem.problemStatement;
-
-            if (fetched || tagsChanged || diffChanged || descChanged) {
-              onUpdate?.(updated);
-              fetched = true;
-              break;
-            }
-          } catch (_) {}
-        }
-
-        if (!fetched) {
-          try {
-            const updated = await Storage.getProblem(problem.id || problem.titleSlug);
-            if (updated) {
-              onUpdate?.(updated);
-              fetched = true;
-            }
-          } catch (_) {}
-        }
-
-        if (!fetched) {
-          setChatError("Refresh timeout. Check the opened tab and try again.");
-          setTimeout(() => setChatError(""), 5000);
-        }
-      } finally {
-        if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
-          chrome.runtime.onMessage.removeListener(onMessageListener);
-        }
+      if (res?.changed?.length) return; // the page now shows what it fetched
+      if (res?.codeQueued) {
+        setChatError(
+          "Fetching your submission in a background tab — it will appear here when it lands, " +
+            "and it is saved even if you close this.",
+        );
+        setTimeout(() => setChatError(""), 8000);
+      } else if (res?.healable === false) {
+        setChatError("This platform has no description API — use Open Platform to read it.");
+        setTimeout(() => setChatError(""), 6000);
+      } else if (!res?.ok) {
+        setChatError("Fetch failed: " + (res?.error || "Unknown error"));
+        setTimeout(() => setChatError(""), 6000);
+      } else {
+        setChatError("Nothing more to fetch — the platform returned no extra details.");
+        setTimeout(() => setChatError(""), 6000);
       }
     } catch (e) {
       setChatError("Refresh failed: " + (e.message || e));
@@ -484,7 +443,23 @@ export function ProblemModal({
     } finally {
       setRefreshing(false);
     }
-  }, [problem, refreshing, onUpdate, problemUrl]);
+  }, [problem, refreshing, onUpdate]);
+
+  // A repair that finished elsewhere — the background sweep, or a code-recovery
+  // tab the user opened and walked away from — lands in this modal too.
+  useEffect(() => {
+    if (typeof chrome === "undefined" || !chrome.runtime?.onMessage) return;
+    const onDone = (msg) => {
+      if (!msg || msg.type !== "REFRESH_METADATA_DONE") return;
+      const mine = msg.problemId === problem?.id || (msg.slug && msg.slug === problem?.titleSlug);
+      if (!mine) return;
+      Storage.getProblem(problem.id)
+        .then((updated) => updated && onUpdate?.(updated))
+        .catch(() => {});
+    };
+    chrome.runtime.onMessage.addListener(onDone);
+    return () => chrome.runtime.onMessage.removeListener(onDone);
+  }, [problem?.id, problem?.titleSlug, onUpdate]);
 
   const sendChat = async () => {
     const rawText = chatInput.trim();
