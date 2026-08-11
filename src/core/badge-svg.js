@@ -69,7 +69,8 @@ export function textWidth(text) {
   let w = 0;
   for (const ch of String(text ?? "")) {
     const code = ch.codePointAt(0);
-    if (code > 0x1f000) w += 12; // emoji render roughly square
+    if (code > 0x1f000)
+      w += 12; // emoji render roughly square
     else if (/[MW@%]/.test(ch)) w += 9.5;
     else if (/[A-Z]/.test(ch)) w += 7.5;
     else if (/[ijltfr.,:;'!|]/.test(ch)) w += 3.5;
@@ -254,53 +255,122 @@ export function formatCount(n) {
 /* ------------------------------------------------------------------ */
 
 /**
- * A larger card for the top of a README or a social share. Self-contained,
- * theme-neutral, and sized for GitHub's content column at 2x.
+ * The two paint jobs for the card.
+ *
+ * A `prefers-color-scheme` media query inside the SVG would be the obvious way
+ * to do this and is the wrong one: GitHub loads badges through camo as `<img>`,
+ * where the query follows the reader's *operating system* rather than the theme
+ * they picked on GitHub. So the two themes are two files, and the README's
+ * `<picture>` element chooses between them — which is the mechanism GitHub
+ * actually honours.
+ *
+ * The light values are not the dark ones lightened. Orange and green at 34px on
+ * white sit under 3:1, so the light card uses darker mixes of the same hues.
+ */
+const CARD_THEMES = Object.freeze({
+  dark: {
+    bg0: "#0f172a",
+    bg1: "#1e293b",
+    border: "#334155",
+    title: "#e2e8f0",
+    muted: "#94a3b8",
+    faint: "#64748b",
+    stamp: "#475569",
+    track: "#334155",
+    streak: COLORS.fire,
+    points: COLORS.points,
+    solved: COLORS.level,
+  },
+  light: {
+    bg0: "#ffffff",
+    bg1: "#f1f5f9",
+    border: "#cbd5e1",
+    title: "#0f172a",
+    muted: "#475569",
+    faint: "#64748b",
+    stamp: "#94a3b8",
+    track: "#e2e8f0",
+    streak: "#c2410c",
+    points: "#6d28d9",
+    solved: "#15803d",
+  },
+});
+
+/**
+ * The card's motion, as a `<style>` block.
+ *
+ * Everything is a one-shot on load — the bar fills, the numbers rise — because
+ * a badge that loops forever in the corner of a README is a distraction the
+ * reader cannot dismiss. It runs only under `prefers-reduced-motion:
+ * no-preference`, and the static card is the un-animated end state, so somebody
+ * who has asked for less motion sees the finished thing rather than a blank one.
+ *
+ * CSS transforms rather than animating `width`: `transform` on an SVG shape is
+ * the part every renderer agrees on.
+ */
+const CARD_MOTION = `<style>
+    .bar,.n{transform-box:fill-box}
+    .bar{transform-origin:left center}
+    @media (prefers-reduced-motion: no-preference){
+      .bar{animation:cl-grow .9s cubic-bezier(.22,1,.36,1) both}
+      .n{animation:cl-rise .5s ease-out both}
+      .n2{animation-delay:.08s}
+      .n3{animation-delay:.16s}
+    }
+    @keyframes cl-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+    @keyframes cl-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  </style>`;
+
+/**
+ * A larger card for the top of a README or a social share. Self-contained and
+ * sized for GitHub's content column at 2x.
  *
  * @param {object} snapshot
- * @param {{ username?: string }} [opts]
+ * @param {{ username?: string, theme?: "dark"|"light", animate?: boolean }} [opts]
  * @returns {string}
  */
 export function streakCard(snapshot, opts = {}) {
+  const t = CARD_THEMES[opts.theme === "light" ? "light" : "dark"];
   const l = snapshot.level || { level: 1, name: "Initiate", progress: 0 };
   const streak = snapshot.vacationActive ? "🌴" : String(snapshot.currentStreak || 0);
   const barW = Math.round(360 * Math.min(1, Math.max(0, l.progress || 0)));
   const who = opts.username ? `${opts.username}'s ledger` : "CodeLedger";
+  const motion = opts.animate === false ? "" : `\n  ${CARD_MOTION}`;
 
-  const cell = (x, value, label, color) => `
-    <text x="${x}" y="86" fill="${color}" font-size="34" font-weight="700" text-anchor="middle">${escapeXml(value)}</text>
-    <text x="${x}" y="108" fill="#94a3b8" font-size="12" text-anchor="middle">${escapeXml(label)}</text>`;
+  const cell = (x, value, label, color, cls) => `
+    <text class="n ${cls}" x="${x}" y="86" fill="${color}" font-size="34" font-weight="700" text-anchor="middle">${escapeXml(value)}</text>
+    <text x="${x}" y="108" fill="${t.muted}" font-size="12" text-anchor="middle">${escapeXml(label)}</text>`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="200" role="img" aria-label="${escapeXml(who)}: ${snapshot.currentStreak || 0} day streak, ${snapshot.totalPoints || 0} points">
-  <title>${escapeXml(who)}</title>
+  <title>${escapeXml(who)}</title>${motion}
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f172a"/>
-      <stop offset="1" stop-color="#1e293b"/>
+      <stop offset="0" stop-color="${t.bg0}"/>
+      <stop offset="1" stop-color="${t.bg1}"/>
     </linearGradient>
     <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="${COLORS.fire}"/>
-      <stop offset="1" stop-color="${COLORS.points}"/>
+      <stop offset="0" stop-color="${t.streak}"/>
+      <stop offset="1" stop-color="${t.points}"/>
     </linearGradient>
   </defs>
   <rect width="420" height="200" rx="12" fill="url(#bg)"/>
-  <rect x="0.5" y="0.5" width="419" height="199" rx="12" fill="none" stroke="#334155"/>
-  <text x="24" y="36" fill="#e2e8f0" font-size="15" font-weight="600" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(who)}</text>
-  <text x="396" y="36" fill="#64748b" font-size="12" text-anchor="end" font-family="Segoe UI,Helvetica,Arial,sans-serif">Lv ${escapeXml(l.level)} · ${escapeXml(l.name)}</text>
+  <rect x="0.5" y="0.5" width="419" height="199" rx="12" fill="none" stroke="${t.border}"/>
+  <text x="24" y="36" fill="${t.title}" font-size="15" font-weight="600" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(who)}</text>
+  <text x="396" y="36" fill="${t.faint}" font-size="12" text-anchor="end" font-family="Segoe UI,Helvetica,Arial,sans-serif">Lv ${escapeXml(l.level)} · ${escapeXml(l.name)}</text>
   <g font-family="Segoe UI,Helvetica,Arial,sans-serif">
-${cell(80, streak, "day streak", COLORS.fire)}
-${cell(210, formatCount(snapshot.totalPoints || 0), "points", COLORS.points)}
-${cell(340, formatCount(snapshot.totalSolves || 0), "solved", COLORS.level)}
+${cell(80, streak, "day streak", t.streak, "n1")}
+${cell(210, formatCount(snapshot.totalPoints || 0), "points", t.points, "n2")}
+${cell(340, formatCount(snapshot.totalSolves || 0), "solved", t.solved, "n3")}
   </g>
-  <rect x="30" y="140" width="360" height="8" rx="4" fill="#334155"/>
-  <rect x="30" y="140" width="${barW}" height="8" rx="4" fill="url(#bar)"/>
-  <text x="30" y="172" fill="#94a3b8" font-size="11" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
+  <rect x="30" y="140" width="360" height="8" rx="4" fill="${t.track}"/>
+  <rect class="bar" x="30" y="140" width="${barW}" height="8" rx="4" fill="url(#bar)"/>
+  <text x="30" y="172" fill="${t.muted}" font-size="11" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
     l.next ? `${l.into} / ${l.span} to ${l.next.name}` : "Max level",
   )}</text>
-  <text x="390" y="172" fill="#94a3b8" font-size="11" text-anchor="end" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
+  <text x="390" y="172" fill="${t.muted}" font-size="11" text-anchor="end" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
     snapshot.freezes || 0,
   )} ❄ · best ${escapeXml(snapshot.longestStreak || 0)}d</text>
-  <text x="210" y="190" fill="#475569" font-size="9" text-anchor="middle" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
+  <text x="210" y="190" fill="${t.stamp}" font-size="9" text-anchor="middle" font-family="Segoe UI,Helvetica,Arial,sans-serif">${escapeXml(
     asOfLabel(snapshot.today) ? `as of ${asOfLabel(snapshot.today)}` : "",
   )}</text>
 </svg>`;
@@ -329,6 +399,13 @@ export function buildBadgeFiles(snapshot, opts = {}) {
     { path: `${BADGE_DIR}/difficulty.svg`, content: difficultyBadge(snapshot) },
     { path: `${BADGE_DIR}/freezes.svg`, content: freezeBadge(snapshot) },
     { path: `${BADGE_DIR}/card.svg`, content: streakCard(snapshot, opts) },
+    // `card.svg` stays the dark one so every URL already embedded anywhere keeps
+    // meaning what it meant. The light file is the addition, and the README's
+    // `<picture>` is what decides between them.
+    {
+      path: `${BADGE_DIR}/card-light.svg`,
+      content: streakCard(snapshot, { ...opts, theme: "light" }),
+    },
     // A machine-readable copy so the landing page's comparison view and any
     // third-party dashboard can read the same numbers without parsing SVG.
     {
@@ -416,13 +493,7 @@ export const BADGE_ALT = Object.freeze({
  * Hardcoding the default there instead would let the checkboxes disagree with
  * what actually gets committed.
  */
-export const DEFAULT_PICKS = Object.freeze([
-  "streak",
-  "points",
-  "level",
-  "difficulty",
-  "freezes",
-]);
+export const DEFAULT_PICKS = Object.freeze(["streak", "points", "level", "difficulty", "freezes"]);
 
 /**
  * The gamification block for the ledger's README, between stable HTML comment
@@ -445,14 +516,23 @@ export function badgeMarkdown(snapshot, opts = {}) {
   const lines = [];
 
   if (opts.showCard !== false) {
-    lines.push(`<img src="${escapeXml(svgUrl("card"))}" alt="Streak card" width="420">`, "");
+    // `<picture>` rather than one image, because GitHub swaps the source on the
+    // theme the reader chose on GitHub. The `<img>` is the dark card, so a
+    // renderer that ignores `<picture>` entirely still shows something.
+    lines.push(
+      "<picture>",
+      `  <source media="(prefers-color-scheme: light)" srcset="${escapeXml(svgUrl("card-light"))}">`,
+      `  <img src="${escapeXml(svgUrl("card"))}" alt="Streak card" width="420">`,
+      "</picture>",
+      "",
+    );
   }
 
   // An unrecognised name is dropped rather than rendered: `picks` comes from
   // stored settings, and a badge file that does not exist is a broken image.
-  const picks = (Array.isArray(opts.picks) && opts.picks.length ? opts.picks : DEFAULT_PICKS).filter(
-    (n) => BADGE_NAMES.includes(n),
-  );
+  const picks = (
+    Array.isArray(opts.picks) && opts.picks.length ? opts.picks : DEFAULT_PICKS
+  ).filter((n) => BADGE_NAMES.includes(n));
   if (picks.length) {
     lines.push(picks.map((n) => `![${BADGE_ALT[n]}](${url(n)})`).join(" "));
   }

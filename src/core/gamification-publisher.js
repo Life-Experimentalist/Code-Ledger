@@ -40,6 +40,7 @@ export const OWNED_PATHS = Object.freeze([
   "badges/difficulty.svg",
   "badges/freezes.svg",
   "badges/card.svg",
+  "badges/card-light.svg",
   "badges/stats.json",
   "badges/config.json",
   ...SHIELDS_PATHS,

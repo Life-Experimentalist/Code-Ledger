@@ -56,7 +56,10 @@ describe("resolvePublishIntent", () => {
   });
 
   test("turning badges off alone revokes them", () => {
-    assert.equal(resolvePublishIntent({ gamificationBadges: false, badgesPublished: true }), "revoke");
+    assert.equal(
+      resolvePublishIntent({ gamificationBadges: false, badgesPublished: true }),
+      "revoke",
+    );
   });
 
   test("nothing published means nothing to revoke", () => {
@@ -145,6 +148,16 @@ describe("buildPublishPlan", () => {
         plan.files.some((f) => f.path === p),
         `${p} missing from the plan`,
       );
+    }
+  });
+
+  test("nothing is written into badges/ that revoking would not clean up", () => {
+    // The other direction of the same invariant. Adding a badge file without
+    // adding it to OWNED_PATHS leaves it behind for ever once publishing is
+    // switched off, and it is the file nobody thinks to look for.
+    const plan = buildPublishPlan({ snapshot: SNAPSHOT, settings: {} });
+    for (const f of plan.files.filter((x) => x.path.startsWith("badges/"))) {
+      assert.ok(OWNED_PATHS.includes(f.path), `${f.path} is written but never deleted`);
     }
   });
 
@@ -258,7 +271,10 @@ describe("buildPublishPlan", () => {
     });
     assert.ok(plan.deletes.includes(WORKFLOW_PATH));
     assert.ok(plan.deletes.includes(REFRESH_SCRIPT_PATH));
-    assert.ok(plan.files.some((f) => f.path === "badges/streak.svg"), "badges stay");
+    assert.ok(
+      plan.files.some((f) => f.path === "badges/streak.svg"),
+      "badges stay",
+    );
   });
 });
 
@@ -350,7 +366,10 @@ describe("badge style", () => {
   const PUBLIC = { username: "octocat", repo: "CodeLedger", branch: "main", repoPrivate: false };
 
   test("the self-hosted SVGs are the default", () => {
-    assert.equal(resolveBadgeStyle({}, { rawBase: "https://raw.githubusercontent.com/o/r/main" }), "svg");
+    assert.equal(
+      resolveBadgeStyle({}, { rawBase: "https://raw.githubusercontent.com/o/r/main" }),
+      "svg",
+    );
   });
 
   test("shields is honoured on a public repository", () => {
@@ -484,10 +503,10 @@ describe("badge picks", () => {
   });
 
   test("unknown names are dropped", () => {
-    assert.deepEqual(
-      resolveBadgePicks({ gamificationBadgePicks: ["streak", "wat", "freezes"] }),
-      ["streak", "freezes"],
-    );
+    assert.deepEqual(resolveBadgePicks({ gamificationBadgePicks: ["streak", "wat", "freezes"] }), [
+      "streak",
+      "freezes",
+    ]);
   });
 
   test("a list of nothing recognisable falls back to the defaults", () => {

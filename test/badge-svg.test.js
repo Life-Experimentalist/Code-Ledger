@@ -255,13 +255,41 @@ describe("streakCard", () => {
 
   test("progress bar never exceeds the track", () => {
     const svg = streakCard({ ...SNAP, level: { level: 1, name: "x", progress: 5 } });
-    const widths = [...svg.matchAll(/<rect x="30" y="140" width="(\d+)"/g)].map((m) => Number(m[1]));
+    const widths = [...svg.matchAll(/<rect x="30" y="140" width="(\d+)"/g)].map((m) =>
+      Number(m[1]),
+    );
     for (const w of widths) assert.ok(w <= 360, `bar width ${w} exceeded the 360px track`);
   });
 
   test("a negative progress value does not produce a negative width", () => {
     const svg = streakCard({ ...SNAP, level: { level: 1, name: "x", progress: -2 } });
     assert.ok(!/width="-/.test(svg));
+  });
+
+  test("the light card is a different paint job, not the same file", () => {
+    const dark = streakCard(SNAP, { username: "octocat" });
+    const light = streakCard(SNAP, { username: "octocat", theme: "light" });
+    assert.notEqual(dark, light);
+    assert.match(light, /stop-color="#ffffff"/);
+    assert.ok(!light.includes('stop-color="#0f172a"'));
+  });
+
+  test("an unknown theme is the dark one rather than a blank card", () => {
+    assert.equal(streakCard(SNAP, { theme: "neon" }), streakCard(SNAP));
+  });
+
+  test("both themes say the same numbers", () => {
+    const nums = (svg) => [...svg.matchAll(/font-size="34"[^>]*>([^<]+)</g)].map((m) => m[1]);
+    assert.deepEqual(nums(streakCard(SNAP, { theme: "light" })), nums(streakCard(SNAP)));
+  });
+
+  test("motion is opt-out and gated on prefers-reduced-motion", () => {
+    const svg = streakCard(SNAP);
+    assert.match(svg, /@media \(prefers-reduced-motion: no-preference\)/);
+    // The static card has to be the finished state, not the starting one, or a
+    // reader who asked for less motion gets an empty progress bar for ever.
+    assert.ok(!/opacity="0"/.test(svg));
+    assert.ok(!streakCard(SNAP, { animate: false }).includes("<style>"));
   });
 });
 
@@ -271,6 +299,7 @@ describe("buildBadgeFiles", () => {
     const paths = files.map((f) => f.path);
     assert.ok(paths.includes(`${BADGE_DIR}/streak.svg`));
     assert.ok(paths.includes(`${BADGE_DIR}/card.svg`));
+    assert.ok(paths.includes(`${BADGE_DIR}/card-light.svg`));
     assert.ok(paths.includes(`${BADGE_DIR}/stats.json`));
   });
 
@@ -356,6 +385,16 @@ describe("badgeMarkdown", () => {
   test("omits the card when asked", () => {
     const md = badgeMarkdown(SNAP, { pagesUrl: "https://x.github.io/r", showCard: false });
     assert.ok(!md.includes("<img"));
+    assert.ok(!md.includes("<picture"));
+  });
+
+  test("the card is a picture so GitHub's theme picker gets a say", () => {
+    const md = badgeMarkdown(SNAP, { pagesUrl: "https://x.github.io/r" });
+    assert.match(md, /<source media="\(prefers-color-scheme: light\)"/);
+    assert.match(md, /srcset="[^"]*\/badges\/card-light\.svg\?v=/);
+    // The plain <img> stays the dark card, so a renderer that ignores <picture>
+    // still shows the same thing it showed before this existed.
+    assert.match(md, /<img src="[^"]*\/badges\/card\.svg\?v=/);
   });
 
   test("lists earned achievements only", () => {
