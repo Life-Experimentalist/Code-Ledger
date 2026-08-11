@@ -99,6 +99,7 @@ Chrome Web Store requires each upload to exceed the last.
 ### Changed
 
 - The default OAuth scope is `public_repo,workflow`. Creating a private repository needs the wider `repo` scope, which the settings panel offers as an explicit one-click upgrade rather than requesting up front.
+- The extension no longer wakes in the background when it has nothing to do. Two of its periodic timers existed only to notice an empty queue — one of them checking every minute, indefinitely, for work that only exists after a profile import. They are now started when something is queued and stopped when it drains.
 - GitLab and Bitbucket are gone from the interface and from the package. Their handlers were stubs that threw on every call, so presenting them as options — as a provider, as a mirror target, as an `@gitlab` chat mention — meant offering something that could not commit.
 
 ### Removed

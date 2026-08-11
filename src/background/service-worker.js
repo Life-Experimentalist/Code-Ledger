@@ -184,6 +184,91 @@ async function getAIReviewQueueStatus() {
   };
 }
 
+/* ── Queue alarms ──────────────────────────────────────────────────────── */
+
+/**
+ * The two alarms that exist only to drain a queue.
+ *
+ * Both used to be created unconditionally at startup and left running forever.
+ * The code-recovery one is the expensive mistake: it woke the service worker
+ * sixty times an hour, indefinitely, for a queue that is empty on every install
+ * that has never imported a GeeksForGeeks profile — and that returns on its
+ * first line anyway, because `codeRecoveryQueueSpeed` defaults to `"disabled"`.
+ *
+ * They are now armed when there is something to drain and cleared when there
+ * is not. `MAINTENANCE_COMMIT` stays periodic and does the re-arming: it runs
+ * every ten minutes, already reads the pending-key map, and is the only place
+ * in the worker that reliably sees work queued from a library tab — those write
+ * storage directly and cannot create an alarm from a page context.
+ *
+ * So the worst case for a queue that was filled from a tab is a ten-minute
+ * wait, and the idle cost of the whole extension drops from seventy-eight wakes
+ * an hour to eight.
+ */
+const QUEUE_ALARMS = {
+  AI_REVIEW: { name: "AI_REVIEW_QUEUE", periodInMinutes: 5 },
+  CODE_RECOVERY: { name: "CODE_RECOVERY_QUEUE", periodInMinutes: 1 },
+};
+
+/**
+ * Bring one queue alarm into line with whether its queue has work.
+ *
+ * @param {{ name: string, periodInMinutes: number }} alarm
+ * @param {boolean} wanted
+ */
+async function _setQueueAlarm(alarm, wanted) {
+  try {
+    const existing = await chrome.alarms.get(alarm.name);
+    if (wanted && !existing) {
+      chrome.alarms.create(alarm.name, { periodInMinutes: alarm.periodInMinutes });
+      dbg.log(`_setQueueAlarm(): armed ${alarm.name}`);
+    } else if (!wanted && existing) {
+      await chrome.alarms.clear(alarm.name);
+      dbg.log(`_setQueueAlarm(): cleared ${alarm.name} — nothing queued`);
+    }
+  } catch (e) {
+    dbg.warn(`_setQueueAlarm(): could not update ${alarm.name}:`, e?.message);
+  }
+}
+
+/** Arm the AI-review alarm iff the review queue has pending items. */
+async function refreshAIReviewAlarm() {
+  const stats = await getQueueStats().catch(() => null);
+  await _setQueueAlarm(QUEUE_ALARMS.AI_REVIEW, (stats?.pending || 0) > 0);
+}
+
+/**
+ * Arm the code-recovery alarm iff recovery is switched on and something is
+ * actually waiting for it.
+ *
+ * The settings check comes first so the common case — recovery disabled, which
+ * is the default — never scans the problem store.
+ */
+async function refreshCodeRecoveryAlarm(settings = null) {
+  const s = settings || (await Storage.getSettings().catch(() => ({})));
+  if ((s.codeRecoveryQueueSpeed || "disabled") === "disabled") {
+    await _setQueueAlarm(QUEUE_ALARMS.CODE_RECOVERY, false);
+    return;
+  }
+  const all = await Storage.getAllProblems().catch(() => []);
+  const eligible = all.some(
+    (p) =>
+      p._needsCodeFetch ||
+      (p.platform === "geeksforgeeks" &&
+        p._importedFromProfile &&
+        (!p.code || p.code.trim() === "")),
+  );
+  await _setQueueAlarm(QUEUE_ALARMS.CODE_RECOVERY, eligible);
+}
+
+/** Both of the above. Called at startup and on every maintenance tick. */
+async function refreshQueueAlarms() {
+  await Promise.all([
+    refreshAIReviewAlarm().catch(() => {}),
+    refreshCodeRecoveryAlarm().catch(() => {}),
+  ]);
+}
+
 const dbg = createDebugger("ServiceWorker");
 
 let initResolve;
@@ -258,8 +343,8 @@ async function init() {
       chrome.alarms.create(CONSTANTS.ALARM_NAMES.SYNC, {
         periodInMinutes: CONSTANTS.SYNC_ALARM_PERIOD_MIN || 30,
       });
-      chrome.alarms.create("AI_REVIEW_QUEUE", { periodInMinutes: 5 });
-      chrome.alarms.create("CODE_RECOVERY_QUEUE", { periodInMinutes: 1 });
+      // AI_REVIEW_QUEUE and CODE_RECOVERY_QUEUE are not created here. They are
+      // armed only while their queue has work — see refreshQueueAlarms().
       // Batch-commit pending AI reviews and metadata edits every 10 minutes.
       // This prevents one-commit-per-problem clutter for maintenance operations.
       chrome.alarms.create("MAINTENANCE_COMMIT", { periodInMinutes: 10 });
@@ -289,6 +374,10 @@ async function init() {
                 dbg.warn("maintenance batch commit failed:", e.message),
               );
             }
+            // The re-arm pass. A library tab that queued a review or flagged a
+            // problem for recovery wrote storage directly and could not create
+            // an alarm from a page context; this is where the worker notices.
+            await refreshQueueAlarms();
           })().catch(() => {});
         } else if (alarm?.name === BADGE_ALARM) {
           refreshIconBadge().catch(() => {});
@@ -330,6 +419,10 @@ async function init() {
   processAIReviewQueue().catch(() => {});
   autoSyncSettings().catch(() => {});
   refreshIconBadge().catch(() => {});
+  // Arm whichever queue alarms have work waiting from a previous session. An
+  // alarm survives a worker restart but not an uninstall or a profile move, so
+  // this is also what puts them back.
+  refreshQueueAlarms().catch(() => {});
 
   dbg.log("init(): ✓ background initialized");
   if (initResolve) {
@@ -2729,6 +2822,10 @@ async function processCodeRecoveryQueue() {
     dbg.warn(`processCodeRecoveryQueue(): error: ${e.message}`);
   } finally {
     _codeRecoveryBusy = false;
+    await refreshCodeRecoveryAlarm(settings).catch(() => {});
+    // A successful recovery enqueues a review, so this run may have given the
+    // other queue work.
+    await refreshAIReviewAlarm().catch(() => {});
   }
 }
 
@@ -2992,6 +3089,12 @@ async function processAIReviewQueue(options = {}) {
     );
   } catch (e) {
     dbg.warn(`[CodeLedger:SnailMode] ✗ Processing error: ${e?.message}`);
+  } finally {
+    // In `finally` because most of this function's exits are early returns —
+    // paused, interval not elapsed, nothing pending. Each of those still has to
+    // leave the alarm matching the queue, or a run that bailed on the interval
+    // would strand the alarm on for a queue that had already drained.
+    await refreshAIReviewAlarm().catch(() => {});
   }
 }
 

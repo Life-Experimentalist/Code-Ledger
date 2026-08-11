@@ -83,7 +83,7 @@ future provider should not have to remember to add itself to one.
 
 ## Modify
 
-### 4. Four periodic alarms are created unconditionally at startup
+### 4. Four periodic alarms are created unconditionally at startup — **applied**
 
 `service-worker.js` registers all of these whether or not there is any work:
 
@@ -99,10 +99,19 @@ one-minute recovery alarm is the aggressive one: it wakes the service worker
 sixty times an hour, indefinitely, for a queue that is empty except in the
 minutes after a failed extraction.
 
-Better: register each queue alarm when something is first enqueued and clear it
-when the queue drains. Identical behaviour, no idle wakes. This matters for
-laptop battery and for the "why is this extension always running" question a
-reviewer or a user will eventually ask.
+`AI_REVIEW_QUEUE` and `CODE_RECOVERY_QUEUE` are now armed only while their
+queue has work and cleared the moment it drains, by `refreshQueueAlarms()` in
+`service-worker.js`. Work can also be queued from a library tab, which writes
+storage directly and cannot create an alarm from a page context, so
+`MAINTENANCE_COMMIT` — which stays periodic, already reads the pending-key map
+every ten minutes, and is cheap — does the re-arming pass.
+
+The worst case for work queued from a tab is therefore a ten-minute wait before
+the queue starts draining. Idle cost drops from seventy-eight service-worker
+wakes an hour to eight.
+
+`SYNC` was left alone: it is the one of the four that does real work on every
+tick.
 
 ### 5. `presence-marker.js` uses raw `console.*`
 
