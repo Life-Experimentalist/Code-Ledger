@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@cloudflare/kv-asset-handler": "^0.4.2",
-    "hono": "^4.12.25"
+    "hono": "4.13.1"
   },
   "devDependencies": {
     "wrangler": "^4.85.0"
