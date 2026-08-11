@@ -37,7 +37,9 @@ export class OpenAIHandler extends BaseAIHandler {
           label: "API Keys",
           type: "text",
           default: "",
-          description: "Comma-separated API keys for rate-limit pooling.",
+          description:
+            "Comma-separated API keys. OpenAI counts quota per organisation and " +
+            "project, not per key — keys from the same project share one limit.",
         },
         {
           key: "openai_model",
@@ -100,7 +102,9 @@ export class OpenAIHandler extends BaseAIHandler {
 
         this._updateRateLimits(res.headers);
 
-        if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
+        if (!res.ok) throw Object.assign(new Error(`OpenAI API error: ${res.status}`), {
+          status: res.status,
+        });
 
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content || "";
@@ -114,7 +118,7 @@ export class OpenAIHandler extends BaseAIHandler {
         return content;
       } catch (err) {
         lastErr = err;
-        this.keyPool.markFailed(key);
+        this.keyPool.markFailed(key, err?.status);
         dbg.warn(
           `review(): key failed (${err?.message}), trying next (${attempt + 1}/${keyCount})`,
         );

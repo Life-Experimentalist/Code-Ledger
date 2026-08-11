@@ -99,13 +99,15 @@ export class ClaudeHandler extends BaseAIHandler {
 
         this._updateRateLimits(res.headers);
 
-        if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
+        if (!res.ok) throw Object.assign(new Error(`Claude API error: ${res.status}`), {
+          status: res.status,
+        });
 
         const data = await res.json();
         return data.content?.[0]?.text || "";
       } catch (err) {
         lastErr = err;
-        this.keyPool.markFailed(key);
+        this.keyPool.markFailed(key, err?.status);
         this.dbg.warn(`Claude key failed, trying next key (${attempt + 1}/${keyCount})`);
       }
     }

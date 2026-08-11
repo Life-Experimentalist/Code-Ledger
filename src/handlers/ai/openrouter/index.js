@@ -102,13 +102,15 @@ export class OpenRouterHandler extends BaseAIHandler {
 
         this._updateRateLimits(res.headers);
 
-        if (!res.ok) throw new Error(`OpenRouter API error: ${res.status}`);
+        if (!res.ok) throw Object.assign(new Error(`OpenRouter API error: ${res.status}`), {
+          status: res.status,
+        });
 
         const data = await res.json();
         return data.choices?.[0]?.message?.content || "";
       } catch (err) {
         lastErr = err;
-        this.keyPool.markFailed(key);
+        this.keyPool.markFailed(key, err?.status);
         this.dbg.warn(`OpenRouter key failed, trying next key (${attempt + 1}/${keyCount})`);
       }
     }

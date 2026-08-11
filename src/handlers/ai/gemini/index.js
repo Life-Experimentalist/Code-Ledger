@@ -38,7 +38,10 @@ export class GeminiHandler extends BaseAIHandler {
           label: "API Keys",
           type: "text",
           default: "",
-          description: "Comma separated list of API keys for rate-limit pooling.",
+          description:
+            "Comma separated list of API keys. Gemini counts quota per Google Cloud " +
+            "project, not per key — extra keys from the same project share one limit " +
+            "and buy you nothing. Only keys from separate projects add capacity.",
         },
         {
           key: "gemini_endpoint",
@@ -100,7 +103,9 @@ export class GeminiHandler extends BaseAIHandler {
 
         this._updateRateLimits(res.headers);
 
-        if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+        if (!res.ok) throw Object.assign(new Error(`Gemini API error: ${res.status}`), {
+          status: res.status,
+        });
 
         const data = await res.json();
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -114,7 +119,7 @@ export class GeminiHandler extends BaseAIHandler {
         return content;
       } catch (err) {
         lastErr = err;
-        this.keyPool.markFailed(key);
+        this.keyPool.markFailed(key, err?.status);
         dbg.warn(
           `review(): key failed (${err?.message}), trying next (${attempt + 1}/${keyCount})`,
         );

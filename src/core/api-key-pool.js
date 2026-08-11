@@ -90,8 +90,27 @@ export class APIKeyPool {
     return null;
   }
 
-  markFailed(key) {
-    dbg.log(`Marking key as failed: ${key.substring(0, 8)}...`);
+  /**
+   * Take a key out of rotation, but only for the one thing a cooldown fixes.
+   *
+   * This used to fire on every error. A malformed prompt, a model name with a
+   * typo, an empty response — each locked the key out for a minute, and because
+   * the caller loops over the whole pool, one 400 burnt every key the user had
+   * and produced "All API keys are currently in cooldown (rate-limited)". That
+   * sentence names the one cause it was not. Waiting does not fix a 400, and the
+   * message sent the user looking for a quota problem they did not have.
+   *
+   * @param {string} key
+   * @param {number} [status] HTTP status, when the failure came from a response
+   */
+  markFailed(key, status) {
+    // 429 is the quota itself; 503 is the model being temporarily out of
+    // capacity. Both are "this key, later" — everything else is "this request".
+    if (status !== undefined && status !== 429 && status !== 503) {
+      dbg.log(`Key failed with ${status}; not a rate limit, leaving it in rotation.`);
+      return;
+    }
+    dbg.log(`Cooling down key: ${key.substring(0, 8)}...`);
     this.cooldowns.set(key, Date.now() + CONSTANTS.KEY_POOL_RETRY_AFTER_MS);
   }
 }
