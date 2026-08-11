@@ -2,7 +2,7 @@
 
 ## Short Description (132 chars max)
 
-> Your DSA journey, committed. Auto-commit every accepted LeetCode solution to GitHub with AI review, analytics, and a live dashboard.
+> Your DSA journey, committed. Auto-commit solved LeetCode, GFG and Codeforces problems to GitHub with AI review, streaks and stats.
 
 ---
 
@@ -43,6 +43,12 @@ A floating AI chat on every problem page. Ask about complexity, request hints, p
 🧠 AI Behaviour Bank
 Personal memory for your AI assistant. Save insights, define custom skills that trigger on command, and build a learning roadmap that auto-injects context into every conversation.
 
+🔥 Streaks that survive real life
+A daily target you set yourself, points weighted by difficulty, and freezes you earn on heavy days so one missed evening does not erase a month. Going away? Vacation mode holds the streak. Fell off anyway? Solve a little extra and take the day back. Badges are drawn as SVG files committed to your own repo — no third-party image service, and they work in a private repo.
+
+👥 Party comparison
+Add a friend's public CodeLedger repo and see your numbers side by side. It is one-sided by design: adding someone does not require them to add you, and nobody is notified. Share a link and it opens for anyone, extension or not.
+
 🔄 Cross-device sync
 Your entire history synced via your own GitHub repo on every startup. Always current on every machine.
 
@@ -54,14 +60,17 @@ Out of the box your data goes to your GitHub repo and nowhere else. No sign-ups,
 
 ---
 
-**REPOSITORY LAYOUT (v3)**
+**REPOSITORY LAYOUT**
 
-problems/
-lc-two-sum/
-lc-two-sum.py ← your code
-lc-two-sum.md ← description + AI review + stats
+problems/two-sum/leetcode/lc-two-sum.py ← your code
+problems/two-sum/leetcode/lc-two-sum.md ← description + AI review + stats
 index.json ← machine-readable index
 index.html ← live GitHub Pages dashboard
+badges/ ← streak badges as plain SVG
+
+The `two-sum` level is the canonical problem, so the same question solved on two
+platforms lands under one folder. A problem with no canonical match uses its
+platform id instead: `problems/lc-two-sum/lc-two-sum.py`.
 
 ---
 
@@ -79,7 +88,7 @@ Optional: add an AI provider key under Settings → AI for code reviews.
 
 Your code and GitHub token are never stored on our servers. The OAuth exchange happens through a Cloudflare Worker proxy — the token is passed directly to your browser and stored only in the extension's local storage; the server does not log or retain it.
 
-The extension includes **optional, opt-in anonymous usage telemetry** (disabled by default). If you enable it in Settings → Advanced → Anonymous telemetry, it sends only `{ event: "solve", platform: "leetcode", version: "x.y.z" }` to our self-hosted counter at `counter.vkrishna04.me`. No code, no tokens, no problem data, no identifiers. Full source at github.com/Life-Experimentalist/Code-Ledger.
+The extension includes **optional, opt-in anonymous usage telemetry** (disabled by default). If you enable it in Settings → Advanced → Anonymous telemetry, it sends only `{ platform: "leetcode", version: "x.y.z" }` to our self-hosted counter at `counter.vkrishna04.me`. No code, no tokens, no problem data, no identifiers. Full source at github.com/Life-Experimentalist/Code-Ledger.
 
 ---
 
@@ -89,7 +98,7 @@ The extension includes **optional, opt-in anonymous usage telemetry** (disabled 
 
 _(paste as-is into the form)_
 
-> CodeLedger automatically detects when a user solves a DSA problem on LeetCode, GeeksForGeeks, or Codeforces and commits their solution code to a GitHub repository they own. All other features (AI review, analytics, conflict sync, knowledge graph) exist solely to enrich that single commit workflow.
+> CodeLedger automatically detects when a user solves a DSA problem on LeetCode, GeeksForGeeks, or Codeforces and commits their solution code to a GitHub repository they own. Every other feature — AI review, analytics, cross-device sync, the knowledge graph, streak badges, and the optional comparison against a friend's public ledger — reads from or writes to that same repository and exists only to serve that single commit workflow.
 
 ---
 
@@ -101,7 +110,7 @@ _(paste as-is into the form)_
 
 **alarms**
 
-> Schedules periodic background sync checks (every 30 minutes) to detect when new solutions need to be pushed to the user's GitHub repository, and to throttle AI review batches to avoid API rate limits.
+> Schedules the periodic repository sync check (every 30 minutes) and the batched maintenance commit (every 10 minutes) that push new solutions to the user's own GitHub repository. Two further alarms drain the AI-review and code-recovery queues; they are created only while a queue actually has work and are cleared when it empties, so the extension does not wake in the background with nothing to do.
 
 **sidePanel**
 
@@ -117,6 +126,8 @@ _(paste as-is into the form)_
 > • `api.github.com` — commits solution files to the user's own repository via the GitHub Trees API.
 > • `codeledger.vkrishna04.me` — starts the GitHub OAuth sign-in flow and serves the shared canonical problem-ID map.
 > • `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `openrouter.ai`, `localhost:11434` — AI code review providers; only contacted if the user has enabled AI review and entered their own API key for that provider.
+>
+> No host permission is requested for `raw.githubusercontent.com`. If the user adds a friend's repository to the party comparison, the extension reads that repository's public `badges/stats.json` with an ordinary anonymous `fetch` — GitHub serves it with `Access-Control-Allow-Origin: *`, so no permission is needed and no credential is sent. An empty friend list makes no such request.
 
 ---
 
@@ -141,7 +152,7 @@ _(paste as-is into the form)_
 | Personal communications             | **No**  | Not applicable.                                                                                                                                                                                                                                                                                                                 |
 | Location                            | **No**  | No IP, GPS, or region data is collected.                                                                                                                                                                                                                                                                                        |
 | Web history                         | **No**  | Content scripts run only on the three configured coding platforms; no general browsing history is accessed.                                                                                                                                                                                                                     |
-| **User activity**                   | **Yes** | If the user opts in to "Anonymous Usage Stats" (off by default), a solve event `{ event: "solve", platform: "leetcode", version: "1.4.5" }` is sent to `counter.vkrishna04.me`. No clicks, scrolls, or keystrokes. Anonymous, no user identifier.                                                                               |
+| **User activity**                   | **Yes** | If the user opts in to "Anonymous Usage Stats" (off by default), a solve hit carrying only `{ platform: "leetcode", version: "1.7.0" }` is sent to `counter.vkrishna04.me`. No clicks, scrolls, or keystrokes. Anonymous, no user identifier.                                                                                   |
 | Website content                     | **No**  | Submitted code is read from the platform DOM and committed to the user's own GitHub repo only — never sent to the developer.                                                                                                                                                                                                    |
 
 **Certifications — all three apply:**
@@ -156,9 +167,11 @@ _(paste as-is into the form)_
 
 ## CWS Reviewer Notes
 
-No remote code. All libraries (Preact, Chart.js) are bundled in `src/vendor/`. No `eval()` used.
-OAuth: Token is proxy-exchanged via `codeledger.vkrishna04.me`, saved only in local storage, and sent directly to `api.github.com`. Worker retains nothing.
-Telemetry: Disabled by default (opt-in). If enabled, sends anonymous `{version, platform}` solve events to `counter.vkrishna04.me`. No code/IDs sent.
+No remote code. All libraries (Preact, htm, Chart.js) are committed under `src/vendor/` as esbuild bundles built from npm — they are readable source in the package, not minified CDN drops. No `<script src>` points off-origin, and no `eval()` or `new Function()` is used anywhere.
+OAuth: this is a **classic OAuth App**, not a GitHub App. The token is proxy-exchanged via `codeledger.vkrishna04.me`, saved only in local storage, and sent directly to `api.github.com`. The worker retains nothing and signs the OAuth `state` into an `HttpOnly` cookie it verifies on the callback.
+Repository creation: the extension calls `POST /user/repos` with the user's own OAuth token and the `repo` scope they granted at sign-in. If sign-in ever returns a GitHub-App-shaped token (which cannot create repositories), the callback now detects it and says so at sign-in rather than letting it surface later as a permission error.
+Telemetry: disabled by default (opt-in). If enabled, POSTs `{ version, platform }` to `counter.vkrishna04.me`; the event name is a path segment, not a field. No code, IDs, repository names or problem data.
+Party comparison: off until the user adds a repository. It then reads that public repository's `badges/stats.json` anonymously from `raw.githubusercontent.com`. Nothing is uploaded and the other person is not contacted.
 
 ---
 
@@ -214,99 +227,13 @@ IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT
 
 ## Privacy Policy Text
 
-_(Paste into Privacy Policy text field if requested)_
+The Chrome Web Store form takes a URL, and the URL is the one to give:
+`https://codeledger.vkrishna04.me/privacy`.
 
-```markdown
-# Privacy Policy for CodeLedger
-
-**Last updated**: 2026-06-22
-
-CodeLedger is committed to protecting your privacy. The extension is designed so that your code, API keys, and access tokens belong entirely to you and stay on your device or in your own GitHub repository.
-
----
-
-## 1. Data Collection & Local Storage
-
-CodeLedger does not collect, store, or transmit any personal data to our own servers.
-
-All extension data is stored **locally on your device** using your browser's IndexedDB and secure local storage:
-
-- **Problem history**: Solved problem titles, code, runtime/memory stats, difficulty, and tags.
-- **API Configuration**: GitHub repository settings, GitHub OAuth access tokens, and optional AI provider API keys.
-
----
-
-## 2. Outbound Requests & Third-Party Services
-
-CodeLedger communicates with external services only to perform its core functionalities, as described below:
-
-### A. GitHub API (`api.github.com`)
-
-- **Purpose**: Commits your solved problem files and updates your progress index directly in a repository you own.
-- **Data Sent**: Your solution code, problem descriptions, and runtime statistics.
-- **Privacy**: Governed by the [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement).
-
-### B. Cloudflare Worker OAuth Proxy (`codeledger.vkrishna04.me`)
-
-- **Purpose**: Temporary proxy used strictly to exchange your GitHub OAuth code for an access token.
-- **Handling**: The token passes through the worker and is returned immediately to your browser. **No tokens, codes, or credentials are logged, saved, or retained** on our servers.
-- **Privacy**: Governed by the [Cloudflare Privacy Policy](https://www.cloudflare.com/privacy/).
-
-### C. Optional AI Code Review Providers
-
-If you choose to enable AI reviews and provide your own API key, CodeLedger makes direct requests to your configured provider:
-
-- **Supported Providers**: Google Gemini, OpenAI, Anthropic Claude, DeepSeek, and OpenRouter.
-- **Data Sent**: The code and description of the solved problem.
-- **Local Alternative**: You can use Ollama (`http://localhost:11434`) to run models locally on your machine, preventing any code from being sent to external AI servers.
-
-### D. shields.io (Optional, Off by Default)
-
-Streak and progress badges are generated as SVG files committed to your own repository, so by default no third party is involved in rendering them.
-
-- **If you switch the badge style to shields** under **Settings → Streaks**, your README loads badge images from `shields.io`, which reads the numbers from a small JSON file in your repository.
-- **Data Sent**: Your repository URL, and one request each time somebody views your README. No code, no tokens, no problem content.
-- **Reversible**: Switching back to the self-hosted style stops it, and the SVG badges are always committed regardless of which style you use.
-
-### E. mermaid.ink (Optional, One Click at a Time)
-
-When an AI review contains a diagram, the extension displays its source together with a **Render diagram** button rather than drawing it automatically.
-
-- **Purpose**: Turns a diagram's source into an image without loading any external script, which the extension's Content Security Policy would block in any case.
-- **Data Sent**: The source of the single diagram you pressed Render on. It describes the shape of your solution but is not the solution code, and no token or account is involved.
-- **Never automatic**: Nothing reaches `mermaid.ink` unless you press the button on that specific diagram.
-
----
-
-## 2b. Public Repositories
-
-If the ledger repository you commit to is **public** — which is what most people want, since it doubles as a portfolio — then your solutions, your solve history, your streak badges, and the generated GitHub Pages site can be read by anyone with the link. This is a property of the repository you chose, not something CodeLedger transmits anywhere extra. Making the repository private keeps all of it visible only to you and anyone you invite.
-
-The extension shows this same list live under **Settings → Privacy**, computed from your actual configuration rather than written down, so it cannot fall out of date with what the extension does.
-
----
-
-## 3. Telemetry (Optional, Opt-In Only)
-
-CodeLedger includes anonymous usage telemetry which is **disabled by default** (`telemetryOptIn` is set to `false`).
-
-If and only if you explicitly opt-in under **Settings → Advanced → Anonymous telemetry**:
-
-- The extension sends a POST request to `https://counter.vkrishna04.me/api/v1/counter/solve/hit`.
-- **Payload sent**: `{ event: "solve", platform: "leetcode", version: "x.y.z" }`
-- **No identifiers, credentials, repository names, problem content, or code** are ever included in this telemetry payload.
-- You can audit the implementation in our open-source codebase under `src/core/telemetry.js`.
-
----
-
-## 4. User Rights & Data Deletion
-
-- **Access**: You can view all stored data under the extension's "Sync" and "Settings" pages.
-- **Deletion**: Uninstalling the extension completely purges all local storage and IndexedDB caches. You can also click **"Clear all data"** in the Settings tab to reset the extension.
-
----
-
-## 5. Contact
-
-For any questions regarding this policy, please email: **github@vkrishna04.me** or open an issue on our GitHub repository: **https://github.com/Life-Experimentalist/Code-Ledger/issues**.
-```
+If a reviewer asks for the text inline, paste [`PRIVACY.md`](../../PRIVACY.md) from
+the repository root. That file and the page at `/privacy` are the only two copies,
+and they are kept in step with each other and with
+`src/core/privacy-disclosure.js`, which is what the extension renders live under
+**Settings → Privacy**. A third copy used to live here and had already drifted —
+it still described a telemetry payload shape the code does not send — so it was
+removed rather than maintained.

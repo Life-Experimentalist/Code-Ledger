@@ -101,6 +101,8 @@ Chrome Web Store requires each upload to exceed the last.
 - The default OAuth scope is `public_repo,workflow`. Creating a private repository needs the wider `repo` scope, which the settings panel offers as an explicit one-click upgrade rather than requesting up front.
 - The extension no longer wakes in the background when it has nothing to do. Two of its periodic timers existed only to notice an empty queue — one of them checking every minute, indefinitely, for work that only exists after a profile import. They are now started when something is queued and stopped when it drains.
 - GitLab and Bitbucket are gone from the interface and from the package. Their handlers were stubs that threw on every call, so presenting them as options — as a provider, as a mirror target, as an `@gitlab` chat mention — meant offering something that could not commit.
+- The privacy policy and the store listings now describe the party comparison and the shared `/compare` link, which had been shipped without appearing in either. The policy also stops claiming that local storage is encrypted at rest; browser extension storage is isolated from other sites and other extensions, but it is readable by anyone who already has the operating system profile, and it now says so.
+- The privacy policy exists in two copies — `PRIVACY.md` and the page at `/privacy` — instead of five. The three copies embedded in the store-submission documents had drifted; each still described a telemetry payload shape the code does not send. They are replaced by pointers to the canonical text.
 
 ### Removed
 

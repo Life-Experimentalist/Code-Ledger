@@ -1,6 +1,6 @@
 # Privacy Policy for Code Ledger
 
-**Last updated**: June 26, 2026
+**Last updated**: August 2026
 
 ## 1. Introduction and Scope
 
@@ -32,6 +32,14 @@ Because Code Ledger runs entirely within your browser context, the following cat
 4. **Integration Settings**:
    - Target repository names, sync status, and feature toggle preferences.
 
+5. **Streak State**:
+   - Vacation days you have taken and which achievements you have already been shown.
+
+6. **Party List**:
+   - If you use the party comparison, the list of friends' repositories you added. It is a list of public repository names held on your side; nobody is told that you added them.
+
+So a second browser can pick up where the first left off, your settings and your party list are also written into your own repository, at `.codeledger/sync.json`. Your GitHub token, your AI API keys and your streak state are deliberately excluded from that file and never leave your device.
+
 ---
 
 ## 3. How Data is Collected
@@ -58,7 +66,7 @@ We process your data strictly to provide the extension's core features:
 ## 5. Data Storage, Security, and Retention
 
 - **Local Storage**: All authentication tokens, API keys, solve history, and AI chats are saved in your browser's sandboxed `IndexedDB` and `chrome.storage.local` environment.
-- **Security**: Local storage is protected by the browser's origin-security model and your operating system's file encryption.
+- **Security**: The browser's extension storage boundary isolates this data — other sites and other extensions cannot read it. It is **not** separately encrypted at rest, so anyone with access to your operating system profile can read it, exactly as with the rest of your browser profile.
 - **Retention**: We retain your local data indefinitely to maintain your solve history. You can purge all data at any time by clicking the "Clear all data" button in the advanced settings tab or by uninstalling the extension.
 - **Remote Copies**: Commits pushed to your GitHub repository are retained according to your repository settings and must be managed or deleted directly through GitHub.
 
@@ -74,6 +82,8 @@ We maintain a strict **zero-sharing policy**. We do not sell, rent, trade, or sh
 - **mermaid.ink (Optional)**: When an AI response contains a Mermaid diagram, the extension shows the diagram's source code and a **Render diagram** button. Only if you press that button is the diagram source sent to `mermaid.ink` to be drawn as an image. Nothing is sent otherwise. [Mermaid Live Editor](https://mermaid.live).
 - **CodeLedger authentication service**: `codeledger.vkrishna04.me` performs the GitHub OAuth exchange. It receives the temporary authorization code GitHub issues, exchanges it for your access token, and returns that token to the extension. The token is stored on your device only — the service does not retain it, and no solve data ever passes through it.
 - **shields.io (Optional, off by default)**: Streak badges are generated as SVG files committed to your own repository, with nothing in the middle. If you switch the badge style to shields under Settings → Streaks, your README loads badge images from `shields.io`, which reads the numbers from a small JSON file in your repository — so shields learns your repository URL and sees one request per README view. It receives no code and no token, and switching back stops it. [Shields privacy](https://github.com/badges/shields/blob/master/PRIVACY.md).
+- **raw.githubusercontent.com (Optional, only once you add a friend)**: The party comparison reads each added repository's public `badges/stats.json` with an anonymous request — no token is sent, and nothing of yours is uploaded. GitHub therefore sees your IP address asking for their file. The people you add are not notified, and removing everyone from the list stops the requests.
+- **The CodeLedger compare page (Optional, only if you share a link)**: The share button builds a URL of the form `/compare?repos=owner/repo,…`. That page holds no state — it reads the repositories named in the link directly from GitHub in the visitor's own browser. The repository names do appear in the request line to our server, as they do in any URL, and anyone you send the link to can open it.
 
 Separately from any third party: if your ledger repository is **public**, then your solutions, your solve history, your streak badges and the generated GitHub Pages site can be read by anyone with the link. That is a property of the repository you chose rather than anything the extension transmits elsewhere, and making the repository private keeps all of it to you and anyone you invite.
 

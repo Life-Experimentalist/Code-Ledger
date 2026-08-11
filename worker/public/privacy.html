@@ -123,7 +123,21 @@
         <li>Extension settings (repository name, commit preferences, AI configuration)</li>
         <li>Solved problem metadata and AI reviews (in IndexedDB)</li>
         <li>AI chat history</li>
+        <li>
+          Your streak state — vacation days taken and which achievements you have already seen
+        </li>
+        <li>
+          The list of friends' repositories you have added, if you use the party comparison. It is a
+          list of public repository names, kept on your side — nobody is notified that you added
+          them.
+        </li>
       </ul>
+      <p>
+        So a second browser can pick up where the first left off, your settings and your friend list
+        are also written into your own repository, in
+        <code>.codeledger/sync.json</code>. Your GitHub token, your AI API keys and your vacation
+        state are deliberately excluded from that file and never leave local storage.
+      </p>
 
       <h2>2. Data Handling & Usage</h2>
       <p>
@@ -174,6 +188,20 @@
           <code>shields.io</code>, which fetches the numbers from your repository — so shields
           learns your repository URL and sees a request each time someone views the README. It
           receives no code and no token, and switching back to the self-hosted style stops it.
+        </li>
+        <li>
+          <strong>raw.githubusercontent.com (only if you add a friend)</strong>: The party
+          comparison reads each added repository's public <code>badges/stats.json</code> with an
+          anonymous request — no token, and nothing of yours is uploaded. GitHub therefore sees your
+          IP address asking for their file. The people you add are not told, and removing everyone
+          from the list stops the requests.
+        </li>
+        <li>
+          <strong>The CodeLedger compare page (only if you share a link)</strong>: The share button
+          builds a URL of the form <code>/compare?repos=owner/repo,…</code>. That page holds no
+          state — it reads the repositories named in the link directly from GitHub in the visitor's
+          own browser. The repository names do appear in the request line to our server, as they do
+          in any URL, and anyone you send the link to can open it.
         </li>
         <li>
           <strong>Anonymous counter (opt-in, off by default)</strong>: If you enable Anonymous Usage
