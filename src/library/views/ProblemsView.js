@@ -19,6 +19,7 @@ import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
+import { isAIActive } from "../../core/feature-flags.js";
 
 const PLATFORMS = [
   {
@@ -99,9 +100,15 @@ export function ProblemsView({
   const [copyText, setCopyText] = useState("");
 
   const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+  const aiOn = isAIActive(settings);
+  // Reviews already written stay filterable after the last provider is switched
+  // off — they are the user's own text, not a live feature.
+  const hasStoredReviews = (problems || []).some((p) => p.aiReview);
 
   const fetchQueueStats = () => {
-    if (!isExtension) return;
+    // Nothing can be queued with no provider switched on, so the ten-second
+    // poll is pure noise in the message log.
+    if (!isExtension || !aiOn) return;
     chrome.runtime.sendMessage({ type: "GET_QUEUE_STATS" }, (resp) => {
       if (chrome.runtime.lastError || !resp?.ok) return;
       setQueueStats(resp);
@@ -112,7 +119,8 @@ export function ProblemsView({
     fetchQueueStats();
     const id = setInterval(fetchQueueStats, 10000);
     return () => clearInterval(id);
-  }, []);
+    // Re-armed when the AI switch flips so the poll starts without a reload.
+  }, [aiOn]);
 
   const handleQueueAllReviews = async () => {
     if (!isExtension || reviewQueueBusy) return;
@@ -525,7 +533,9 @@ export function ProblemsView({
   return html`
     <div class="flex flex-col gap-6 w-full">
       <!-- AI Review queue status banner -->
-      ${isExtension && (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg)
+      ${aiOn &&
+      isExtension &&
+      (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg)
         ? html`
             <div
               class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs"
@@ -590,7 +600,8 @@ export function ProblemsView({
               </div>
             </div>
           `
-        : isExtension &&
+        : aiOn &&
+            isExtension &&
             ((problems || []).filter((p) => !p.aiReview).length > 0 || queueStats?.failed > 0)
           ? html`
               <div
@@ -770,15 +781,19 @@ export function ProblemsView({
               (o) => html`<option value=${o}>${o === "All" ? "All Tags" : o}</option>`,
             )}
           </select>
-          <select
-            value=${filterAIReview}
-            onChange=${(e) => setFilterAIReview(e.target.value)}
-            class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
-          >
-            <option value="All">All Reviews</option>
-            <option value="With Review">Has AI Review</option>
-            <option value="Without Review">No AI Review</option>
-          </select>
+          ${aiOn || hasStoredReviews
+            ? html`
+                <select
+                  value=${filterAIReview}
+                  onChange=${(e) => setFilterAIReview(e.target.value)}
+                  class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
+                >
+                  <option value="All">All Reviews</option>
+                  <option value="With Review">Has AI Review</option>
+                  <option value="Without Review">No AI Review</option>
+                </select>
+              `
+            : ""}
           ${query
             ? html`
                 <button

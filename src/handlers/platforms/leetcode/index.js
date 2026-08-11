@@ -12,6 +12,7 @@ import { Storage } from "../../../core/storage.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
+import { isAIActive } from "../../../core/feature-flags.js";
 import { runtime, tabs } from "../../../lib/browser-compat.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { resolveLang, langExt, LANG_VERBOSE } from "./lang-utils.js";
@@ -306,6 +307,9 @@ Be concise. Max 200 words.`;
   _startAIPanel(slug) {
     Storage.getSettings()
       .then((settings) => {
+        // Nothing to chat with until a provider is switched on. A panel that
+        // can only apologise is worse than no panel.
+        if (!isAIActive(settings)) return;
         if (settings.leetcode_ai_panel === false) return;
         if (settings.floatingAIEnabled === false) return;
         if (this._aiPanel && this._aiPanelSlug === slug) return;

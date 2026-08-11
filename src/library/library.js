@@ -25,7 +25,7 @@ import { CanonicalView } from "./views/CanonicalView.js";
 import { AIChatsView } from "./views/AIChatsView.js";
 import { BehaviourBankView } from "./views/BehaviourBankView.js";
 import { PartyView } from "./views/PartyView.js";
-import { isGamificationActive } from "/core/feature-flags.js";
+import { isAIActive, isGamificationActive } from "/core/feature-flags.js";
 import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
 import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js";
 import {
@@ -584,11 +584,22 @@ function LibraryApp() {
     setActiveTab("graph");
   }, []);
 
+  // A tab can disappear from the sidebar while it is the one on screen — the
+  // last AI provider gets switched off, or streaks do. Waiting for `loading`
+  // means an old `?tab=ai-chats` link is not bounced before settings arrive.
+  useEffect(() => {
+    if (loading) return;
+    if (activeTab === "ai-chats" && !isAIActive(settings)) setActiveTab("solutions");
+    if (activeTab === "party" && !isGamificationActive(settings)) setActiveTab("solutions");
+  }, [loading, activeTab, settings]);
+
   const navItems = [
     { id: "solutions", label: "Solutions", icon: "💡" },
     { id: "analytics", label: "Analytics", icon: "📈" },
     { id: "graph", label: "Graph", icon: "🔗" },
-    { id: "ai-chats", label: "AI Chats", icon: "🤖" },
+    // Same reasoning as Party below: with no provider switched on there is
+    // nothing here but an explanation of why there is nothing here.
+    ...(isAIActive(settings) ? [{ id: "ai-chats", label: "AI Chats", icon: "🤖" }] : []),
     { id: "behaviour-bank", label: "Behaviour Bank", icon: "🧠" },
     { id: "canonical", label: "Canonical", icon: "🔀" },
     // Party compares streaks and points, so it has nothing to show when the

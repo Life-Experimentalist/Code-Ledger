@@ -18,11 +18,31 @@ import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.j
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
 import { modalTabRegistry } from "../../core/modal-tab-registry.js";
+import { isAIActive } from "../../core/feature-flags.js";
 import { expandChatVariables } from "../../lib/chat-variables.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
 // Side-effect: registers LeetCode tabs into modalTabRegistry
 import "../../handlers/platforms/leetcode/modal-tabs.js";
+
+/** Tabs that exist only to talk to a model, keyed by registry id. */
+const AI_TAB_IDS = new Set(["review", "chat"]);
+
+/**
+ * The registry's tabs, minus the AI ones when there is no provider to reach.
+ *
+ * A stored review is the exception: it is the user's own text and stays
+ * readable whatever the AI switch says now. Hiding it would look like the
+ * extension had thrown it away.
+ *
+ * @param {object} problem
+ * @param {Record<string, any>} settings
+ */
+function aiAwareTabs(problem, settings) {
+  const tabs = modalTabRegistry.getTabs(problem?.platform || "leetcode", problem);
+  if (isAIActive(settings)) return tabs;
+  return tabs.filter((t) => !AI_TAB_IDS.has(t.id) || (t.id === "review" && !!problem?.aiReview));
+}
 
 function renderMarkdown(md) {
   if (!md) return "";
@@ -238,7 +258,7 @@ export function ProblemModal({
   useEffect(() => {
     if (settings?.remember_modal_tab && _lastModalTab && _lastModalTab !== "overview") {
       // Check if the remembered tab exists for this problem
-      const regTabs = modalTabRegistry.getTabs(problem?.platform || "leetcode", problem);
+      const regTabs = aiAwareTabs(problem, settings);
       const available = new Set([
         ...regTabs.map((t) => t.id),
         "notes",
@@ -725,7 +745,7 @@ export function ProblemModal({
     } catch (_) {}
   };
 
-  const registryTabs = modalTabRegistry.getTabs(problem.platform || "leetcode", problem);
+  const registryTabs = aiAwareTabs(problem, settings);
   const baseTabs = registryTabs.map((tab) => ({
     id: tab.id,
     label: typeof tab.label === "function" ? tab.label(problem) : tab.label,

@@ -18,6 +18,7 @@ import { setupSubmitHook, isAcceptedVisible } from "./submission-detector.js";
 import { injectProfileImportBtn, removeProfileImportBtn } from "./profile-import.js";
 import { injectGFGQoL } from "./qol.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
+import { isAIActive } from "../../../core/feature-flags.js";
 
 const dbg = createDebugger("GFG");
 
@@ -167,6 +168,9 @@ Be concise. Max 200 words.`;
   _startAIPanel(slug) {
     Storage.getSettings()
       .then((settings) => {
+        // Nothing to chat with until a provider is switched on. A panel that
+        // can only apologise is worse than no panel.
+        if (!isAIActive(settings)) return;
         if (settings.gfg_ai_panel === false) return;
         if (settings.floatingAIEnabled === false) return;
         if (this._aiPanel && this._aiPanelSlug === slug) return;
