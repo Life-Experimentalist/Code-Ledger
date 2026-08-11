@@ -113,15 +113,20 @@ wakes an hour to eight.
 `SYNC` was left alone: it is the one of the four that does real work on every
 tick.
 
-### 5. `presence-marker.js` uses raw `console.*`
+### 5. `presence-marker.js` uses raw `console.*` — **applied**
 
-About fifteen call sites, against the project's own rule that everything goes
-through `createDebugger()`. It is a non-module content script, so the fix is not
-a one-line import swap. It also carries the OAuth relay, which is the single most
-rejection-sensitive path in the extension.
+Twenty-eight call sites, against the project's own rule that everything goes
+through `createDebugger()`. It is a non-module content script, so the fix was not
+an import swap: the file now builds its own gate in the same shape — a getter
+returning a bound `console` method, so DevTools still reports the call site — and
+reads the same `codeledger.debug` key. Errors stay unconditional.
 
-Deliberately not changed before a store resubmission. Worth doing immediately
-after acceptance, not before.
+The caution that held this back was that the file also carries the OAuth relay,
+the single most rejection-sensitive path in the extension. Nothing in the relay
+changed, and the storage read that resolves the flag is wrapped in both
+`Promise.resolve()` and a `try`, because a browser with a callback-style
+`storage.local.get` would otherwise throw on `.then()` and abort the IIFE before
+the marker was injected.
 
 ### 6. Repo URLs still point at `Life-Experimentalist/Code-Ledger`
 

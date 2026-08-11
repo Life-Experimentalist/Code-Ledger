@@ -15,17 +15,57 @@
  */
 
 (function injectPresenceMarker() {
-  console.log(`[CodeLedger:PresenceMarker] IIFE starting...`);
   // Supports both Chrome (chrome.*) and Firefox (browser.* / chrome.* alias)
   const _rt = (typeof browser !== "undefined" ? browser : chrome)?.runtime;
+  const storageApi = (typeof browser !== "undefined" ? browser : chrome)?.storage;
+
+  // This file is a plain content script, not a module, so it cannot import
+  // createDebugger — and the console patching debug.js installs lives in a
+  // different world and never reaches here. Unguarded, every visitor to the
+  // landing page got ~30 lines in their console. Same shape as createDebugger:
+  // a getter returning a bound console method, so DevTools still reports the
+  // call site rather than this file. Errors stay unconditional, matching
+  // rawError() elsewhere.
+  const PREFIX = `[CodeLedger:PresenceMarker]`;
+  let _debug = false;
+  const noop = () => {};
+  const dbg = {
+    get log() {
+      return _debug ? console.log.bind(console, PREFIX) : noop;
+    },
+    get warn() {
+      return _debug ? console.warn.bind(console, PREFIX) : noop;
+    },
+    get error() {
+      return console.error.bind(console, PREFIX);
+    },
+  };
+
   if (!_rt) {
-    console.warn(`[CodeLedger:PresenceMarker] runtime unavailable`);
+    dbg.warn(`runtime unavailable`);
     return;
   }
 
   const version = _rt.getManifest?.()?.version || "unknown";
   const libraryUrl = _rt.getURL("library/library.html");
-  console.log(`[CodeLedger:PresenceMarker] version=${version}, libraryUrl=${libraryUrl}`);
+
+  // The flag resolves after the synchronous work below has already run, so
+  // restate what that work saw instead of losing it to the race.
+  //
+  // Wrapped because everything after this point is the OAuth relay, and a
+  // browser whose storage.local.get is callback-style rather than promise-based
+  // would throw on .then() and abort the whole IIFE — taking the presence
+  // marker and the relay with it. A debug flag is never worth that.
+  try {
+    Promise.resolve(storageApi?.local?.get("codeledger.debug"))
+      .then((r) => {
+        _debug = r?.["codeledger.debug"] === true;
+        dbg.log(`started — version=${version}, libraryUrl=${libraryUrl}`);
+      })
+      .catch(noop);
+  } catch (_) {
+    /* debug stays off */
+  }
 
   // ── 1. DOM marker (legacy + MutationObserver path) ──────────────────────
   if (!document.getElementById("codeledger-present")) {
@@ -36,9 +76,9 @@
     marker.setAttribute("data-library-url", libraryUrl);
     marker.setAttribute("data-source", "extension");
     (document.body || document.documentElement).appendChild(marker);
-    console.log(`[CodeLedger:PresenceMarker] ✓ DOM marker injected`);
+    dbg.log(`✓ DOM marker injected`);
   } else {
-    console.log(`[CodeLedger:PresenceMarker] DOM marker already present`);
+    dbg.log(`DOM marker already present`);
   }
 
   // ── 2. CustomEvent handshake (robust cross-browser detection) ────────────
@@ -48,7 +88,7 @@
   };
 
   fire(); // immediate
-  console.log(`[CodeLedger:PresenceMarker] ✓ initial CustomEvent dispatched`);
+  dbg.log(`✓ initial CustomEvent dispatched`);
 
   // Retry for a few seconds to catch pages where our script loads first
   let n = 0;
@@ -56,7 +96,7 @@
     fire();
     if (++n >= 10) {
       clearInterval(iv);
-      console.log(`[CodeLedger:PresenceMarker] ✓ retry loop complete (10 retries sent)`);
+      dbg.log(`✓ retry loop complete (10 retries sent)`);
     }
   }, 250);
 
@@ -79,29 +119,21 @@
   // The library page's chrome.storage.onChanged listener picks up the new token.
 
   const AUTH_TOKENS_KEY = "auth.tokens";
-  const storageApi = (typeof browser !== "undefined" ? browser : chrome)?.storage;
 
   function writeAuthToken(provider, token) {
     if (!provider || !token) {
-      console.warn(
-        `[CodeLedger:PresenceMarker] writeAuthToken(): skipped — provider=${provider}, token=${!!token}`,
-      );
+      dbg.warn(`writeAuthToken(): skipped — provider=${provider}, token=${!!token}`);
       return;
     }
-    console.log(`[CodeLedger:PresenceMarker] writeAuthToken(): dispatching relay for ${provider}`);
+    dbg.log(`writeAuthToken(): dispatching relay for ${provider}`);
 
     // Primary: sendMessage to SW — Chrome puts this in the IPC queue synchronously,
     // so delivery is guaranteed even if this popup window closes right after.
     // SW writes the token; library page detects it via chrome.storage.onChanged.
     _rt
       .sendMessage({ type: "CODELEDGER_AUTH_RELAY", provider, token })
-      .then(() => console.log(`[CodeLedger:PresenceMarker] ✓ SW relay confirmed`))
-      .catch((e) =>
-        console.warn(
-          `[CodeLedger:PresenceMarker] SW relay response error (message still delivered):`,
-          e?.message,
-        ),
-      );
+      .then(() => dbg.log(`✓ SW relay confirmed`))
+      .catch((e) => dbg.warn(`SW relay response error (message still delivered):`, e?.message));
 
     // Belt-and-suspenders: also attempt direct storage write.
     // Faster when context is stable; SW relay is the guarantee when context tears down.
@@ -113,15 +145,8 @@
           tokens[provider] = token;
           return storageApi.local.set({ [AUTH_TOKENS_KEY]: tokens });
         })
-        .then(() =>
-          console.log(`[CodeLedger:PresenceMarker] ✓ direct storage write also succeeded`),
-        )
-        .catch((e) =>
-          console.warn(
-            `[CodeLedger:PresenceMarker] direct write skipped (SW relay covers it):`,
-            e?.message,
-          ),
-        );
+        .then(() => dbg.log(`✓ direct storage write also succeeded`))
+        .catch((e) => dbg.warn(`direct write skipped (SW relay covers it):`, e?.message));
     }
 
     // Close popup after 150 ms — both paths have been dispatched by then.
@@ -135,39 +160,32 @@
 
   // Path A: DOM element (primary)
   function relayAuthFromDOM() {
-    console.log(
-      `[CodeLedger:PresenceMarker] relayAuthFromDOM(): checking for #codeledger-auth-result`,
-    );
+    dbg.log(`relayAuthFromDOM(): checking for #codeledger-auth-result`);
     const el = document.getElementById("codeledger-auth-result");
     if (!el) {
-      console.log(
-        `[CodeLedger:PresenceMarker] relayAuthFromDOM(): no auth element — not the callback page`,
-      );
+      dbg.log(`relayAuthFromDOM(): no auth element — not the callback page`);
       return;
     }
     let authData;
     try {
       authData = JSON.parse(el.getAttribute("data-auth") || "");
     } catch (e) {
-      console.error(`[CodeLedger:PresenceMarker] relayAuthFromDOM(): JSON.parse failed:`, e);
+      dbg.error(`relayAuthFromDOM(): JSON.parse failed:`, e);
       return;
     }
     if (!authData || authData.type !== "CODELEDGER_AUTH") {
-      console.warn(
-        `[CodeLedger:PresenceMarker] relayAuthFromDOM(): unexpected data shape`,
-        authData?.type,
-      );
+      dbg.warn(`relayAuthFromDOM(): unexpected data shape`, authData?.type);
       return;
     }
     if (!authData.token) {
-      console.error(
-        `[CodeLedger:PresenceMarker] relayAuthFromDOM(): auth element present but token missing — error=${authData.error}`,
+      dbg.error(
+        `relayAuthFromDOM(): auth element present but token missing — error=${authData.error}`,
       );
       return;
     }
     // Never log any part of the token — this page is the OAuth callback and its
     // console is readable by anything with devtools access to the tab.
-    console.log(`[CodeLedger:PresenceMarker] OAuth relay (DOM): provider=${authData.provider}`);
+    dbg.log(`OAuth relay (DOM): provider=${authData.provider}`);
     writeAuthToken(authData.provider, authData.token);
   }
   relayAuthFromDOM();
@@ -178,12 +196,10 @@
   // This is the primary relay path for both Chrome and Firefox.
   _rt.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type !== "CL_GET_AUTH_DATA") return false;
-    console.log(`[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA received from background`);
+    dbg.log(`CL_GET_AUTH_DATA received from background`);
     const el = document.getElementById("codeledger-auth-result");
     if (!el) {
-      console.log(
-        `[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: no #codeledger-auth-result — not the callback page`,
-      );
+      dbg.log(`CL_GET_AUTH_DATA: no #codeledger-auth-result — not the callback page`);
       sendResponse(null);
       return true;
     }
@@ -191,20 +207,16 @@
     try {
       data = JSON.parse(el.getAttribute("data-auth") || "{}");
     } catch (e) {
-      console.error(`[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: JSON parse failed:`, e);
+      dbg.error(`CL_GET_AUTH_DATA: JSON parse failed:`, e);
       sendResponse(null);
       return true;
     }
     if (!data?.token) {
-      console.warn(
-        `[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: element found but no token (error=${data?.error})`,
-      );
+      dbg.warn(`CL_GET_AUTH_DATA: element found but no token (error=${data?.error})`);
       sendResponse(null);
       return true;
     }
-    console.log(
-      `[CodeLedger:PresenceMarker] CL_GET_AUTH_DATA: ✓ returning token for ${data.provider}`,
-    );
+    dbg.log(`CL_GET_AUTH_DATA: ✓ returning token for ${data.provider}`);
     sendResponse({ token: data.token, provider: data.provider || "github" });
     return true;
   });
@@ -220,14 +232,10 @@
     if (event.origin !== window.location.origin) return;
     if (!event.data.token) return;
     if (document.getElementById("codeledger-auth-result")) {
-      console.log(
-        `[CodeLedger:PresenceMarker] OAuth relay (postMessage): DOM path already handled, skipping`,
-      );
+      dbg.log(`OAuth relay (postMessage): DOM path already handled, skipping`);
       return;
     }
-    console.log(
-      `[CodeLedger:PresenceMarker] OAuth relay (postMessage fallback): provider=${event.data.provider}`,
-    );
+    dbg.log(`OAuth relay (postMessage fallback): provider=${event.data.provider}`);
     writeAuthToken(event.data.provider, event.data.token);
   });
 })();
