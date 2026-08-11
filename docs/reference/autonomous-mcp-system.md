@@ -1,77 +1,44 @@
-# Autonomous MCP and AI System
+# Automatic Behaviour: Settings, Repo Infrastructure, and MCP
 
-## Overview
+This page covers what CodeLedger does without being asked: committing your
+settings, building out your repository, and keeping the Pages dashboard current.
 
-CodeLedger now features a fully autonomous MCP (Model Context Protocol) system where:
+It also covers the one thing that is **not** automatic despite the plumbing
+being present — AI providers invoking MCP tools on their own.
 
-1. **AI providers automatically know about available MCPs**
-2. **Users can enable/disable individual tools**
-3. **Settings auto-commit with every problem solve**
-4. **GitHub infrastructure fully autonomous**
+## MCP invocation: manual today, not automatic
 
-## MCP Auto-Invocation
+**What works:** the 🔧 panel in the AI chat view lists every enabled tool, runs
+the one you pick, and drops the result into the chat context.
 
-### How It Works
+**What does not:** the AI deciding for itself to call a tool. The pieces are all
+written — `_buildMCPToolsContext()`, per-provider format converters, an executor,
+a result formatter — but nothing turns them on. `BaseAIHandler` sets
+`supportsMCPTools = false`; no provider handler overrides it; no handler passes a
+tool array to its provider's API; and `processMCPToolCalls()` has no callers
+outside its own module.
 
-When an AI provider generates a review or chat response:
-
-1. **Initialization**: `BaseAIHandler._buildMCPToolsContext()` checks if MCP should be used
-   - Checks global config: `useInChat` or `useInReview`
-   - Checks provider support: `supportsMCPTools` flag
-   - Fetches enabled tools from `getMCPConfig()`
-
-2. **Context Building**: Prepends available tools to the prompt
-
-   ```
-   [AVAILABLE_MCP_TOOLS]
-   - Query Problems: Search for problems by platform/difficulty/topic/time
-   - Get Problem Stats: Detailed statistics for a single problem
-   - Get Next Suggestion: Analyze weak topics and suggest next problem
-   ... (all enabled tools listed)
-   [END_MCP_TOOLS]
-   ```
-
-3. **Provider Decision**: AI provider decides when/which tools to invoke
-   - Included in system prompt
-   - Provider can see when tools are available
-   - Provider autonomously calls tools when helpful
-
-4. **Tool Execution**: When provider calls a tool
-   - Executor validates tool ID exists
-   - Executes tool handler with arguments
-   - Returns structured result
-   - Formats result for AI context
+Flipping the flag by itself would make things worse rather than better. It
+prepends a list of tool names to the prompt, so the model starts emitting tool
+calls that no code executes and then answers as though it had the results. A
+provider is only genuinely wired up once it also sends the tool array to its API
+and routes the response back through the executor. See
+[MCP Tools → Provider Integration Guide](mcp-tools.md#provider-integration-guide).
 
 ### Enabling MCP Tools
 
-Users control which tools are available in **Settings → MCP Tools**:
+Which tools are available is under **Settings → AI → MCP Tools**:
 
-- **Global Settings**:
-  - "Use MCP in Chat" — Tools available during chat
-  - "Use MCP in Review" — Tools available during AI review
-  - "Cache Tool Results" — Cache results for 5 minutes
+- **Global**:
+  - "Use in Chat" — tools offered during chat
+  - "Use in Review" — tools offered during AI review
 
-- **Individual Tools**: Per-tool toggle
-  - Each of 7 tools can be individually enabled/disabled
-  - Tools grouped by category (Context, Suggestions, Analysis)
+- **Individual tools**: each of the 15 tools has its own toggle, grouped by
+  category (Context, Suggestions, Analysis, Knowledge, Roadmap, Chats,
+  Navigation). All are on by default.
 
-### Tool Categories
-
-**Context Tools** (default enabled):
-
-- `query-problems` — Search problems
-- `get-problem-stats` — Problem analytics
-- `find-similar-problems` — Similar problem suggestions
-- `get-user-profile` — User context
-
-**Suggestions** (default enabled):
-
-- `get-next-suggestion` — Smart difficulty progression
-
-**Analysis** (default enabled):
-
-- `analyze-code-quality` — Code complexity & patterns
-- `get-trend-analysis` — 30-day trends
+Both settings are honoured by the manual path, so turning a tool off removes it
+from the sidebar.
 
 ## Settings Auto-Commit
 
@@ -91,7 +58,7 @@ On next problem commit:
 
 ### Portable Settings (Auto-Committed)
 
-Settings automatically committed to GitHub repo:
+Settings automatically committed to your GitHub repo:
 
 - Theme configuration (preset, mode, accent)
 - Behavior bank settings (enabled, telemetry, debug)
@@ -115,57 +82,52 @@ After push to GitHub:
 3. Merges remote settings (remote wins except critical keys)
 4. Local critical keys (github_owner, github_repo) preserved
 
-## GitHub Handler Refactoring
+## GitHub Handler Structure
 
-### New Modular Structure
+The handler is split into focused modules rather than one file:
 
-Instead of monolithic `index.js`, split into focused modules:
-
-**[src/handlers/git/github/api-client.js]**
+**[api-client.js](../../src/handlers/git/github/api-client.js)**
 
 - Pure GitHub API wrapper functions
 - Handles auth, error handling, retries
 - Functions: `apiFetch`, `getCurrentUser`, `getRepoRef`, `createTree`, `createCommit`, etc.
 - Single responsibility: API communication
 
-**[src/handlers/git/github/infra-builder.js]**
+**[infra-builder.js](../../src/handlers/git/github/infra-builder.js)**
 
 - Builds infrastructure files (README, LICENSE, .github/workflows, Pages)
 - Generates GitHub Pages HTML with optional verification
 - Normalizes repo topics
 - Functions: `buildInfraFiles`, `resolveRepoTopics`
-- Single responsibility: File generation
 
-**[src/handlers/git/github/pages-template.js]** (existing)
+**[commit-builder.js](../../src/handlers/git/github/commit-builder.js)**
 
-- GitHub Pages HTML/CSS template
-- Actions workflow template
-- README template
+- Assembles the file list for one commit
 
-**[src/handlers/git/github/index.js]** (refactored - now ~200 lines)
+**[permissions.js](../../src/handlers/git/github/permissions.js)**
 
-- Main GitHubHandler class
-- Orchestrates API calls using modules
-- Implements BaseGitHandler interface
-- Delegates to api-client.js and infra-builder.js
-- Single responsibility: Orchestration
+- Works out what the current token is actually allowed to do, so a missing
+  scope surfaces as a clear message rather than a raw 403
 
-### Benefits
+**[pages-template.js](../../src/handlers/git/github/pages-template.js)**
 
-✅ **Maintainability**: Each module has clear responsibility
-✅ **Testability**: Modules can be tested independently
-✅ **Reusability**: API client can be used by other handlers
-✅ **Readability**: Shorter, focused files
-✅ **Scalability**: Easy to add features without bloating handler
+- GitHub Pages HTML/CSS template, Actions workflow template, README template
+
+**[index.js](../../src/handlers/git/github/index.js)**
+
+- The `GitHubHandler` class: implements `BaseGitHandler` and orchestrates the
+  modules above
 
 ### Code Organization
 
 ```
 github/
-├── index.js              (120 lines) - Handler orchestration
-├── api-client.js         (200 lines) - GitHub API calls
-├── infra-builder.js      (250 lines) - File generation
-└── pages-template.js     (1000+ lines) - Templates
+├── index.js              (~450 lines) - Handler orchestration
+├── api-client.js         (~250 lines) - GitHub API calls
+├── commit-builder.js     (~65 lines)  - Commit file assembly
+├── permissions.js        (~150 lines) - Token capability checks
+├── infra-builder.js      (~570 lines) - File generation
+└── pages-template.js     (~1290 lines) - Templates
 ```
 
 ## GitHub Actions Autonomy
@@ -212,26 +174,17 @@ User solves problem
     ↓
 Problem:solved event → service-worker
     ↓
-1. Check MCP config → get enabled tools
-2. Build problem files
-3. Check settings changed → build config file
-4. Commit all files via GitHubHandler
+1. Build problem files
+2. Check settings changed → build config file
+3. Commit all files via GitHubHandler
     ├→ api-client: Create tree, commit, update ref
     └→ infra-builder: Add infrastructure if needed
-5. Clear settings commit flag
-6. GitHub Pages auto-updates (via Actions)
-    ↓
-User checks Settings → MCP Tools
-    ↓
-Toggles tools on/off
-    ↓
-Next time AI provider generates review:
-1. Builds MCP tools context (enabled only)
-2. Includes in prompt to provider
-3. Provider decides which tools to call
-4. Tools execute autonomously
-5. Results included in AI response
+4. Clear settings commit flag
+5. GitHub Pages auto-updates (via Actions)
 ```
+
+MCP tools are not part of this path. They run when you open the chat view and
+pick one.
 
 ## Configuration Flow
 
@@ -253,7 +206,7 @@ Next problem commit:
 ### MCP Configuration
 
 ```
-User toggles tool in Settings → MCP Tools
+User toggles tool in Settings → AI → MCP Tools
     ↓
 setMCPToolEnabled(toolId, true/false)
     ↓
@@ -264,39 +217,37 @@ On next commit:
   - Synced to .codeledger/config.json
 ```
 
-## Autonomous Features
+## What happens without you
 
-✅ **Auto-commit settings** — No manual sync needed
-✅ **Auto-invoke MCP tools** — AI decides when to use
-✅ **Auto-generate Pages** — Dashboard stays current
-✅ **Auto-setup repo** — All infrastructure created automatically
-✅ **Auto-enable Pages** — No GitHub UI clicks needed
-✅ **Auto-normalize topics** — Consistent repo presentation
-✅ **Auto-co-author** — Optional trailer on commits
+- **Settings commit themselves** — no manual sync step
+- **Pages regenerate** — the dashboard stays current
+- **Repo sets itself up** — infrastructure files created on first commit
+- **Pages get enabled** — no clicks in the GitHub UI
+- **Topics get normalized** — consistent repo presentation
+- **Co-author trailer** — optional, added on commit
 
 ## User Control
 
-Users can:
+You can:
 
-- ✅ Enable/disable individual MCP tools
-- ✅ Toggle global MCP usage (chat/review)
-- ✅ Override AI model per provider
-- ✅ Configure GitHub Pages options
-- ✅ Customize co-author trailer
-- ✅ Set extra repo topics
-- ✅ Configure sync intervals
+- Enable/disable individual MCP tools
+- Toggle tool availability for chat and for review separately
+- Override the AI model per provider
+- Configure GitHub Pages options
+- Customize the co-author trailer
+- Set extra repo topics
+- Configure sync intervals
 
-Users don't need to:
+You don't need to:
 
-- ❌ Manually commit settings
-- ❌ Invoke MCP tools manually (AI does it)
-- ❌ Regenerate Pages dashboard
-- ❌ Set up GitHub Actions
-- ❌ Manage infrastructure files
+- Manually commit settings
+- Regenerate the Pages dashboard
+- Set up GitHub Actions
+- Manage infrastructure files
 
 ## Testing
 
-All autonomous systems type-checked via:
+Type gate:
 
 ```bash
 npm run lint
@@ -305,24 +256,21 @@ npm run lint
 Manual testing checklist:
 
 - [ ] Change setting → verify next commit includes config.json
-- [ ] Enable/disable MCP tool → verify setting persisted
-- [ ] AI generates review → verify MCP tools in prompt if enabled
+- [ ] Enable/disable MCP tool → verify setting persisted and the sidebar updates
 - [ ] Create new repo → verify all infrastructure files created
 - [ ] Check GitHub Pages → verify dashboard updated
 - [ ] Pull repo on new device → verify settings synced
 
 ## Future Enhancements
 
-- [ ] MCP tool result caching (5-min in-memory cache)
-- [ ] Provider-specific MCP format auto-detection
+- [ ] Wire provider-driven tool invocation up end to end for one provider
+- [ ] MCP tool result caching
 - [ ] MCP tool chaining (output of one → input of next)
 - [ ] Tool usage analytics (which tools most helpful)
 - [ ] Custom MCP tool creation UI
-- [ ] MCP tool scheduling (run specific tool at time X)
 - [ ] Multi-provider MCP orchestration
 
 ## See Also
 
-- [MCP Tools](mcp-tools.md) — 7 available tools reference
-- [CLAUDE.md](../CLAUDE.md) — Architecture overview
-- [CodeLedger extension docs](../README.md)
+- [MCP Tools](mcp-tools.md) — all 15 tools, and the provider integration contract
+- [CodeLedger docs index](../README.md)

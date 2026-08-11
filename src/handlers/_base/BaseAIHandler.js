@@ -18,7 +18,15 @@ export class BaseAIHandler {
     this.id = id;
     this.name = name;
     this.dbg = createDebugger(`${name}AIHandler`);
-    this.supportsMCPTools = false; // Override in subclass if supported
+    // Provider-driven tool calling is not switched on for any provider yet, so
+    // this stays false everywhere. Leave it that way until the handler also
+    // sends the tool array to its provider's API and feeds the returned calls
+    // through processMCPToolCalls(). Flipping the flag alone only prepends a
+    // list of tool names to the prompt, which is worse than saying nothing: the
+    // model emits tool calls nothing executes and answers from a result it
+    // never got. Manual invocation from MCPToolsSidebar works today and does
+    // not depend on this. See docs/reference/mcp-tools.md.
+    this.supportsMCPTools = false;
     this.mcpToolFormat = "generic"; // Override with provider format: "openai" | "claude" | "gemini" | "deepseek"
     this.rateLimitStats = null;
   }

@@ -33,14 +33,8 @@ const DEFAULT_MCP_CONFIG = {
     "delete-chat": true,
     "open-problem": true,
   },
-  useInChat: true, // AI uses MCP tools in chat by default
-  useInReview: true, // AI uses MCP tools in AI review by default
-  maxToolCallsPerRequest: 3, // Max tools called per AI request
-  cacheResults: true, // Cache tool results for 5 mins
-  autoInvokeThreshold: {
-    queryProblems: 2, // Invoke if seen >= N times in context
-    suggestions: 1, // Always invoke if mentioned
-  },
+  useInChat: true, // Tools offered in chat
+  useInReview: true, // Tools offered during AI review
 };
 
 /**
@@ -118,6 +112,15 @@ export async function updateMCPConfig(updates) {
 }
 
 /**
+ * Read a tool's id out of whichever provider shape it was converted into.
+ * The `openai` and `deepseek` formats nest the name under `function`, so a
+ * top-level `id || name` lookup reads `undefined` for both of them.
+ */
+function toolIdOf(tool) {
+  return tool?.id || tool?.name || tool?.function?.name;
+}
+
+/**
  * Get MCP tool availability info for AI provider.
  * Returns tools that are enabled + provider supports.
  */
@@ -129,7 +132,7 @@ export async function getAvailableMCPToolsForAI(providerFormat) {
   const allTools = getAvailableMCPTools(providerFormat);
 
   // Filter to only enabled tools
-  return allTools.filter((tool) => enabledIds.includes(tool.id || tool.name));
+  return allTools.filter((tool) => enabledIds.includes(toolIdOf(tool)));
 }
 
 /**

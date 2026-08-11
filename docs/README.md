@@ -41,7 +41,7 @@ a file tracked in this repository.
 ## Reference
 
 - [MCP tools](reference/mcp-tools.md)
-- [Autonomous MCP system](reference/autonomous-mcp-system.md)
+- [Automatic behaviour: settings, repo, MCP](reference/autonomous-mcp-system.md)
 - [Prompt templates](reference/prompts/README.md)
 - [Portfolio integration](reference/strategy/portfolio-integration.md)
 

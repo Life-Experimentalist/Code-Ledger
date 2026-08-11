@@ -223,6 +223,33 @@ same-browser preferences that should follow a Chrome profile across machines
 without waiting on a repository fetch. It is a cache in front of the repository,
 never the source of truth.
 
+### 10. Let an AI provider invoke MCP tools itself
+
+Fifteen tools are registered, executable, individually toggleable, and reachable
+by hand from the 🔧 panel in the chat view. What does not exist is the model
+deciding on its own to call one. The supporting parts are all written —
+`_buildMCPToolsContext()`, converters for the OpenAI, Claude, Gemini and DeepSeek
+tool schemas, an executor, a result formatter — but `BaseAIHandler` sets
+`supportsMCPTools = false` and no provider overrides it, no provider passes a
+tool array to its API, and `processMCPToolCalls()` has no caller outside its own
+module.
+
+The flag is not the work, and flipping it alone makes the product worse: it
+prepends a list of tool names to the prompt, so the model starts emitting tool
+calls that nothing executes and then answers as though it had the results. A
+provider is only wired up once it also sends the tool array on the request and
+routes the response back through the executor — six providers, six live request
+shapes, none verifiable without a paid key for each.
+
+Two things were fixed while establishing the above, and are not part of the
+remaining work: `getAvailableMCPToolsForAI()` filtered on `id || name`, which the
+`openai` and `deepseek` shapes carry under `function` instead, so both formats
+resolved to an empty tool list; and the settings panel listed 7 of the 15 tools,
+leaving the knowledge-bank, roadmap, chat and navigation tools with no toggle.
+
+Do one provider first, end to end, against a real key, before touching the other
+five.
+
 ---
 
 ## Applying the deletions

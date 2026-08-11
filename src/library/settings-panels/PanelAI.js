@@ -74,7 +74,52 @@ const MCP_TOOL_INFO = {
     description: "Comprehensive user context: total problems, top platforms/languages/topics",
     category: "Context",
   },
+  remember: {
+    name: "Remember Insight",
+    description: "Save a note, preference, or observation to your knowledge bank",
+    category: "Knowledge",
+  },
+  recall: {
+    name: "Recall Insights",
+    description: "Read stored insights back, optionally filtered by topic",
+    category: "Knowledge",
+  },
+  forget: {
+    name: "Forget Insight",
+    description: "Delete a single insight from the knowledge bank",
+    category: "Knowledge",
+  },
+  "set-roadmap": {
+    name: "Set Roadmap",
+    description: "Save a study roadmap as an ordered list of problems",
+    category: "Roadmap",
+  },
+  "get-roadmap-progress": {
+    name: "Get Roadmap Progress",
+    description: "How far through the active roadmap you are, and what comes next",
+    category: "Roadmap",
+  },
+  "get-chats": {
+    name: "Get Saved Chats",
+    description: "Retrieve saved conversations, optionally filtered by problem",
+    category: "Chats",
+  },
+  "delete-chat": {
+    name: "Delete Chat",
+    description: "Permanently delete a saved chat — asks you to confirm first",
+    category: "Chats",
+  },
+  "open-problem": {
+    name: "Open Problem",
+    description: "Open a LeetCode, GeeksforGeeks, or Codeforces problem in a new tab",
+    category: "Navigation",
+  },
 };
+
+// Categories in display order, taken from the map above so a tool added there
+// shows up here without a second edit. The list used to be hardcoded to three
+// names, which is why eight registered tools had no toggle at all.
+const MCP_CATEGORIES = [...new Set(Object.values(MCP_TOOL_INFO).map((i) => i.category))];
 
 export function PanelAI({ settings, onSettingsChange }) {
   const [savedKeys, setSavedKeys] = useState({});
@@ -796,7 +841,6 @@ export function PanelAI({ settings, onSettingsChange }) {
                   ${[
                     ["useInChat", "Use in Chat"],
                     ["useInReview", "Use in Review"],
-                    ["cacheResults", "Cache Results (5 min)"],
                   ].map(
                     ([k, label]) => html`
                       <label class="flex items-center gap-2 cursor-pointer">
@@ -815,7 +859,7 @@ export function PanelAI({ settings, onSettingsChange }) {
                     `,
                   )}
                 </div>
-                ${["Context", "Suggestions", "Analysis"].map((cat) => {
+                ${MCP_CATEGORIES.map((cat) => {
                   const tools = Object.entries(MCP_TOOL_INFO).filter(([, i]) => i.category === cat);
                   return html`
                     <div>

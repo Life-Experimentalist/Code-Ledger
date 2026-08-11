@@ -1,37 +1,62 @@
 # MCP (Model Context Protocol) Tools System
 
-CodeLedger includes a comprehensive MCP tools system that provides AI providers with powerful context and analysis capabilities. The system is **modal-agnostic** (not tied to any UI) and **provider-specific** (each provider handles invocation differently).
+CodeLedger defines a set of tools that read and write your own solve history:
+query it, analyse it, and store notes against it. Each tool is a pure function of
+its arguments and runs entirely locally against IndexedDB, independent of any UI.
+
+## What ships, and what does not
+
+**You can invoke every tool by hand.** The 🔧 panel in the AI chat view lists
+them, runs the one you pick, and puts the result into the chat context. That path
+is complete, and it is what "MCP tools" means in the product today.
+
+**The AI cannot invoke them on its own.** The plumbing for provider-driven tool
+calling is written — format converters for OpenAI, Claude, Gemini and DeepSeek, a
+dispatcher, a result formatter — but nothing switches it on. `BaseAIHandler` sets
+`supportsMCPTools = false`, no provider handler overrides it, no handler passes a
+tool array to its provider's API, and `processMCPToolCalls()` has no callers
+outside its own module. The [Provider Integration Guide](#provider-integration-guide)
+below is the contract for finishing that work, not a description of work already
+done.
+
+Keep that distinction in mind while reading the rest of this file: the tool
+descriptions are accurate, the invocation model is half-built.
 
 ## Architecture
 
 ### Core Components
 
-1. **[src/core/mcp-tools.js](src/core/mcp-tools.js)**
-   - Defines 7 MCP tools with handlers
+1. **[mcp-tools.js](../../src/core/mcp-tools.js)**
+   - Defines the 15 tools and their handlers
    - Each tool is a pure function: takes args, returns structured data
    - Tools work independently of any UI context
 
-2. **[src/core/mcp-executor.js](src/core/mcp-executor.js)**
-   - Executes tool calls
+2. **[mcp-executor.js](../../src/core/mcp-executor.js)**
+   - Executes a tool call by id
    - Converts tool definitions to provider-specific formats (OpenAI, Claude, Gemini, DeepSeek)
-   - Processes provider responses and formats results
+   - Parses provider tool-call responses back into `(toolId, args)`
 
-3. **[src/handlers/\_base/BaseAIHandler.js](src/handlers/_base/BaseAIHandler.js)**
-   - Added MCP support to all AI providers
-   - `supportsMCPTools` flag: provider can enable/disable
-   - `mcpToolFormat` property: provider specifies format (openai, claude, gemini, etc.)
+3. **[mcp-config.js](../../src/core/mcp-config.js)**
+   - Which tools the user has enabled, and whether tools apply in chat, in
+     review, or both
 
-4. **[src/ui/components/MCPToolsSidebar.js](src/ui/components/MCPToolsSidebar.js)**
-   - UI component for browsing and invoking tools
+4. **[BaseAIHandler.js](../../src/handlers/_base/BaseAIHandler.js)**
+   - `supportsMCPTools` — off on the base class, and not overridden anywhere yet
+   - `mcpToolFormat` — which of the four wire schemas a provider expects
+
+5. **[MCPToolsSidebar.js](../../src/ui/components/MCPToolsSidebar.js)**
+   - Browsing and manual invocation
    - Compact mode: floating button + panel
    - Full mode: sidebar with categories and results display
 
-5. **[src/library/views/AIChatsView.js](src/library/views/AIChatsView.js)**
-   - Integrated MCP sidebar toggle button
-   - Shows/hides tools panel during chat
-   - Captures tool results for context
+6. **[AIChatsView.js](../../src/library/views/AIChatsView.js)**
+   - Hosts the sidebar toggle and captures tool results into the chat context
 
 ## Available MCP Tools
+
+Fifteen in total. The seven analysis tools are documented in full below; the
+remaining eight are summarised under
+[Knowledge, roadmap and navigation tools](#knowledge-roadmap-and-navigation-tools).
 
 ### 1. Query Problems
 
@@ -94,9 +119,40 @@ CodeLedger includes a comprehensive MCP tools system that provides AI providers 
 - **Parameters**: None
 - **Returns**: Total problems, top platforms/languages/topics, weak areas, time stats
 
+### Knowledge, roadmap and navigation tools
+
+These eight are registered and executable on the same footing as the seven
+above. They are how the chat surface reaches the knowledge bank and the roadmap.
+
+| ID                     | Name                 | Parameters                              | What it does                                                     |
+| ---------------------- | -------------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| `remember`             | Remember Insight     | `content` (req), `topic`, `tags[]`      | Save a note or observation to the persistent knowledge bank      |
+| `recall`               | Recall Insights      | `topic`, `limit`                        | Read insights back, optionally filtered by topic                 |
+| `forget`               | Forget Insight       | `id` (req)                              | Delete one insight by id                                         |
+| `set-roadmap`          | Set Roadmap          | `problems[]` (req), `name`              | Save a study roadmap as slugs or `{slug, title, difficulty}`      |
+| `get-roadmap-progress` | Get Roadmap Progress | none                                    | How far through the active roadmap, and what is next             |
+| `get-chats`            | Get Saved Chats      | `problemSlug`, `limit`                  | Retrieve saved conversations, optionally filtered by problem     |
+| `delete-chat`          | Delete Chat          | `id` (req)                              | Delete a saved chat — confirm with the user before calling       |
+| `open-problem`         | Open Problem         | `url` (req), `platform`                 | Open a LeetCode/GFG/Codeforces problem in a new tab              |
+
 ## Provider Integration Guide
 
 ### For AI Providers: Enable MCP Support
+
+**Not yet done for any provider.** This is the contract a provider handler must
+satisfy for the AI to call tools on its own. Today every handler leaves
+`supportsMCPTools` at its default of `false`, so none of the code below runs.
+
+Two things must be true before switching a provider on, or it will fail quietly:
+
+- The provider's API must actually receive the tool array. Prepending a prose
+  list of tool names to the prompt is worse than saying nothing — the model will
+  emit tool calls that no code executes, and the user gets an answer built on a
+  result that was never fetched.
+- `getAvailableMCPToolsForAI()` in `mcp-config.js` filters by
+  `tool.id || tool.name`, which the `openai` and `deepseek` shapes do not carry
+  at the top level (the name is nested under `function`). Those two formats
+  resolve to an empty tool list until that filter is fixed.
 
 In your provider handler (`src/handlers/ai/{provider}/index.js`):
 
@@ -177,44 +233,32 @@ export class MyAIHandler extends BaseAIHandler {
 
 ## Using MCP Tools in Chat
 
-1. **Manual Invocation**: Click the MCP icon (🔧) in AIChatsView chat header
+1. **Manual invocation** — click the 🔧 icon in the AI chat header
    - Browse available tools by category
-   - Click tool to execute
-   - View results in sidebar
-   - Results available for AI context
+   - Click a tool to execute it
+   - The result appears in the sidebar and joins the chat context
 
-2. **AI Provider Invocation**: Providers can call tools automatically
-   - Include tools in system prompt
-   - Provider decides when/which tools to use
-   - Results automatically attached to context
+2. **Alongside chat commands** — `/mycode` and `/problem` supply the problem and
+   your solution; a tool result supplies the analysis. They compose.
 
-3. **Combining with Chat Commands**: Use both MCP tools and `/commands`
-   - `/mycode` + `/problem` provide problem context
-   - MCP tools add data analysis and suggestions
-   - Together provide rich context for AI
+Provider-driven invocation — the model deciding on its own to call
+`get-next-suggestion` — is the unbuilt half described at the top of this file.
 
-## Example: Complete Chat Flow
+## Architecture notes
 
-```javascript
-// User asks: "What should I practice next?"
-//
-// 1. AI provider receives message
-// 2. Provider sees MCP tools available
-// 3. Provider decides to call "get-next-suggestion"
-// 4. Tool executes, finds user solved 10 Graph problems but only 2 DP
-// 5. Suggests a DP problem from weak area
-// 6. Provider includes result in response:
-//    "Based on your weak topics, try this DP problem: LongestIncreasingSubsequence"
-```
+- **Modal-agnostic**: a tool is a function of its arguments, so the same tool
+  runs from the chat sidebar, from settings, or from a background context.
+- **One definition, four wire formats**: tools are declared once and converted
+  per provider, so adding a provider does not mean redeclaring the tools.
+- **Extensible**: a new tool is a handler plus a JSON Schema entry.
+- **No server**: everything reads IndexedDB locally. Tools work offline and send
+  nothing anywhere.
+- **User control**: each tool can be disabled individually, and tool use can be
+  turned off for chat and for review separately.
 
-## Architecture Benefits
-
-✅ **Modal-agnostic**: Tools work from anywhere (chat, settings, background)
-✅ **Provider-specific**: Each AI provider handles tools their own way
-✅ **Extensible**: New tools added by defining handler + schema
-✅ **Type-safe**: TypeScript + schema validation
-✅ **Offline-capable**: No server required, pure IndexedDB
-✅ **User control**: Manual invocation in UI + automatic via AI
+Schemas are plain JSON Schema objects. There is no TypeScript in this project —
+the type gate is `tsc --checkJs` over untyped JS, which does not validate these
+shapes; the executor checks required arguments at call time instead.
 
 ## Adding a New MCP Tool
 
@@ -257,7 +301,8 @@ case "my-tool":
   return html`<div>/* render result */</div>`;
 ```
 
-4. Providers can immediately use the new tool
+The tool is then invocable from the sidebar. It becomes reachable by a provider
+only once that provider is wired up per the guide above.
 
 ## Testing MCP Tools
 
@@ -274,6 +319,8 @@ const result = await executeMCPTool("query-problems", {
 
 ## Future Enhancements
 
+- [ ] Wire provider-driven invocation up for at least one provider end to end
+- [ ] Fix the `openai`/`deepseek` name lookup in `getAvailableMCPToolsForAI()`
 - [ ] MCP server for external Claude/Cursor integration
 - [ ] Tool caching for frequently-run queries
 - [ ] Rate limiting per tool
@@ -283,6 +330,6 @@ const result = await executeMCPTool("query-problems", {
 
 ## See Also
 
-- [Existing Chat Commands](../src/lib/chat-variables.js): `/mycode`, `/problem`, `/explain`, etc.
-- [AI Handlers](../src/handlers/ai/): Provider-specific implementations
-- [AI Chat Storage](../src/core/ai-chat-storage.js): Chat persistence
+- [Chat Commands](../../src/lib/chat-variables.js): `/mycode`, `/problem`, `/explain`, etc.
+- [AI Handlers](../../src/handlers/ai/): Provider-specific implementations
+- [AI Chat Storage](../../src/core/ai-chat-storage.js): Chat persistence
