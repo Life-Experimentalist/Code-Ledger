@@ -28,6 +28,7 @@ import {
 } from "../core/path-builder.js";
 import { canonicalMapper } from "../core/canonical-mapper.js";
 import { dayKey } from "../core/gamification.js";
+import { refreshIconBadge, registerBadgeAlarm, BADGE_ALARM } from "./gamification-service.js";
 import { getChatsByProblem } from "../core/ai-chat-storage.js";
 import { buildCommitMessage, COMMIT_TYPES, resolveCommitType } from "../core/commit-messages.js";
 import {
@@ -258,6 +259,9 @@ async function init() {
       // Batch-commit pending AI reviews and metadata edits every 10 minutes.
       // This prevents one-commit-per-problem clutter for maintenance operations.
       chrome.alarms.create("MAINTENANCE_COMMIT", { periodInMinutes: 10 });
+      // Hourly, so the streak on the toolbar icon rolls over at midnight even
+      // if nothing else wakes the worker that day.
+      registerBadgeAlarm();
 
       chrome.alarms.onAlarm.addListener((alarm) => {
         if (alarm?.name === CONSTANTS.ALARM_NAMES.SYNC) {
@@ -282,6 +286,8 @@ async function init() {
               );
             }
           })().catch(() => {});
+        } else if (alarm?.name === BADGE_ALARM) {
+          refreshIconBadge().catch(() => {});
         } else if (alarm?.name === "BULK_IMPORT_RESUME") {
           dbg.log("BULK_IMPORT_RESUME: resuming interrupted bulk import after delay");
           handleResyncAll("individual", "feat").catch((e) =>
@@ -319,6 +325,7 @@ async function init() {
   SyncEngine.performSync().catch(() => {});
   processAIReviewQueue().catch(() => {});
   autoSyncSettings().catch(() => {});
+  refreshIconBadge().catch(() => {});
 
   dbg.log("init(): ✓ background initialized");
   if (initResolve) {
@@ -1372,6 +1379,10 @@ async function handleSolved(data) {
       dbg.error(`handleSolved(): error details:`, err);
     }
   }
+
+  // The solve is in IndexedDB by now whether or not the commit went through,
+  // so the streak on the icon is accurate either way.
+  refreshIconBadge().catch(() => {});
 
   Telemetry.track("solve", { platform: data.platform });
 }
@@ -3082,6 +3093,14 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && CONSTANTS.SK.DEBUG in changes) {
     setDebug(changes[CONSTANTS.SK.DEBUG].newValue === true);
+  }
+  // Turning gamification off, changing the daily target, or booking a vacation
+  // all change what the toolbar icon should be saying right now.
+  if (
+    area === "local" &&
+    (CONSTANTS.SK.SETTINGS in changes || CONSTANTS.SK.GAMIFICATION in changes)
+  ) {
+    refreshIconBadge().catch(() => {});
   }
 });
 

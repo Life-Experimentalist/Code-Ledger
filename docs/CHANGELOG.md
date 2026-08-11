@@ -48,6 +48,18 @@ Chrome Web Store requires each upload to exceed the last.
 - Behaviour bank recording how you interact with problems, off unless you turn it on.
 - Backups: manual JSON export, scheduled snapshots, and a snapshot before any bulk import.
 
+**Streaks and badges**
+
+- Points per solve on a fixed scale — Easy 10, Medium 25, Hard 50 — so the number means the same thing in your ledger as in anybody else's. Re-solving a problem you already have earns 40% of the first solve, and only after a three-day cooldown, which pays for spaced repetition without making one easy problem farmable.
+- A daily points target (25 by default, adjustable) closes the day and keeps the streak alive. Doubling the target banks a streak freeze, up to five; a missed day can be bought back the next day at 1.5× the target.
+- Vacation mode, with a three-day ramp at half target afterwards rather than dropping you straight back onto the full one.
+- Ten levels and a set of achievements, both derived from the ledger.
+- Streaks start the day you install. An imported back catalogue contributes its points but does not invent a streak you never lived through.
+- The toolbar icon carries the current streak, coloured by whether today's target is already in, and the tooltip spells out the rest. The popup shows the same numbers with today's progress and what a rescue would cost.
+- Badges are generated as SVG files committed into your own repository, with a `badges/stats.json` beside them. Nothing is fetched from a badge service, so a private repository works the same as a public one, and there is nothing to pay for or keep running.
+- An optional GitHub Actions workflow refreshes the badges once a day, at an hour you pick, so a streak reads correctly on a day you have not solved yet.
+- The whole feature has one switch. Turned off, solves are captured and committed exactly as before and every streak surface disappears — including the toolbar badge. The welcome page offers the choice before the first streak exists.
+
 **Party**
 
 - A **Party** tab that lines your ledger up against other people's. You add somebody by writing down their public repository — `owner/repo` or a pasted link — and the extension reads the `badges/stats.json` their own copy commits. There is no server, no account, and no request to be accepted.

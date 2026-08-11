@@ -12,6 +12,7 @@ import { Storage } from "../core/storage.js";
 import { createDebugger } from "../lib/debug.js";
 import { CONSTANTS } from "../core/constants.js";
 import { privacyTier } from "../core/privacy-disclosure.js";
+import { isGamificationActive } from "../core/feature-flags.js";
 
 const dbg = createDebugger("WelcomePage");
 
@@ -172,6 +173,16 @@ function WelcomeApp() {
   // Read from the settings that are loaded already, so this says what the setup
   // in front of the user actually does rather than what the average one does.
   const privacy = privacyTier(settings);
+
+  const gamificationOn = isGamificationActive(settings);
+  const toggleGamification = async () => {
+    // Written through updateSettings so a service-worker write landing at the
+    // same moment merges instead of one of the two disappearing.
+    await Storage.updateSettings({ gamificationEnabled: !gamificationOn }).catch((e) =>
+      dbg.warn("could not save the streak preference:", e?.message),
+    );
+    setSettings((prev) => ({ ...prev, gamificationEnabled: !gamificationOn }));
+  };
 
   const repoUrl = (() => {
     const repo = settings.github_repo || settings.gitRepo;
@@ -446,6 +457,43 @@ function WelcomeApp() {
                 >
               `
             : ""}
+        </div>
+
+        <!--
+          Streaks are on out of the box, so the only honest place to offer the
+          off switch is before the first one has been built. Waiting until it
+          appears in the library means asking somebody to give up a number they
+          already have.
+        -->
+        <div class="mb-4 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3.5">
+          <div class="flex items-start gap-3">
+            <span class="text-base leading-none mt-0.5" aria-hidden="true">🔥</span>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-xs font-semibold text-slate-300">Streaks and points</h3>
+              <p class="mt-1 text-[11px] leading-snug text-slate-500">
+                ${gamificationOn
+                  ? "Every solve earns points toward a daily target, and hitting it keeps a streak alive. It is worked out from the problems you already have — nothing extra is collected and nothing is published until you ask for badges."
+                  : "Off. Solves are still recorded and committed exactly as before; there is just no streak, no points and no badges."}
+              </p>
+            </div>
+            <button
+              onClick=${toggleGamification}
+              role="switch"
+              aria-checked=${String(gamificationOn)}
+              aria-label="Streaks and points"
+              class=${`shrink-0 h-6 w-11 rounded-full border transition-colors ${
+                gamificationOn
+                  ? "bg-emerald-500/25 border-emerald-500/40"
+                  : "bg-white/5 border-white/10"
+              }`}
+            >
+              <span
+                class=${`block h-4 w-4 rounded-full bg-white transition-transform ${
+                  gamificationOn ? "translate-x-6" : "translate-x-1"
+                }`}
+              ></span>
+            </button>
+          </div>
         </div>
 
         <!-- What this setup currently sends, computed rather than promised -->
