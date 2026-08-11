@@ -32,6 +32,7 @@ import {
   levelFor,
   computeSnapshot,
   computeIceBreaker,
+  newlyEarned,
   recallCandidates,
   describeStreak,
   configFromSettings,
@@ -405,6 +406,43 @@ describe("levelFor", () => {
 
   test("thresholds are strictly ascending", () => {
     for (let i = 1; i < LEVELS.length; i++) assert.ok(LEVELS[i].at > LEVELS[i - 1].at);
+  });
+});
+
+describe("newlyEarned", () => {
+  const list = [
+    { id: "first-blood", earned: true },
+    { id: "century", earned: true },
+    { id: "level-ten", earned: false },
+  ];
+
+  test("announces nothing before the seen-list has been seeded", () => {
+    // The back catalogue of a user who has been solving for months is not new.
+    assert.deepEqual(newlyEarned(list, { seenAchievements: [], achievementsSeeded: false }), []);
+    assert.deepEqual(newlyEarned(list, {}), []);
+    assert.deepEqual(newlyEarned(list, undefined), []);
+  });
+
+  test("announces earned achievements missing from a seeded list", () => {
+    const state = { seenAchievements: ["first-blood"], achievementsSeeded: true };
+    assert.deepEqual(newlyEarned(list, state), ["century"]);
+  });
+
+  test("never announces one that is not earned yet", () => {
+    const state = { seenAchievements: [], achievementsSeeded: true };
+    assert.deepEqual(newlyEarned(list, state), ["first-blood", "century"]);
+    assert.ok(!newlyEarned(list, state).includes("level-ten"));
+  });
+
+  test("says nothing when everything earned has been seen", () => {
+    const state = { seenAchievements: ["first-blood", "century"], achievementsSeeded: true };
+    assert.deepEqual(newlyEarned(list, state), []);
+  });
+
+  test("tolerates a missing or ragged list", () => {
+    const state = { seenAchievements: [], achievementsSeeded: true };
+    assert.deepEqual(newlyEarned(undefined, state), []);
+    assert.deepEqual(newlyEarned([null, { earned: true, id: "a" }], state), ["a"]);
   });
 });
 

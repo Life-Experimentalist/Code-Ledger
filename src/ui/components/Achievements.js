@@ -17,13 +17,37 @@
  */
 
 import { h } from "../../vendor/preact-bundle.js";
+import { useEffect, useState } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { visibleAchievements } from "../../core/feature-flags.js";
+import { newlyEarned } from "../../core/gamification.js";
+import { Storage } from "../../core/storage.js";
 
 export function Achievements({ snapshot, settings }) {
   const list = visibleAchievements(snapshot, settings);
+  // Ones earned since the last look. Frozen at mount and then written back as
+  // seen, so the pip survives this visit and is gone on the next one.
+  const [fresh, setFresh] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    const all = snapshot?.achievements || [];
+    if (!all.length) return;
+    Storage.getGamificationState()
+      .then((state) => {
+        if (!live) return;
+        setFresh(new Set(newlyEarned(all, state)));
+        return Storage.markAchievementsSeen(all.filter((a) => a.earned).map((a) => a.id));
+      })
+      .catch(() => live && setFresh(new Set()));
+    return () => (live = false);
+    // Only on the first snapshot: re-running on every recompute would clear the
+    // pip out from under someone still reading it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!list.length) return "";
 
   const earned = list.filter((a) => a.earned).length;
@@ -53,7 +77,11 @@ export function Achievements({ snapshot, settings }) {
                   class="text-xs truncate ${a.earned ? "text-amber-200" : "text-slate-400"}"
                   title=${a.name}
                 >
-                  ${a.name}
+                  ${a.name}${fresh?.has(a.id)
+                    ? html`<span class="ml-1.5 text-[9px] uppercase tracking-wider text-amber-400"
+                        >new</span
+                      >`
+                    : ""}
                 </p>
                 <p class="text-[10px] text-slate-600 truncate">${a.hint}</p>
               </div>

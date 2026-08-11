@@ -306,7 +306,8 @@ export const CONSTANTS = Object.freeze({
     // Gamification state that cannot be derived from the ledger: declared
     // vacation ranges and which achievement toasts have already been shown.
     // Streaks, points and freezes are always recomputed, never stored.
-    // Shape: { vacations: [{ start, end, note }], seenAchievements: string[] }
+    // Shape: { vacations: [{ start, end, note }], seenAchievements: string[],
+    //          achievementsSeeded: boolean }
     GAMIFICATION: "gamification.state",
   },
 

@@ -698,6 +698,25 @@ export function computeSnapshot(problems, options = {}) {
 }
 
 /**
+ * The achievements earned since the last time the user looked at them.
+ *
+ * Deliberately returns nothing until the seen-list has been seeded once. The
+ * list starts empty for everybody, including a user who has been solving for
+ * months, and flagging their entire back catalogue as new the first time they
+ * open the shelf would be a lie about when the work happened. Seeding is the
+ * first read; everything earned after it is genuinely new.
+ *
+ * @param {Array<{id:string,earned:boolean}>} achievements from `computeSnapshot`
+ * @param {{ seenAchievements?: string[], achievementsSeeded?: boolean }} [state]
+ * @returns {string[]} ids, in the order they appear in the list
+ */
+export function newlyEarned(achievements, state) {
+  if (!state || state.achievementsSeeded !== true) return [];
+  const seen = new Set(state.seenAchievements || []);
+  return (achievements || []).filter((a) => a?.earned && !seen.has(a.id)).map((a) => a.id);
+}
+
+/**
  * Where the user is in the post-vacation ramp.
  *
  * @param {Array<{start:string,end?:string|null}>} vacations

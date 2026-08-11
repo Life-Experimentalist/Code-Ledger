@@ -153,6 +153,11 @@ export const Storage = {
     return {
       vacations: Array.isArray(s.vacations) ? s.vacations : [],
       seenAchievements: Array.isArray(s.seenAchievements) ? s.seenAchievements : [],
+      // Whether the seen-list has ever been written. Without it an empty list
+      // is ambiguous — a fresh install and a long-time user who has not opened
+      // the shelf yet look identical, and only one of them should have their
+      // whole back catalogue announced as new.
+      achievementsSeeded: s.achievementsSeeded === true,
     };
   },
 
@@ -183,10 +188,11 @@ export const Storage = {
     return state.vacations;
   },
 
-  /** Record achievements as announced so the same toast never fires twice. */
+  /** Record achievements as announced so the same one is never flagged twice. */
   async markAchievementsSeen(ids) {
     const state = await this.getGamificationState();
     state.seenAchievements = [...new Set([...state.seenAchievements, ...ids])];
+    state.achievementsSeeded = true;
     await this.setGamificationState(state);
     return state.seenAchievements;
   },
