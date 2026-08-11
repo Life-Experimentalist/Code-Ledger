@@ -268,9 +268,6 @@ export const CONSTANTS = Object.freeze({
     IMPORT: "import",
   },
 
-  HEARTBEAT_PORT_NAME: "heartbeat",
-  HEARTBEAT_INTERVAL_MS: 20_000,
-
   // Duplicate-detection modal timings — change here to affect all dedup UI.
   DEDUP: {
     SAME_CODE_COUNTDOWN_S: 10, // seconds before auto-keeping the better version

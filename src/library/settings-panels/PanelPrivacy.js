@@ -19,12 +19,7 @@ import { h } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import {
-  disclosures,
-  privacyTier,
-  aiCostNotes,
-  TIER_META,
-} from "../../core/privacy-disclosure.js";
+import { disclosures, privacyTier, aiCostNotes, TIER_META } from "../../core/privacy-disclosure.js";
 import { isAIActive } from "../../core/feature-flags.js";
 
 /**
@@ -56,10 +51,22 @@ const PANEL_LABEL = {
 
 /** Colour per tier, worst last — the same ordering `TIERS` uses. */
 const TIER_STYLE = {
-  private: { ring: "border-emerald-500/30 bg-emerald-500/5", dot: "bg-emerald-400", text: "text-emerald-300" },
+  private: {
+    ring: "border-emerald-500/30 bg-emerald-500/5",
+    dot: "bg-emerald-400",
+    text: "text-emerald-300",
+  },
   shared: { ring: "border-sky-500/30 bg-sky-500/5", dot: "bg-sky-400", text: "text-sky-300" },
-  public: { ring: "border-amber-500/30 bg-amber-500/5", dot: "bg-amber-400", text: "text-amber-300" },
-  code: { ring: "border-fuchsia-500/30 bg-fuchsia-500/5", dot: "bg-fuchsia-400", text: "text-fuchsia-300" },
+  public: {
+    ring: "border-amber-500/30 bg-amber-500/5",
+    dot: "bg-amber-400",
+    text: "text-amber-300",
+  },
+  code: {
+    ring: "border-fuchsia-500/30 bg-fuchsia-500/5",
+    dot: "bg-fuchsia-400",
+    text: "text-fuchsia-300",
+  },
 };
 
 function DisclosureRow({ entry, onGoToPanel }) {
@@ -83,10 +90,14 @@ function DisclosureRow({ entry, onGoToPanel }) {
             ? html`<span class="text-[10px] uppercase tracking-wide text-slate-500">required</span>`
             : null}
           ${entry.manual && entry.on
-            ? html`<span class="text-[10px] uppercase tracking-wide text-slate-500">only when you ask</span>`
+            ? html`<span class="text-[10px] uppercase tracking-wide text-slate-500"
+                >only when you ask</span
+              >`
             : null}
           ${!entry.on
-            ? html`<span class="text-[10px] uppercase tracking-wide text-slate-600">not enabled</span>`
+            ? html`<span class="text-[10px] uppercase tracking-wide text-slate-600"
+                >not enabled</span
+              >`
             : null}
         </div>
         <p class="text-xs leading-snug ${entry.on ? "text-slate-400" : "text-slate-600"}">
@@ -131,8 +142,8 @@ export function PanelPrivacy({ settings, onGoToPanel }) {
         </div>
         <p class="mt-1.5 text-sm text-slate-300 leading-snug">${tier.summary}</p>
         <p class="mt-2 text-[11px] text-slate-500 leading-snug">
-          This is computed from your settings as they are right now, not a promise written
-          in a document. Change something below and this line changes with it.
+          This is computed from your settings as they are right now, not a promise written in a
+          document. Change something below and this line changes with it.
         </p>
       </div>
 
@@ -143,14 +154,20 @@ export function PanelPrivacy({ settings, onGoToPanel }) {
         </h4>
         ${on.length === 0
           ? html`
-              <p class="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-3 text-xs text-slate-500">
-                Nothing yet. Until you link a repository, every solve stays in this browser's
-                local storage.
+              <p
+                class="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-3 text-xs text-slate-500"
+              >
+                Nothing yet. Until you link a repository, every solve stays in this browser's local
+                storage.
               </p>
             `
           : on.map(
               (entry) =>
-                html`<${DisclosureRow} key=${entry.id} entry=${entry} onGoToPanel=${onGoToPanel} />`,
+                html`<${DisclosureRow}
+                  key=${entry.id}
+                  entry=${entry}
+                  onGoToPanel=${onGoToPanel}
+                />`,
             )}
       </div>
 
@@ -160,8 +177,7 @@ export function PanelPrivacy({ settings, onGoToPanel }) {
           Available, currently off (${off.length})
         </h4>
         <p class="text-[11px] text-slate-500 leading-snug">
-          Listed so you can read what each one costs you before switching it on, rather than
-          after.
+          Listed so you can read what each one costs you before switching it on, rather than after.
         </p>
         ${off.map(
           (entry) =>
@@ -173,30 +189,34 @@ export function PanelPrivacy({ settings, onGoToPanel }) {
       <div class="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-4">
         <h4 class="text-sm font-semibold text-slate-200">About AI reviews</h4>
         <p class="mt-1.5 text-xs text-slate-400 leading-snug">
-          Reviews are off until you add a key, and they are the single feature that turns this
-          from a commit log into something that teaches you. They do cost you privacy: a review
-          sends your solution and the problem statement to whichever provider you pick.
+          Reviews are off until you add a key, and they are the single feature that turns this from
+          a commit log into something that teaches you. They do cost you privacy: a review sends
+          your solution and the problem statement to whichever provider you pick.
           ${aiOn
             ? " You have that switched on, so the providers listed above are receiving it."
             : " Nothing is being sent today."}
         </p>
         <p class="mt-2 text-xs text-slate-400 leading-snug">
-          ${freeOnes.length} of the ${costs.length} providers have a no-cost path, so trying it
-          need not cost anything:
+          ${freeOnes.length} of the ${costs.length} providers have a no-cost path, so trying it need
+          not cost anything:
         </p>
         <ul class="mt-2 space-y-1">
           ${costs.map(
             (c) => html`
               <li key=${c.id} class="flex items-start gap-2 text-[11px] leading-snug">
-                <span class="${c.free ? "text-emerald-400" : "text-slate-600"}">${c.free ? "free" : "paid"}</span>
-                <span class="text-slate-400"><span class="text-slate-300">${c.name}</span> ${c.why}.</span>
+                <span class="${c.free ? "text-emerald-400" : "text-slate-600"}"
+                  >${c.free ? "free" : "paid"}</span
+                >
+                <span class="text-slate-400"
+                  ><span class="text-slate-300">${c.name}</span> ${c.why}.</span
+                >
               </li>
             `,
           )}
         </ul>
         <p class="mt-3 text-[11px] text-slate-500 leading-snug">
-          If you want reviews with no third party at all, Ollama runs a model on your own
-          machine and keeps this page reading
+          If you want reviews with no third party at all, Ollama runs a model on your own machine
+          and keeps this page reading
           <span class="text-emerald-300">${TIER_META.private.name}</span>.
         </p>
       </div>

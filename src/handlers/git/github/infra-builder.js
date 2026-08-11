@@ -62,14 +62,7 @@ export async function buildInfraFiles(
   const items = [];
 
   // Dynamic files — always up to date
-  const dynamic = await _buildDynamicFiles(
-    owner,
-    repo,
-    branch,
-    token,
-    settings,
-    indexMetaOverride,
-  );
+  const dynamic = await _buildDynamicFiles(owner, repo, branch, token, settings, indexMetaOverride);
   items.push(...dynamic.items);
 
   // Bootstrap files — only on first commit so they never re-dirty the tree
@@ -149,14 +142,7 @@ jobs:
         uses: actions/deploy-pages@v4
 `;
 
-async function _buildDynamicFiles(
-  owner,
-  repo,
-  branch,
-  token,
-  settings,
-  indexMetaOverride = null,
-) {
+async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMetaOverride = null) {
   const theme = await Storage.getTheme().catch(() => null);
   const pagesTheme = _buildPagesTheme(theme);
   // Use caller-supplied meta when available (e.g. REFRESH_INFRA passes fresh local data).
@@ -308,7 +294,9 @@ async function _buildGamificationFiles(owner, repo, branch, settings, readme, pa
         badgesPublished: plan.badgesPublished,
         // Mirrors the same condition buildPublishPlan used, so a later revoke
         // knows whether there is a workflow to remove.
-        workflowPublished: plan.files.some((f) => f.path.startsWith(".github/workflows/codeledger")),
+        workflowPublished: plan.files.some((f) =>
+          f.path.startsWith(".github/workflows/codeledger"),
+        ),
       },
     };
   } catch (e) {

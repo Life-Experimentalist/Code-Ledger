@@ -101,6 +101,10 @@ Chrome Web Store requires each upload to exceed the last.
 - The default OAuth scope is `public_repo,workflow`. Creating a private repository needs the wider `repo` scope, which the settings panel offers as an explicit one-click upgrade rather than requesting up front.
 - GitLab and Bitbucket are no longer offered in the interface. Their handlers were stubs that threw on every call, so presenting them as options meant offering a provider that could not commit.
 
+### Removed
+
+- Eighteen modules that shipped in the package but that nothing imported, including an encryption helper with a hardcoded salt that no code path ever called. Every line in the package is now a line something runs.
+
 ### Known limitations
 
 - GitHub is the only working repository provider.

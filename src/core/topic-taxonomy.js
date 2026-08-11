@@ -154,8 +154,14 @@ export const BUILT_IN_KINDS = Object.freeze({
  * word "search" reaches the algorithm rule.
  */
 const HEURISTICS = [
-  [/\b(tree|heap|list|stack|queue|trie|graph|table|array|matrix|set|map|deque|buffer|structure)\b/, KIND.DS],
-  [/\b(sort|search|traversal|dp|programming|greedy|recursion|divide|sweep|flow|path|algorithm|technique|method)\b/, KIND.ALGO],
+  [
+    /\b(tree|heap|list|stack|queue|trie|graph|table|array|matrix|set|map|deque|buffer|structure)\b/,
+    KIND.DS,
+  ],
+  [
+    /\b(sort|search|traversal|dp|programming|greedy|recursion|divide|sweep|flow|path|algorithm|technique|method)\b/,
+    KIND.ALGO,
+  ],
   [/\b(sql|database|shell|design|concurrency|thread|system|interactive|puzzle)\b/, KIND.DOMAIN],
 ];
 
@@ -437,7 +443,8 @@ export function buildTopicGraph(problems, opts = {}) {
 
     for (let i = 0; i < topics.length; i++) {
       for (let j = i + 1; j < topics.length; j++) {
-        const key = topics[i] < topics[j] ? `${topics[i]}|${topics[j]}` : `${topics[j]}|${topics[i]}`;
+        const key =
+          topics[i] < topics[j] ? `${topics[i]}|${topics[j]}` : `${topics[j]}|${topics[i]}`;
         pairs.set(key, (pairs.get(key) || 0) + 1);
       }
     }

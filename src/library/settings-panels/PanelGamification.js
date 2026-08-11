@@ -137,7 +137,13 @@ export function PanelGamification({ settings, onSettingsChange }) {
     return () => {
       live = false;
     };
-  }, [s.dailyTargetPoints, s.freezeEarnMultiplier, s.maxFreezes, s.penaltyMultiplier, s.installDay]);
+  }, [
+    s.dailyTargetPoints,
+    s.freezeEarnMultiplier,
+    s.maxFreezes,
+    s.penaltyMultiplier,
+    s.installDay,
+  ]);
 
   const specs = snapshot ? badgeSpecs(snapshot) : null;
 
@@ -197,7 +203,8 @@ export function PanelGamification({ settings, onSettingsChange }) {
           <${Row}
             on=${publishing && s.gamificationReadme !== false}
             disabled=${!publishing}
-            onClick=${() => onSettingsChange?.("gamificationReadme", s.gamificationReadme === false)}
+            onClick=${() =>
+              onSettingsChange?.("gamificationReadme", s.gamificationReadme === false)}
             title="Keep a badge row in README.md"
           >
             Rewritten in place between two HTML comments. Everything you wrote around it is left
@@ -214,8 +221,8 @@ export function PanelGamification({ settings, onSettingsChange }) {
               onClick=${() => onSettingsChange?.("gamificationBadgeStyle", "svg")}
               class="text-left p-3 rounded-lg border transition-colors
                 ${style === "svg"
-                  ? "bg-cyan-500/10 border-cyan-500/30"
-                  : "bg-white/5 border-white/10 hover:bg-white/10"}"
+                ? "bg-cyan-500/10 border-cyan-500/30"
+                : "bg-white/5 border-white/10 hover:bg-white/10"}"
             >
               <p class="text-sm text-slate-200 mb-1">Self-hosted SVG</p>
               <p class="text-[11px] text-slate-500 leading-snug">
@@ -229,8 +236,8 @@ export function PanelGamification({ settings, onSettingsChange }) {
               disabled=${shieldsBlocked}
               class="text-left p-3 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed
                 ${style === "shields"
-                  ? "bg-cyan-500/10 border-cyan-500/30"
-                  : "bg-white/5 border-white/10 hover:bg-white/10"}"
+                ? "bg-cyan-500/10 border-cyan-500/30"
+                : "bg-white/5 border-white/10 hover:bg-white/10"}"
             >
               <p class="text-sm text-slate-200 mb-1">shields.io</p>
               <p class="text-[11px] text-slate-500 leading-snug">
@@ -343,7 +350,9 @@ export function PanelGamification({ settings, onSettingsChange }) {
                   class="w-20 shrink-0 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-cyan-500/40"
                 />
                 <div>
-                  <p class="text-sm text-slate-300">${label} ${unit && html`<span class="text-slate-500">${unit}</span>`}</p>
+                  <p class="text-sm text-slate-300">
+                    ${label} ${unit && html`<span class="text-slate-500">${unit}</span>`}
+                  </p>
                   <p class="text-[11px] text-slate-500 leading-snug">${hint}</p>
                 </div>
               </div>
@@ -357,15 +366,17 @@ export function PanelGamification({ settings, onSettingsChange }) {
             Nightly refresh
           </h3>
           <p class="text-[11px] text-slate-500 leading-snug">
-            A badge is a picture written at commit time, so it cannot notice a streak ending on a day
-            you did not solve. A small GitHub Actions job recomputes them and commits only when a
-            number actually changed. Actions minutes are free on public repositories and metered on
-            private ones, which is why the default differs.
+            A badge is a picture written at commit time, so it cannot notice a streak ending on a
+            day you did not solve. A small GitHub Actions job recomputes them and commits only when
+            a number actually changed. Actions minutes are free on public repositories and metered
+            on private ones, which is why the default differs.
           </p>
           <label class="block">
             <span class="block text-xs font-medium text-slate-400 mb-1.5">Run it</span>
             <select
-              value=${typeof s.gamificationActions === "boolean" ? String(s.gamificationActions) : ""}
+              value=${typeof s.gamificationActions === "boolean"
+                ? String(s.gamificationActions)
+                : ""}
               onChange=${(e) =>
                 onSettingsChange?.(
                   "gamificationActions",

@@ -8,7 +8,7 @@ not inferred from other docs. Items are grouped by what they ask you to do:
 
 ## Remove
 
-### 1. Eighteen modules nothing imports
+### 1. Eighteen modules nothing imports — **applied**
 
 Each of these has zero references from any `.js`, `.html` or `.json` under
 `src/`, `dev/`, `test/` or `worker/`. They are not lazily loaded — the two places
@@ -56,9 +56,10 @@ Three of them are worth calling out individually:
 Deleting them removes 1,353 lines that a reader has to rule out before trusting
 the module graph.
 
-### 2. `HEARTBEAT_PORT_NAME` from `constants.js`
+### 2. `HEARTBEAT_PORT_NAME` from `constants.js` — **applied**
 
-Follows the file above. It is referenced only by the dead module.
+Follows the file above. It was referenced only by the dead module.
+`HEARTBEAT_INTERVAL_MS` sat next to it with no reader at all and went with it.
 
 ### 3. The GitLab and Bitbucket handler stubs — decide, don't leave
 
@@ -188,18 +189,15 @@ never the source of truth.
 
 ## Applying the deletions
 
-The removals in §1 and §2 were not applied. Run this to take them, from the
-repository root:
+Done. The eighteen files and the two heartbeat constants are gone, and the gate
+(`npm run lint`, the full suite, `npm run format:check`) is green without them.
 
-```bash
-git rm src/background/alarm-manager.js src/content/heartbeat.js src/core/canonical.js src/core/crypto.js src/core/git-provider-selector.js src/core/markdown-generator.js src/core/problem-graph.js src/handlers/ai/claude/model-fetcher.js src/handlers/ai/deepseek/model-fetcher.js src/handlers/ai/gemini/model-fetcher.js src/handlers/ai/ollama/model-fetcher.js src/handlers/ai/openai/model-fetcher.js src/handlers/platforms/leetcode/enhanced-detection.js src/library/settings-panels/PanelMCP.js src/ui/components/HandlerStatus.js src/ui/components/ProviderBadge.js src/ui/components/StatsRing.js src/ui/components/TelemetryPrompt.js
-```
-
-Then drop `HEARTBEAT_PORT_NAME` from `src/core/constants.js` and re-run:
-
-```bash
-npm run lint && npm test && npm run format:check
-```
+One of the eighteen deserves a note rather than a silent removal.
+`PanelMCP.js` was the only screen for editing `mcp.config`, and
+`SettingsPageView.js` never imported it, so there has been no way to reach that
+screen for as long as the panel has existed. Deleting it takes away nothing a
+user could get to. The setting itself and `src/core/mcp-tools.js` are untouched;
+if the MCP surface comes back it needs a panel that is actually mounted.
 
 ---
 
