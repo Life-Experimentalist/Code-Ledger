@@ -461,3 +461,50 @@ export async function migrateTagsToCanonical() {
     `migrateTagsToCanonical(): ✓ complete — ${changed}/${problems.length} problem(s) updated`,
   );
 }
+
+/**
+ * One-time migration: get stranded API keys out of the settings map.
+ *
+ * The provider card used to write what you typed into `settings.{provider}_keys`
+ * on every keystroke and only move it to `ai.keys` when you pressed Save. It no
+ * longer does, which leaves anyone who typed a key and navigated away with a
+ * plaintext credential sitting in a settings key nothing reads. Dropping it
+ * would silently lose keys somebody meant to keep, so it is folded into
+ * `ai.keys` — the same place Save would have put it — and then removed.
+ *
+ * Runs on every start until it succeeds; the marker is written last so a failed
+ * run is retried rather than skipped.
+ */
+export async function migrateStrandedAIKeys() {
+  const MIGRATION_KEY = "cl.migration.strandedAIKeys.v1";
+  const settings = await Storage.getSettings().catch(() => ({}));
+  if (settings[MIGRATION_KEY]) return;
+
+  const stranded = Object.keys(settings).filter(
+    (k) => k.endsWith("_keys") && typeof settings[k] === "string" && settings[k].trim(),
+  );
+
+  if (stranded.length) {
+    const all = await Storage.getAIKeys().catch(() => ({}));
+    const patch = {};
+
+    for (const key of stranded) {
+      const providerId = key.slice(0, -"_keys".length);
+      const incoming = String(settings[key])
+        .split(/[,\n]/)
+        .map((k) => k.trim())
+        .filter(Boolean);
+      const existing = Array.isArray(all[providerId]) ? all[providerId] : [];
+      all[providerId] = [...new Set([...existing, ...incoming])];
+      patch[key] = undefined;
+    }
+
+    await Storage.setAIKeys(all);
+    await Storage.updateSettings(patch);
+    dbg.log(
+      `migrateStrandedAIKeys(): moved keys out of ${stranded.length} settings key(s) into ai.keys`,
+    );
+  }
+
+  await Storage.updateSettings({ [MIGRATION_KEY]: true }).catch(() => {});
+}

@@ -442,6 +442,15 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
   const [savedAIKeys, setSavedAIKeys] = useState({});
+  /**
+   * What is currently typed into each provider's API-key box, keyed on provider
+   * id. Deliberately component state and not a setting: this box used to write
+   * through to `settings.{provider}_keys` on every keystroke, which put a
+   * plaintext API key into storage, into the local settings backup, and — until
+   * the sync boundary learned to refuse it — into the user's repository. It is
+   * a staging box. Nothing reads keys from here; the handlers read `ai.keys`.
+   */
+  const [keyDrafts, setKeyDrafts] = useState({});
   const [advancedMap, setAdvancedMap] = useState({});
   const [activeTab, setActiveTab] = useState("general");
   const [showAdvancedProviders, setShowAdvancedProviders] = useState(false);
@@ -612,9 +621,12 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     setSavedAIKeys(all);
   };
 
-  const handleProviderKeysChange = async (_providerId, fieldKey, rawVal) => {
-    onChange(fieldKey, rawVal);
+  const handleProviderKeysChange = (providerId, _fieldKey, rawVal) => {
+    setKeyDrafts((d) => ({ ...d, [providerId]: rawVal }));
   };
+
+  /** Empty the staging box once its contents have reached `ai.keys`. */
+  const clearKeyDraft = (providerId) => setKeyDrafts((d) => ({ ...d, [providerId]: "" }));
 
   const handleSaveAllKeys = async (providerId, keyField, rawVal) => {
     const keys = parseKeys(rawVal);
@@ -627,7 +639,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     }
     try {
       await persistProviderKeys(providerId, rawVal);
-      onChange(keyField, "");
+      clearKeyDraft(providerId);
       setTestResults((s) => ({
         ...s,
         [`${keyField}:all`]: `Saved ${keys.length} key(s)`,
@@ -689,7 +701,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     }
     if (allPassed) {
       await persistProviderKeys(providerId, rawVal);
-      onChange(baseResultKey, "");
+      clearKeyDraft(providerId);
       setTestResults((s) => ({
         ...s,
         [`${baseResultKey}:all`]: `Tested and saved ${keys.length} key(s)`,
@@ -1438,7 +1450,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                 ${primaryProvider
                   ? html`<${ModelSelector}
                       providerId=${primaryProvider}
-                      apiKey=${values[`${primaryProvider}_keys`] || ""}
+                      apiKey=${keyDrafts[primaryProvider] || ""}
                       selectedModel=${values.aiPrimaryModel || ""}
                       onSelect=${(v) => onChange("aiPrimaryModel", v)}
                       endpoint=${values[`${primaryProvider}_endpoint`] || ""}
@@ -1478,7 +1490,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                 ${secondaryProvider
                   ? html`<${ModelSelector}
                       providerId=${secondaryProvider}
-                      apiKey=${values[`${secondaryProvider}_keys`] || ""}
+                      apiKey=${keyDrafts[secondaryProvider] || ""}
                       selectedModel=${values.aiSecondaryModel || ""}
                       onSelect=${(v) => onChange("aiSecondaryModel", v)}
                       endpoint=${values[`${secondaryProvider}_endpoint`] || ""}
@@ -1508,7 +1520,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
           const modelField = `${pid}_model`;
           const enabledField = `${pid}_enabled`;
           const strategyField = `${pid}_keyStrategy`;
-          const rawKeys = values[keyField] || "";
+          const rawKeys = keyDrafts[pid] || "";
           const keyList = parseKeys(rawKeys);
           const savedKeys = Array.isArray(savedAIKeys[pid]) ? savedAIKeys[pid] : [];
           const endpoint = values[endpointField] || p.endpoint || "";

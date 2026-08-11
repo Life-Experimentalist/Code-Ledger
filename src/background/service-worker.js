@@ -38,6 +38,7 @@ import {
   detectRepoLayoutVersion,
   migrateProblemIds,
   migrateTagsToCanonical,
+  migrateStrandedAIKeys,
 } from "./migration-manager.js";
 import { SyncEngine, importFromRepo, applyImport } from "./sync-engine.js";
 import { detectDuplicate, normalizeCode } from "../core/duplicate-detector.js";
@@ -207,6 +208,9 @@ async function init() {
   migrateProblemIds().catch((e) => dbg.error(`init(): migrateProblemIds failed:`, e));
   migrateTagsToCanonical().catch((e) =>
     dbg.warn("migrateTagsToCanonical() failed (non-blocking):", e?.message),
+  );
+  migrateStrandedAIKeys().catch((e) =>
+    dbg.warn("migrateStrandedAIKeys() failed (non-blocking):", e?.message),
   );
 
   // Register handlers
