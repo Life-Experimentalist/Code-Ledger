@@ -10,6 +10,7 @@ import { CONSTANTS } from "./constants.js";
 import { createDebugger } from "../lib/debug.js";
 import { registry } from "./handler-registry.js";
 import { buildCommitMessage, COMMIT_TYPES } from "./commit-messages.js";
+import { isPortableSetting } from "./settings-sync.js";
 
 const dbg = createDebugger("SettingsAutoCommit");
 
@@ -134,42 +135,22 @@ export async function forceCommitSettingsNow() {
 
 /**
  * Get portable settings (non-secret, user-facing preferences).
- * Must match settings-sync.js PORTABLE_SETTINGS.
+ *
+ * The definition of "portable" lives in `settings-sync.js` and nowhere else.
+ * Keeping a second copy here is what let the two drift apart, and the drift was
+ * invisible: both files kept working, they just backed up different halves of
+ * the user's preferences.
+ *
+ * Sorted so the committed file has a stable key order. Built from a scan of
+ * storage rather than a fixed list, the key order would otherwise follow
+ * whatever order the keys happened to be written in, and the file would show up
+ * as changed in the user's repo without anything about it having changed.
  */
 function _extractPortableSettings(settings) {
-  const PORTABLE_SETTINGS = [
-    "theme_preset",
-    "theme_mode",
-    "theme_accent",
-    "darkMode",
-    "behaviorBankEnabled",
-    "telemetryEnabled",
-    "debugMode",
-    "aiCopyable",
-    "deduplicationThreshold",
-    "autoReview",
-    "autoCommit",
-    "autoSync",
-    "syncInterval",
-    "commitMessageStyle",
-    "showNotifications",
-    "hideCompleted",
-    "hideIgnored",
-    "pages_show_verification",
-    "github_pages",
-    "github_repo_topics_extra",
-    "github_coauthor_enabled",
-    "github_coauthor_trailer",
-    "mcp.config",
-  ];
-
   const portable = {};
-  PORTABLE_SETTINGS.forEach((key) => {
-    if (key in settings) {
-      portable[key] = settings[key];
-    }
-  });
-
+  for (const key of Object.keys(settings).sort()) {
+    if (isPortableSetting(key)) portable[key] = settings[key];
+  }
   return portable;
 }
 

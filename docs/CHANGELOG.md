@@ -91,6 +91,8 @@ Chrome Web Store requires each upload to exceed the last.
 - The OAuth callback signs its `state` parameter, stores it in an `HttpOnly; Secure; SameSite=Lax` cookie with a ten-minute lifetime, and compares it in constant time.
 - The authentication worker exposes no endpoint that mints GitHub App installation tokens.
 - Repository paths built from scraped titles are constrained: no `..` segments, no leading dots, no path escapes.
+- **AI provider API keys could be written into your repository.** Settings sync waves through every key belonging to a provider — `openai_enabled`, `claude_model` and so on — so that a second device gets the same setup. `openai_keys` is one of those keys, and it is where the provider card puts what you type while you type it, before you press Save. An API key entered and not saved could therefore be committed to `.codeledger/sync.json` and `.codeledger/config.json`, in plaintext, in a repository that is usually public. Anything ending in `_keys`, `_token`, `_secret`, `_apiKey`, `_api_key` or `_password` is now refused regardless of which provider it belongs to, both on the way out and on the way back in, and the next settings commit rewrites both files without it. **Git history is not rewritten by this: if you entered an API key in a previous version, rotate it.**
+- Reading a sync file back applies the same test as writing one, so a file written by an older build cannot reintroduce a key this one would refuse to send.
 - Mermaid diagrams in AI responses are shown as source with a **Render diagram** button. The diagram is only sent to `mermaid.ink` when you press it, because that source describes your problem and your solution.
 
 ### Changed
