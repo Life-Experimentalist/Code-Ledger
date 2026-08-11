@@ -135,7 +135,7 @@ sweep `README.md`, `worker/public/`, and the canonical-map fallback URL in
 
 ## Add
 
-### 7. A first-run health check
+### 7. A first-run health check — **applied**
 
 The Chrome Web Store rejection was a user who could not tell why repository
 creation failed. The fixes address the causes, but nothing yet tells a user
@@ -156,22 +156,46 @@ Most of the pieces exist already. `GitHubOnboardingModal.js` reads
 place to see that state outside the first-run wizard, once something has gone
 wrong. **Settings → Advanced** is the natural home.
 
+Built as `src/core/health-check.js` and mounted as the **Connection check** panel
+in Settings → Advanced. It takes its `fetch` as an argument, so every branch is
+covered without a network. Two judgement calls are worth recording, because both
+are cases where saying less is more accurate:
+
+- A token that reports no `X-OAuth-Scopes` header is a GitHub App token **or** a
+  fine-grained PAT, and nothing in the response distinguishes them. Only the
+  first cannot create a repository, so the check warns and names both rather
+  than declaring a failure it has not observed.
+- A 404 on the repository means it does not exist **or** this token cannot see
+  it. Telling somebody to recreate a repository they already have is the more
+  expensive of the two wrong answers, so it says both.
+
 ### 8. An end-to-end test against a real repository
 
-The suite is 156 passing tests across 37 files, all unit-level with the GitHub
+The suite is 572 passing tests across 25 files, all unit-level with the GitHub
 API mocked. The one path that has now broken in production twice — OAuth token →
 create repo → root commit → ref creation — is the one path no test exercises
 against a live endpoint. A single opt-in integration test, gated on a PAT in the
 environment and skipped otherwise, would have caught both failures.
 
-### 9. Finish cross-browser sync through the repository
+### 9. Finish cross-browser sync through the repository — **partly applied**
 
-Half of this already exists. `src/background/sync-engine.js` reads the remote
-`index.json` to work out what a fresh install is missing, and every commit
-writes `.codeledger/sync.json` alongside it. What is missing is the other
-direction and the settings: a second browser can reconstruct the ledger, but it
-comes up with no configuration and no gamification state, and nothing reconciles
-two devices that both solved something while offline.
+`src/background/sync-engine.js` reads the remote `index.json` to work out what a
+fresh install is missing, and every commit writes `.codeledger/sync.json`
+alongside it. `src/core/settings-sync.js` now carries the settings in both
+directions: one allow-list (`PORTABLE_SETTINGS` plus a prefix scan) decides what
+may leave the device, a suffix rule refuses anything credential-shaped whichever
+list it matched, and `github_owner` / `github_repo` / `github_username` are never
+overwritten from remote — a second device that has already been pointed at a
+repository keeps pointing at it.
+
+Two things named below are still open. Conflict resolution is whole-file, not
+per-key: `syncSettingsFromGitHub()` compares one `__syncedAt` against one local
+`__updatedAt` and skips the pull if local is newer, so two devices editing
+different settings in the same window still resolve as one winner rather than a
+merge. And gamification _state_ — the streak itself, freezes banked, vacation
+ranges — is deliberately not in the file: the settings that shape it travel, the
+numbers do not, so a second browser reconstructs the ledger but starts its streak
+fresh.
 
 The repository is the right channel for this, not `chrome.storage.sync`. That
 API allows 102,400 bytes in total, 8,192 per item, 512 items, and 1,800 writes
@@ -184,16 +208,15 @@ that can make an HTTPS request.
 
 What is left to build:
 
-- Extend `.codeledger/sync.json` to carry settings, gamification state and
-  vacation ranges, not just the ledger cursor. Tokens and AI keys stay out of
-  it — the file lands in a repository that may be public.
-- A pull on startup and on demand: fetch, compare a per-key `updatedAt`,
-  last-write-wins per key rather than per file so two devices editing different
-  settings do not clobber each other.
+- Per-key `updatedAt` rather than one timestamp for the whole file, so two
+  devices editing different settings do not resolve as one winner.
 - Deduplicate the ledger on merge by the key `getProblemCommitKey` already
   computes, so the same solve arriving from two devices stays one entry.
 - Mark the device that wrote each key, so a conflict can be shown as "your
   laptop set this an hour ago" rather than a silent overwrite.
+- Decide whether streak state should travel at all. It is the one thing in the
+  ledger a user could gain by editing, and the file lands in a repository they
+  control — which is an argument for leaving it where it is.
 
 `chrome.storage.sync` is still worth using for one thing: the handful of
 same-browser preferences that should follow a Chrome profile across machines

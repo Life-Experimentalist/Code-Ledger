@@ -55,6 +55,9 @@ Your entire history synced via your own GitHub repo on every startup. Always cur
 💾 Rolling backups
 Automatic snapshots of your problems and settings committed to your repo. Full restore in one click.
 
+🩺 A connection check that names the problem
+When nothing is being committed, Settings → Advanced tells you which link in the chain is broken — the token, its permissions, the repository, or the push — and what to do about that one thing. No more "permission denied" for four different causes.
+
 🔒 Private by default
 Out of the box your data goes to your GitHub repo and nowhere else. No sign-ups, no dashboards on our servers, no scraping. Everything past that is a choice you make and can see: Settings → Privacy lists every destination live, computed from your own configuration. You own everything — plain files, Apache 2.0.
 
@@ -172,6 +175,7 @@ OAuth: this is a **classic OAuth App**, not a GitHub App. The token is proxy-exc
 Repository creation: the extension calls `POST /user/repos` with the user's own OAuth token and the `repo` scope they granted at sign-in. If sign-in ever returns a GitHub-App-shaped token (which cannot create repositories), the callback now detects it and says so at sign-in rather than letting it surface later as a permission error.
 Telemetry: disabled by default (opt-in). If enabled, POSTs `{ version, platform }` to `counter.vkrishna04.me`; the event name is a path segment, not a field. No code, IDs, repository names or problem data.
 Party comparison: off until the user adds a repository. It then reads that public repository's `badges/stats.json` anonymously from `raw.githubusercontent.com`. Nothing is uploaded and the other person is not contacted.
+Diagnosing a failed setup: **Settings → Advanced → Connection check** runs the same four steps a commit does — token stored, token accepted by GitHub and what it grants, repository visible and writable, last commit present — and reports each one separately with the action that fixes it. If a review of this build hits a repository-creation failure, that panel names the cause.
 
 ---
 
