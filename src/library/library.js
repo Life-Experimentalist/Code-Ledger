@@ -589,7 +589,8 @@ function LibraryApp() {
   // means an old `?tab=ai-chats` link is not bounced before settings arrive.
   useEffect(() => {
     if (loading) return;
-    if (activeTab === "ai-chats" && !isAIActive(settings)) setActiveTab("solutions");
+    if ((activeTab === "ai-chats" || activeTab === "behaviour-bank") && !isAIActive(settings))
+      setActiveTab("solutions");
     if (activeTab === "party" && !isGamificationActive(settings)) setActiveTab("solutions");
   }, [loading, activeTab, settings]);
 
@@ -599,8 +600,14 @@ function LibraryApp() {
     { id: "graph", label: "Graph", icon: "🔗" },
     // Same reasoning as Party below: with no provider switched on there is
     // nothing here but an explanation of why there is nothing here.
-    ...(isAIActive(settings) ? [{ id: "ai-chats", label: "AI Chats", icon: "🤖" }] : []),
-    { id: "behaviour-bank", label: "Behaviour Bank", icon: "🧠" },
+    ...(isAIActive(settings)
+      ? [
+          { id: "ai-chats", label: "AI Chats", icon: "🤖" },
+          // Insights, roadmap and skills are all written by and read back into
+          // the AI prompts. With no provider they are three empty lists.
+          { id: "behaviour-bank", label: "Behaviour Bank", icon: "🧠" },
+        ]
+      : []),
     { id: "canonical", label: "Canonical", icon: "🔀" },
     // Party compares streaks and points, so it has nothing to show when the
     // streak system is off. The tab is hidden rather than shown-and-empty.

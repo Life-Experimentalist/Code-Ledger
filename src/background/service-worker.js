@@ -2446,6 +2446,19 @@ async function handleAIChat(messages, context = {}) {
     contextParts.push(`My solution:\n\`\`\`\n${context.code.slice(0, 3000)}\n\`\`\``);
   if (context.aiReview) contextParts.push(`Prior AI review:\n${context.aiReview.slice(0, 1000)}`);
 
+  // The review prompt already gets the behaviour bank; the chat is the other half
+  // of the same conversation, so it reads back the same record. Key derivation
+  // matches the one the AI_CHAT handler writes with, or the lookup would miss.
+  const chatProblem = context.problem || {};
+  const chatSlug = chatProblem.titleSlug || chatProblem.slug || context.title || "";
+  const chatPlatform = context.platform || chatProblem.platform || "";
+  if (chatSlug && chatPlatform) {
+    const chatBehavior = _buildBehaviorContext(
+      await getProblemStats(chatSlug, chatPlatform).catch(() => null),
+    );
+    if (chatBehavior) contextParts.push(`Learner history:\n${chatBehavior}`);
+  }
+
   dbg.log(`handleAIChat(): prepared ${contextParts.length} context part(s)`);
 
   const lastUserMsg =

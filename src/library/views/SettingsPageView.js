@@ -11,6 +11,7 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("SettingsPageView");
 
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
+import { isAIActive } from "../../core/feature-flags.js";
 
 import { PanelGeneral } from "../settings-panels/PanelGeneral.js";
 import { PanelAI } from "../settings-panels/PanelAI.js";
@@ -58,9 +59,16 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
     updateQueryParams({ settingsTab: id });
   }
 
+  // The bank holds nothing but AI-written insights and the skills they draw on,
+  // so it follows the AI switch. The AI panel itself always stays — it is where
+  // the switch is turned back on.
+  const aiOn = isAIActive(settings);
+  const navItems = NAV_ITEMS.filter((item) => item.id !== "bank" || aiOn);
+  const shownPanel = activePanel === "bank" && !aiOn ? "general" : activePanel;
+
   function renderPanel() {
     const props = { settings, onSettingsChange, onSetupRepo, onConnect };
-    switch (activePanel) {
+    switch (shownPanel) {
       case "general":
         return html`<${PanelGeneral} ...${props} />`;
       case "ai":
@@ -88,13 +96,13 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
     <div class="flex flex-col h-full min-h-0 gap-0">
       <!-- Horizontal tab bar -->
       <div class="flex items-center gap-1 px-1 border-b border-white/5 shrink-0 overflow-x-auto">
-        ${NAV_ITEMS.map(
+        ${navItems.map(
           ({ id, emoji, label }) => html`
             <button
               key=${id}
               onClick=${() => goToPanel(id)}
               class="flex items-center gap-1.5 px-3 py-2.5 rounded-t-lg text-sm font-medium whitespace-nowrap transition-colors border-b-2
-              ${activePanel === id
+              ${shownPanel === id
                 ? "border-cyan-500 text-cyan-200 bg-cyan-500/5"
                 : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5"}"
             >

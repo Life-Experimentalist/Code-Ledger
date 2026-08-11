@@ -6,7 +6,7 @@
  * interactions, and hint views to provide richer context for AI suggestions.
  * All data is stored locally via Storage.getBehaviorBank() / setBehaviorBank().
  *
- * Opt-in: only records when settings.behaviorBankEnabled === true.
+ * Opt-out: records unless settings.behaviorBankEnabled === false.
  */
 
 import { Storage } from "./storage.js";

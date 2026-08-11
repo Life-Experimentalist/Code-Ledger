@@ -133,10 +133,15 @@
         </li>
       </ul>
       <p>
-        So a second browser can pick up where the first left off, your settings and your friend list
-        are also written into your own repository, in
-        <code>.codeledger/sync.json</code>. Your GitHub token, your AI API keys and your vacation
-        state are deliberately excluded from that file and never leave local storage.
+        So a second browser can pick up where the first left off, some of this is also written into
+        your own repository, in a <code>.codeledger/</code> folder beside your solutions:
+        <code>sync.json</code> and <code>config.json</code> hold your settings and your friend list;
+        <code>behaviour-bank.json</code> holds solve times, attempt counts, hint views and short
+        summaries of what an AI review flagged, and Settings → Advanced turns that recording off;
+        <code>roadmaps.json</code> and <code>knowledge.json</code> hold the roadmaps and insights
+        written in the Behaviour Bank tab. Your GitHub token, your AI API keys and your vacation
+        state are deliberately excluded and never leave local storage. Everything else in that
+        folder is as public as the repository you chose.
       </p>
 
       <h2>2. Data Handling & Usage</h2>

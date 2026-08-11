@@ -38,7 +38,8 @@ Chrome Web Store requires each upload to exceed the last.
 - A floating chat panel on problem pages with `/` commands for pulling in your code, the problem statement, and your errors.
 - Chat history stored locally and, optionally, synced to the repository as Markdown.
 - MCP tool support for providers that accept it.
-- With no provider configured, every AI surface is gone rather than idle — no review panel on problem pages, no chat tab, no queue banner, no AI Chats tab in the library. Reviews you already have stay readable and filterable, because that text is yours. Adding a provider brings the surfaces back without a reload.
+- With no provider configured, every AI surface is gone rather than idle — no review panel on problem pages, no chat tab, no queue banner, and neither the AI Chats nor the Behaviour Bank tab in the library, the latter holding nothing but insights and skills written by and for a model. Reviews you already have stay readable and filterable, because that text is yours. Adding a provider brings the surfaces back without a reload.
+- The chat reads the behaviour bank the same way the review does. How long you took, how many attempts it took, and what a previous review flagged were being recorded on every solve and then only ever shown to the reviewer; the assistant you are talking to now gets the same history for the problem in front of it.
 
 **Library**
 
@@ -49,7 +50,7 @@ Chrome Web Store requires each upload to exceed the last.
 - Topics are split onto two axes — data structures and algorithms — everywhere they are counted, because ranking them together lets Array bury Dynamic Programming. Which axis a topic sits on is a judgement call — Binary Search is a technique, Binary Search Tree is a structure — so the canonical topic list in Settings → Platforms lets you overrule any of them, and everything that counts topics follows your call instead.
 - A **Where the gaps are** panel in Analytics that ranks topics by how well you hold them rather than by how often they turn up: solve count saturates, time since the last solve decays, and the two multiply. Structures and algorithms are ranked in separate columns, well-known topics with no solves at all are listed as blind spots, and one number up top says what share of your solves needed a technique rather than just a structure. Any row opens the solves behind it.
 - The knowledge graph can colour topics by mastery instead of by identity. Giving every topic its own hue makes a pretty picture of what you have tagged and answers nothing; the mastery colouring spends the same colour on how well you hold each topic, so the weak areas are the ones that stand out. Switching mode repaints in place — the layout stays exactly where you left it — and a selected topic now shows how many problems you actually solved under it, when you last did, and how solid that leaves it. That solve count no longer includes the unsolved suggestions hanging off the topic.
-- Behaviour bank recording how you interact with problems, off unless you turn it on.
+- Behaviour bank recording how you interact with problems, with a switch in Settings → Advanced that stops the recording.
 - Backups: manual JSON export, scheduled snapshots, and a snapshot before any bulk import.
 
 **Streaks and badges**

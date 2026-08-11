@@ -38,7 +38,13 @@ Because Code Ledger runs entirely within your browser context, the following cat
 6. **Party List**:
    - If you use the party comparison, the list of friends' repositories you added. It is a list of public repository names held on your side; nobody is told that you added them.
 
-So a second browser can pick up where the first left off, your settings and your party list are also written into your own repository, at `.codeledger/sync.json`. Your GitHub token, your AI API keys and your streak state are deliberately excluded from that file and never leave your device.
+So a second browser can pick up where the first left off, some of this is also written into your own repository, in a `.codeledger/` folder beside your solutions:
+
+- `sync.json` and `config.json` — your settings and your party list.
+- `behaviour-bank.json` — the behaviour bank: solve times, attempt counts, hint views, and short summaries of what an AI review flagged. Settings → Advanced turns the recording off.
+- `roadmaps.json` and `knowledge.json` — the learning roadmaps and saved insights you and the AI assistant write in the Behaviour Bank tab.
+
+Your GitHub token, your AI API keys and your streak state are deliberately excluded and never leave your device. Everything else in that folder is as public as the repository you chose: if the repository is public, so is it.
 
 ---
 

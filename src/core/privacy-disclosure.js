@@ -98,7 +98,7 @@ export function disclosures(settings) {
     required: true,
     tier: "private",
     destination: "GitHub",
-    what: "Your solutions and the metadata around them.",
+    what: "Your solutions, the metadata around them, and — under .codeledger/ — your settings, your party list, and the behaviour bank if it is recording.",
     note: repo
       ? `Sent straight from this browser to the API with your own token, into ${repo}. It is your repository — you can delete it, make it private, or take it elsewhere.`
       : "Nothing is committed until you link a repository.",
