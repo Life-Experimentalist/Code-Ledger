@@ -86,7 +86,12 @@ Open DevTools → Application → Session Storage → `codeforces.com` → look 
 
 - CF uses full page reloads; code is preserved across the problem → /my navigation via sessionStorage.
 - Gym problems supported (`/gym/{id}/problem/{letter}`) but less tested.
-- CF API is CORS-blocked — metadata (rating, tags) is read from the DOM, not the API.
+- A live solve reads its metadata (rating, tags) from the DOM rather than the API, because the page
+  already has it. The profile import does use the API (`user.status`, one request per two seconds).
+- Imported problems have no code: Codeforces publishes the submission list, not the submission text.
+
+**Profile import:** sign in, open `https://codeforces.com/profile/{your handle}` and click
+"Import All Solves to CodeLedger". The button is not injected on anyone else's profile.
 
 ---
 

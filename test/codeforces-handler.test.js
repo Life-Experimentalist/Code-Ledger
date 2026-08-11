@@ -31,6 +31,12 @@ import {
   PAGE_TYPES,
 } from "../src/handlers/platforms/codeforces/page-detector.js";
 import { resolveLang, normalizeCFRating } from "../src/handlers/platforms/codeforces/lang-utils.js";
+import {
+  buildUserStatusUrl,
+  extractSolves,
+  mergeSolves,
+  CF_PAGE_SIZE,
+} from "../src/handlers/platforms/codeforces/api.js";
 import { CONSTANTS } from "../src/core/constants.js";
 
 describe("splitCFSlug", () => {
@@ -244,5 +250,174 @@ describe("normalizeCFRating", () => {
 
   test("accepts the numeric string the DOM gives", () => {
     assert.equal(normalizeCFRating("1500"), "Medium");
+  });
+});
+
+/**
+ * The profile importer. Codeforces publishes every submission through
+ * `user.status` but never the source text, so an import is a list of dated,
+ * rated, tagged problems with an empty solution — and must not queue a code
+ * fetch that has nothing to fetch.
+ */
+const submission = (over = {}) => ({
+  id: 12345678,
+  contestId: 4,
+  creationTimeSeconds: 1_400_000_000,
+  problem: {
+    contestId: 4,
+    index: "A",
+    name: "Watermelon",
+    type: "PROGRAMMING",
+    rating: 800,
+    tags: ["brute force", "math"],
+  },
+  author: { participantType: "PRACTICE" },
+  programmingLanguage: "GNU C++17 7.3.0",
+  verdict: "OK",
+  passedTestCount: 55,
+  timeConsumedMillis: 30,
+  memoryConsumedBytes: 102400,
+  ...over,
+});
+
+describe("buildUserStatusUrl", () => {
+  test("asks for one page of a handle's submissions", () => {
+    assert.equal(
+      buildUserStatusUrl("tourist", 1, 1000),
+      "https://codeforces.com/api/user.status?handle=tourist&from=1&count=1000",
+    );
+  });
+
+  test("escapes a handle rather than pasting it into the query", () => {
+    assert.ok(buildUserStatusUrl("a b&count=1").includes("a%20b%26count%3D1"));
+  });
+
+  test("returns nothing when there is no handle to ask about", () => {
+    assert.equal(buildUserStatusUrl(""), "");
+    assert.equal(buildUserStatusUrl(null), "");
+  });
+});
+
+describe("extractSolves", () => {
+  test("turns an accepted submission into a library record", () => {
+    const { ok, error, solves, seen } = extractSolves({ status: "OK", result: [submission()] });
+    assert.equal(ok, true);
+    assert.equal(error, null);
+    assert.equal(seen, 1);
+    assert.deepEqual(solves[0], {
+      slug: "4A",
+      title: "Watermelon",
+      difficulty: "Easy",
+      rating: 800,
+      tags: ["brute force", "math"],
+      lang: { name: "GNU C++17 7.3.0", ext: "cpp", slug: "cpp" },
+      timestamp: 1_400_000_000_000,
+      runtime: "30 ms",
+      memory: "100 KB",
+    });
+  });
+
+  test("keeps only accepted submissions", () => {
+    const { solves, seen } = extractSolves({
+      status: "OK",
+      result: [
+        submission({ verdict: "WRONG_ANSWER" }),
+        submission({ verdict: "TIME_LIMIT_EXCEEDED" }),
+        submission({ verdict: "TESTING" }),
+        submission(),
+      ],
+    });
+    assert.equal(seen, 4, "seen counts the page, not the solves — it drives paging");
+    assert.equal(solves.length, 1);
+  });
+
+  test("files a gym solve under its gym slug", () => {
+    const { solves } = extractSolves({
+      status: "OK",
+      result: [submission({ problem: { contestId: 100500, index: "B", name: "Gym problem" } })],
+    });
+    assert.equal(solves[0].slug, "gym100500B");
+  });
+
+  test("skips a problem it cannot address rather than filing it wrongly", () => {
+    // acmsguru problems have a numeric index and no contest — no slug exists
+    // for them, and a guessed one would collide with a real problem.
+    const { solves } = extractSolves({
+      status: "OK",
+      result: [
+        submission({ problem: { index: "101", name: "acmsguru", problemsetName: "acmsguru" } }),
+        submission({ problem: null }),
+      ],
+    });
+    assert.deepEqual(solves, []);
+  });
+
+  test("an unrated problem says Unknown instead of claiming Easy", () => {
+    const { solves } = extractSolves({
+      status: "OK",
+      result: [submission({ problem: { contestId: 4, index: "A", name: "W", tags: [] } })],
+    });
+    assert.equal(solves[0].difficulty, "Unknown");
+    assert.equal(solves[0].rating, null);
+  });
+
+  test("reports zero memory as none rather than '0 KB'", () => {
+    const { solves } = extractSolves({
+      status: "OK",
+      result: [submission({ memoryConsumedBytes: 0, timeConsumedMillis: 0 })],
+    });
+    assert.equal(solves[0].memory, null);
+    assert.equal(solves[0].runtime, "0 ms");
+  });
+
+  test("passes the API's own refusal back instead of pretending there are no solves", () => {
+    // The rate limiter answers this way, and "you have solved nothing" would be
+    // a lie that also wipes the progress display.
+    const res = extractSolves({ status: "FAILED", comment: "Call limit exceeded" });
+    assert.equal(res.ok, false);
+    assert.equal(res.error, "Call limit exceeded");
+    assert.deepEqual(res.solves, []);
+  });
+
+  test("an unreadable body is a failure, not an empty history", () => {
+    for (const bad of [null, undefined, "", 42]) {
+      assert.equal(extractSolves(bad).ok, false, String(bad));
+    }
+  });
+
+  test("a page smaller than the page size is what ends the paging loop", () => {
+    const { seen } = extractSolves({ status: "OK", result: [] });
+    assert.ok(seen < CF_PAGE_SIZE);
+  });
+});
+
+describe("mergeSolves", () => {
+  const at = (ts, over = {}) => ({ slug: "4A", timestamp: ts, ...over });
+
+  test("the first accepted submission is the solve date", () => {
+    // user.status returns newest first, so the later one arrives first.
+    const map = mergeSolves(new Map(), [at(2000), at(1000), at(3000)]);
+    assert.equal(map.get("4A").timestamp, 1000);
+  });
+
+  test("merges across pages", () => {
+    const map = new Map();
+    mergeSolves(map, [at(5000), { slug: "1234B", timestamp: 9000 }]);
+    mergeSolves(map, [at(4000)]);
+    assert.equal(map.size, 2);
+    assert.equal(map.get("4A").timestamp, 4000);
+  });
+
+  test("keeps the whole record of the submission whose date won", () => {
+    const map = mergeSolves(new Map(), [
+      at(2000, { runtime: "late" }),
+      at(1000, { runtime: "first" }),
+    ]);
+    assert.equal(map.get("4A").runtime, "first");
+  });
+
+  test("a dated submission beats an undated one either way round", () => {
+    assert.equal(mergeSolves(new Map(), [at(null), at(1000)]).get("4A").timestamp, 1000);
+    assert.equal(mergeSolves(new Map(), [at(1000), at(null)]).get("4A").timestamp, 1000);
   });
 });

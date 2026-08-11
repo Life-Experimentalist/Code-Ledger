@@ -9,8 +9,12 @@
  *   2. watchForVerdict() observes span[submissionverdict="OK"] on any CF page.
  *   3. On accepted verdict: read saved code, extract DOM metadata, emit solve.
  *
+ * Your own profile page also carries an "Import All Solves" button, which reads
+ * the public `user.status` API. Codeforces publishes the submission list but not
+ * the submission text, so imported problems arrive without code — see
+ * `profile-import.js`.
+ *
  * Alpha limitations:
- *   - No profile bulk import (CF API is CORS-blocked from content scripts).
  *   - Gym contest submissions are detected but the source URL in README points
  *     to the gym contest, not a permanent problemset URL.
  */
@@ -33,6 +37,7 @@ import {
   readCurrentTestOutput,
 } from "./submission-detector.js";
 import { injectCFQoL, removeCFQoL } from "./qol.js";
+import { injectProfileImportBtn } from "./profile-import.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
 import { isAIActive } from "../../../core/feature-flags.js";
 
@@ -104,15 +109,6 @@ Be concise. Max 200 words.`;
           default: true,
           description: "Show a floating AI chat panel on Codeforces problem pages.",
         },
-        {
-          key: "cf_handle",
-          label: "Codeforces handle",
-          type: "text",
-          default: "",
-          description: "Your Codeforces handle. Reserved for future profile import support.",
-          advanced: true,
-          placeholder: "e.g. tourist",
-        },
       ],
     };
   }
@@ -140,6 +136,16 @@ Be concise. Max 200 words.`;
       this._cleanupSubmitHook = hookSubmitButton(page);
     }
 
+    if (page.type === PAGE_TYPES.PROFILE) {
+      Storage.getSettings()
+        .then((s) => {
+          if (this.isEnabled(s)) {
+            injectProfileImportBtn((slug) => this.makeProblemId(slug), page.handle);
+          }
+        })
+        .catch(() => {});
+    }
+
     // Watch for accepted verdict on ALL CF pages:
     //   - Problem page: inline submissions section updates via XHR
     //   - /contest/{id}/my: full page load after contest submission
@@ -147,7 +153,8 @@ Be concise. Max 200 words.`;
       this._handleAcceptedVerdict(submissionId, contestId, page);
     });
 
-    // On-demand metadata fetch (used by future profile import feature)
+    // On-demand metadata fetch: the background metadata refresh opens the
+    // problem page with ?codeledger_fetch=1 and waits for this to write back.
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get("codeledger_fetch") && page.type === PAGE_TYPES.PROBLEM) {
