@@ -30,6 +30,7 @@ Chrome Web Store requires each upload to exceed the last.
 - A generated GitHub Pages dashboard in the repository showing a solve heatmap, language and topic breakdowns, and a searchable problem table.
 - Cross-device sync through the repository's `index.json`, with a conflict resolver for entries that changed in two places.
 - Mirror repositories: a commit that fails against the primary target falls through to a configured mirror rather than being lost.
+- A **Connection check** in Settings → Advanced that answers "why is nothing being committed?" in one press. It reports the four things that have to be true in the order they matter — a token is stored, GitHub still accepts it and says what it can do, the repository exists and this token can push to it, and something has actually landed there — and each line that is not green says what to do about it. It draws the distinctions the old error message could not: a token that reports no scopes is a GitHub App token or a fine-grained PAT, and only the first of those is unable to create a repository; a 404 on the repository means either it is missing or this token cannot see it, and it says both rather than guessing.
 
 **AI**
 

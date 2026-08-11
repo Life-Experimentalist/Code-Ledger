@@ -12,6 +12,7 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("PanelAdvanced");
 
 import { Storage } from "../../core/storage.js";
+import { runHealthCheck, overallStatus } from "../../core/health-check.js";
 import { registry } from "../../core/handler-registry.js";
 import { MissingMetadataModal } from "../../ui/components/MissingMetadataModal.js";
 import { DedupReviewQueue } from "../../ui/components/DedupReviewQueue.js";
@@ -387,6 +388,9 @@ Return ONLY a JSON array of objects representing suggestions where the current m
         </p>
       </div>
 
+      <!-- Connection check -->
+      <${ConnectionCheck} />
+
       <!-- Tracking & privacy -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
@@ -741,6 +745,106 @@ Return ONLY a JSON array of objects representing suggestions where the current m
           </p>
         `}
       </div>
+    </div>
+  `;
+}
+
+/**
+ * "What state am I actually in?" for the GitHub connection.
+ *
+ * The store rejection was a reviewer who could not tell why repository creation
+ * failed. The causes are fixed; this is the part that tells someone which one
+ * they hit, in a form they can screenshot.
+ *
+ * It runs on demand, not on mount: it costs three GitHub API calls, and a
+ * settings page that spends rate limit every time it is opened is its own bug.
+ */
+function ConnectionCheck() {
+  const [busy, setBusy] = useState(false);
+  const [results, setResults] = useState(null);
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const settings = (await Storage.getSettings()) || {};
+      const oauth = await Storage.getAuthToken("github").catch(() => "");
+      const pat = settings.github_token || "";
+      setResults(
+        await runHealthCheck({
+          token: oauth || pat,
+          tokenSource: oauth ? "GitHub sign-in" : pat ? "personal access token" : "",
+          owner: settings.github_owner || settings.github_username || "",
+          repo: settings.github_repo || settings.gitRepo || "",
+        }),
+      );
+    } catch (e) {
+      dbg.error("connection check failed", e?.message || e);
+      setResults([
+        {
+          id: "error",
+          label: "Connection check",
+          status: "fail",
+          detail: e?.message || "The check itself failed.",
+        },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const TONE = {
+    ok: "text-emerald-400",
+    warn: "text-amber-400",
+    fail: "text-rose-400",
+    skipped: "text-slate-500",
+  };
+  const MARK = { ok: "✓", warn: "!", fail: "✗", skipped: "–" };
+  const HEADLINE = {
+    ok: "Everything the extension needs is in place.",
+    warn: "It works, but something below is worth knowing about.",
+    fail: "Something is broken. The line marked ✗ says which.",
+    skipped: "",
+  };
+
+  return html`
+    <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
+            Connection check
+          </h3>
+          <p class="text-[11px] text-slate-500 leading-snug mt-1 max-w-[320px]">
+            Asks GitHub what your token is, what it may do, and whether your repository is
+            reachable. Nothing is changed and nothing is sent anywhere else.
+          </p>
+        </div>
+        <button
+          onClick=${run}
+          disabled=${busy}
+          class="px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/20 disabled:opacity-50 shrink-0"
+        >
+          ${busy ? "Checking…" : "Run check"}
+        </button>
+      </div>
+      ${results &&
+      html`
+        <div class="space-y-2">
+          <p class="text-xs ${TONE[overallStatus(results)]}">${HEADLINE[overallStatus(results)]}</p>
+          ${results.map(
+            (r) => html`
+              <div key=${r.id} class="flex items-start gap-2">
+                <span class="text-xs ${TONE[r.status]} w-3 shrink-0 mt-0.5">${MARK[r.status]}</span>
+                <div class="min-w-0">
+                  <p class="text-sm text-slate-300">${r.label}</p>
+                  <p class="text-[11px] text-slate-500 leading-snug">${r.detail}</p>
+                  ${r.fix &&
+                  html`<p class="text-[11px] text-cyan-400/80 leading-snug">${r.fix}</p>`}
+                </div>
+              </div>
+            `,
+          )}
+        </div>
+      `}
     </div>
   `;
 }
