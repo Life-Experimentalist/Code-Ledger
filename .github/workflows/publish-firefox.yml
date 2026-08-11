@@ -18,14 +18,40 @@ permissions:
   contents: read
 
 jobs:
+  # `secrets` is not in scope in a job-level `if`, so the guard that was written
+  # there never skipped anything — it made the whole workflow file invalid, and
+  # every push recorded a failed run in under a second. Reading the secret in a
+  # step and passing the answer out as an output is the way to express "no-op
+  # until this is configured".
+  gate:
+    name: Check AMO credentials
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          SENTINEL: ${{ secrets.AMO_JWT_ISSUER }}
+        run: |
+          if [ -n "$SENTINEL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "AMO credentials are not set — nothing to publish."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish-firefox:
     name: Upload & submit to Firefox AMO
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Skip pre-releases and skip if secrets are not configured
-    if: "!contains(github.ref_name, '-') && secrets.AMO_JWT_ISSUER != ''"
+    needs: gate
+    # Skip pre-releases, and skip entirely when the credentials are absent.
+    if: "!contains(github.ref_name, '-') && needs.gate.outputs.configured == 'true'"
 
     steps:
+      # The JWT generator lives in .github/scripts/, so the tree has to be here.
+      - uses: actions/checkout@v4
+
       - name: Extract version from tag
         id: version
         run: |
@@ -49,24 +75,7 @@ jobs:
       - name: Generate AMO JWT
         id: amo_jwt
         run: |
-          JWT=$(python3 - <<'PYEOF'
-import base64, hashlib, hmac, json, time, uuid, os
-
-iss    = os.environ["AMO_JWT_ISSUER"]
-secret = os.environ["AMO_JWT_SECRET"]
-iat    = int(time.time())
-exp    = iat + 300
-
-def b64(data):
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-header  = b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-payload = b64(json.dumps({"iss": iss, "jti": str(uuid.uuid4()), "iat": iat, "exp": exp}).encode())
-msg     = f"{header}.{payload}"
-sig     = b64(hmac.new(secret.encode(), msg.encode(), hashlib.sha256).digest())
-print(f"{msg}.{sig}")
-PYEOF
-)
+          JWT=$(python3 .github/scripts/amo-jwt.py)
           echo "::add-mask::$JWT"
           echo "jwt=$JWT" >> "$GITHUB_OUTPUT"
         env:

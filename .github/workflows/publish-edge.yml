@@ -20,12 +20,36 @@ permissions:
   contents: read
 
 jobs:
+  # `secrets` is not in scope in a job-level `if`, so the guard that was written
+  # there never skipped anything — it made the whole workflow file invalid, and
+  # every push recorded a failed run in under a second. Reading the secret in a
+  # step and passing the answer out as an output is the way to express "no-op
+  # until this is configured".
+  gate:
+    name: Check Edge credentials
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          SENTINEL: ${{ secrets.EDGE_CLIENT_ID }}
+        run: |
+          if [ -n "$SENTINEL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Edge credentials are not set — nothing to publish."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish-edge:
     name: Upload & publish to Microsoft Edge Add-ons
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Skip pre-releases and skip if secrets are not configured
-    if: "!contains(github.ref_name, '-') && secrets.EDGE_CLIENT_ID != ''"
+    needs: gate
+    # Skip pre-releases, and skip entirely when the credentials are absent.
+    if: "!contains(github.ref_name, '-') && needs.gate.outputs.configured == 'true'"
 
     steps:
       - name: Extract version from tag
