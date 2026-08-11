@@ -14,6 +14,8 @@ const dbg = createDebugger("HandlersInit");
 import { LeetCodeHandler } from "./platforms/leetcode/index.js";
 import { GFGHandler as GeeksForGeeksHandler } from "./platforms/geeksforgeeks/index.js";
 import { CodeforcesHandler } from "./platforms/codeforces/index.js";
+import { NeetCodeHandler } from "./platforms/neetcode/index.js";
+import { TakeUForwardHandler } from "./platforms/takeuforward/index.js";
 
 // Git Providers
 import { GitHubHandler } from "./git/github/index.js";
@@ -28,7 +30,13 @@ import { OpenRouterHandler } from "./ai/openrouter/index.js";
 
 export function initializeHandlers() {
   dbg.log(`initializeHandlers(): starting handler registration...`);
-  const platforms = [new LeetCodeHandler(), new GeeksForGeeksHandler(), new CodeforcesHandler()];
+  const platforms = [
+    new LeetCodeHandler(),
+    new GeeksForGeeksHandler(),
+    new CodeforcesHandler(),
+    new NeetCodeHandler(),
+    new TakeUForwardHandler(),
+  ];
   platforms.forEach((h) => {
     registry.registerPlatform(h.id, h);
     if (typeof h.getSettingsSchema === "function")

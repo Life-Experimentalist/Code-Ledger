@@ -467,7 +467,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 3. Create `page-detector.js` with `detectPage()` and `isSolveCapablePage()`
 4. Add hostname match in `src/content/handler-loader.js`
 5. Run `node dev/generate-manifest-domains.js` to update host_permissions in both manifests
-6. See `docs/ADDING_PLATFORM_HANDLER.md` for full contract
+6. See `docs/guides/development/adding-platform-handler.md` for full contract
 
 ## Adding a New AI Provider
 

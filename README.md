@@ -99,20 +99,23 @@ index.html               ← GitHub Pages dashboard, same commit
 
 ## Install
 
-| Browser              | Install                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Chrome / Edge / Brave | [Chrome Web Store](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb)     |
-| Firefox              | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/code-ledger/)                               |
-| Any                  | [Download a release zip](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) and load it unpacked |
+| Browser               | Install                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Chrome / Edge / Brave | [Chrome Web Store](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb)           |
+| Firefox               | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/code-ledger/)                                     |
+| Any                   | [Download a release zip](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) and load it unpacked |
 
 **Loading unpacked from source:**
 
 ```
-Chromium   chrome://extensions  →  Developer mode ON  →  Load unpacked  →  select src/
+Chromium   chrome://extensions  →  Developer mode ON  →  Load unpacked  →  select dist/chromium
 Firefox    about:debugging      →  Load Temporary Add-on  →  select dist/firefox/manifest.json
 ```
 
-Firefox needs `npm run build` first, because it loads a single `manifest.json` that the build emits per target.
+Run `npm run build` first for either target. `src/` holds two manifests —
+`manifest-chromium.json` and `manifest-firefox.json` — and no `manifest.json`;
+picking one and writing it out under that name is what the build does, so `src/`
+cannot be loaded unpacked directly.
 
 ---
 
@@ -136,6 +139,14 @@ CodeLedger requests `public_repo` and `workflow` by default — enough to create
 | **LeetCode**      | GraphQL submission polling + DOM       | Yes — Progress page |
 | **GeeksForGeeks** | DOM + Ace editor extraction            | Yes — profile page  |
 | **Codeforces**    | Submission-status DOM observation      | No                  |
+| **NeetCode**      | Judge response, read in the page world | No                  |
+| **takeuforward**  | Judge response, read in the page world | No                  |
+
+NeetCode and takeuforward are single-page apps that judge over `fetch` and never
+render a durable verdict node, so their handlers read the judge's own response
+instead of the DOM. On takeuforward only the TUF+ judge reports a verdict;
+without a subscription the handler still marks off sheet rows you have already
+solved elsewhere, but has nothing to commit.
 
 Each platform is a self-contained directory under `src/handlers/platforms/`. Adding another one requires no changes to the core — see [the handler contract](docs/guides/development/adding-platform-handler.md).
 
@@ -143,14 +154,14 @@ Each platform is a self-contained directory under `src/handlers/platforms/`. Add
 
 ## Supported AI Providers
 
-| Provider                    | Notes                            |
-| --------------------------- | -------------------------------- |
-| Google Gemini               | Default — free tier available    |
-| OpenAI                      | Bring your own key               |
-| Anthropic Claude            | Bring your own key               |
-| DeepSeek                    | Bring your own key               |
-| Ollama                      | Local models — no API key needed |
-| OpenRouter                  | Access many models with one key  |
+| Provider         | Notes                            |
+| ---------------- | -------------------------------- |
+| Google Gemini    | Default — free tier available    |
+| OpenAI           | Bring your own key               |
+| Anthropic Claude | Bring your own key               |
+| DeepSeek         | Bring your own key               |
+| Ollama           | Local models — no API key needed |
+| OpenRouter       | Access many models with one key  |
 
 Keys are stored in your browser under `ai.keys` and are sent only to the provider you selected. If a provider fails, the queue retries and can fall back to another configured provider.
 
@@ -158,18 +169,18 @@ Keys are stored in your browser under `ai.keys` and are sent only to the provide
 
 ## What You Get
 
-|                          |                                                                                                                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Zero-click commits**   | Every accepted submission is committed the moment it is accepted — solution file and problem statement in one atomic commit.                                                                       |
-| **Bulk import**          | Pull your existing LeetCode or GeeksForGeeks history in from your profile page: past accepted solutions with code, statements and stats, committed in batched commits.                             |
-| **AI code review**       | Complexity analysis, optimisation suggestions and hints, committed alongside your code. Six providers, your own keys.                                                                              |
-| **Live dashboard**       | A heatmap, topic radar, difficulty breakdown and solve-velocity chart, generated into your repo and served from your own GitHub Pages.                                                             |
-| **Knowledge graph**      | A force-directed graph of everything you have solved, linked by topic.                                                                                                                             |
-| **AI chat panel**        | A floating panel on every problem page. Ask about complexity, request hints, paste errors — your code is available to the chat via `/mycode`.                                                      |
-| **AI Behaviour Bank**    | Personal memory for the assistant: saved insights, named skills that trigger on command, and learning roadmaps that inject context into every chat.                                                |
-| **Cross-device sync**    | A `chrome.alarms` job polls your repo's `index.json` and reconciles it with local IndexedDB, so any machine you install on catches up on its own.                                                  |
-| **Rolling backups**      | Scheduled snapshots of problems and settings committed to your repo. Restore in one click.                                                                                                         |
-| **100% yours**           | Your code goes from your browser straight to your repo. The only server this project runs is the OAuth relay.                                                                                      |
+|                        |                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zero-click commits** | Every accepted submission is committed the moment it is accepted — solution file and problem statement in one atomic commit.                                           |
+| **Bulk import**        | Pull your existing LeetCode or GeeksForGeeks history in from your profile page: past accepted solutions with code, statements and stats, committed in batched commits. |
+| **AI code review**     | Complexity analysis, optimisation suggestions and hints, committed alongside your code. Six providers, your own keys.                                                  |
+| **Live dashboard**     | A heatmap, topic radar, difficulty breakdown and solve-velocity chart, generated into your repo and served from your own GitHub Pages.                                 |
+| **Knowledge graph**    | A force-directed graph of everything you have solved, linked by topic.                                                                                                 |
+| **AI chat panel**      | A floating panel on every problem page. Ask about complexity, request hints, paste errors — your code is available to the chat via `/mycode`.                          |
+| **AI Behaviour Bank**  | Personal memory for the assistant: saved insights, named skills that trigger on command, and learning roadmaps that inject context into every chat.                    |
+| **Cross-device sync**  | A `chrome.alarms` job polls your repo's `index.json` and reconciles it with local IndexedDB, so any machine you install on catches up on its own.                      |
+| **Rolling backups**    | Scheduled snapshots of problems and settings committed to your repo. Restore in one click.                                                                             |
+| **100% yours**         | Your code goes from your browser straight to your repo. The only server this project runs is the OAuth relay.                                                          |
 
 ---
 

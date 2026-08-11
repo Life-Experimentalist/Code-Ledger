@@ -223,12 +223,38 @@ export const CONSTANTS = Object.freeze({
       contestsBase: "https://codeforces.com/contest/",
       status: FEATURE_STATUS.ALPHA,
     },
+    neetcode: {
+      id: "neetcode",
+      name: "NeetCode",
+      color: "#4CAF50",
+      domains: ["neetcode.io"],
+      baseUrl: "https://neetcode.io",
+      problemsBase: "https://neetcode.io/problems/",
+      problemsetUrl: "https://neetcode.io/practice",
+      apiBase: "https://neetcode.io/api",
+      status: FEATURE_STATUS.BETA,
+    },
+    takeuforward: {
+      id: "takeuforward",
+      name: "takeuforward",
+      color: "#F97316",
+      domains: ["takeuforward.org"],
+      baseUrl: "https://takeuforward.org",
+      // Solving happens on TUF+, which is behind the subscription. The free
+      // sheets live at /dsa/{sheet} and link out to LeetCode.
+      problemsBase: "https://takeuforward.org/plus/dsa/problems/",
+      problemsetUrl: "https://takeuforward.org/dsa/strivers-a2z-sheet-learn-dsa-a-to-z",
+      apiBase: "https://backend-go.takeuforward.org/api",
+      status: FEATURE_STATUS.BETA,
+    },
   },
 
   PLATFORM_CODE: {
     leetcode: "lc",
     geeksforgeeks: "gfg",
     codeforces: "cf",
+    neetcode: "nc",
+    takeuforward: "tuf",
   },
 
   CANONICAL_VOTES_REQUIRED: 5,

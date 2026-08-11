@@ -23,7 +23,14 @@ const PLATFORM_DOMAINS = [
   "*://*.leetcode.com/*",
   "*://*.geeksforgeeks.org/*",
   "*://*.codeforces.com/*",
+  "*://*.neetcode.io/*",
+  "*://*.takeuforward.org/*",
 ];
+
+// Where content/net-tap.js runs. It executes in the page's own world, so it is
+// deliberately scoped to the two sites whose judges cannot be observed any
+// other way — not to every platform.
+const TAP_DOMAINS = ["*://*.neetcode.io/*", "*://*.takeuforward.org/*"];
 
 // The auth worker origin. Required for BOTH the OAuth callback relay
 // (background tabs.onUpdated reads changeInfo.url) and the presence-marker
@@ -55,6 +62,9 @@ for (const rel of ["src/manifest-chromium.json", "src/manifest-firefox.json"]) {
   // marker on the worker origin. Only the former is domain-generated.
   const loader = (m.content_scripts || []).find((c) => c.js?.includes("content/handler-loader.js"));
   if (loader) loader.matches = PLATFORM_DOMAINS;
+
+  const tap = (m.content_scripts || []).find((c) => c.js?.includes("content/net-tap.js"));
+  if (tap) tap.matches = TAP_DOMAINS;
 
   for (const entry of m.web_accessible_resources || []) {
     if (entry.resources?.includes("content/presence-marker.js")) continue;

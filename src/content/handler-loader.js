@@ -51,6 +51,22 @@ async function loadHandler() {
       console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing CodeforcesHandler...`);
       await cfHandler.init();
       console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ CodeforcesHandler initialized`);
+    } else if (isHost("neetcode.io", hostname)) {
+      console.log(`[CodeLedger:HandlerLoader] loadHandler(): platform detected = NeetCode`);
+      const ncUrl = chrome.runtime.getURL("handlers/platforms/neetcode/index.js");
+      const { NeetCodeHandler } = await import(ncUrl);
+      const ncHandler = new NeetCodeHandler();
+      console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing NeetCodeHandler...`);
+      await ncHandler.init();
+      console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ NeetCodeHandler initialized`);
+    } else if (isHost("takeuforward.org", hostname)) {
+      console.log(`[CodeLedger:HandlerLoader] loadHandler(): platform detected = takeuforward`);
+      const tufUrl = chrome.runtime.getURL("handlers/platforms/takeuforward/index.js");
+      const { TakeUForwardHandler } = await import(tufUrl);
+      const tufHandler = new TakeUForwardHandler();
+      console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing TakeUForwardHandler...`);
+      await tufHandler.init();
+      console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ TakeUForwardHandler initialized`);
     } else {
       console.log(
         `[CodeLedger:HandlerLoader] loadHandler(): hostname not recognized (${hostname}) — CodeLedger not applicable`,

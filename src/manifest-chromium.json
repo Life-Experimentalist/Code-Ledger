@@ -26,6 +26,8 @@
         "*://*.leetcode.com/*",
         "*://*.geeksforgeeks.org/*",
         "*://*.codeforces.com/*",
+        "*://*.neetcode.io/*",
+        "*://*.takeuforward.org/*",
         "https://api.github.com/*",
         "https://api.openai.com/*",
         "https://api.anthropic.com/*",
@@ -43,12 +45,26 @@
             "matches": [
                 "*://*.leetcode.com/*",
                 "*://*.geeksforgeeks.org/*",
-                "*://*.codeforces.com/*"
+                "*://*.codeforces.com/*",
+                "*://*.neetcode.io/*",
+                "*://*.takeuforward.org/*"
             ],
             "js": [
                 "content/handler-loader.js"
             ],
             "run_at": "document_idle",
+            "all_frames": false
+        },
+        {
+            "matches": [
+                "*://*.neetcode.io/*",
+                "*://*.takeuforward.org/*"
+            ],
+            "js": [
+                "content/net-tap.js"
+            ],
+            "world": "MAIN",
+            "run_at": "document_start",
             "all_frames": false
         },
         {
@@ -80,6 +96,8 @@
                 "handlers/platforms/leetcode/*",
                 "handlers/platforms/geeksforgeeks/*",
                 "handlers/platforms/codeforces/*",
+                "handlers/platforms/neetcode/*",
+                "handlers/platforms/takeuforward/*",
                 "handlers/_base/*",
                 "handlers/ai/*",
                 "handlers/git/*",
@@ -96,7 +114,9 @@
             "matches": [
                 "*://*.leetcode.com/*",
                 "*://*.geeksforgeeks.org/*",
-                "*://*.codeforces.com/*"
+                "*://*.codeforces.com/*",
+                "*://*.neetcode.io/*",
+                "*://*.takeuforward.org/*"
             ]
         },
         {

@@ -89,7 +89,7 @@ npx wrangler dev    # local dev — copy worker/wrangler.toml.example to worker/
 3. Create `page-detector.js` with `detectPage()` and `isSolveCapablePage()`
 4. Add hostname match in `src/content/handler-loader.js`
 5. Run `node dev/generate-manifest-domains.js` to update `host_permissions` in both manifests
-6. See `docs/ADDING_PLATFORM_HANDLER.md` for the full contract and checklist
+6. See `docs/guides/development/adding-platform-handler.md` for the full contract and checklist
 
 Open tickets for GFG and Codeforces are in `docs/FEATURE_REQUESTS.md` with acceptance criteria.
 
