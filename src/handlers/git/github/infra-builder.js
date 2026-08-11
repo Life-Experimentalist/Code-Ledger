@@ -24,6 +24,7 @@ import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { LAYOUT_VERSION } from "../../../core/path-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
+import { decodeBase64Utf8 } from "../../../lib/base64.js";
 import { getPagesHtml, getRepoReadme } from "./pages-template.js";
 import { getCommitHistory, getContents, listDirectory, createBlob } from "./api-client.js";
 import { DEFAULT_THEME, getThemePalette } from "../../../core/theme-engine.js";
@@ -94,7 +95,7 @@ function _mergeReadme(existing, newBlock) {
 /** Decode GitHub's base64-encoded file content (handles line-wrapped base64). */
 function _decodeContent(encoded) {
   try {
-    return atob(encoded.replace(/\n/g, ""));
+    return decodeBase64Utf8(encoded);
   } catch (_) {
     return null;
   }
@@ -519,7 +520,7 @@ async function _readIndexMeta(owner, repo, token) {
   try {
     const file = await getContents(owner, repo, "index.json", token);
     if (!file?.content) return null;
-    const parsed = JSON.parse(atob(file.content.replace(/\n/g, "")));
+    const parsed = JSON.parse(decodeBase64Utf8(file.content));
     return {
       stats: parsed.stats || null,
       summary: parsed.meta?.summary || null,

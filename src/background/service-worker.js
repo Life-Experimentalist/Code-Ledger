@@ -4,6 +4,7 @@
  */
 
 import { initDebug, coreDebug, setDebug, createDebugger } from "../lib/debug.js";
+import { decodeBase64Utf8 } from "../lib/base64.js";
 import { storage as browserStorage } from "../lib/browser-compat.js";
 import { registry } from "../core/handler-registry.js";
 import { eventBus } from "../core/event-bus.js";
@@ -85,7 +86,7 @@ import {
   commitBackupToGitHub,
   fetchBackupSnapshot,
   restoreSnapshot,
-  buildSnapshot,
+  saveLocalSnapshots,
 } from "../core/backup/backup-manager.js";
 import {
   findDuplicatesForProblem,
@@ -946,10 +947,8 @@ async function commitUpdatedProblem(problem, settings) {
     );
     dbg.log(`commitUpdatedProblem(): ✓ commit succeeded`);
     _maybeGenerateAISummary(currentSettings).catch(() => {});
-    // Rolling backup — fire-and-forget, errors logged internally
-    buildSnapshot()
-      .then((snapshot) => Storage.updateRollingBackup(snapshot))
-      .catch((e) => dbg.warn("Failed to update local rolling backup on update:", e));
+    // Rolling backup — fire-and-forget; the outcome lands in the backup status
+    saveLocalSnapshots();
 
     const _git = registry.getGitProvider(currentSettings.gitProvider || "github");
     if (_git) {
@@ -1478,17 +1477,12 @@ async function handleSolved(data) {
         } catch (_) {}
       }
 
-      // Local rolling backup (always-current snapshot)
-      buildSnapshot()
-        .then((snapshot) => Storage.updateRollingBackup(snapshot))
-        .catch((e) => dbg.warn("Failed to update local rolling backup on solve:", e));
-
-      // Scheduled backup on solve (if enabled)
-      if (settings.schedBackupOnSolve !== false) {
-        buildSnapshot()
-          .then((snapshot) => Storage.addScheduledBackup(snapshot, "on-solve"))
-          .catch((e) => dbg.warn("Failed to save scheduled backup on solve:", e));
-      }
+      // On-device snapshots — one build feeds the rolling copy and, if it is
+      // switched on, the scheduled one.
+      saveLocalSnapshots({
+        scheduled: settings.schedBackupOnSolve !== false,
+        trigger: "on-solve",
+      });
 
       // GitHub rolling backup (if enabled)
       const _git = registry.getGitProvider(settings.gitProvider || "github");
@@ -1589,7 +1583,7 @@ async function performPendingRenames() {
       for (const f of relevant) {
         const newPath = f.path.replace(r.oldBase, r.newBase);
         const blob = await git.apiFetch(`/repos/${owner}/${repo}/git/blobs/${f.sha}`);
-        const content = atob((blob.content || "").replace(/\n/g, ""));
+        const content = decodeBase64Utf8(blob.content);
         filesToAdd.push({ path: newPath, content });
         pathsToDelete.push(f.path);
       }
@@ -1768,7 +1762,7 @@ async function handleResyncCount() {
   const remoteProblems = [];
   try {
     const indexRes = await git.getContents(owner, repoName, "index.json");
-    const raw = atob((indexRes.content || "").replace(/\n/g, ""));
+    const raw = decodeBase64Utf8(indexRes.content);
     const index = JSON.parse(raw);
     remoteProblems.push(...(index.problems || []));
     dbg.log(`handleResyncCount(): fetched ${remoteProblems.length} remote problem(s)`);
@@ -1898,7 +1892,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
   let headSha = null;
   try {
     const indexRes = await git.getContents(owner, repoName, "index.json");
-    const raw = atob((indexRes.content || "").replace(/\n/g, ""));
+    const raw = decodeBase64Utf8(indexRes.content);
     const index = JSON.parse(raw);
     (index.problems || []).forEach((p) => {
       const key = getProblemCommitKey(p);
@@ -3732,7 +3726,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // 5. Committed count (from index.json)
         try {
           const indexFile = await git.getContents(owner, repo, "index.json");
-          const indexRaw = indexFile?.content ? atob(indexFile.content.replace(/\n/g, "")) : "{}";
+          const indexRaw = decodeBase64Utf8(indexFile?.content) || "{}";
           const index = JSON.parse(indexRaw);
           checks.committedProblemCount = Array.isArray(index.problems) ? index.problems.length : 0;
           checks.indexLayoutVersion = index.layoutVersion || 1;
@@ -4239,8 +4233,8 @@ try {
             return;
           }
           const keep = Math.max(1, parseInt(settings.githubBackupKeep || "10", 10));
-          await commitBackupToGitHub(owner, repo, git, keep);
-          sendResponse({ ok: true });
+          const result = await commitBackupToGitHub(owner, repo, git, keep);
+          sendResponse({ ok: true, ...result });
         } catch (e) {
           dbg.error(`onMessage(COMMIT_GITHUB_BACKUP_NOW): failed:`, e?.message);
           sendResponse({ ok: false, error: e.message });

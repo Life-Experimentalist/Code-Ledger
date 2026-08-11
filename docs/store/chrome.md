@@ -111,6 +111,10 @@ _(paste as-is into the form)_
 
 > Stores the user's GitHub repository settings, OAuth token reference, problem cache, AI provider configuration, and sync state locally in the browser. If the user opts in to anonymous usage stats (disabled by default), a solve-event counter `{ platform, version }` is sent to `counter.vkrishna04.me`. No other data leaves the browser.
 
+**unlimitedStorage**
+
+> Lifts the 10 MB local-storage cap so the on-device backups fit. CodeLedger keeps up to sixteen local snapshots of the user's own solve history (ten they save by hand, five taken automatically, and one always-current copy), and each snapshot contains the full text of every solution they have written. A user with a few hundred solutions passes 10 MB, at which point the backups silently stop updating — the safety net they are relying on. No additional data is collected; the permission only allows the data the user already has to be stored in full.
+
 **alarms**
 
 > Schedules the periodic repository sync check (every 30 minutes) and the batched maintenance commit (every 10 minutes) that push new solutions to the user's own GitHub repository. Two further alarms drain the AI-review and code-recovery queues; they are created only while a queue actually has work and are cleared when it empties, so the extension does not wake in the background with nothing to do.

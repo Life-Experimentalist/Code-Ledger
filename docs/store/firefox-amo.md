@@ -63,13 +63,14 @@ Thank you for reviewing CodeLedger.
 - **OAuth Security:** GitHub OAuth token is exchanged via a Cloudflare Worker proxy (`codeledger.vkrishna04.me`) and returned directly to the browser. Tokens are saved only in local extension storage and never stored on the worker.
 - **Strict Permission Scopes:**
   - `storage`: Persists settings, OAuth token, and IndexedDB solve cache locally.
+  - `unlimitedStorage`: Local backup snapshots of the user's own solve history — up to sixteen, each holding the full source of every solution — outgrow the default `storage.local` cap past a few hundred solutions. Grants no access to any new data.
   - `alarms`: Schedules the 30-minute repository sync check and the 10-minute batched maintenance commit. Two further alarms drain the AI-review and code-recovery queues and exist only while a queue has work. Streak badges are refreshed by a GitHub Action inside the user's own repository, not by the extension.
   - `tabs`: Detects the OAuth callback URL and refreshes open library tabs after a commit. The extension does not request `scripting`; content scripts are declared statically in the manifest.
   - Host permissions (`leetcode.com`, `geeksforgeeks.org`, `codeforces.com`): Observes DOM on coding platforms.
   - Host permission `api.github.com`: Commits files directly to the user's repo.
   - Host permission `codeledger.vkrishna04.me`: Starts the OAuth sign-in flow and serves the shared canonical problem-ID map.
   - Host permissions for AI providers (`api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `openrouter.ai`, `localhost:11434`): Contacted only for the provider the user configured a key for.
-  - The Firefox build declares only `storage`, `alarms` and `tabs`; the Library uses `sidebar_action` rather than the Chromium `sidePanel` permission.
+  - The Firefox build declares only `storage`, `unlimitedStorage`, `alarms` and `tabs`; the Library uses `sidebar_action` rather than the Chromium `sidePanel` permission.
   - No host permission is declared for `raw.githubusercontent.com`. If the user adds a friend's repository to the optional party comparison, the extension reads that public repository's `badges/stats.json` with an anonymous `fetch`, which GitHub serves with `Access-Control-Allow-Origin: *`. Nothing is uploaded, no credential is attached, and an empty friend list makes no such request.
 - **Opt-In Telemetry:** Disabled by default. If enabled under Settings → Advanced → Anonymous telemetry, it sends only `{ version: "x.y.z", platform: "leetcode" }` to `counter.vkrishna04.me`. No code, tokens, or identifiers are included. Reviewers can verify in `src/core/telemetry.js`.
 

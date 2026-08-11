@@ -17,6 +17,7 @@ CodeLedger detects accepted DSA submissions on LeetCode, GeeksForGeeks, and Code
 **Permission notes:**
 
 - storage: persists settings, OAuth token, and problem cache locally. The only external call not covered by a host permission above is opt-in anonymous telemetry (disabled by default) — sends { platform, version } to counter.vkrishna04.me only if the user enables "Anonymous telemetry" in Settings → Advanced.
+- unlimitedStorage: local backup snapshots of the user's own solve history exceed the 10 MB `storage.local` cap past a few hundred solutions. No new data is read.
 - alarms: cross-device sync every 30 min, a batched maintenance commit every 10 min, plus queue-drain alarms that exist only while a queue has work.
 - sidePanel: CodeLedger Library panel (solve history, analytics, knowledge graph).
 - tabs: watches the tab URL during the GitHub OAuth redirect on codeledger.vkrishna04.me, and finds open Library tabs to refresh after a commit.
@@ -115,6 +116,9 @@ CodeLedger automatically detects accepted DSA problem submissions on LeetCode, G
 
 **storage**
 Required to persist user settings (GitHub repository name and owner, AI provider preferences, OAuth tokens, and per-problem solve history in IndexedDB). All data remains exclusively in local browser storage or the user's own GitHub repository. Nothing is transmitted to the extension developer.
+
+**unlimitedStorage**
+Required so the local backups are not truncated by the 10 MB `storage.local` cap. The extension keeps up to sixteen snapshots of the user's own solve history on the device — ten manual, five automatic, one always-current — and each holds the full source of every solution. Past a few hundred solutions those writes begin to fail, which silently disables the recovery path. The permission grants no access to anything new; it only lets the user's existing data be stored whole.
 
 **alarms**
 Required to schedule periodic work via `chrome.alarms`: a cross-device sync check every 30 minutes that reads the user's own GitHub repository index for solutions committed from another device, and a maintenance commit every 10 minutes that batches pending writes into one commit. Two further alarms drain the AI-review and code-recovery queues; they exist only while a queue has work and are cleared when it empties.

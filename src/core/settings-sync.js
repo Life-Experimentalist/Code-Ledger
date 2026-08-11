@@ -10,6 +10,7 @@
  */
 
 import { createDebugger } from "../lib/debug.js";
+import { decodeBase64Utf8 } from "../lib/base64.js";
 import { Storage } from "./storage.js";
 import { registry } from "./handler-registry.js";
 
@@ -174,7 +175,7 @@ async function _fetchSyncFile(owner, repo, git) {
   try {
     const res = await git.getContents(owner, repo, SYNC_PATH);
     if (!res?.content) return { data: null, sha: null };
-    const raw = atob((res.content || "").replace(/\n/g, ""));
+    const raw = decodeBase64Utf8(res.content);
     return { data: JSON.parse(raw), sha: res.sha || null };
   } catch (e) {
     if (String(e?.message || e).includes("404")) return { data: null, sha: null };

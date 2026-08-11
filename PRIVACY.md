@@ -101,7 +101,7 @@ The extension shows this same list live under **Settings → Privacy**, computed
 
 Code Ledger fully complies with the Google Chrome Web Store User Data Policy and the Mozilla Add-on Policies:
 
-- **Limited Use**: We only use the permissions requested (storage, alarms, sidePanel, tabs) to provide and improve the user-facing features of the extension. We do not use or transfer any data for advertising, marketing, or profiling purposes.
+- **Limited Use**: We only use the permissions requested (storage, unlimitedStorage, alarms, sidePanel, tabs) to provide and improve the user-facing features of the extension. We do not use or transfer any data for advertising, marketing, or profiling purposes.
 - **Encryption**: All communications with external APIs (GitHub, Google, OpenAI, etc.) are encrypted in transit via standard HTTPS (SSL/TLS).
 - **Single Purpose**: The extension's single purpose is to automate DSA solve commits and provide local analytics.
 

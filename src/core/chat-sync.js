@@ -10,6 +10,7 @@
  */
 
 import { createDebugger } from "../lib/debug.js";
+import { decodeBase64Utf8 } from "../lib/base64.js";
 import {
   getAllChats,
   getPendingSyncChats,
@@ -239,7 +240,7 @@ export async function importChatsFromRepo(owner, repo, token, getContentsFn, imp
     for (const file of toImport) {
       try {
         const fileData = await getContentsFn(owner, repo, file.path, token);
-        const raw = fileData?.content ? atob(fileData.content.replace(/\n/g, "")) : "";
+        const raw = decodeBase64Utf8(fileData?.content);
         if (!raw) continue;
         const parsed = parseChatMarkdown(raw, file.path);
         imported.push({

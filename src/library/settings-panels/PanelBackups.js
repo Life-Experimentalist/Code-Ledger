@@ -12,7 +12,11 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("PanelBackups");
 
 import { Storage } from "../../core/storage.js";
-import { buildSnapshot, restoreSnapshot } from "../../core/backup/backup-manager.js";
+import {
+  BACKUP_STATUS_KEY,
+  buildSnapshot,
+  restoreSnapshot,
+} from "../../core/backup/backup-manager.js";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -45,6 +49,52 @@ async function importData(file) {
 function fmtTime(ts) {
   if (!ts) return "—";
   return new Date(ts).toLocaleString();
+}
+
+/**
+ * What the last attempt on each route actually did.
+ *
+ * The automatic backups run when nobody is looking, so until this line existed
+ * a failing one looked exactly like a working one: the panel showed the same
+ * four tabs either way, and the reason was in a console the user never opens.
+ */
+function BackupStatus({ settings }) {
+  // Read it back rather than trusting the prop: the automatic backups are
+  // written by the service worker, which does not know this panel is open.
+  const [fresh, setFresh] = useState(null);
+  useEffect(() => {
+    Storage.getSettings()
+      .then((s) => setFresh(s?.[BACKUP_STATUS_KEY] || null))
+      .catch(() => {});
+  }, []);
+
+  const status = fresh || settings?.[BACKUP_STATUS_KEY];
+  const rows = [
+    ["On this device", status?.local],
+    ["In your repo", status?.github],
+  ].filter(([, s]) => s && s.at);
+  if (rows.length === 0) return null;
+
+  return html`
+    <div class="rounded-xl border border-white/8 bg-white/[0.02] divide-y divide-white/5">
+      ${rows.map(
+        ([label, s]) => html`
+          <div key=${label} class="flex items-start gap-2 px-3 py-2">
+            <span class="text-xs ${s.ok ? "text-emerald-400" : "text-rose-400"}">
+              ${s.ok ? "✓" : "✕"}
+            </span>
+            <div class="min-w-0">
+              <p class="text-[11px] text-slate-400">${label} · ${fmtTime(s.at)}</p>
+              ${s.detail &&
+              html`<p class="text-[11px] ${s.ok ? "text-slate-500" : "text-rose-300"} break-words">
+                ${s.detail}
+              </p>`}
+            </div>
+          </div>
+        `,
+      )}
+    </div>
+  `;
 }
 
 function fmtSize(data) {
@@ -552,8 +602,10 @@ function GitHubBackups({ settings, onSettingsChange }) {
   const commitNow = async () => {
     setBusy(true);
     try {
-      await sw("COMMIT_GITHUB_BACKUP_NOW");
-      flash("Backup committed to GitHub.");
+      const r = await sw("COMMIT_GITHUB_BACKUP_NOW");
+      flash(
+        `Committed ${r.path || "backup"}${r.pruned ? ` · pruned ${r.pruned} older` : ""}`.trim(),
+      );
       await loadBackups();
     } catch (e) {
       flash(e.message, true);
@@ -728,9 +780,12 @@ export function PanelBackups({ settings, onSettingsChange }) {
       <div>
         <h2 class="text-base font-semibold text-white mb-1">Backups</h2>
         <p class="text-xs text-slate-500 mb-1">
-          Three layers of protection for your solve history.
+          Four layers of protection for your solve history — three on this device, one in your
+          repository.
         </p>
       </div>
+
+      <${BackupStatus} settings=${settings} />
 
       <!-- Tab strip -->
       <div class="flex gap-1 border-b border-white/5">

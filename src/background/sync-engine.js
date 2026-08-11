@@ -7,6 +7,7 @@ import { Storage } from "../core/storage.js";
 import { CONSTANTS } from "../core/constants.js";
 import { registry } from "../core/handler-registry.js";
 import { createDebugger } from "../lib/debug.js";
+import { decodeBase64Utf8 } from "../lib/base64.js";
 import { normalizeLang } from "../core/lang-utils.js";
 import { flushPendingChatSync, importChatsFromRepo } from "../core/chat-sync.js";
 import { importChatsLocal } from "../core/ai-chat-storage.js";
@@ -87,7 +88,7 @@ export async function importFromRepo(owner, repo, git) {
 
   let raw = null;
   if (res && typeof res.content === "string" && res.content.trim()) {
-    raw = atob((res.content || "").replace(/\n/g, ""));
+    raw = decodeBase64Utf8(res.content);
     dbg.log(`importFromRepo(): ✓ loaded index.json from API`);
   } else {
     // Fallback: try raw.githubusercontent URL (public repos)

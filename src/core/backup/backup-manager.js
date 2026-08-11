@@ -11,6 +11,7 @@
  */
 
 import { createDebugger } from "../../lib/debug.js";
+import { decodeBase64Utf8 } from "../../lib/base64.js";
 import { Storage } from "../storage.js";
 import { getAllInsights, importInsights } from "../memory/knowledge-bank.js";
 import { autoPopulateFromHistory } from "../behavior-bank.js";
@@ -20,6 +21,36 @@ const dbg = createDebugger("BackupManager");
 const BACKUP_DIR = "backups";
 const DEFAULT_KEEP = 10;
 const COMMIT_INTERVAL_KEY = "_backupCommitCount";
+
+/** Where the last outcome of each backup route is kept. Underscore-prefixed, so
+ *  `buildSnapshot` strips it and a restore never carries one device's history
+ *  onto another. */
+export const BACKUP_STATUS_KEY = "_backupStatus";
+
+/**
+ * Remember how the last attempt on one route went.
+ *
+ * A backup nobody can see the result of is indistinguishable from no backup:
+ * the automatic routes run without anyone watching, and until now a failure on
+ * one of them went to `dbg.warn` and nowhere else. Settings is the right home
+ * because the panel already has them in hand.
+ *
+ * @param {"local"|"github"} scope
+ * @param {boolean} ok
+ * @param {string} detail  one line, shown to the user as-is
+ */
+export async function recordBackupOutcome(scope, ok, detail = "") {
+  try {
+    await Storage.updateSettings((cur) => ({
+      [BACKUP_STATUS_KEY]: {
+        ...(cur[BACKUP_STATUS_KEY] || {}),
+        [scope]: { ok, at: Date.now(), detail: String(detail || "").slice(0, 300) },
+      },
+    }));
+  } catch (e) {
+    dbg.warn(`recordBackupOutcome(${scope}): could not save status:`, e?.message || e);
+  }
+}
 
 // ── Snapshot builder ──────────────────────────────────────────────────────────
 
@@ -56,6 +87,39 @@ export async function buildSnapshot() {
 }
 
 /**
+ * Take the on-device snapshots in one pass.
+ *
+ * Two separate `buildSnapshot()` calls used to run on every solve — each one
+ * reading every problem, with its code, back out of IndexedDB — to store two
+ * copies of the same thing. One build now serves both, and the outcome is
+ * recorded so a device that has run out of room says so instead of quietly
+ * keeping the snapshot it had months ago.
+ *
+ * @param {object} [opts]
+ * @param {boolean} [opts.scheduled] also file it as a scheduled snapshot
+ * @param {string}  [opts.trigger] what caused it, shown in the scheduled list
+ * @returns {Promise<object|null>} the snapshot, or null if it could not be saved
+ */
+export async function saveLocalSnapshots({ scheduled = false, trigger = "on-solve" } = {}) {
+  try {
+    const snapshot = await buildSnapshot();
+    await Storage.updateRollingBackup(snapshot);
+    if (scheduled) await Storage.addScheduledBackup(snapshot, trigger);
+    await recordBackupOutcome(
+      "local",
+      true,
+      `${(snapshot.problems || []).length} problems saved on this device`,
+    );
+    return snapshot;
+  } catch (e) {
+    const reason = e?.message || String(e);
+    dbg.warn(`saveLocalSnapshots(): failed:`, reason);
+    await recordBackupOutcome("local", false, reason);
+    return null;
+  }
+}
+
+/**
  * Derive the backup file path from an ISO timestamp.
  * @param {string|Date} [ts]
  * @returns {string}
@@ -72,18 +136,23 @@ export function backupFilePath(ts = new Date()) {
 
 /**
  * Commit a new backup snapshot to GitHub and prune old ones.
- * Safe to call fire-and-forget — errors are caught and logged.
+ *
+ * **Throws** if the commit does not land. It used to swallow everything, which
+ * meant the "Backup now" button reported success after a 401, a rate limit or a
+ * repo that had been renamed — the one moment the user is actually watching.
+ * Callers that genuinely cannot fail (the fire-and-forget path after a solve)
+ * catch it themselves; the outcome is recorded either way.
  *
  * @param {string} owner
  * @param {string} repo
  * @param {object} git - GitHandler instance
  * @param {number} [keep=10] - Number of backups to retain
- * @returns {Promise<void>}
+ * @returns {Promise<{path: string, pruned: number, problems: number}>}
  */
 export async function commitBackupToGitHub(owner, repo, git, keep = DEFAULT_KEEP) {
+  const filePath = backupFilePath();
   try {
     const snapshot = await buildSnapshot();
-    const filePath = backupFilePath();
     const content = JSON.stringify(snapshot, null, 2);
 
     dbg.log(
@@ -103,8 +172,22 @@ export async function commitBackupToGitHub(owner, repo, git, keep = DEFAULT_KEEP
     dbg.log(
       `commitBackupToGitHub(): ✓ committed ${filePath}, pruned ${toDelete.length} old backup(s)`,
     );
+    const result = {
+      path: filePath,
+      pruned: toDelete.length,
+      problems: snapshot.problems.length,
+    };
+    await recordBackupOutcome(
+      "github",
+      true,
+      `${result.problems} problems → ${filePath}${result.pruned ? `, ${result.pruned} pruned` : ""}`,
+    );
+    return result;
   } catch (e) {
-    dbg.warn(`commitBackupToGitHub(): failed:`, e?.message || e);
+    const reason = e?.message || String(e);
+    dbg.warn(`commitBackupToGitHub(): failed:`, reason);
+    await recordBackupOutcome("github", false, reason);
+    throw e;
   }
 }
 
@@ -151,7 +234,18 @@ export async function maybeCommitRollingBackup(owner, repo, git) {
 
     if (count % interval === 0) {
       dbg.log(`maybeCommitRollingBackup(): triggering backup at commit #${count}`);
-      await commitBackupToGitHub(owner, repo, git, keep);
+      try {
+        await commitBackupToGitHub(owner, repo, git, keep);
+      } catch (e) {
+        // Give the counter back rather than waiting another full interval. A
+        // failed attempt is usually transient — an expired token, a rate limit,
+        // no network — and the next solve then retries instead of leaving the
+        // repo without a backup for another N problems.
+        await Storage.updateSettings((cur) => ({
+          [COMMIT_INTERVAL_KEY]: Math.max(0, (cur[COMMIT_INTERVAL_KEY] || 1) - 1),
+        }));
+        dbg.warn(`maybeCommitRollingBackup(): will retry on the next solve:`, e?.message || e);
+      }
     }
   } catch (e) {
     dbg.warn(`maybeCommitRollingBackup(): failed:`, e?.message || e);
@@ -199,8 +293,7 @@ export async function fetchBackupSnapshot(owner, repo, filePath, git) {
   try {
     const fileData = await git.getContents(owner, repo, filePath);
     if (!fileData?.content) return null;
-    const raw = atob(fileData.content.replace(/\n/g, ""));
-    return JSON.parse(raw);
+    return JSON.parse(decodeBase64Utf8(fileData.content));
   } catch (e) {
     dbg.warn(`fetchBackupSnapshot(): failed for ${filePath}:`, e?.message);
     return null;

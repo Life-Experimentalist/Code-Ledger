@@ -19,6 +19,7 @@ import { buildCommitMessage, COMMIT_TYPES } from "../core/commit-messages.js";
 import { Storage } from "../core/storage.js";
 import { registry } from "../core/handler-registry.js";
 import { createDebugger } from "../lib/debug.js";
+import { decodeBase64Utf8 } from "../lib/base64.js";
 import { CONSTANTS } from "../core/constants.js";
 import { cleanGfgSlug } from "../core/gfg-utils.js";
 import { countByDifficulty } from "../core/difficulty-map.js";
@@ -163,7 +164,7 @@ export async function detectRepoLayoutVersion() {
   try {
     const { git, token, owner, repo } = await _getGitContext();
     const res = await git.apiFetch(`/repos/${owner}/${repo}/contents/index.json`, token);
-    const raw = atob((res.content || "").replace(/\n/g, ""));
+    const raw = decodeBase64Utf8(res.content);
     const index = JSON.parse(raw);
     return index.layoutVersion ?? 1;
   } catch (e) {
