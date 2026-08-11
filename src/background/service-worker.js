@@ -11,7 +11,7 @@ import { Storage } from "../core/storage.js";
 import { Telemetry } from "../core/telemetry.js";
 import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
-import { buildConversationSystemPrompt } from "../core/ai-prompts.js";
+import { buildConversationSystemPrompt, parseWeakAreas } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
 import {
   handleRefreshMetadata,
@@ -686,6 +686,7 @@ async function generateAIReview(problem = {}, settings = null) {
 
       // Parse AI-inferred metadata
       let inferredMetadata = null;
+      let reviewerWeakAreas = [];
       if (review) {
         const metaRegex = /METADATA\s*\n([\s\S]*?)\n\s*END_METADATA/i;
         const blockMatch = review.match(metaRegex);
@@ -698,7 +699,7 @@ async function generateAIReview(problem = {}, settings = null) {
           const lines = review.split("\n");
           const keptLines = [];
           for (const line of lines) {
-            if (/^(TAGS|TOPIC|PATTERN|DIFFICULTY|METADATA|END_METADATA):/i.test(line)) {
+            if (/^(TAGS|TOPIC|PATTERN|DIFFICULTY|WEAK_AREAS|METADATA|END_METADATA):/i.test(line)) {
               blockText += line + "\n";
             } else {
               keptLines.push(line);
@@ -711,6 +712,8 @@ async function generateAIReview(problem = {}, settings = null) {
         const topicMatch = blockText.match(/TOPIC:\s*(.+)/i);
         const patternMatch = blockText.match(/PATTERN:\s*(.+)/i);
         const diffMatch = blockText.match(/DIFFICULTY:\s*(.+)/i);
+        const weakMatch = blockText.match(/WEAK_AREAS:\s*(.+)/i);
+        if (weakMatch) reviewerWeakAreas = parseWeakAreas(weakMatch[1]);
 
         const meta = {};
         if (tagsMatch) {
@@ -736,11 +739,13 @@ async function generateAIReview(problem = {}, settings = null) {
         }
       }
 
-      // Write back insights to behavior bank (non-blocking)
+      // Write back insights to behavior bank (non-blocking). The reviewer's own
+      // WEAK_AREAS line is authoritative when present — it knows what it flagged.
+      // The keyword scan stays as the fallback for models that drop the block.
       recordAIInsights({
         slug: problem.titleSlug || problem.id || "",
         platform: problem.platform || "",
-        weakAreas: _extractWeakAreas(review),
+        weakAreas: reviewerWeakAreas.length ? reviewerWeakAreas : _extractWeakAreas(review),
         summary: review.slice(0, 200),
       }).catch(() => {});
 

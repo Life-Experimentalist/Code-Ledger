@@ -171,12 +171,45 @@ export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) 
       ? `\n\nThis problem has sparse tags (${existingTags.length} found). Infer 2-5 accurate DSA tags from the code and title. Use ONLY the canonical names listed above.`
       : "";
 
-  const metadataInstruction = `\n\nAt the very end of your response, you MUST output a metadata block in exactly this format (no other text on these lines):\nMETADATA\nTAGS: Tag One, Tag Two  ← use ONLY from this canonical list: ${CANONICAL_TOPICS}${sparseTagHint}\nTOPIC: Primary Topic\nPATTERN: Optional Pattern Name\nDIFFICULTY: Easy/Medium/Hard\nEND_METADATA`;
+  // WEAK_AREAS is what gets written back into the behaviour bank and becomes the
+  // learner's recurring-flag profile. A keyword scan over the prose used to
+  // guess it and could only ever recognise seven fixed phrases; the reviewer
+  // already knows what it flagged, so it may as well say so.
+  const metadataInstruction = `\n\nAt the very end of your response, you MUST output a metadata block in exactly this format (no other text on these lines):\nMETADATA\nTAGS: Tag One, Tag Two  ← use ONLY from this canonical list: ${CANONICAL_TOPICS}${sparseTagHint}\nTOPIC: Primary Topic\nPATTERN: Optional Pattern Name\nDIFFICULTY: Easy/Medium/Hard\nWEAK_AREAS: short, lowercase labels for what this solution actually got wrong or handled poorly, comma-separated (e.g. off-by-one, edge cases, space complexity). Reuse the same wording across reviews so repeats are recognisable. Leave empty if the solution was sound.\nEND_METADATA`;
 
   const behaviorSection = problemContext._behaviorContext
     ? `\n\n## Learner History:\n${problemContext._behaviorContext}`
     : "";
   return `${filledTemplate}${behaviorSection}${currentMetadata}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\`${metadataInstruction}`;
+}
+
+/**
+ * Parse the reviewer's own WEAK_AREAS metadata line into labels.
+ *
+ * These labels become map keys in the aggregate learner profile and chips in
+ * the Behaviour tab, so a model that answers with a sentence instead of labels
+ * must not be able to poison either. Prose is dropped rather than truncated: a
+ * half-sentence label would never match the next review's wording, so it could
+ * only ever be a count of one, and a count of one is filtered out anyway.
+ *
+ * @param {string} raw the text following "WEAK_AREAS:"
+ * @returns {string[]} lowercase labels, deduplicated
+ */
+export function parseWeakAreas(raw = "") {
+  const MAX_LABEL_CHARS = 40;
+  const MAX_LABELS = 6;
+  const seen = new Set();
+  for (const part of String(raw).split(",")) {
+    const label = part
+      .trim()
+      .toLowerCase()
+      .replace(/[.;]+$/, "");
+    if (!label || label.length > MAX_LABEL_CHARS) continue;
+    if (/^(none|n\/a|na|nothing|not applicable|-|—)$/.test(label)) continue;
+    seen.add(label);
+    if (seen.size >= MAX_LABELS) break;
+  }
+  return [...seen];
 }
 
 export function buildConversationSystemPrompt(context = {}) {
