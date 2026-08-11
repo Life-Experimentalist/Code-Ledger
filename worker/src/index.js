@@ -58,21 +58,45 @@ app.options("/api/data/*", () => new Response(null, { status: 204, headers: PUBL
 
 /* ── Env helper ───────────────────────────────────────────────────── */
 
-function env(c, key) {
-  const aliases = {
-    GH_CLIENT_ID: ["CODELEDGER_OAUTH_CLIENT_ID", "CODELEDGER_GH_APP_CLIENT_ID", "GITHUB_CLIENT_ID"],
-    GH_CLIENT_SECRET: [
-      "CODELEDGER_OAUTH_CLIENT_SECRET",
-      "CODELEDGER_GH_APP_CLIENT_SECRET",
-      "GITHUB_CLIENT_SECRET",
-    ],
-    GH_WEBHOOK_SECRET: ["CODELEDGER_GH_APP_WEBHOOK_SECRET", "GITHUB_APP_WEBHOOK_SECRET"],
-  };
-  const names = aliases[key] || [key];
-  for (const name of names) {
-    if (c.env?.[name]) return c.env[name];
+const ENV_ALIASES = {
+  GH_CLIENT_ID: ["CODELEDGER_OAUTH_CLIENT_ID", "CODELEDGER_GH_APP_CLIENT_ID", "GITHUB_CLIENT_ID"],
+  GH_CLIENT_SECRET: [
+    "CODELEDGER_OAUTH_CLIENT_SECRET",
+    "CODELEDGER_GH_APP_CLIENT_SECRET",
+    "GITHUB_CLIENT_SECRET",
+  ],
+  GH_WEBHOOK_SECRET: ["CODELEDGER_GH_APP_WEBHOOK_SECRET", "GITHUB_APP_WEBHOOK_SECRET"],
+};
+
+/**
+ * Which alias actually supplied a value, or undefined if none did.
+ *
+ * The ID and the secret resolve through separate chains, so setting only the
+ * new `CODELEDGER_OAUTH_CLIENT_ID` on a deployment that still holds an old
+ * `CODELEDGER_GH_APP_CLIENT_SECRET` pairs one app's ID with another app's
+ * secret. GitHub answers that with "client_id and/or client_secret passed are
+ * incorrect", which names neither, and `wrangler secret list` shows both
+ * present and looks right. Naming the winning alias is what makes the
+ * mismatch visible.
+ *
+ * @param {any} c
+ * @param {string} key
+ * @returns {string|undefined}
+ */
+function envSource(c, key) {
+  for (const name of ENV_ALIASES[key] || [key]) {
+    if (c.env?.[name]) return name;
   }
   return undefined;
+}
+
+function env(c, key) {
+  const name = envSource(c, key);
+  // Trailing whitespace survives `wrangler secret put` when the value is pasted
+  // with a newline. An untrimmed ID still passes the authorize redirect — it is
+  // percent-encoded and GitHub tolerates it — and then fails the token
+  // exchange, where the value is compared byte for byte.
+  return name === undefined ? undefined : String(c.env[name]).trim();
 }
 
 /**
@@ -371,6 +395,23 @@ app.get("/api/auth/github/callback", async (c) => {
         "This server is configured with a GitHub App client ID. CodeLedger needs a " +
           "classic OAuth App — set CODELEDGER_OAUTH_CLIENT_ID and " +
           "CODELEDGER_OAUTH_CLIENT_SECRET from an OAuth App registration.",
+      );
+    }
+
+    // "incorrect client_id and/or client_secret" names neither half, and both
+    // are present, so `wrangler secret list` looks correct. Say which alias
+    // supplied each — a pair drawn from two different chains is the usual
+    // cause and is otherwise invisible.
+    if (data.error === "incorrect_client_credentials") {
+      const idFrom = envSource(c, "GH_CLIENT_ID");
+      const secretFrom = envSource(c, "GH_CLIENT_SECRET");
+      return reply(
+        "",
+        `GitHub rejected the client credentials. The client ID came from ${idFrom} and ` +
+          `the client secret from ${secretFrom}; they must both belong to the same OAuth ` +
+          `App registration. Re-set both with \`wrangler secret put\`, and delete any ` +
+          `leftover CODELEDGER_GH_APP_CLIENT_ID / CODELEDGER_GH_APP_CLIENT_SECRET so they ` +
+          `cannot supply half the pair.`,
       );
     }
 

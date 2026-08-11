@@ -132,6 +132,22 @@ describe("OAuth authorize redirect", () => {
       assert.equal(new URL(res.headers.get("location")).searchParams.get("client_id"), id);
     }
   });
+
+  // A pasted value carries a trailing newline more often than not. Untrimmed,
+  // it survives the authorize redirect and fails only at the token exchange,
+  // which reports "incorrect client_id and/or client_secret" and points at the
+  // wrong thing entirely.
+  test("strips whitespace a paste left around the client ID", async () => {
+    const res = await req(
+      "/api/auth/github",
+      { redirect: "manual" },
+      { ...ENV, CODELEDGER_OAUTH_CLIENT_ID: "  Ov23liTESTCLIENTID\n" },
+    );
+    assert.equal(
+      new URL(res.headers.get("location")).searchParams.get("client_id"),
+      "Ov23liTESTCLIENTID",
+    );
+  });
 });
 
 describe("OAuth callback — CSRF", () => {
@@ -170,7 +186,7 @@ describe("OAuth callback — credential type", () => {
    * Completes a real state round-trip and stubs only GitHub's token endpoint,
    * so the exchange runs exactly as it does in production.
    */
-  async function exchange(tokenResponse) {
+  async function exchange(tokenResponse, env = ENV) {
     const { state, cookie } = await issuedState();
     const realFetch = globalThis.fetch;
     globalThis.fetch = async (url, init) =>
@@ -185,6 +201,7 @@ describe("OAuth callback — credential type", () => {
         {
           headers: { cookie },
         },
+        env,
       );
       return await res.text();
     } finally {
@@ -208,6 +225,28 @@ describe("OAuth callback — credential type", () => {
     });
     assert.ok(!body.includes("ghu_appToken"), "the unusable token must not be handed out");
     assert.match(body, /OAuth App/);
+  });
+
+  // The ID and the secret resolve through independent alias chains, so setting
+  // only the new ID on a deployment that still holds the old GitHub App secret
+  // pairs one app's ID with another's secret. GitHub's reply names neither, and
+  // `wrangler secret list` shows both present. The message has to name them.
+  test("names which secret supplied each half when GitHub rejects the pair", async () => {
+    const body = await exchange(
+      { error: "incorrect_client_credentials" },
+      {
+        SESSION_SECRET: ENV.SESSION_SECRET,
+        CODELEDGER_OAUTH_CLIENT_ID: "Ov23liTESTCLIENTID",
+        CODELEDGER_GH_APP_CLIENT_SECRET: "stale-secret-from-the-old-app",
+      },
+    );
+    assert.match(body, /CODELEDGER_OAUTH_CLIENT_ID/);
+    assert.match(body, /CODELEDGER_GH_APP_CLIENT_SECRET/);
+    assert.equal(
+      body.includes("stale-secret-from-the-old-app"),
+      false,
+      "the secret's value must never be echoed back",
+    );
   });
 });
 
