@@ -23,6 +23,7 @@ import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
 import { loadUserDifficultyMap, mapDifficulty } from "../../core/difficulty-map.js";
 import { Storage } from "../../core/storage.js";
 import { ShareStreak } from "../../ui/components/ShareStreak.js";
+import { Achievements } from "../../ui/components/Achievements.js";
 import { loadSnapshot } from "../../core/gamification-state.js";
 import { isGamificationActive } from "../../core/feature-flags.js";
 
@@ -933,6 +934,8 @@ export function AnalyticsView({ problems, onNavigate }) {
           `,
         )}
       </div>
+
+      ${snapshot ? html`<${Achievements} snapshot=${snapshot} settings=${settings} />` : ""}
 
       <!-- Platform breakdown -->
       ${Object.keys(stats.platforms).length > 0

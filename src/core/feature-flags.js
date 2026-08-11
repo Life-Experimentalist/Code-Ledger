@@ -90,3 +90,21 @@ export function isGamificationActive(settings) {
 export function isCombinedActive(settings) {
   return isAIActive(settings) && isGamificationActive(settings);
 }
+
+/**
+ * The achievements worth putting in front of somebody.
+ *
+ * With no review provider configured, the ones that need one are unreachable,
+ * and a locked tile nobody can ever unlock reads as a broken feature rather than
+ * something to aim at. Ones already earned stay regardless: that work happened,
+ * and removing an API key does not undo it.
+ *
+ * @param {object} [snapshot] from `computeSnapshot`
+ * @param {Record<string, any>} [settings]
+ * @returns {Array<object>}
+ */
+export function visibleAchievements(snapshot, settings) {
+  const list = snapshot?.achievements || [];
+  if (isCombinedActive(settings)) return list;
+  return list.filter((a) => !a.needsAI || a.earned);
+}

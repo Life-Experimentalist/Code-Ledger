@@ -413,24 +413,142 @@ export function levelFor(points) {
 /**
  * Declarative badge set. Each `test` takes the snapshot below and returns a
  * boolean, so adding a badge never means touching the engine.
+ *
+ * `needsAI` marks the ones that cannot be earned without a review provider
+ * configured. They are still computed — an achievement earned last year does not
+ * un-earn itself when the last API key is removed — but a surface showing the
+ * locked ones hides them, because a permanently unreachable badge in the list
+ * reads as a broken feature rather than an invitation.
  */
 export const ACHIEVEMENTS = Object.freeze([
-  { id: "first-blood", emoji: "🩸", name: "First Blood", hint: "Commit your first solve", test: (s) => s.totalSolves >= 1 },
-  { id: "ten-down", emoji: "🔟", name: "Ten Down", hint: "Solve 10 problems", test: (s) => s.totalSolves >= 10 },
-  { id: "century", emoji: "💯", name: "Century", hint: "Solve 100 problems", test: (s) => s.totalSolves >= 100 },
-  { id: "half-k", emoji: "🏛️", name: "Five Hundred", hint: "Solve 500 problems", test: (s) => s.totalSolves >= 500 },
-  { id: "week-streak", emoji: "🔥", name: "Week On Fire", hint: "7-day streak", test: (s) => s.longestStreak >= 7 },
-  { id: "month-streak", emoji: "🌋", name: "Month On Fire", hint: "30-day streak", test: (s) => s.longestStreak >= 30 },
-  { id: "hundred-streak", emoji: "☄️", name: "Unbroken", hint: "100-day streak", test: (s) => s.longestStreak >= 100 },
-  { id: "hard-mode", emoji: "💀", name: "Hard Mode", hint: "Solve 25 Hard problems", test: (s) => (s.byDifficulty.Hard || 0) >= 25 },
-  { id: "polyglot", emoji: "🗣️", name: "Polyglot", hint: "Solve in 5 languages", test: (s) => s.languageCount >= 5 },
-  { id: "explorer", emoji: "🧭", name: "Explorer", hint: "Solve on 3 platforms", test: (s) => s.platformCount >= 3 },
-  { id: "well-rounded", emoji: "🎯", name: "Well Rounded", hint: "Cover 15 topics", test: (s) => s.topicCount >= 15 },
-  { id: "rememberer", emoji: "🧠", name: "Rememberer", hint: "50 recall solves", test: (s) => s.totalRecalls >= 50 },
-  { id: "double-day", emoji: "⚡", name: "Double Day", hint: "Hit twice the daily target in one day", test: (s) => s.bestDayPoints >= s.dailyTargetPoints * 2 },
-  { id: "comeback", emoji: "🪃", name: "Comeback", hint: "Buy back a missed day with the penalty", test: (s) => s.penaltyDays.length >= 1 },
-  { id: "level-five", emoji: "⭐", name: "Engineer", hint: "Reach level 5", test: (s) => s.level.level >= 5 },
-  { id: "level-ten", emoji: "👑", name: "Grandmaster", hint: "Reach level 10", test: (s) => s.level.level >= 10 },
+  {
+    id: "first-blood",
+    emoji: "🩸",
+    name: "First Blood",
+    hint: "Commit your first solve",
+    test: (s) => s.totalSolves >= 1,
+  },
+  {
+    id: "ten-down",
+    emoji: "🔟",
+    name: "Ten Down",
+    hint: "Solve 10 problems",
+    test: (s) => s.totalSolves >= 10,
+  },
+  {
+    id: "century",
+    emoji: "💯",
+    name: "Century",
+    hint: "Solve 100 problems",
+    test: (s) => s.totalSolves >= 100,
+  },
+  {
+    id: "half-k",
+    emoji: "🏛️",
+    name: "Five Hundred",
+    hint: "Solve 500 problems",
+    test: (s) => s.totalSolves >= 500,
+  },
+  {
+    id: "week-streak",
+    emoji: "🔥",
+    name: "Week On Fire",
+    hint: "7-day streak",
+    test: (s) => s.longestStreak >= 7,
+  },
+  {
+    id: "month-streak",
+    emoji: "🌋",
+    name: "Month On Fire",
+    hint: "30-day streak",
+    test: (s) => s.longestStreak >= 30,
+  },
+  {
+    id: "hundred-streak",
+    emoji: "☄️",
+    name: "Unbroken",
+    hint: "100-day streak",
+    test: (s) => s.longestStreak >= 100,
+  },
+  {
+    id: "hard-mode",
+    emoji: "💀",
+    name: "Hard Mode",
+    hint: "Solve 25 Hard problems",
+    test: (s) => (s.byDifficulty.Hard || 0) >= 25,
+  },
+  {
+    id: "polyglot",
+    emoji: "🗣️",
+    name: "Polyglot",
+    hint: "Solve in 5 languages",
+    test: (s) => s.languageCount >= 5,
+  },
+  {
+    id: "explorer",
+    emoji: "🧭",
+    name: "Explorer",
+    hint: "Solve on 3 platforms",
+    test: (s) => s.platformCount >= 3,
+  },
+  {
+    id: "well-rounded",
+    emoji: "🎯",
+    name: "Well Rounded",
+    hint: "Cover 15 topics",
+    test: (s) => s.topicCount >= 15,
+  },
+  {
+    id: "rememberer",
+    emoji: "🧠",
+    name: "Rememberer",
+    hint: "50 recall solves",
+    test: (s) => s.totalRecalls >= 50,
+  },
+  {
+    id: "double-day",
+    emoji: "⚡",
+    name: "Double Day",
+    hint: "Hit twice the daily target in one day",
+    test: (s) => s.bestDayPoints >= s.dailyTargetPoints * 2,
+  },
+  {
+    id: "comeback",
+    emoji: "🪃",
+    name: "Comeback",
+    hint: "Buy back a missed day with the penalty",
+    test: (s) => s.penaltyDays.length >= 1,
+  },
+  {
+    id: "level-five",
+    emoji: "⭐",
+    name: "Engineer",
+    hint: "Reach level 5",
+    test: (s) => s.level.level >= 5,
+  },
+  {
+    id: "level-ten",
+    emoji: "👑",
+    name: "Grandmaster",
+    hint: "Reach level 10",
+    test: (s) => s.level.level >= 10,
+  },
+  {
+    id: "second-opinion",
+    emoji: "🔍",
+    name: "Second Opinion",
+    hint: "Get 10 solutions reviewed",
+    needsAI: true,
+    test: (s) => s.totalReviews >= 10,
+  },
+  {
+    id: "peer-reviewed",
+    emoji: "📝",
+    name: "Peer Reviewed",
+    hint: "Get 100 solutions reviewed",
+    needsAI: true,
+    test: (s) => s.totalReviews >= 100,
+  },
 ]);
 
 /* ------------------------------------------------------------------ */
@@ -471,12 +589,17 @@ export function computeSnapshot(problems, options = {}) {
   const languages = new Set();
   const platforms = new Set();
   const topics = new Set();
+  // Solves that came back with a review on them. Counted here rather than asked
+  // of the AI settings, because the count is about work that happened: a review
+  // written last month still counts after the last provider is switched off.
+  let totalReviews = 0;
   for (const p of problems || []) {
     if (!p) continue;
     const lang = p.lang?.name || p.lang?.slug;
     if (lang) languages.add(String(lang).toLowerCase());
     if (p.platform) platforms.add(p.platform);
     for (const t of p.tags || []) if (t) topics.add(String(t).toLowerCase());
+    if (typeof p.aiReview === "string" && p.aiReview.trim()) totalReviews += 1;
   }
 
   let bestDayPoints = 0;
@@ -501,8 +624,7 @@ export function computeSnapshot(problems, options = {}) {
   // Ask the timeline rather than re-deriving. A freeze spent on yesterday, or a
   // penalty already paid by today's points, both leave a status other than
   // "missed" — and in either case there is nothing left to rescue.
-  const yesterdayMissed =
-    streak.timeline.find((t) => t.day === yesterday)?.status === "missed";
+  const yesterdayMissed = streak.timeline.find((t) => t.day === yesterday)?.status === "missed";
 
   const snapshot = {
     // config echoed back so renderers never need their own copy
@@ -517,6 +639,7 @@ export function computeSnapshot(problems, options = {}) {
     totalPoints,
     totalSolves: events.filter((e) => !e.recall).length,
     totalRecalls,
+    totalReviews,
     byDifficulty,
     languageCount: languages.size,
     platformCount: platforms.size,
@@ -566,6 +689,7 @@ export function computeSnapshot(problems, options = {}) {
     emoji: a.emoji,
     name: a.name,
     hint: a.hint,
+    needsAI: a.needsAI === true,
     earned: !!a.test(snapshot),
   }));
   snapshot.earnedCount = snapshot.achievements.filter((a) => a.earned).length;
@@ -648,6 +772,8 @@ export function describeStreak(snapshot) {
   const s = snapshot.currentStreak;
   if (snapshot.vacationActive) return "On vacation — streak is paused";
   if (s === 0) return "No streak yet — solve one problem to start";
-  const done = snapshot.todayDone ? "today is done" : `${snapshot.todayRemaining} points to go today`;
+  const done = snapshot.todayDone
+    ? "today is done"
+    : `${snapshot.todayRemaining} points to go today`;
   return `${s}-day streak · ${done}`;
 }

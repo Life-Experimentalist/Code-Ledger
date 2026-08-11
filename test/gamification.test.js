@@ -515,8 +515,18 @@ describe("computeSnapshot", () => {
 
   test("counts distinct languages, platforms and topics", () => {
     const problems = [
-      solve("2026-03-01", "Easy", { id: "a", platform: "leetcode", lang: { name: "Python" }, tags: ["array", "hash"] }),
-      solve("2026-03-01", "Easy", { id: "b", platform: "codeforces", lang: { name: "C++" }, tags: ["array"] }),
+      solve("2026-03-01", "Easy", {
+        id: "a",
+        platform: "leetcode",
+        lang: { name: "Python" },
+        tags: ["array", "hash"],
+      }),
+      solve("2026-03-01", "Easy", {
+        id: "b",
+        platform: "codeforces",
+        lang: { name: "C++" },
+        tags: ["array"],
+      }),
     ];
     const s = computeSnapshot(problems, { ...base, now: at("2026-03-01") });
     assert.equal(s.languageCount, 2);
@@ -592,6 +602,37 @@ describe("computeSnapshot", () => {
     });
     assert.equal(s.enabled, false);
     assert.equal(describeStreak(s), "");
+  });
+
+  test("counts the solves that came back with a review on them", () => {
+    const problems = [
+      solve("2026-03-01", "Easy", { id: "a", aiReview: "Looks fine." }),
+      solve("2026-03-01", "Easy", { id: "b", aiReview: "   " }),
+      solve("2026-03-01", "Easy", { id: "c" }),
+      solve("2026-03-01", "Easy", { id: "d", aiReview: "Consider a set here." }),
+    ];
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-01") });
+    // Whitespace is not a review.
+    assert.equal(s.totalReviews, 2);
+    assert.equal(s.totalSolves, 4);
+  });
+
+  test("the review achievements are marked as needing a provider", () => {
+    const s = computeSnapshot([], { ...base, now: at("2026-03-01") });
+    const needs = s.achievements.filter((a) => a.needsAI).map((a) => a.id);
+    assert.deepEqual(needs, ["second-opinion", "peer-reviewed"]);
+    // Everything else has to stay reachable with AI switched off, or the shelf
+    // quietly shortens for someone who never turned AI on in the first place.
+    assert.ok(s.achievements.every((a) => a.needsAI || a.needsAI === false));
+  });
+
+  test("a review achievement is earned by the reviews, not by the settings", () => {
+    const problems = Array.from({ length: 10 }, (_, i) =>
+      solve("2026-03-01", "Easy", { id: `r${i}`, aiReview: "ok" }),
+    );
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-01") });
+    assert.ok(s.achievements.find((a) => a.id === "second-opinion").earned);
+    assert.ok(!s.achievements.find((a) => a.id === "peer-reviewed").earned);
   });
 });
 
@@ -712,7 +753,10 @@ describe("describeStreak", () => {
 
   test("says the day is done once the target is met", () => {
     const problems = pointsOn("2026-03-01", 25);
-    assert.match(describeStreak(computeSnapshot(problems, { ...base, now: at("2026-03-01") })), /today is done/);
+    assert.match(
+      describeStreak(computeSnapshot(problems, { ...base, now: at("2026-03-01") })),
+      /today is done/,
+    );
   });
 
   test("says the streak is paused on vacation", () => {

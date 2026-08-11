@@ -17,6 +17,7 @@ import {
   canToggleAI,
   isGamificationActive,
   isCombinedActive,
+  visibleAchievements,
 } from "../src/core/feature-flags.js";
 import { CONSTANTS } from "../src/core/constants.js";
 
@@ -113,10 +114,39 @@ describe("isCombinedActive", () => {
   test("needs both halves", () => {
     const id = PROVIDER_IDS[0];
     assert.equal(isCombinedActive({ [`${id}_enabled`]: true }), true);
-    assert.equal(
-      isCombinedActive({ [`${id}_enabled`]: true, gamificationEnabled: false }),
-      false,
-    );
+    assert.equal(isCombinedActive({ [`${id}_enabled`]: true, gamificationEnabled: false }), false);
     assert.equal(isCombinedActive({ gamificationEnabled: true }), false);
+  });
+});
+
+describe("visibleAchievements", () => {
+  const id = PROVIDER_IDS[0];
+  const snapshot = {
+    achievements: [
+      { id: "century", earned: false },
+      { id: "second-opinion", needsAI: true, earned: false },
+      { id: "peer-reviewed", needsAI: true, earned: true },
+    ],
+  };
+
+  test("with a provider on, everything is on the shelf", () => {
+    const shown = visibleAchievements(snapshot, { [`${id}_enabled`]: true });
+    assert.equal(shown.length, 3);
+  });
+
+  test("without one, the unreachable ones are dropped", () => {
+    // A locked tile nobody can ever unlock reads as a broken feature.
+    const shown = visibleAchievements(snapshot, {}).map((a) => a.id);
+    assert.deepEqual(shown, ["century", "peer-reviewed"]);
+  });
+
+  test("one already earned survives the last API key being removed", () => {
+    const shown = visibleAchievements(snapshot, { aiEnabled: false }).map((a) => a.id);
+    assert.ok(shown.includes("peer-reviewed"));
+  });
+
+  test("no snapshot yet is an empty shelf, not a crash", () => {
+    assert.deepEqual(visibleAchievements(null, {}), []);
+    assert.deepEqual(visibleAchievements({}, {}), []);
   });
 });
