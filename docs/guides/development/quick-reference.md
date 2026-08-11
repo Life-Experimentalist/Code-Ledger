@@ -80,8 +80,8 @@ Never hardcode a settings key — use `CONSTANTS.SK.*` from
 - **Sign-in returns 500** — `SESSION_SECRET` is not set on the worker. The state
   cookie cannot be signed without it.
 - **`403 Resource not accessible by integration`** — the OAuth app is registered
-  as a GitHub App. Client IDs start `Iv23li` for OAuth Apps, `Ov23li` for GitHub
-  Apps.
+  as a GitHub App. Client IDs start `Ov23li` for OAuth Apps, `Iv23li` (or the
+  older `Iv1.`) for GitHub Apps.
 - **Token not saving** — the worker's `postMessage` type must be exactly
   `CODELEDGER_AUTH`.
 - **LeetCode not detecting** — selectors moved. Check

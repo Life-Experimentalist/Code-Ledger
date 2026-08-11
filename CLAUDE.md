@@ -431,7 +431,7 @@ misconfiguration at sign-in rather than letting it surface as a later 403.
 
 | Secret name                        | Required | Source                                                     |
 | ---------------------------------- | -------- | ---------------------------------------------------------- |
-| `CODELEDGER_OAUTH_CLIENT_ID`       | yes      | OAuth App Client ID (`Iv23li…`; `Ov23li…` is a GitHub App) |
+| `CODELEDGER_OAUTH_CLIENT_ID`       | yes      | OAuth App Client ID (`Ov23li…`; `Iv23li…` is a GitHub App) |
 | `CODELEDGER_OAUTH_CLIENT_SECRET`   | yes      | OAuth App client secret                                    |
 | `SESSION_SECRET`                   | yes      | 32 random bytes — signs the OAuth `state` cookie           |
 | `CANONICAL_UPLOAD_TOKEN`           | no       | 32 random bytes — guards `POST /api/admin/canonical`       |

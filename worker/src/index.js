@@ -260,7 +260,7 @@ app.get("/api/auth/:provider", async (c) => {
   // it to a generic login page — a broken sign-in with nothing anywhere saying
   // why. Production held a single 0x16 byte, which is what a terminal that does
   // not handle Ctrl+V records when you try to paste into `wrangler secret put`.
-  // GitHub's IDs are 20 characters of `Iv23li…`/`Ov23li…`; anything that is not
+  // GitHub's IDs are 20 characters of `Ov23li…`/`Iv23li…`; anything that is not
   // plausibly one of those is a misconfiguration, and should say so here.
   if (!/^[A-Za-z0-9._-]{10,}$/.test(clientId)) {
     // Say what arrived, not just that it was wrong. The first time this fired,
@@ -273,7 +273,7 @@ app.get("/api/auth/:provider", async (c) => {
     return c.text(
       "GitHub OAuth is misconfigured: CODELEDGER_OAUTH_CLIENT_ID is set but is not a " +
         `client ID. It is ${describeSecretShape(clientId)}; a client ID is 20 characters ` +
-        "of letters and digits, beginning `Iv23li` for an OAuth App or `Ov23li` for a " +
+        "of letters and digits, beginning `Ov23li` for an OAuth App or `Iv23li` for a " +
         "GitHub App. Re-set it with `wrangler secret put CODELEDGER_OAUTH_CLIENT_ID` and " +
         "type or right-click-paste the value — Ctrl+V does not paste in that prompt.",
       500,

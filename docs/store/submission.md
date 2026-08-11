@@ -83,7 +83,7 @@ get `403 Resource not accessible by integration` on `POST /user/repos`.
 
 Check all of these before resubmitting:
 
-- [ ] The client ID starts `Iv23li`. `Ov23li` means it is still a GitHub App
+- [ ] The client ID starts `Ov23li`. `Iv23li` (or `Iv1.`) means it is still a GitHub App
 - [ ] `SESSION_SECRET` is set on the worker, or sign-in returns 500
 - [ ] `curl -sf https://codeledger.vkrishna04.me/api/health` succeeds against the
       deployed worker, not a local one

@@ -58,7 +58,7 @@ For the registration walkthrough, see
 | `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | yes      |
 | `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | no       |
 | `SESSION_SECRET`                   | Signs the OAuth `state` cookie — sign-in 500s without | yes      |
-| `CODELEDGER_OAUTH_CLIENT_ID`       | OAuth App client ID (`Iv23li…`)                       | yes      |
+| `CODELEDGER_OAUTH_CLIENT_ID`       | OAuth App client ID (`Ov23li…`)                       | yes      |
 | `CODELEDGER_OAUTH_CLIENT_SECRET`   | OAuth App client secret                               | yes      |
 | `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook HMAC secret                                   | no       |
 
@@ -306,9 +306,10 @@ Alternatively, manually create/manage routes in the Cloudflare dashboard (as we 
 
 1. OAuth App settings: callback URL is exactly
    `https://codeledger.vkrishna04.me/api/auth/github/callback`
-2. The client ID starts with `Iv23li`. An `Ov23li` prefix means the app was
-   registered as a **GitHub App**, whose user-to-server tokens cannot create a
-   repository — the callback refuses such a token and says so.
+2. The client ID starts with `Ov23li`. An `Iv23li` prefix — or the older `Iv1.`
+   — means the app was registered as a **GitHub App**, whose user-to-server
+   tokens cannot create a repository; the callback refuses such a token and
+   says so.
 3. `cd worker && npx wrangler secret list` shows `CODELEDGER_OAUTH_CLIENT_ID`,
    `CODELEDGER_OAUTH_CLIENT_SECRET` and `SESSION_SECRET`.
 
@@ -344,7 +345,7 @@ not a claim to take on trust.
 1. `curl -sf https://codeledger.vkrishna04.me/api/health` returns `{"ok":true,…}`
    with the deployed version.
 2. `curl -sI https://codeledger.vkrishna04.me/api/auth/github` returns `302`, and
-   the `location` header carries a `client_id` that starts with `Iv23li` — not a
+   the `location` header carries a `client_id` that starts with `Ov23li` — not a
    percent-escape.
 3. `curl -sf https://codeledger.vkrishna04.me/api/data/canonical-map.json` returns
    JSON.

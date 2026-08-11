@@ -81,13 +81,14 @@ Worker secrets, set from `worker/` with `npx wrangler secret put NAME` — the
 command takes the name only and prompts for the value, so nothing lands in shell
 history:
 
-- `CODELEDGER_OAUTH_CLIENT_ID` — classic **OAuth App** client ID, starts `Iv23li`
+- `CODELEDGER_OAUTH_CLIENT_ID` — classic **OAuth App** client ID, starts `Ov23li`
 - `CODELEDGER_OAUTH_CLIENT_SECRET`
 - `SESSION_SECRET` — 32 random bytes; **sign-in returns 500 without it**
 - `CANONICAL_UPLOAD_TOKEN` (optional) — guards `POST /api/admin/canonical`
 - `CODELEDGER_GH_APP_WEBHOOK_SECRET` (optional) — HMAC for the webhook route
 
-A client ID starting `Ov23li` belongs to a **GitHub App**, not an OAuth App.
+A client ID starting `Iv23li` — or `Iv1.`, the pre-May-2024 form — belongs to a
+**GitHub App**, not an OAuth App.
 GitHub Apps ignore the `scope` parameter and issue expiring user-to-server
 tokens that get `403 Resource not accessible by integration` on
 `POST /user/repos`. The callback detects that token shape and reports it at

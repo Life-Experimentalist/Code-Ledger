@@ -7,8 +7,9 @@ CodeLedger authenticates through a **GitHub OAuth App**, registered at
 > `scope` parameter and issue user-to-server tokens, which cannot call
 > `POST /user/repos` — every repository-creation attempt comes back
 > `403 Resource not accessible by integration`. OAuth App client IDs begin with
-> `Iv23li…`; GitHub App client IDs begin with `Ov23li…`. If yours starts with
-> `Ov`, you registered the wrong kind. The Worker detects this at token exchange
+> `Ov23li…` (`Ov` for OAuth); GitHub App client IDs begin with `Iv23li…`, or
+> `Iv1.` on apps registered before May 2024. If yours starts with `Iv`, you
+> registered the wrong kind. The Worker detects this at token exchange
 > and reports it rather than handing back a token that cannot work.
 
 ## Registration values
@@ -52,7 +53,7 @@ npx wrangler secret put CODELEDGER_OAUTH_CLIENT_ID
 
 | Secret                           | Purpose                                      |
 | -------------------------------- | -------------------------------------------- |
-| `CODELEDGER_OAUTH_CLIENT_ID`     | OAuth App client ID (`Iv23li…`)              |
+| `CODELEDGER_OAUTH_CLIENT_ID`     | OAuth App client ID (`Ov23li…`)              |
 | `CODELEDGER_OAUTH_CLIENT_SECRET` | OAuth App client secret                      |
 | `SESSION_SECRET`                 | HMAC key for the signed `state` cookie       |
 | `CANONICAL_UPLOAD_TOKEN`         | Bearer token for `POST /api/admin/canonical` |

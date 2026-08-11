@@ -13,7 +13,7 @@ Before testing OAuth, you need:
 **Worker secrets:**
 
 ```
-CODELEDGER_OAUTH_CLIENT_ID=<OAuth App client ID, starts with Iv23li>
+CODELEDGER_OAUTH_CLIENT_ID=<OAuth App client ID, starts with Ov23li>
 CODELEDGER_OAUTH_CLIENT_SECRET=<OAuth App client secret>
 SESSION_SECRET=<random hex, 32 bytes>
 CANONICAL_UPLOAD_TOKEN=<random hex, 32 bytes>
@@ -153,8 +153,8 @@ console.log("Settings:", items.settings);
 
 - [ ] Check worker secrets are set: `npx wrangler secret list`
 - [ ] Verify the app is an **OAuth App** at github.com/settings/developers —
-      not a GitHub App. A client ID starting `Ov23li` is a GitHub App and cannot
-      create repositories.
+      not a GitHub App. A client ID starting `Iv23li` (or the older `Iv1.`) is a
+      GitHub App and cannot create repositories.
 - [ ] Confirm `SESSION_SECRET` is set; without it every sign-in returns 500
 - [ ] Check worker is deployed: `npx wrangler deploy`
 - [ ] Test health endpoint: `curl https://codeledger.vkrishna04.me/api/health`

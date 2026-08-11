@@ -13,7 +13,8 @@ import assert from "node:assert/strict";
 import app from "../src/index.js";
 
 const ENV = {
-  CODELEDGER_OAUTH_CLIENT_ID: "Iv23liTESTCLIENTID",
+  // `Ov23li…` is the OAuth App prefix, which is what production is meant to hold.
+  CODELEDGER_OAUTH_CLIENT_ID: "Ov23liTESTCLIENTID",
   CODELEDGER_OAUTH_CLIENT_SECRET: "test-client-secret",
   SESSION_SECRET: "test-session-secret-do-not-use-in-production",
   CANONICAL_UPLOAD_TOKEN: "test-upload-token",
