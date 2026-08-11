@@ -21,7 +21,7 @@ import { computeSnapshot, configFromSettings } from "./gamification.js";
  */
 export async function loadSnapshot(settings) {
   const s = settings || (await Storage.getSettings().catch(() => ({})));
-  const problems = await Storage.getProblems().catch(() => []);
+  const problems = await Storage.getAllProblems().catch(() => []);
   const { vacations } = await Storage.getGamificationState().catch(() => ({ vacations: [] }));
   return computeSnapshot(problems || [], {
     config: configFromSettings(s),

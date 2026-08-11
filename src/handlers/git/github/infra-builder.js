@@ -246,7 +246,7 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
  */
 async function _buildGamificationFiles(owner, repo, branch, settings, readme, pagesUrl) {
   try {
-    const problems = await Storage.getProblems().catch(() => []);
+    const problems = await Storage.getAllProblems().catch(() => []);
     const { vacations } = await Storage.getGamificationState().catch(() => ({ vacations: [] }));
     const snapshot = computeSnapshot(problems, {
       config: configFromSettings(settings),

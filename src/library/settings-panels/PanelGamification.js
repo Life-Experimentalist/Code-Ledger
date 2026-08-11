@@ -122,7 +122,7 @@ export function PanelGamification({ settings, onSettingsChange }) {
     let live = true;
     (async () => {
       try {
-        const problems = await Storage.getProblems().catch(() => []);
+        const problems = await Storage.getAllProblems().catch(() => []);
         const state = await Storage.getGamificationState().catch(() => ({ vacations: [] }));
         const next = computeSnapshot(problems || [], {
           config: configFromSettings(s),
