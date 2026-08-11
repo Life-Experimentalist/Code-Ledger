@@ -78,7 +78,7 @@
     "@tailwindcss/cli": "^4.0.0",
     "@types/chrome": "^0.0.308",
     "@types/node": "^22.13.10",
-    "adm-zip": "^0.5.17",
+    "adm-zip": "0.6.0",
     "esbuild": "0.28.1",
     "js-yaml": "^4.1.0",
     "octokit": "^4.0.0",
