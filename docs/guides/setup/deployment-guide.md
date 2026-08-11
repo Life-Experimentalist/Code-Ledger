@@ -21,7 +21,7 @@ git push to main
     ↓
 GitHub Actions (.github/workflows/deploy-worker.yml)
     ├─ Generate worker/wrangler.toml from secrets
-    ├─ Upload runtime secrets to Cloudflare (CANONICAL_UPLOAD_TOKEN, SESSION_SECRET, CODELEDGER_GH_*)
+    ├─ Upload runtime secrets to Cloudflare (CANONICAL_UPLOAD_TOKEN, SESSION_SECRET, CODELEDGER_OAUTH_*)
     └─ Publish Worker to codeledger.vkrishna04.me
 ```
 
@@ -34,32 +34,41 @@ Extension → opens popup to /api/auth/github
     ↓
 Worker → redirects to GitHub's OAuth authorize endpoint
     ↓
-User → approves scope (repo access)
+User → approves the requested scope
     ↓
 GitHub → redirects back to /api/auth/github/callback?code=XXX
- For details, see [GitHub OAuth App setup](github-oauth-app-setup.md).
-Worker → exchanges code for access token (using OAuth client ID/secret)
-Worker → posts token back to opener window (via postMessage)
     ↓
-Extension → stores token in chrome.storage.local
+Worker → verifies the signed state cookie, then exchanges the code for a token
+Worker → posts the token to the opener window (postMessage)
+    ↓
+Extension → stores the token via Storage.setAuthToken("github", …)
 ```
+
+For the registration walkthrough, see
+[GitHub OAuth App setup](github-oauth-app-setup.md).
 
 ---
 
 ## Required Secrets (GitHub Repository)
 
-All secrets are **already set** in your repository. Here's what they do:
+| Secret                             | Purpose                                               | Required |
+| ---------------------------------- | ----------------------------------------------------- | -------- |
+| `CF_API_TOKEN`                     | Cloudflare API token for publishing Worker            | yes      |
+| `CF_ZONE_ID`                       | DNS zone ID for codeledger.vkrishna04.me              | yes      |
+| `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | yes      |
+| `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | no       |
+| `SESSION_SECRET`                   | Signs the OAuth `state` cookie — sign-in 500s without | yes      |
+| `CODELEDGER_OAUTH_CLIENT_ID`       | OAuth App client ID (`Iv23li…`)                       | yes      |
+| `CODELEDGER_OAUTH_CLIENT_SECRET`   | OAuth App client secret                               | yes      |
+| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook HMAC secret                                   | no       |
 
-| Secret                             | Purpose                                               | Set? |
-| ---------------------------------- | ----------------------------------------------------- | ---- |
-| `CF_API_TOKEN`                     | Cloudflare API token for publishing Worker            | ✅   |
-| `CF_ZONE_ID`                       | DNS zone ID for codeledger.vkrishna04.me              | ✅   |
-| `CANONICAL_KV_ID`                  | Workers KV namespace ID for canonical map             | ✅   |
-| `CANONICAL_UPLOAD_TOKEN`           | Bearer token for admin `/api/admin/canonical` uploads | ✅   |
-| `SESSION_SECRET`                   | Signs the OAuth `state` cookie — sign-in 500s without | ✅   |
-| `CODELEDGER_OAUTH_CLIENT_ID`       | OAuth App client ID (`Iv23li…`)                       | ✅   |
-| `CODELEDGER_OAUTH_CLIENT_SECRET`   | OAuth App client secret                               | ✅   |
-| `CODELEDGER_GH_APP_WEBHOOK_SECRET` | Webhook HMAC secret — optional                        | —    |
+`gh secret list --repo Life-Experimentalist/Code-Ledger` reports which of these
+exist. It cannot report whether their **values** are right — a secret set to the
+wrong string looks identical to a correct one until something calls it, which is
+what the smoke tests further down are for. This has bitten before: a client ID
+pasted with Ctrl+V at a `wrangler secret put` prompt was recorded as a single
+control byte, the secret existed, and sign-in was broken until someone read the
+authorize URL by hand.
 
 > **Note:** These are named `CODELEDGER_*` instead of `GITHUB_*` because GitHub Actions forbids repository secret names starting with `GITHUB_`.
 
@@ -93,20 +102,27 @@ Worker: codeledger
 
 ### Runtime Secrets (in Cloudflare Worker)
 
-The CI workflow automatically uploads these at deployment time. To verify they're set:
+The CI workflow uploads these from the repository secrets at deployment time.
+List what the Worker currently holds:
 
 ```bash
-# List all secrets for the codeledger worker
+cd worker && npx wrangler secret list
 ```
 
-Expected secrets in Cloudflare:
+Expected: `SESSION_SECRET` and the two `CODELEDGER_OAUTH_*` values, plus
+`CANONICAL_UPLOAD_TOKEN` and `CODELEDGER_GH_APP_WEBHOOK_SECRET` if you use those
+features. `wrangler secret list` prints names only, never values.
 
-- `CANONICAL_UPLOAD_TOKEN` (from GitHub repo secret)
-- `SESSION_SECRET` (from GitHub repo secret)
-- `CODELEDGER_GH_APP_PRIVATE_KEY` (from GitHub repo secret)
-- `CODELEDGER_GH_APP_CLIENT_ID` (from GitHub repo secret)
-- `CODELEDGER_GH_APP_CLIENT_SECRET` (from GitHub repo secret)
-- `CODELEDGER_GH_APP_WEBHOOK_SECRET` (from GitHub repo secret)
+To set one by hand:
+
+```bash
+cd worker && npx wrangler secret put CODELEDGER_OAUTH_CLIENT_ID
+```
+
+The command takes the **name** only and prompts for the value — passing the
+secret as an argument would put it in your shell history. At that prompt, type
+the value or paste it with right-click; Ctrl+V is not a paste in a Windows
+console and records a control character instead.
 
 ---
 
@@ -137,7 +153,7 @@ ledger.
 gh secret list --repo Life-Experimentalist/Code-Ledger
 ```
 
-Expected output: all 11 secrets listed above should be present.
+Expected output: every secret marked **yes** in the table above.
 
 ### 2. Verify Worker Route in Cloudflare
 
@@ -145,10 +161,12 @@ Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → **codeledger.vkris
 
 - Route `codeledger.vkrishna04.me/*` is bound to the `codeledger` Worker.
 
+### 3. Deploy
+
 **Option A: Using GitHub Actions UI (recommended)**
 
 1. Go to [Actions](https://github.com/Life-Experimentalist/Code-Ledger/actions)
-2. Select **Deploy Worker** workflow
+2. Select **Deploy Worker** workflow, then **Run workflow**
 
 **Option B: Via CLI**
 
@@ -243,25 +261,27 @@ npm ci
 
 ### Run Locally
 
-````bash
-npm run dev
-# or
-npx wrangler dev --local
+```bash
+cd worker && npm run dev
+```
 
-This starts a local Worker on `http://localhost:8787`.
+This starts a local Worker on `http://localhost:8787`. It reads
+`worker/wrangler.toml`, which is git-ignored — copy `worker/wrangler.toml.example`
+first. Secrets for local runs go in `worker/.dev.vars`, not in the toml.
 
 ### Test Local Endpoints
 
 ```bash
-# Landing page
-curl http://localhost:8787/
+curl http://localhost:8787/api/health
+```
 
-# OAuth redirect
-curl -L http://localhost:8787/api/auth/github
+```bash
+curl -sI http://localhost:8787/api/auth/github
+```
 
-# Canonical map
+```bash
 curl http://localhost:8787/api/data/canonical-map.json
-````
+```
 
 ---
 
@@ -280,13 +300,20 @@ Alternatively, manually create/manage routes in the Cloudflare dashboard (as we 
 
 ### Issue: Worker deployed but OAuth redirect not working
 
-**Cause:** GitHub App callback URL or client ID/secret misconfigured.
+**Cause:** OAuth App callback URL or client ID/secret misconfigured.
 
 **Check:**
 
-1. GitHub App settings: callback URL is `https://codeledger.vkrishna04.me/api/auth/github/callback`
-2. Repo secrets: `CODELEDGER_GH_APP_CLIENT_ID` and `CODELEDGER_GH_APP_CLIENT_SECRET` are set
-3. Verify they're uploaded to Cloudflare: `npx wrangler secret list --env production`
+1. OAuth App settings: callback URL is exactly
+   `https://codeledger.vkrishna04.me/api/auth/github/callback`
+2. The client ID starts with `Iv23li`. An `Ov23li` prefix means the app was
+   registered as a **GitHub App**, whose user-to-server tokens cannot create a
+   repository — the callback refuses such a token and says so.
+3. `cd worker && npx wrangler secret list` shows `CODELEDGER_OAUTH_CLIENT_ID`,
+   `CODELEDGER_OAUTH_CLIENT_SECRET` and `SESSION_SECRET`.
+
+`GET /api/auth/github` distinguishes the failure modes for you: `302` is
+healthy, and `500` names which of the three is missing or malformed.
 
 ### Issue: Secrets not uploaded to Cloudflare
 
@@ -298,37 +325,34 @@ gh run view <run-id> --repo Life-Experimentalist/Code-Ledger --log | Select-Stri
 
 Expected output: `✨ Success! Uploaded secret <NAME>` for each secret.
 
-### Issue: "Cannot modify Vite config: could not find a valid plugins array"
+### Issue: Sign-in returns 500
 
-**Cause:** Your `vite.config.js` was missing a `plugins` array.
-
-**Solution:** Ensure `vite.config.js` includes:
-
-```javascript
-export default defineConfig({
-  plugins: [], // ← This line was added
-  // ... rest of config
-});
-```
-
-This is already fixed in the current code.
+The body says which one it is. `SESSION_SECRET` unset means the `state` cookie
+cannot be signed, and the Worker refuses to start an unauthenticated flow rather
+than continue without CSRF protection. A missing or malformed
+`CODELEDGER_OAUTH_CLIENT_ID` is reported separately, because a bad-but-present
+ID used to be percent-encoded straight into the authorize URL, where GitHub
+answered with a generic login page that named no cause.
 
 ---
 
-## Summary
+## Post-deploy checklist
 
-✅ **All secrets are set** in GitHub
-✅ **Worker code is complete** with all OAuth, webhook, and API endpoints
-✅ **CI workflow is configured** to generate wrangler config and upload secrets
-✅ **Vite config has plugins array** to avoid Wrangler errors
-✅ **Worker route manually created** in Cloudflare dashboard
+Run these against the live deployment, in order. Each is a fact you can check,
+not a claim to take on trust.
 
-**Next steps:**
-
-1. Trigger the deployment workflow (via GitHub Actions UI or CLI)
-2. Monitor logs to confirm all secrets upload successfully
-3. Test deployed endpoints to verify OAuth and API flows work
-4. Chrome Extension can then use the `/api/auth/github` endpoint to authenticate users
+1. `curl -sf https://codeledger.vkrishna04.me/api/health` returns `{"ok":true,…}`
+   with the deployed version.
+2. `curl -sI https://codeledger.vkrishna04.me/api/auth/github` returns `302`, and
+   the `location` header carries a `client_id` that starts with `Iv23li` — not a
+   percent-escape.
+3. `curl -sf https://codeledger.vkrishna04.me/api/data/canonical-map.json` returns
+   JSON.
+4. The removed installation endpoints still 404 (see above).
+5. Sign in from the extension once, end to end, and confirm a repository is
+   created. Nothing above proves the token exchange works; only this does.
+6. Test deployed endpoints to verify OAuth and API flows work
+7. Chrome Extension can then use the `/api/auth/github` endpoint to authenticate users
 
 ---
 
