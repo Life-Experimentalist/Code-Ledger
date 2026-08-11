@@ -1,6 +1,7 @@
 import AdmZip from "adm-zip";
 import { readFileSync, mkdirSync, writeFileSync, unlinkSync } from "fs";
 import { resolve } from "path";
+import { shipsInPackage } from "./pack-filter.js";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const version = pkg.version;
@@ -18,14 +19,7 @@ writeFileSync(tmpManifest, JSON.stringify(ffManifest, null, 2), "utf8");
 const zip = new AdmZip();
 
 // Add all src files, replacing manifest.json with the Firefox-compatible one
-zip.addLocalFolder("./src", "", (name) => {
-  return (
-    name !== "manifest-chromium.json" &&
-    name !== "manifest-firefox.json" &&
-    name !== "manifest.json" &&
-    !/desktop\.ini$/i.test(name)
-  );
-});
+zip.addLocalFolder("./src", "", shipsInPackage);
 zip.addLocalFile(tmpManifest, "", "manifest.json");
 
 // Save to versioned releases folder only

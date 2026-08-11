@@ -86,6 +86,7 @@ Chrome Web Store requires each upload to exceed the last.
 **Both browsers**
 
 - Chrome and Firefox from one source tree, with every extension API call routed through a single compatibility shim.
+- The download is 3.5 MB rather than 17 MB. The packager copied all of `assets/images/`, which is mostly store promo tiles, a social preview and a screenshot of every tab — none of it opened by anything the extension runs. It now ships the four icons the manifests declare and the three branding images that get committed into your repository, and nothing else. The unpacked build applies the same rule, so what you load locally is what ships.
 
 ### Security
 
