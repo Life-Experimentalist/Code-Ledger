@@ -1,14 +1,25 @@
-// Extension CSP blocks external scripts. Use mermaid.ink to render diagrams
-// as images — no script injection required, works in both extension and web contexts.
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * mermaid-stub.js — Mermaid diagram URLs.
+ *
+ * The extension CSP blocks external scripts, so mermaid itself cannot run here.
+ * Diagrams are rendered by mermaid.ink instead, which means the diagram source —
+ * derived from the user's problem and code by their AI provider — leaves the
+ * device to a third party that is not otherwise part of CodeLedger.
+ *
+ * That is why these are URL builders and nothing more: the caller decides when,
+ * and the UI only requests the image after an explicit click.
+ *
+ * @ts-check
+ */
 
 /**
- * Rewrite horizontal graph directions to vertical (top-down) when the user
+ * Rewrite horizontal graph directions to vertical (top-down) when the author
  * hasn't explicitly chosen one, or has chosen LR/RL (horizontal).
  */
 function preferVertical(src) {
-  // Already vertical: TD, TB, BT — leave alone
-  // Horizontal: LR, RL — switch to TD
-  // No direction specified — add TD
   return src
     .replace(/^(graph)\s+(LR|RL)\s/im, "$1 TD ")
     .replace(/^(flowchart)\s+(LR|RL)\s/im, "$1 TD ")
@@ -16,41 +27,30 @@ function preferVertical(src) {
     .replace(/^(flowchart)\s*(\n|$)/im, "flowchart TD\n");
 }
 
+/** UTF-8 safe base64, since btoa() rejects code points above U+00FF. */
 function toBase64(str) {
-  // Safe Unicode-to-base64 for btoa
-  return btoa(unescape(encodeURIComponent(str)));
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 /**
- * Renders a mermaid diagram source string into an <img> pointing at mermaid.ink.
- * Falls back to showing the code block if encoding fails.
- * @param {string} _id  Unused (kept for API compatibility)
- * @param {string} src  Raw mermaid diagram source
- * @returns {Promise<string>} HTML string (img or pre fallback)
+ * Encode diagram source for the mermaid.ink / mermaid.live URL formats.
+ * Returns null when the source cannot be encoded.
+ *
+ * @param {string} src Raw mermaid diagram source
+ * @returns {{ image: string, live: string } | null}
  */
-export async function renderMermaid(_id, src) {
+export function mermaidUrls(src) {
   try {
-    const diagram = preferVertical(src.trim());
-    const encoded = toBase64(diagram);
-    const imgUrl = `https://mermaid.ink/svg/${encoded}`;
-    const liveUrl = `https://mermaid.live/view#base64:${encoded}`;
-
-    return (
-      `<div class="mermaid-rendered" style="text-align:center;padding:0.5rem 0">` +
-      `<img src="${imgUrl}" alt="Mermaid diagram" loading="lazy" style="max-width:100%;height:auto;border-radius:8px" ` +
-      `onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />` +
-      `<div style="display:none;font-size:11px;color:#64748b;margin-top:4px">` +
-      `<span>Could not load diagram image. </span>` +
-      `<a href="${liveUrl}" target="_blank" rel="noopener" style="color:#06b6d4">Open in Mermaid Live ↗</a>` +
-      `</div>` +
-      `<div style="text-align:right;margin-top:2px">` +
-      `<a href="${liveUrl}" target="_blank" rel="noopener" ` +
-      `style="font-size:10px;color:#475569;text-decoration:none;opacity:0.7">Open in Mermaid Live ↗</a>` +
-      `</div>` +
-      `</div>`
-    );
+    const encoded = toBase64(preferVertical(String(src || "").trim()));
+    if (!encoded) return null;
+    return {
+      image: `https://mermaid.ink/svg/${encoded}`,
+      live: `https://mermaid.live/view#base64:${encoded}`,
+    };
   } catch {
-    // Leave the <pre> fallback intact (handled by AIMarkdownRenderer useEffect catch)
-    throw new Error("mermaid.ink encoding failed");
+    return null;
   }
 }

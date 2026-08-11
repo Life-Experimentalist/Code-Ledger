@@ -12,6 +12,12 @@ import { createDebugger } from "../../lib/debug.js";
 import { registry } from "../../core/handler-registry.js";
 import { getPagesHtml } from "../../handlers/git/github/pages-template.js";
 import { importFromRepo, applyImport } from "../../background/sync-engine.js";
+import {
+  fetchTokenScopes,
+  canCreatePrivateRepo,
+  describeGitHubError,
+  PRIVATE_SCOPE,
+} from "../../handlers/git/github/permissions.js";
 import { ConflictResolutionModal } from "../../library/components/ConflictResolutionModal.js";
 
 const html = htm.bind(h);
@@ -51,6 +57,14 @@ const DEFAULT_REPO_TOPICS = [
 export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   const [step, setStep] = useState("check");
   const [repoName, setRepoName] = useState(DEFAULT_REPO_NAME);
+  // Public by default: the default OAuth scope is public_repo, and a solutions
+  // ledger is normally a portfolio the user wants visible. Ticking "private"
+  // requires the wider `repo` scope, which is requested on demand — see
+  // privateAllowed below.
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [scopes, setScopes] = useState(null); // Set<string> | null (unknown)
+  // Non-fatal problems from optional setup steps, shown on the final screen.
+  const [setupWarnings, setSetupWarnings] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
@@ -87,6 +101,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     setBusy(false);
     setNameCheck(null);
     setPostSyncState(null);
+    setSetupWarnings([]);
     setRepoName(DEFAULT_REPO_NAME);
     setSelectedOwner(username || "");
     setStep("check");
@@ -129,7 +144,35 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
       .finally(() => setOrgsLoading(false));
   }, [isOpen, token]);
 
+  // Read the token's granted scopes so the private-repo option is only offered
+  // when it can actually succeed. Without this the user picks "private", and
+  // GitHub answers a bare 403 several steps later.
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    let cancelled = false;
+    fetchTokenScopes(token)
+      .then((s) => {
+        if (cancelled) return;
+        setScopes(s);
+        if (s && !canCreatePrivateRepo(s)) setIsPrivate(false);
+      })
+      .catch(() => {
+        /* Unknown scopes leave every option available; the request is the real check. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, token]);
+
   if (!isOpen) return null;
+
+  const privateAllowed = canCreatePrivateRepo(scopes);
+
+  /** Re-runs the OAuth flow asking for the wider `repo` scope. */
+  const grantPrivateAccess = () => {
+    const url = `${CONSTANTS.URLS.AUTH_WORKER}/auth/github?scope=${encodeURIComponent(PRIVATE_SCOPE)}`;
+    window.open(url, "codeledger-oauth", "width=600,height=760");
+  };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -198,10 +241,10 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   };
 
   const saveRepoConfig = async (owner, repo) => {
-    const settings = await Storage.getSettings();
-    settings.github_repo = repo;
-    settings.github_owner = owner !== username ? owner : "";
-    await Storage.setSettings(settings);
+    await Storage.updateSettings({
+      github_repo: repo,
+      github_owner: owner !== username ? owner : "",
+    });
   };
 
   // ── Repo name availability check (debounced) ──────────────────────────────
@@ -300,34 +343,52 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
           body: JSON.stringify({
             name: cleanName,
             description: DEFAULT_REPO_DESC,
-            private: false,
-            auto_init: true,
+            private: isPrivate,
+            auto_init: false,
             has_wiki: false,
             has_issues: true,
           }),
         });
       } catch (e) {
-        if (e.status === 403 || e.status === 401)
-          throw new Error(
-            "Permission denied. Disconnect and reconnect GitHub in Settings to approve repository permissions.",
-          );
-        if (e.status === 422) {
-          const msg = e.body?.errors?.[0]?.message || e.message;
-          throw new Error(`Repository creation failed: ${msg}`);
-        }
-        throw e;
+        throw new Error(
+          describeGitHubError(e, {
+            action: "create repositories",
+            owner: selectedOwner,
+            isPrivate,
+          }),
+        );
       }
 
-      setProgress("Setting up initial files…");
-      await initializeRepository(repoData.owner.login, repoData.name, token);
-
-      setProgress("Applying repository settings…");
-      await configureRepositoryPresentation(repoData.owner.login, repoData.name, token);
-
-      setProgress("Enabling GitHub Pages…");
-      await enableGitHubPages(repoData.owner.login, repoData.name, token);
-
+      // The repository now exists. Link it before anything else: if a later
+      // step throws, the user must not be left with a created-but-unlinked repo
+      // whose name is then taken on every retry.
       await saveRepoConfig(repoData.owner.login, repoData.name);
+
+      const warnings = [];
+      const bestEffort = async (label, fn) => {
+        setProgress(label);
+        try {
+          await fn();
+        } catch (e) {
+          dbg.warn(`${label} failed:`, e.message);
+          warnings.push(describeGitHubError(e, { owner: repoData.owner.login }));
+        }
+      };
+
+      // None of these are required to commit solutions. Pages in particular
+      // fails routinely — it is unavailable for private repos on the free tier
+      // and returns 409 when it is already enabled.
+      await bestEffort("Setting up initial files…", () =>
+        initializeRepository(repoData.owner.login, repoData.name, token),
+      );
+      await bestEffort("Applying repository settings…", () =>
+        configureRepositoryPresentation(repoData.owner.login, repoData.name, token),
+      );
+      await bestEffort("Enabling GitHub Pages…", () =>
+        enableGitHubPages(repoData.owner.login, repoData.name, token),
+      );
+      setSetupWarnings(warnings);
+
       setFinalRepo(repoData.name);
       setFinalOwner(repoData.owner.login);
       setProgress("Setup complete!");
@@ -354,8 +415,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     setProgress("Validating repository…");
     try {
       const repoData = await ghFetch(`/repos/${selectedOwner}/${repoToLink}`).catch((e) => {
-        if (e.status === 404) throw new Error("Repository not found.");
-        throw e;
+        throw new Error(
+          describeGitHubError(e, { action: "read that repository", owner: selectedOwner }),
+        );
       });
 
       const contents = await ghFetch(`/repos/${selectedOwner}/${repoToLink}/contents`).catch(
@@ -421,11 +483,11 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
 
   const unlinkRepo = async () => {
     try {
-      const settings = await Storage.getSettings();
-      delete settings.github_repo;
-      delete settings.github_owner;
-      delete settings.gitRepo;
-      await Storage.setSettings(settings);
+      await Storage.updateSettings({
+        github_repo: undefined,
+        github_owner: undefined,
+        gitRepo: undefined,
+      });
     } catch (_) {}
     setFinalRepo("");
     setFinalOwner("");
@@ -735,6 +797,36 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     </p>
                   </div>
 
+                  <div
+                    class="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-lg mt-2"
+                  >
+                    <input
+                      type="checkbox"
+                      id="private-repo-toggle"
+                      checked=${isPrivate}
+                      onChange=${(e) => setIsPrivate(e.target.checked)}
+                      disabled=${busy || !privateAllowed}
+                      class="w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/50 bg-black disabled:opacity-40"
+                    />
+                    <label for="private-repo-toggle" class="flex flex-col cursor-pointer">
+                      <span class="text-sm font-medium text-slate-200">Private Repository</span>
+                      <span class="text-xs text-slate-400">
+                        ${privateAllowed
+                          ? "Only you can see this repository. GitHub Pages needs a public repo on the free tier."
+                          : "Your GitHub connection currently covers public repositories only."}
+                      </span>
+                    </label>
+                    ${!privateAllowed
+                      ? html`<button
+                          type="button"
+                          onClick=${grantPrivateAccess}
+                          class="ml-auto shrink-0 px-2.5 py-1 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] hover:bg-cyan-500/25"
+                        >
+                          Grant access
+                        </button>`
+                      : null}
+                  </div>
+
                   ${error
                     ? html`<div
                         class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs whitespace-pre-wrap"
@@ -767,9 +859,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     </button>
                     <button
                       onClick=${createNewRepo}
-                      disabled=${busy ||
-                      !sanitize(repoName) ||
-                      nameCheck === "taken"}
+                      disabled=${busy || !sanitize(repoName) || nameCheck === "taken"}
                       class="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                     >
                       ${busy ? "Creating…" : "Create Repository"}
@@ -903,6 +993,25 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                       View on GitHub ↗
                     </a>
                   </div>
+                  ${setupWarnings.length
+                    ? html`
+                        <div
+                          class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-left"
+                        >
+                          <p class="text-xs font-medium text-amber-300 mb-1">
+                            Optional setup steps were skipped
+                          </p>
+                          <p class="text-[11px] text-amber-200/70 mb-2">
+                            Your repository is linked and solutions will still be committed.
+                          </p>
+                          <ul class="space-y-1">
+                            ${setupWarnings.map(
+                              (w) => html`<li class="text-[11px] text-amber-200/80">• ${w}</li>`,
+                            )}
+                          </ul>
+                        </div>
+                      `
+                    : null}
                   ${postSyncState?.phase === "syncing"
                     ? html`
                         <div class="space-y-2">
@@ -987,24 +1096,21 @@ async function initializeRepository(owner, repo, token) {
     return res.json();
   };
 
-  // Get latest commit SHA — retry up to 6× since GitHub needs a moment after creation
+  // Check if repository is empty or already has commits
   let latestSha, baseTreeSha;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    try {
-      let ref;
-      try {
-        ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/main`);
-      } catch (_) {
-        ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/master`);
-      }
-      latestSha = ref.object.sha;
-      const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
-      baseTreeSha = commit.tree.sha;
-      break;
-    } catch (_) {
-      if (attempt === 5) throw new Error("Repository branch not ready. Please try again.");
-      await new Promise((r) => setTimeout(r, 2000));
-    }
+  let isRootCommit = false;
+  let defaultBranch = "main";
+
+  try {
+    const repoInfo = await ghFetch(`/repos/${owner}/${repo}`);
+    defaultBranch = repoInfo.default_branch || "main";
+    const ref = await ghFetch(`/repos/${owner}/${repo}/git/ref/heads/${defaultBranch}`);
+    latestSha = ref.object.sha;
+    const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
+    baseTreeSha = commit.tree.sha;
+  } catch (e) {
+    // If we get an error (e.g. 409 Conflict for empty repo), it's likely an empty repository
+    isRootCommit = true;
   }
 
   const now = new Date().toISOString();
@@ -1017,52 +1123,76 @@ async function initializeRepository(owner, repo, token) {
     stats: { total: 0, easy: 0, medium: 0, hard: 0 },
   };
 
+  const treePayload = {
+    tree: [
+      {
+        path: "index.json",
+        mode: "100644",
+        type: "blob",
+        content: JSON.stringify(indexJson, null, 2),
+      },
+      {
+        path: "index.html",
+        mode: "100644",
+        type: "blob",
+        content: getPagesHtml(),
+      },
+      {
+        path: ".gitignore",
+        mode: "100644",
+        type: "blob",
+        content: "node_modules/\n.env\n*.log\n.DS_Store\n",
+      },
+    ],
+  };
+
+  if (!isRootCommit) {
+    treePayload.base_tree = baseTreeSha;
+  }
+
   const treeRes = await ghFetch(`/repos/${owner}/${repo}/git/trees`, {
     method: "POST",
-    body: JSON.stringify({
-      base_tree: baseTreeSha,
-      tree: [
-        {
-          path: "index.json",
-          mode: "100644",
-          type: "blob",
-          content: JSON.stringify(indexJson, null, 2),
-        },
-        {
-          path: "index.html",
-          mode: "100644",
-          type: "blob",
-          content: getPagesHtml(),
-        },
-        {
-          path: ".gitignore",
-          mode: "100644",
-          type: "blob",
-          content: "node_modules/\n.env\n*.log\n.DS_Store\n",
-        },
-      ],
-    }),
+    body: JSON.stringify(treePayload),
   });
+
+  const commitPayload = {
+    message: "chore: initialize CodeLedger structure",
+    tree: treeRes.sha,
+  };
+
+  if (!isRootCommit) {
+    commitPayload.parents = [latestSha];
+  }
 
   const commitRes = await ghFetch(`/repos/${owner}/${repo}/git/commits`, {
     method: "POST",
-    body: JSON.stringify({
-      message: "chore: initialize CodeLedger structure",
-      tree: treeRes.sha,
-      parents: [latestSha],
-    }),
+    body: JSON.stringify(commitPayload),
   });
 
-  for (const branch of ["main", "master"]) {
+  if (isRootCommit) {
+    // Create new main branch since repository is empty
+    await ghFetch(`/repos/${owner}/${repo}/git/refs`, {
+      method: "POST",
+      body: JSON.stringify({
+        ref: "refs/heads/main",
+        sha: commitRes.sha,
+      }),
+    });
+    // Ensure default branch is set to main
     try {
-      await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
+      await ghFetch(`/repos/${owner}/${repo}`, {
         method: "PATCH",
-        body: JSON.stringify({ sha: commitRes.sha, force: false }),
+        body: JSON.stringify({ default_branch: "main" }),
       });
-      break;
     } catch (_) {
-      /* try next */
+      // Ignore if patching default branch fails
     }
+  } else {
+    // Advance existing branch
+    await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/${defaultBranch}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: commitRes.sha, force: false }),
+    });
   }
 }
 
@@ -1127,8 +1257,7 @@ async function enableGitHubPages(owner, repo, token) {
     const pagesUrl = pagesData?.html_url || `https://${owner}.github.io/${repo}/`;
 
     // Save Pages URL to settings so infra-builder uses the real URL
-    const settings = await Storage.getSettings();
-    await Storage.setSettings({ ...settings, github_pages_url: pagesUrl });
+    await Storage.updateSettings({ github_pages_url: pagesUrl });
 
     // Set it as the repo website/homepage on GitHub
     await fetch(`https://api.github.com/repos/${owner}/${repo}`, {

@@ -76,18 +76,29 @@ export class GeminiHandler extends BaseAIHandler {
     for (let attempt = 0; attempt < keyCount; attempt++) {
       // eslint-disable-next-line no-await-in-loop
       const key = await this.keyPool.getNextKey();
-      if (!key) break;
+      if (!key) {
+        if (!lastErr) {
+          lastErr = new Error(
+            "All API keys for Gemini are currently in cooldown (rate-limited). Please wait and try again.",
+          );
+        }
+        break;
+      }
 
       try {
         dbg.log(`review(): attempt ${attempt + 1}/${keyCount}, calling Gemini API...`);
-        const url = `${endpoint}/models/${model}:generateContent?key=${key}`;
+        // Send the key as a header, not ?key=. A query string is recorded by
+        // proxies, devtools request lists and error reporters; a header is not.
+        const url = `${endpoint}/models/${model}:generateContent`;
         const res = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
           }),
         });
+
+        this._updateRateLimits(res.headers);
 
         if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
 

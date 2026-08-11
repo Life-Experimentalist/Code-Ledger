@@ -22,6 +22,7 @@ import * as api from "./api-client.js";
 import { resolveRepoTopics, buildInfraFiles } from "./infra-builder.js";
 import { buildTreeItems, buildCommitPayload } from "./commit-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
+import { withLock } from "../../../core/async-lock.js";
 
 const dbg = createDebugger("GitHubHandler");
 
@@ -49,7 +50,9 @@ export class GitHubHandler extends BaseGitHandler {
           type: "oauth",
           provider: "github",
           default: "",
-          description: 'Authenticate with GitHub to sync code. Requires "repo" scope.',
+          description:
+            'Authenticate with GitHub to sync code. Grants "public_repo" by default; ' +
+            "private repositories need the wider “repo” scope.",
         },
         {
           key: "github_repo",
@@ -64,6 +67,18 @@ export class GitHubHandler extends BaseGitHandler {
           type: "text",
           default: "",
           description: "Leave blank for your personal account. Set to an org login for org repos.",
+          advanced: true,
+        },
+        {
+          key: "github_repo_private",
+          label: "Create as Private Repository",
+          type: "toggle",
+          // Off by default: the default OAuth scope is public_repo, which cannot
+          // create a private repository. Defaulting this on made the very first
+          // commit fail with a 403 that read as a permissions problem.
+          default: false,
+          description:
+            "When auto-creating the repository, make it private. Requires the wider “repo” scope.",
           advanced: true,
         },
         {
@@ -190,12 +205,36 @@ export class GitHubHandler extends BaseGitHandler {
     const userRes = await api.getCurrentUser(token);
 
     const owner = opts.ownerOverride?.trim() || settings["github_owner"]?.trim() || userRes.login;
-    const name = (repoName || settings["github_repo"] || CONSTANTS.DEFAULT_REPO_NAME).replace(
-      /\s+/g,
-      "-",
-    );
+    // gitRepo is the legacy camelCase key. Omitting it here silently committed a
+    // legacy user's solutions to the default repository name instead of theirs.
+    const name = (
+      repoName ||
+      settings["github_repo"] ||
+      settings["gitRepo"] ||
+      CONSTANTS.DEFAULT_REPO_NAME
+    ).replace(/\s+/g, "-");
 
     dbg.log(`commit(): ${files?.length || 0} file(s) → ${owner}/${name} (${BRANCH})`);
+
+    // One commit at a time per branch. Two solves finishing together read the
+    // same branch HEAD, build two trees on the same base, and then race to move
+    // the ref — the loser gets a 422, and the tree it built no longer describes
+    // the branch it was built from. The retry loop below exists for GitHub's
+    // own ref propagation lag; it is not a substitute for not racing ourselves.
+    return withLock(`codeledger:commit:${owner}/${name}/${BRANCH}`, () =>
+      this._commitToBranch(files, message, { owner, name, token, settings, userRes, opts }),
+    );
+  }
+
+  /**
+   * The body of a commit, run while this branch's lock is held.
+   *
+   * @param {Array<{path: string, content: string}>} files
+   * @param {string} message
+   * @param {{owner: string, name: string, token: string, settings: Record<string, any>, userRes: any, opts: any}} ctx
+   */
+  async _commitToBranch(files, message, ctx) {
+    const { owner, name, token, settings, userRes, opts } = ctx;
 
     // ── Resolve branch HEAD (create repo if missing) ──────────────────────
     let latestSha;
@@ -217,16 +256,22 @@ export class GitHubHandler extends BaseGitHandler {
 
         dbg.log(`commit(): repo not found — creating ${owner}/${name}…`);
         const isOrg = owner !== userRes.login;
-        await api.createRepository(name, token, isOrg ? owner : null);
+        // Opt-in, not opt-out: the default OAuth scope cannot create a private repo.
+        const isPrivate = settings["github_repo_private"] === true;
+        await api.createRepository(name, token, isOrg ? owner : null, isPrivate);
         isNewRepo = true;
 
-        // GitHub needs a moment after auto_init to create the initial commit
-        await _sleep(NEW_REPO_WAIT_MS);
-        await this._configureRepo(owner, name, token, settings);
-
-        const ref = await api.getRepoRef(owner, name, BRANCH, token);
-        latestSha = ref.object.sha;
+        // auto_init's first commit is not visible immediately and the delay is
+        // not fixed, so poll rather than sleep a guessed interval.
+        latestSha = await this._awaitInitialCommit(owner, name, token);
         dbg.log(`commit(): new repo HEAD = ${latestSha.slice(0, 7)}`);
+
+        // Cosmetic — a failure here must not lose the user's solution.
+        try {
+          await this._configureRepo(owner, name, token, settings);
+        } catch (cfgErr) {
+          dbg.warn(`commit(): repo configuration failed (non-fatal):`, cfgErr.message);
+        }
       }
     }
 
@@ -237,6 +282,7 @@ export class GitHubHandler extends BaseGitHandler {
     const treeItems = buildTreeItems(files, opts.deletes);
 
     // Add infrastructure files unless this is a mirror commit or explicitly skipped
+    let gamificationState = null;
     if (!opts.isMirror && !opts.skipInfra) {
       const infra = await buildInfraFiles(
         owner,
@@ -247,8 +293,9 @@ export class GitHubHandler extends BaseGitHandler {
         isNewRepo,
         opts.indexMetaOverride ?? null,
       );
-      treeItems.push(...infra);
-      dbg.log(`commit(): +${infra.length} infra file(s) (isNewRepo=${isNewRepo})`);
+      treeItems.push(...infra.items);
+      gamificationState = infra.gamification;
+      dbg.log(`commit(): +${infra.items.length} infra file(s) (isNewRepo=${isNewRepo})`);
     }
 
     // ── Create tree → commit → update ref ────────────────────────────────
@@ -287,6 +334,22 @@ export class GitHubHandler extends BaseGitHandler {
     }
 
     dbg.log(`commit(): ✅ ${owner}/${name} @ ${BRANCH}`);
+
+    // Only now that the ref moved. Recording this before the push would leave
+    // the badges in the repository with nothing left to say they are there, so
+    // a later "remove them" would find no work to do.
+    if (gamificationState) {
+      try {
+        await Storage.updateSettings((fresh) =>
+          fresh.badgesPublished !== gamificationState.badgesPublished ||
+          fresh.workflowPublished !== gamificationState.workflowPublished
+            ? gamificationState
+            : null,
+        );
+      } catch (e) {
+        dbg.warn(`commit(): badge state not persisted (non-fatal):`, e?.message);
+      }
+    }
 
     // Enable Pages on new repo — fire-and-forget
     if (isNewRepo && settings["github_pages"] !== false) {
@@ -339,6 +402,26 @@ export class GitHubHandler extends BaseGitHandler {
 
     await api.setRepositoryTopics(owner, name, resolveRepoTopics(settings), token);
     dbg.log(`ensureRepoTopics(): updated topics for ${owner}/${name}`);
+  }
+
+  /**
+   * Wait for a freshly auto_init'd repository to expose its first commit.
+   * Returns the branch HEAD sha; throws the last 404 if it never appears.
+   */
+  async _awaitInitialCommit(owner, name, token) {
+    let lastErr;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await _sleep(attempt === 0 ? NEW_REPO_WAIT_MS : 1500);
+      try {
+        const ref = await api.getRepoRef(owner, name, BRANCH, token);
+        return ref.object.sha;
+      } catch (err) {
+        if (err.status !== 404) throw err;
+        lastErr = err;
+        dbg.warn(`_awaitInitialCommit(): ${BRANCH} not ready yet (attempt ${attempt + 1})`);
+      }
+    }
+    throw lastErr;
   }
 
   async _configureRepo(owner, name, token, settings) {

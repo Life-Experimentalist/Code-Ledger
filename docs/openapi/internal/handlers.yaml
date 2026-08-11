@@ -15,8 +15,6 @@ bootstrap:
     - codeforces
   gitProviders:
     - github
-    - gitlab
-    - bitbucket
   aiProviders:
     - gemini
     - openai

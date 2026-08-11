@@ -1,73 +1,61 @@
 # CodeLedger Documentation Index
 
-This index is the canonical entry point for project documentation.
+The canonical entry point for project documentation. Every link below points at
+a file tracked in this repository.
 
-## TLDR:
+## Start here
 
-- Backlog: [docs/reference/backlog.md](reference/backlog.md)
-- Changelog: [docs/archive/changelog.md](archive/changelog.md)
-- Release guide: [docs/guides/release/release-guide.md](guides/release/release-guide.md)
-- Release policy: [docs/guides/release/release-versioning.md](guides/release/release-versioning.md)
-- OpenAPI contract: [docs/OPENAPI.yaml](OPENAPI.yaml)
+- [Architecture overview](architecture/README.md) — how the extension, the
+  worker and the ledger repository fit together
+- [Queues and orchestration](queues/README.md) — the solve → commit pipeline
+- [Debugging and logging](debugging/README.md)
+- [Changelog](CHANGELOG.md)
+- [Roadmap and recommendations](ROADMAP.md) — what to remove, change and add next
+- [Feature backlog](reference/backlog.md)
+- [OpenAPI contract for the Worker](OPENAPI.yaml)
 
-## Start Here
+## Setup and operations
 
-- Architecture: [architecture/README.md](architecture/README.md)
-- Queues & orchestration: [queues/README.md](queues/README.md)
-- Debugging & logging: [debugging/README.md](debugging/README.md)
-- Operational guides: [guides/README.md](guides/README.md)
-- Reference material: [reference/README.md](reference/README.md)
-- Archive: [archive/README.md](archive/README.md)
-- Store notes: [store/README.md](store/README.md)
-- Superpowers: [superpowers/README.md](superpowers/README.md)
-- Changelog: [archive/changelog.md](archive/changelog.md)
-- OpenAPI contract (Worker): [OPENAPI.yaml](OPENAPI.yaml)
-- Feature backlog: [reference/backlog.md](reference/backlog.md)
+- [GitHub OAuth App setup](guides/setup/github-oauth-app-setup.md) — registering the
+  app and loading the Worker's secrets
+- [Deployment guide](guides/setup/deployment-guide.md)
+- [OAuth testing guide](guides/setup/oauth-testing-guide.md)
+- [Git integration setup](guides/setup/git-integration-setup.md)
 
-## Setup and Operations
+## Build and release
 
-- GitHub App setup: [guides/setup/github-app-setup.md](guides/setup/github-app-setup.md)
-- Deployment guide: [guides/setup/deployment-guide.md](guides/setup/deployment-guide.md)
-- OAuth test guide: [guides/setup/oauth-testing-guide.md](guides/setup/oauth-testing-guide.md)
-- Git integration setup: [guides/setup/git-integration-setup.md](guides/setup/git-integration-setup.md)
-
-## Build and Release
-
-- Canonical release process: [guides/release/release-guide.md](guides/release/release-guide.md)
-- Release policy and versioning: [guides/release/release-versioning.md](guides/release/release-versioning.md)
-- Store submission checklist: [store/README.md](store/README.md)
+- [Release process](guides/release/release-guide.md)
+- [Versioning policy](guides/release/release-versioning.md)
+- [Store secrets setup](guides/release/store-secrets-setup.md)
+- [Store submission checklist](store/README.md)
 
 ## Development
 
-- Add a platform handler: [guides/development/adding-platform-handler.md](guides/development/adding-platform-handler.md)
-- Graphify workflow: [guides/development/graphify-workflow.md](guides/development/graphify-workflow.md)
-- Debug commit-on-accept: [queues/orchestration.md](queues/orchestration.md)
-- Build system optimization notes: [guides/development/build-system-optimization.md](guides/development/build-system-optimization.md)
-- Quick reference: [guides/development/quick-reference.md](guides/development/quick-reference.md)
+- [Adding a platform handler](guides/development/adding-platform-handler.md)
+- [Handler contract](guides/development/handlers-spec.md)
+- [Quick reference](guides/development/quick-reference.md)
+- [Build system notes](guides/development/build-system-optimization.md)
+- [Graphify workflow](guides/development/graphify-workflow.md)
+- [Testing guide](TESTING_GUIDE.md)
 
-## Strategy and Product
+## Reference
 
-- Portfolio integration: [reference/strategy/portfolio-integration.md](reference/strategy/portfolio-integration.md)
+- [MCP tools](reference/mcp-tools.md)
+- [Autonomous MCP system](reference/autonomous-mcp-system.md)
+- [Prompt templates](reference/prompts/README.md)
+- [Portfolio integration](reference/strategy/portfolio-integration.md)
 
-## Legacy and Transitional Notes
+## Design records
 
-- Version timing note (legacy pointer): [archive/README.md](archive/README.md)
+- [Code recovery and tag inference](superpowers/specs/2026-05-13-code-recovery-tag-inference-design.md)
+- [Smart dedup on import](superpowers/specs/2026-05-13-smart-dedup-import-design.md)
 
-## Archive
+## Conventions
 
-- Release quick start: [archive/release-quick-start.md](archive/release-quick-start.md)
-- Pre-launch checklist: [archive/pre-launch-checklist.md](archive/pre-launch-checklist.md)
-- Comprehensive fix plan: [archive/comprehensive-fix-plan.md](archive/comprehensive-fix-plan.md)
-- Final release summary: [archive/final-release-summary.md](archive/final-release-summary.md)
-- Launch complete note: [archive/launch-complete.md](archive/launch-complete.md)
-- Session summary: [archive/session-summary.md](archive/session-summary.md)
-
-## Temporary Notes
-
-- Use docs/reference/ for canonical references and docs/archive/ for historical notes.
-
-## Redundancy Policy
-
-- New release instructions should be added only in [guides/README.md](guides/README.md).
-- Top-level docs should not duplicate full procedural steps from guides.
-- If a file becomes redundant, convert it into a short pointer to the canonical document.
+- `docs/CHANGELOG.md` is the only changelog. `dev/release.js` and
+  `dev/v2/tasks/extract-changelog.js` both read it, so an entry must exist for a
+  version before that version can be tagged.
+- Release instructions live in [guides/release/](guides/release/README.md) only.
+  Other pages link there rather than restating the steps.
+- `docs/archive/` holds historical working notes. It is git-ignored on purpose —
+  nothing in the tracked tree should link into it.

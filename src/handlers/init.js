@@ -17,8 +17,6 @@ import { CodeforcesHandler } from "./platforms/codeforces/index.js";
 
 // Git Providers
 import { GitHubHandler } from "./git/github/index.js";
-import { GitLabHandler } from "./git/gitlab/index.js";
-import { BitbucketHandler } from "./git/bitbucket/index.js";
 
 // AI Providers
 import { GeminiHandler } from "./ai/gemini/index.js";
@@ -38,7 +36,10 @@ export function initializeHandlers() {
     dbg.log(`initializeHandlers(): ✓ platform ${h.id} registered`);
   });
 
-  const gits = [new GitHubHandler(), new GitLabHandler(), new BitbucketHandler()];
+  // GitHub is the only git provider. The GitLab and Bitbucket handlers used to
+  // be registered here with every method throwing "not yet implemented", which
+  // meant the registry could hand a caller a provider that could only fail.
+  const gits = [new GitHubHandler()];
   gits.forEach((h) => {
     registry.registerGitProvider(h.id, h);
     if (typeof h.getSettingsSchema === "function")

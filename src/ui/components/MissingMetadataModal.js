@@ -86,11 +86,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
     setIgnoredIds(newIgnored);
 
     try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({
-        ...settings,
-        [IGNORED_METADATA_KEY]: Array.from(newIgnored),
-      });
+      await Storage.updateSettings({ [IGNORED_METADATA_KEY]: Array.from(newIgnored) });
     } catch (e) {
       dbg.error("Failed to save ignored metadata:", e?.message);
     }
@@ -102,11 +98,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
     setIgnoredIds(toIgnore);
 
     try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({
-        ...settings,
-        [IGNORED_METADATA_KEY]: Array.from(toIgnore),
-      });
+      await Storage.updateSettings({ [IGNORED_METADATA_KEY]: Array.from(toIgnore) });
     } catch (e) {
       dbg.error("Failed to ignore all:", e?.message);
     }
@@ -115,11 +107,7 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
   async function unignoreAll() {
     setIgnoredIds(new Set());
     try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({
-        ...settings,
-        [IGNORED_METADATA_KEY]: [],
-      });
+      await Storage.updateSettings({ [IGNORED_METADATA_KEY]: [] });
     } catch (e) {
       dbg.error("Failed to unignore all:", e?.message);
     }

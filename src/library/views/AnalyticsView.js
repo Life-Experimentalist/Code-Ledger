@@ -15,10 +15,18 @@ const dbg = createDebugger("AnalyticsView");
 import { ProblemModal } from "../components/ProblemModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { CONSTANTS } from "../../core/constants.js";
+import { normalizeTag } from "../../core/topic-resolver.js";
+import { classifyTopic, KIND } from "../../core/topic-taxonomy.js";
 
 import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
 import { loadUserDifficultyMap, mapDifficulty } from "../../core/difficulty-map.js";
+import { Storage } from "../../core/storage.js";
+import { ShareStreak } from "../../ui/components/ShareStreak.js";
+import { Achievements } from "../../ui/components/Achievements.js";
+import { TopicGaps } from "../../ui/components/TopicGaps.js";
+import { loadSnapshot } from "../../core/gamification-state.js";
+import { isGamificationActive } from "../../core/feature-flags.js";
 
 // Curated Blind 75 / NeetCode 150 — covers all major topics with real LeetCode slugs
 const BLIND75 = [
@@ -359,41 +367,10 @@ const PLATFORM_META = {
   },
 };
 
-// Normalize lang display names so "python3" / "Python3" / "Python 3" all map to "Python3"
-const LANG_NORM = {
-  python: "Python",
-  python3: "Python3",
-  python3: "Python3",
-  cpp: "C++",
-  "c++": "C++",
-  c: "C",
-  java: "Java",
-  javascript: "JavaScript",
-  js: "JavaScript",
-  typescript: "TypeScript",
-  ts: "TypeScript",
-  ruby: "Ruby",
-  golang: "Go",
-  go: "Go",
-  swift: "Swift",
-  kotlin: "Kotlin",
-  scala: "Scala",
-  rust: "Rust",
-  php: "PHP",
-  csharp: "C#",
-  "c#": "C#",
-  dart: "Dart",
-  racket: "Racket",
-  erlang: "Erlang",
-  elixir: "Elixir",
-  mysql: "MySQL",
-  postgresql: "PostgreSQL",
-  bash: "Bash",
-};
 function normalizeLang(raw) {
   if (!raw) return "Unknown";
   const key = String(raw).toLowerCase().replace(/\s+/g, "");
-  return LANG_NORM[key] || raw;
+  return CONSTANTS.LANG_NORM_MAP[key] || raw;
 }
 
 function dateStr(d) {
@@ -408,9 +385,19 @@ function toMs(ts) {
 
 export function AnalyticsView({ problems, onNavigate }) {
   const [userMap, setUserMap] = useState({});
+  // settings.topicKinds — the user's own calls on which topics are structures
+  // and which are techniques. Empty until loaded; the built-in table covers it.
+  const [topicKinds, setTopicKinds] = useState({});
   const [modalProblem, setModalProblem] = useState(null);
   const [drilldown, setDrilldown] = useState(null); // { label, problems[] }
   const [modalProblemList, setModalProblemList] = useState([]); // list to navigate within modal
+  const [settings, setSettings] = useState(null);
+  // The streak as the rest of the extension understands it — freezes, vacation
+  // days and the install floor included. This page used to count back through
+  // the solve dates itself, which meant the number here could differ from the
+  // one in the popup and on the badge for the same day.
+  const [snapshot, setSnapshot] = useState(null);
+  const [sharing, setSharing] = useState(false);
   useEffect(() => {
     let m = true;
     loadUserDifficultyMap()
@@ -418,8 +405,19 @@ export function AnalyticsView({ problems, onNavigate }) {
         if (m) setUserMap(map || {});
       })
       .catch(() => {});
+    Storage.getSettings()
+      .then((s) => {
+        if (!m) return;
+        setTopicKinds(s?.topicKinds || {});
+        setSettings(s || {});
+        if (!isGamificationActive(s)) return;
+        loadSnapshot(s)
+          .then((snap) => m && setSnapshot(snap))
+          .catch((e) => dbg.warn("snapshot failed:", e?.message || e));
+      })
+      .catch(() => {});
     return () => (m = false);
-  }, []);
+  }, [problems.length]);
 
   const stats = useMemo(() => {
     const s = {
@@ -471,13 +469,19 @@ export function AnalyticsView({ problems, onNavigate }) {
       else if (cat === "Hard") s.hard++;
       else s.unknown++;
 
-      const tags = Array.isArray(p.tags) ? p.tags : [];
-      tags.forEach((t) => {
-        if (!s.topics[t]) s.topics[t] = { easy: 0, medium: 0, hard: 0, total: 0 };
-        s.topics[t].total++;
-        if (cat === "Easy") s.topics[t].easy++;
-        else if (cat === "Medium") s.topics[t].medium++;
-        else if (cat === "Hard") s.topics[t].hard++;
+      const rawTags =
+        Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : p.topic ? [p.topic] : [];
+      // Normalize tags through canonical system — deduplicates platform-specific variants
+      const seenCanonical = new Set();
+      rawTags.forEach((t) => {
+        const canonical = normalizeTag(t);
+        if (!canonical || seenCanonical.has(canonical)) return;
+        seenCanonical.add(canonical);
+        if (!s.topics[canonical]) s.topics[canonical] = { easy: 0, medium: 0, hard: 0, total: 0 };
+        s.topics[canonical].total++;
+        if (cat === "Easy") s.topics[canonical].easy++;
+        else if (cat === "Medium") s.topics[canonical].medium++;
+        else if (cat === "Hard") s.topics[canonical].hard++;
       });
 
       const platform = p.platform || "unknown";
@@ -620,7 +624,19 @@ export function AnalyticsView({ problems, onNavigate }) {
 
   const handleTopicClick = useCallback(
     (topic) => {
-      openDrilldown(topic, (p) => (p.tags || []).includes(topic) || p.topic === topic, "topic");
+      openDrilldown(
+        topic,
+        (p) => {
+          const tags = Array.isArray(p.tags) ? p.tags : [];
+          // Match either exact tag or normalized canonical form
+          return (
+            tags.some((t) => normalizeTag(t) === topic || t === topic) ||
+            normalizeTag(p.topic) === topic ||
+            p.topic === topic
+          );
+        },
+        "topic",
+      );
     },
     [openDrilldown],
   );
@@ -648,18 +664,26 @@ export function AnalyticsView({ problems, onNavigate }) {
         (p) => (PLATFORM_META[p.platform]?.name || p.platform) === sectionFilter,
       );
     } else if (section === "topic") {
-      openDrilldown(
-        sectionFilter,
-        (p) => (p.tags || []).includes(sectionFilter) || p.topic === sectionFilter,
-      );
+      openDrilldown(sectionFilter, (p) => {
+        const tags = Array.isArray(p.tags) ? p.tags : [];
+        return (
+          tags.some((t) => normalizeTag(t) === sectionFilter) ||
+          normalizeTag(p.topic) === sectionFilter
+        );
+      });
     }
   }, [problems?.length, userMap]);
 
   const chartData = useMemo(() => {
-    const sortedTopics = Object.entries(stats.topics).sort(
-      (a, b) =>
-        b[1].hard * 5 + b[1].medium * 3 + b[1].easy - (a[1].hard * 5 + a[1].medium * 3 + a[1].easy),
-    );
+    // For the radar, prefer Algorithm topics (lower weight = higher priority) as they're more insightful
+    const sortedTopics = Object.entries(stats.topics).sort((a, b) => {
+      // First by type: algorithms before data structures
+      const typeA = classifyTopic(a[0], topicKinds).kind === KIND.ALGO ? 0 : 1;
+      const typeB = classifyTopic(b[0], topicKinds).kind === KIND.ALGO ? 0 : 1;
+      if (typeA !== typeB) return typeA - typeB;
+      // Then by solve count (desc)
+      return b[1].total - a[1].total;
+    });
     const tpLabels = sortedTopics.slice(0, 8).map((t) => t[0]);
     const maxTopicTotal = Math.max(1, ...Object.values(stats.topics).map((t) => t.total));
 
@@ -771,12 +795,30 @@ export function AnalyticsView({ problems, onNavigate }) {
         ],
       },
     };
-  }, [stats]);
+  }, [stats, topicKinds]);
 
-  const topTopics = Object.entries(stats.topics)
-    .sort((a, b) => b[1].total - a[1].total)
-    .slice(0, 6);
+  // Split canonical topics into DS and Algorithm groups
+  const [activeTopicTab, setActiveTopicTab] = useState("algo");
 
+  const topicsByType = useMemo(() => {
+    const ds = [];
+    const algo = [];
+    Object.entries(stats.topics).forEach(([topic, counts]) => {
+      // Database, Shell and Design are neither a structure nor a technique, and
+      // filing them under algorithms (as the old two-way split did) put "SQL"
+      // next to "Dynamic Programming" in the ranking.
+      const kind = classifyTopic(topic, topicKinds).kind;
+      if (kind === KIND.DS) ds.push([topic, counts]);
+      else if (kind === KIND.ALGO) algo.push([topic, counts]);
+    });
+    // Sort each group by solve count desc
+    ds.sort((a, b) => b[1].total - a[1].total);
+    algo.sort((a, b) => b[1].total - a[1].total);
+    return { ds, algo };
+  }, [stats.topics, topicKinds]);
+
+  const activeTopics = activeTopicTab === "ds" ? topicsByType.ds : topicsByType.algo;
+  const topTopics = activeTopics.slice(0, 8);
   const maxTopicCount = Math.max(1, ...topTopics.map(([, c]) => c.total));
 
   const unsolvedNext = useMemo(() => {
@@ -825,9 +867,13 @@ export function AnalyticsView({ problems, onNavigate }) {
           },
           {
             label: "Current Streak",
-            value: `${stats.currentStreak}d`,
-            sub: `Best: ${stats.longestStreak} days`,
+            // The snapshot wins when it is there. Falling back to the local
+            // count keeps the card populated while it loads and when streaks
+            // are switched off entirely.
+            value: `${snapshot ? snapshot.currentStreak : stats.currentStreak}d`,
+            sub: `Best: ${snapshot ? snapshot.longestStreak : stats.longestStreak} days`,
             color: "#10b981",
+            action: snapshot ? { label: "Share", onClick: () => setSharing(true) } : null,
           },
           {
             label: "Last 7 Days",
@@ -875,10 +921,22 @@ export function AnalyticsView({ problems, onNavigate }) {
               >
               <span class="text-2xl font-bold" style=${{ color: card.color }}>${card.value}</span>
               <span class="text-[10px] text-slate-500 truncate">${card.sub}</span>
+              ${card.action
+                ? html`
+                    <button
+                      onClick=${card.action.onClick}
+                      class="absolute top-3 right-3 px-2 py-0.5 rounded-lg text-[10px] text-slate-400 border border-white/10 hover:text-white hover:bg-white/10 transition-colors"
+                    >
+                      ${card.action.label}
+                    </button>
+                  `
+                : ""}
             </div>
           `,
         )}
       </div>
+
+      ${snapshot ? html`<${Achievements} snapshot=${snapshot} settings=${settings} />` : ""}
 
       <!-- Platform breakdown -->
       ${Object.keys(stats.platforms).length > 0
@@ -1144,21 +1202,57 @@ export function AnalyticsView({ problems, onNavigate }) {
         </div>
       </div>
 
+      <!-- Where the gaps are: the same topics ranked by mastery instead of volume -->
+      <${TopicGaps}
+        problems=${problems}
+        topicKinds=${topicKinds}
+        onTopic=${(t) => handleTopicClick(t.topic)}
+      />
+
       <!-- Topic grid + Unsolved Next -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 flex flex-col gap-4">
-          <h3 class="text-sm font-bold text-white tracking-wide">Topic Breakdown</h3>
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white tracking-wide">Topic Breakdown</h3>
+            <div class="flex gap-1 p-0.5 bg-white/5 rounded-lg">
+              <button
+                class=${`text-xs px-3 py-1 rounded-md transition-all font-medium ` +
+                (activeTopicTab === "algo"
+                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                  : "text-slate-500 hover:text-slate-300")}
+                onClick=${() => setActiveTopicTab("algo")}
+              >
+                Algorithms
+                <span class="ml-1 text-[10px] opacity-60">${topicsByType.algo.length}</span>
+              </button>
+              <button
+                class=${`text-xs px-3 py-1 rounded-md transition-all font-medium ` +
+                (activeTopicTab === "ds"
+                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                  : "text-slate-500 hover:text-slate-300")}
+                onClick=${() => setActiveTopicTab("ds")}
+              >
+                Data Structures
+                <span class="ml-1 text-[10px] opacity-60">${topicsByType.ds.length}</span>
+              </button>
+            </div>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             ${topTopics.map(([topic, counts]) => {
               const barPct = Math.round((counts.total / maxTopicCount) * 100);
+              const accentColor =
+                activeTopicTab === "algo" ? "border-cyan-900/50" : "border-purple-900/50";
               return html`
                 <div
-                  class="p-4 bg-[#0a0a0f] border border-white/5 rounded-xl hover:border-cyan-900/50 transition-colors cursor-pointer group"
+                  class="p-4 bg-[#0a0a0f] border border-white/5 rounded-xl hover:${accentColor} transition-colors cursor-pointer group"
                   onClick=${() => handleTopicClick(topic)}
                 >
                   <div class="flex justify-between items-center mb-2">
                     <span
-                      class="font-medium text-sm text-slate-300 group-hover:text-cyan-400 transition-colors truncate pr-2"
+                      class=${`font-medium text-sm transition-colors truncate pr-2 ` +
+                      (activeTopicTab === "algo"
+                        ? "text-slate-300 group-hover:text-cyan-400"
+                        : "text-slate-300 group-hover:text-purple-400")}
                       >${topic}</span
                     >
                     <span class="text-xs font-mono text-slate-500 shrink-0"
@@ -1198,6 +1292,14 @@ export function AnalyticsView({ problems, onNavigate }) {
               `;
             })}
           </div>
+          ${activeTopics.length > 8
+            ? html`
+                <p class="text-[11px] text-slate-600 text-center">
+                  Showing top 8 of ${activeTopics.length}
+                  ${activeTopicTab === "algo" ? "algorithm" : "data structure"} topics
+                </p>
+              `
+            : ""}
         </div>
 
         <!-- Unsolved Next (Blind 75-based) -->
@@ -1374,6 +1476,14 @@ export function AnalyticsView({ problems, onNavigate }) {
         onNavigateProblem=${setModalProblem}
         onNavigate=${onNavigate}
       />
+
+      ${sharing && snapshot
+        ? html`<${ShareStreak}
+            snapshot=${snapshot}
+            settings=${settings}
+            onClose=${() => setSharing(false)}
+          />`
+        : ""}
     </div>
   `;
 }

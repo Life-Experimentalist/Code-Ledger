@@ -44,11 +44,16 @@ export function buildCommitPayload(message, treeSha, parentSha, opts = {}, user 
   const payload = {
     message,
     tree: treeSha,
-    parents: [parentSha],
+    // An empty repository has no parent. `parents: [null]` is rejected with a
+    // 422, so the field is omitted entirely to produce a root commit.
+    parents: parentSha ? [parentSha] : [],
   };
 
-  if (opts.date) {
-    const iso = new Date(opts.date).toISOString();
+  const backdate = opts.date ? new Date(opts.date) : null;
+  // Submission timestamps are scraped, so an unparseable one is expected input.
+  // Letting toISOString() throw here would abort an otherwise valid commit.
+  if (backdate && !Number.isNaN(backdate.getTime())) {
+    const iso = backdate.toISOString();
     const name = user.name || user.login || "CodeLedger";
     const email = user.email || `${user.login || "codeledger"}@users.noreply.github.com`;
     payload.author = { name, email, date: iso };

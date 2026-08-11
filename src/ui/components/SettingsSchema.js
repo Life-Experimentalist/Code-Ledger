@@ -9,6 +9,7 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { createDebugger } from "../../lib/debug.js";
+import { trustedAuthOrigins, isTrustedAuthMessage } from "../../lib/oauth-message.js";
 
 const dbg = createDebugger("SettingsSchema");
 
@@ -441,6 +442,15 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
   const [testResults, setTestResults] = useState({});
   const [testing, setTesting] = useState({});
   const [savedAIKeys, setSavedAIKeys] = useState({});
+  /**
+   * What is currently typed into each provider's API-key box, keyed on provider
+   * id. Deliberately component state and not a setting: this box used to write
+   * through to `settings.{provider}_keys` on every keystroke, which put a
+   * plaintext API key into storage, into the local settings backup, and — until
+   * the sync boundary learned to refuse it — into the user's repository. It is
+   * a staging box. Nothing reads keys from here; the handlers read `ai.keys`.
+   */
+  const [keyDrafts, setKeyDrafts] = useState({});
   const [advancedMap, setAdvancedMap] = useState({});
   const [activeTab, setActiveTab] = useState("general");
   const [showAdvancedProviders, setShowAdvancedProviders] = useState(false);
@@ -582,16 +592,6 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [activeTab, schema]);
 
-  // When a provider is selected as primary/secondary, auto-enable it
-  useEffect(() => {
-    const selected = [values?.aiProvider, values?.aiSecondary].filter(Boolean);
-    selected.forEach((pid) => {
-      if (values?.[`${pid}_enabled`] !== true) {
-        onChange(`${pid}_enabled`, true);
-      }
-    });
-  }, [values?.aiProvider, values?.aiSecondary, onChange]);
-
   // Open welcome tab the first time a repo is linked
   useEffect(() => {
     const prev = prevRepoRef.current;
@@ -602,7 +602,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       Storage.getSettings()
         .then((s) => {
           if (s.welcomeShown) return;
-          Storage.setSettings({ ...s, welcomeShown: true }).catch(() => {});
+          Storage.updateSettings({ welcomeShown: true }).catch(() => {});
           if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
             chrome.runtime.sendMessage({ type: "OPEN_WELCOME" });
           }
@@ -621,9 +621,12 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     setSavedAIKeys(all);
   };
 
-  const handleProviderKeysChange = async (_providerId, fieldKey, rawVal) => {
-    onChange(fieldKey, rawVal);
+  const handleProviderKeysChange = (providerId, _fieldKey, rawVal) => {
+    setKeyDrafts((d) => ({ ...d, [providerId]: rawVal }));
   };
+
+  /** Empty the staging box once its contents have reached `ai.keys`. */
+  const clearKeyDraft = (providerId) => setKeyDrafts((d) => ({ ...d, [providerId]: "" }));
 
   const handleSaveAllKeys = async (providerId, keyField, rawVal) => {
     const keys = parseKeys(rawVal);
@@ -636,7 +639,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     }
     try {
       await persistProviderKeys(providerId, rawVal);
-      onChange(keyField, "");
+      clearKeyDraft(providerId);
       setTestResults((s) => ({
         ...s,
         [`${keyField}:all`]: `Saved ${keys.length} key(s)`,
@@ -698,7 +701,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
     }
     if (allPassed) {
       await persistProviderKeys(providerId, rawVal);
-      onChange(baseResultKey, "");
+      clearKeyDraft(providerId);
       setTestResults((s) => ({
         ...s,
         [`${baseResultKey}:all`]: `Tested and saved ${keys.length} key(s)`,
@@ -726,6 +729,52 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
       delete updated[`${keyField}:all`];
       return updated;
     });
+  };
+
+  const handleDeleteSavedKey = async (providerId, idx) => {
+    const all = await Storage.getAIKeys();
+    const existing = Array.isArray(all[providerId]) ? [...all[providerId]] : [];
+    if (idx >= 0 && idx < existing.length) {
+      existing.splice(idx, 1);
+      all[providerId] = existing;
+      await Storage.setAIKeys(all);
+      setSavedAIKeys(all);
+    }
+  };
+
+  const handleCopyKey = (key, resultKey) => {
+    navigator.clipboard
+      .writeText(key)
+      .then(() => {
+        setTestResults((s) => ({ ...s, [resultKey]: "Key copied!" }));
+        setTimeout(() => {
+          setTestResults((s) => {
+            const updated = { ...s };
+            delete updated[resultKey];
+            return updated;
+          });
+        }, 1500);
+      })
+      .catch(() => {});
+  };
+
+  const handleCopyAllKeys = (providerId, keyField) => {
+    const keys = Array.isArray(savedAIKeys[providerId]) ? savedAIKeys[providerId] : [];
+    if (keys.length === 0) return;
+    const joined = keys.join(", ");
+    navigator.clipboard
+      .writeText(joined)
+      .then(() => {
+        setTestResults((s) => ({ ...s, [`${keyField}:all`]: "All keys copied!" }));
+        setTimeout(() => {
+          setTestResults((s) => {
+            const updated = { ...s };
+            delete updated[`${keyField}:all`];
+            return updated;
+          });
+        }, 1500);
+      })
+      .catch(() => {});
   };
 
   const handleTestEndpoint = async (providerId, endpointVal, fieldKey) => {
@@ -770,13 +819,17 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
         return;
       }
 
+      // Only the auth worker may deliver a token. The popup we open hands its
+      // `window.opener` to every page it navigates through, so without this
+      // check any of them — or any page that obtains a handle to this view —
+      // can post a CODELEDGER_AUTH message and swap in an attacker's GitHub
+      // token, silently redirecting the user's ledger to a repo they do not own.
+      const allowedOrigins = trustedAuthOrigins(CONSTANTS.URLS.AUTH_WORKER, window.location.origin);
+
       const receiveMessage = async (ev) => {
         try {
-          const data = ev && ev.data;
-          if (!data) return;
-          if (data.type !== "CODELEDGER_AUTH") return;
-          if (data.provider !== provider) return;
-          if (!data.token) return;
+          if (!isTrustedAuthMessage(ev, allowedOrigins, provider)) return;
+          const data = ev.data;
           await Storage.setAuthToken(provider, data.token);
           onChange(key, data.token);
           setTestResults((s) => ({ ...s, [key]: "OK" }));
@@ -925,7 +978,6 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
 
   const isProviderEffectivelyEnabled = (providerId) => {
     if (!providerId) return false;
-    if (values?.aiProvider === providerId || values?.aiSecondary === providerId) return true;
     return values?.[`${providerId}_enabled`] === true;
   };
 
@@ -1398,7 +1450,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                 ${primaryProvider
                   ? html`<${ModelSelector}
                       providerId=${primaryProvider}
-                      apiKey=${values[`${primaryProvider}_keys`] || ""}
+                      apiKey=${keyDrafts[primaryProvider] || ""}
                       selectedModel=${values.aiPrimaryModel || ""}
                       onSelect=${(v) => onChange("aiPrimaryModel", v)}
                       endpoint=${values[`${primaryProvider}_endpoint`] || ""}
@@ -1438,12 +1490,15 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                 ${secondaryProvider
                   ? html`<${ModelSelector}
                       providerId=${secondaryProvider}
-                      apiKey=${values[`${secondaryProvider}_keys`] || ""}
+                      apiKey=${keyDrafts[secondaryProvider] || ""}
                       selectedModel=${values.aiSecondaryModel || ""}
                       onSelect=${(v) => onChange("aiSecondaryModel", v)}
                       endpoint=${values[`${secondaryProvider}_endpoint`] || ""}
                       providerEnabled=${isProviderEffectivelyEnabled(secondaryProvider)}
                       onToggleEnabled=${(val) => onChange(`${secondaryProvider}_enabled`, val)}
+                      excludeModel=${primaryProvider === secondaryProvider
+                        ? values.aiPrimaryModel
+                        : ""}
                     />`
                   : ""}
               </div>
@@ -1465,7 +1520,7 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
           const modelField = `${pid}_model`;
           const enabledField = `${pid}_enabled`;
           const strategyField = `${pid}_keyStrategy`;
-          const rawKeys = values[keyField] || "";
+          const rawKeys = keyDrafts[pid] || "";
           const keyList = parseKeys(rawKeys);
           const savedKeys = Array.isArray(savedAIKeys[pid]) ? savedAIKeys[pid] : [];
           const endpoint = values[endpointField] || p.endpoint || "";
@@ -1491,21 +1546,26 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                     type="checkbox"
                     class="sr-only peer"
                     checked=${providerEnabled}
-                    disabled=${isPinned}
-                    onChange=${(e) => onChange(enabledField, e.target.checked)}
+                    onChange=${(e) => {
+                      const isEn = e.target.checked;
+                      onChange(enabledField, isEn);
+                      if (!isEn) {
+                        if (values?.aiProvider === pid) {
+                          onChange("aiProvider", "");
+                          onChange("aiPrimaryModel", "");
+                        }
+                        if (values?.aiSecondary === pid) {
+                          onChange("aiSecondary", "");
+                          onChange("aiSecondaryModel", "");
+                        }
+                      }
+                    }}
                   />
                   <div
-                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500 disabled:opacity-50"
+                    class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"
                   ></div>
                 </label>
               </div>
-              ${isPinned
-                ? html`<p class="text-[11px] text-amber-400">
-                    This provider is active as
-                    ${values?.aiProvider === pid ? " primary " : " secondary "}and cannot be
-                    disabled.
-                  </p>`
-                : ""}
               ${p.keyRequired
                 ? html`
                     <div class="space-y-3">
@@ -1535,6 +1595,13 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                           >
                             Test All
                           </button>
+                          <button
+                            onClick=${() => handleCopyAllKeys(pid, keyField)}
+                            disabled=${savedKeys.length === 0}
+                            class="px-3 py-1.5 bg-[#1f2937] hover:bg-[#334155] disabled:opacity-40 text-xs text-white rounded transition-colors"
+                          >
+                            Copy All Keys
+                          </button>
                         </div>
                       </div>
                       ${testResults[`${keyField}:all`]
@@ -1543,37 +1610,121 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
                           </div>`
                         : ""}
 
-                      <div class="space-y-2">
-                        ${keyList.map(
-                          (k, idx) => html`
-                            <div
-                              key=${`${pid}-${idx}`}
-                              class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
-                            >
-                              <span class="text-xs text-slate-300 font-mono">${maskKey(k)}</span>
-                              <div class="flex items-center gap-2">
-                                <button
-                                  onClick=${() =>
-                                    handleTestKey(pid, k, `${keyField}:${idx}`, endpoint)}
-                                  class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
-                                >
-                                  ${testing[`${keyField}:${idx}`] ? "Testing..." : "Test"}
-                                </button>
-                                ${(() => {
-                                  const r = testResults[`${keyField}:${idx}`];
-                                  if (!r) return "";
-                                  const ok = r === "OK";
-                                  return html`<span
-                                    class="text-[11px] ${ok ? "text-emerald-400" : "text-rose-400"}"
-                                    >${r}</span
-                                  >`;
-                                })()}
+                      <!-- Saved Keys List -->
+                      ${savedKeys.length > 0
+                        ? html`
+                            <div class="space-y-2">
+                              <div
+                                class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold"
+                              >
+                                Saved Keys (${savedKeys.length})
+                              </div>
+                              <div class="space-y-2">
+                                ${savedKeys.map(
+                                  (k, idx) => html`
+                                    <div
+                                      key=${`saved-${pid}-${idx}`}
+                                      class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
+                                    >
+                                      <span class="text-xs text-slate-300 font-mono"
+                                        >${maskKey(k)}</span
+                                      >
+                                      <div class="flex items-center gap-2">
+                                        <button
+                                          onClick=${() =>
+                                            handleTestKey(
+                                              pid,
+                                              k,
+                                              `${keyField}:saved:${idx}`,
+                                              endpoint,
+                                            )}
+                                          class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                                        >
+                                          ${testing[`${keyField}:saved:${idx}`]
+                                            ? "Testing..."
+                                            : "Test"}
+                                        </button>
+                                        ${(() => {
+                                          const r = testResults[`${keyField}:saved:${idx}`];
+                                          if (!r) return "";
+                                          const ok = r === "OK";
+                                          return html`<span
+                                            class="text-[11px] ${ok
+                                              ? "text-emerald-400"
+                                              : "text-rose-400"}"
+                                            >${r}</span
+                                          >`;
+                                        })()}
+                                        <button
+                                          onClick=${() =>
+                                            handleCopyKey(k, `${keyField}:saved:${idx}`)}
+                                          title="Copy API Key"
+                                          class="p-1 text-slate-400 hover:text-white transition-colors"
+                                        >
+                                          📋
+                                        </button>
+                                        <button
+                                          onClick=${() => handleDeleteSavedKey(pid, idx)}
+                                          title="Delete API Key"
+                                          class="p-1 text-slate-400 hover:text-red-400 transition-colors"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    </div>
+                                  `,
+                                )}
                               </div>
                             </div>
-                          `,
-                        )}
-                      </div>
+                          `
+                        : ""}
 
+                      <!-- Draft Keys List -->
+                      ${keyList.length > 0
+                        ? html`
+                            <div class="space-y-2">
+                              <div
+                                class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold"
+                              >
+                                Draft Keys (${keyList.length})
+                              </div>
+                              <div class="space-y-2">
+                                ${keyList.map(
+                                  (k, idx) => html`
+                                    <div
+                                      key=${`draft-${pid}-${idx}`}
+                                      class="flex items-center justify-between bg-black/40 border border-white/10 rounded px-3 py-2"
+                                    >
+                                      <span class="text-xs text-slate-300 font-mono"
+                                        >${maskKey(k)}</span
+                                      >
+                                      <div class="flex items-center gap-2">
+                                        <button
+                                          onClick=${() =>
+                                            handleTestKey(pid, k, `${keyField}:${idx}`, endpoint)}
+                                          class="px-2 py-1 bg-[#1f2937] hover:bg-[#334155] text-xs text-white rounded"
+                                        >
+                                          ${testing[`${keyField}:${idx}`] ? "Testing..." : "Test"}
+                                        </button>
+                                        ${(() => {
+                                          const r = testResults[`${keyField}:${idx}`];
+                                          if (!r) return "";
+                                          const ok = r === "OK";
+                                          return html`<span
+                                            class="text-[11px] ${ok
+                                              ? "text-emerald-400"
+                                              : "text-rose-400"}"
+                                            >${r}</span
+                                          >`;
+                                        })()}
+                                      </div>
+                                    </div>
+                                  `,
+                                )}
+                              </div>
+                            </div>
+                          `
+                        : ""}
                       ${(() => {
                         const hasFailed = keyList.some((_, idx) => {
                           const r = testResults[`${keyField}:${idx}`];

@@ -11,8 +11,70 @@ import { Storage } from "../core/storage.js";
 import { tabs, runtime } from "../lib/browser-compat.js";
 import { createDebugger } from "../lib/debug.js";
 import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
+import { isAIActive, isGamificationActive } from "../core/feature-flags.js";
+import { loadSnapshot } from "../core/gamification-state.js";
 
 const dbg = createDebugger("PopupApp");
+
+/**
+ * The streak, today's progress toward it, and what it would take to save it.
+ *
+ * The toolbar badge has room for the number alone; this is where the number
+ * gets its sentence. Both read the same snapshot, so they cannot disagree.
+ */
+function StreakStrip({ snapshot }) {
+  if (!snapshot) return "";
+
+  const target = Math.max(1, snapshot.effectiveTarget || 1);
+  const points = Math.max(0, snapshot.todayPoints || 0);
+  const done = snapshot.todayDone === true || snapshot.vacationActive === true;
+  const rescue = snapshot.rescue && snapshot.rescue.remaining > 0 ? snapshot.rescue : null;
+  const pct = Math.round(Math.min(1, points / target) * 100);
+
+  const line = snapshot.vacationActive
+    ? "Vacation day — the streak is safe."
+    : rescue
+      ? `${rescue.remaining} more points restores ${rescue.restoresDay}.`
+      : done
+        ? `Today's ${target} points are in.`
+        : `${points} / ${target} points today`;
+
+  return html`
+    <div class="mb-4 rounded-lg bg-white/5 border border-white/5 p-3">
+      <div class="flex items-baseline justify-between">
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-base leading-none">🔥</span>
+          <span
+            class="text-xl font-bold ${snapshot.currentStreak > 0
+              ? "text-amber-300"
+              : "text-slate-600"}"
+            >${snapshot.currentStreak}</span
+          >
+          <span class="text-[10px] uppercase tracking-widest text-slate-500">
+            ${snapshot.currentStreak === 1 ? "day" : "days"}
+          </span>
+        </div>
+        <div class="flex items-baseline gap-2 text-[10px] text-slate-500">
+          ${snapshot.freezes > 0
+            ? html`<span title="Streak freezes earned">❄ ${snapshot.freezes}</span>`
+            : ""}
+          <span>Lv ${snapshot.level}</span>
+        </div>
+      </div>
+      <div class="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden">
+        <div
+          class="h-full transition-[width] ${done
+            ? "bg-emerald-400"
+            : rescue
+              ? "bg-rose-400"
+              : "bg-cyan-400"}"
+          style=${`width:${done ? 100 : pct}%`}
+        ></div>
+      </div>
+      <p class="mt-1.5 text-[10px] ${rescue ? "text-rose-300" : "text-slate-500"}">${line}</p>
+    </div>
+  `;
+}
 
 applyThemeFromStorage().catch(() => {});
 setupThemeListener();
@@ -26,6 +88,8 @@ function PopupApp() {
   });
   const [recent, setRecent] = useState([]);
   const [pendingConflicts, setPendingConflicts] = useState(0);
+  const [settings, setSettings] = useState(null);
+  const [snapshot, setSnapshot] = useState(null);
 
   useEffect(() => {
     Storage.getAllProblems().then((problems) => {
@@ -41,11 +105,19 @@ function PopupApp() {
     Storage.getSettings()
       .then((s) => {
         setPendingConflicts(Number(s?._pendingConflicts) || 0);
+        setSettings(s || {});
+        // Only computed when it is going to be shown — the popup opens often
+        // and reading every problem back is the expensive part.
+        if (isGamificationActive(s)) {
+          loadSnapshot(s)
+            .then(setSnapshot)
+            .catch((e) => dbg.warn("streak snapshot failed:", e?.message));
+        }
       })
       .catch(() => {});
   }, []);
 
-  const openLibrary = (tab = "dashboard", settingsTab = null) => {
+  const openLibrary = (tab = "solutions", settingsTab = null) => {
     let url = runtime.getURL(`library/library.html?tab=${tab}`);
     if (settingsTab) url += `&settingsTab=${settingsTab}`;
     try {
@@ -79,6 +151,8 @@ function PopupApp() {
         <h1 class="text-lg font-semibold tracking-tight">CodeLedger</h1>
       </div>
 
+      ${isGamificationActive(settings) ? html`<${StreakStrip} snapshot=${snapshot} />` : ""}
+
       <div class="grid grid-cols-3 gap-2 mb-4">
         <div class="bg-white/5 border border-white/5 rounded p-2 flex flex-col items-center">
           <span class="text-emerald-400 font-bold">${stats.easy}</span>
@@ -101,18 +175,12 @@ function PopupApp() {
             placeholder="Search problems or topics"
             class="w-full px-3 py-2 rounded bg-black border border-white/10 text-sm text-white"
           />
-          <div class="mt-2 flex gap-2">
+          <div class="mt-2">
             <button
-              class="flex-1 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-xs font-bold uppercase tracking-widest"
+              class="w-full py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-xs font-bold uppercase tracking-widest"
               onClick=${() => searchLibrary(document.getElementById("popup-search").value || "")}
             >
               Search
-            </button>
-            <button
-              class="flex-1 py-2 bg-white/5 border border-white/10 rounded-lg text-slate-300 text-xs font-bold uppercase tracking-widest"
-              onClick=${() => openLibrary("add")}
-            >
-              Add Solve
             </button>
           </div>
         </div>
@@ -175,16 +243,20 @@ function PopupApp() {
       <div class="flex flex-col gap-2 mb-2">
         <button
           class="w-full py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-xs font-bold uppercase tracking-widest hover:bg-cyan-500/20 transition-colors"
-          onClick=${() => openLibrary("dashboard")}
+          onClick=${() => openLibrary("solutions")}
         >
-          Open Dashboard
+          Open Library
         </button>
-        <button
-          class="w-full py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs font-bold uppercase tracking-widest hover:bg-emerald-500/20 transition-colors"
-          onClick=${() => openLibrary("ai-chats")}
-        >
-          AI Chats
-        </button>
+        ${isAIActive(settings)
+          ? html`
+              <button
+                class="w-full py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs font-bold uppercase tracking-widest hover:bg-emerald-500/20 transition-colors"
+                onClick=${() => openLibrary("ai-chats")}
+              >
+                AI Chats
+              </button>
+            `
+          : ""}
         <button
           class="w-full py-2 bg-white/5 border border-white/10 rounded-lg text-slate-300 text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
           onClick=${() => openLibrary("settings")}

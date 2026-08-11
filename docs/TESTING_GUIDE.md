@@ -3,12 +3,13 @@
 Quick-reference for manually verifying the extension on each supported platform.
 
 ## ⚡ TL;DR Testing Flow
-* **Setup**: Load `src/` as an unpacked extension → open popup → click **Connect GitHub** (OAuth) → enter a repo name in Settings.
-* **LeetCode**: Open Two Sum → Submit solution → Verify commit appears on GitHub in ~3 seconds.
-* **GeeksForGeeks**: Solve Reverse a Linked List → Submit → Verify commit appears.
-* **Codeforces**: Solve Theatre Square → Submit → Verify commit appears.
-* **AI Panel**: Set API key in Settings → AI → Open floating AI Review panel on any problem page → Ask for review.
-* **Dashboard**: Go to Library side-panel → Verify Heatmap, Charts, and Knowledge Graph render correctly.
+
+- **Setup**: Load `src/` as an unpacked extension → open popup → click **Connect GitHub** (OAuth) → enter a repo name in Settings.
+- **LeetCode**: Open Two Sum → Submit solution → Verify commit appears on GitHub in ~3 seconds.
+- **GeeksForGeeks**: Solve Reverse a Linked List → Submit → Verify commit appears.
+- **Codeforces**: Solve Theatre Square → Submit → Verify commit appears.
+- **AI Panel**: Set API key in Settings → AI → Open floating AI Review panel on any problem page → Ask for review.
+- **Dashboard**: Go to Library side-panel → Verify Heatmap, Charts, and Knowledge Graph render correctly.
 
 ---
 

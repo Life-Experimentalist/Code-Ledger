@@ -8,6 +8,7 @@
  */
 
 import { createDebugger } from "../lib/debug.js";
+import { CONSTANTS } from "./constants.js";
 
 const dbg = createDebugger("AIPrompts");
 export const DEFAULT_PROMPT_TEMPLATE = `You are an expert competitive programming mentor. Review this {difficulty} {language} solution for '{title}'.
@@ -160,14 +161,22 @@ export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) 
   const filledTemplate = fillPromptTemplate(template, problemContext);
   const lang = problemContext.language || problemContext.lang?.name || "";
   dbg.log(`buildReviewPrompt(): ${platform} (${lang})`);
-  const needsTags = !problemContext.tags?.length;
-  const tagInstruction = needsTags
-    ? `\n\nThis problem has no topic tags. On the very last line of your response, output 2–4 relevant algorithm/data structure tags in exactly this format (no other text on that line):\nTAGS: Tag One, Tag Two`
-    : "";
+  const currentMetadata = `\n\n## Current Metadata:\n- **Topic:** ${problemContext.topic || "None"}\n- **Tags:** ${problemContext.tags?.join(", ") || "None"}\n- **Pattern:** ${problemContext.pattern || "None"}\n- **Difficulty:** ${problemContext.difficulty || "None"}`;
+
+  const CANONICAL_TOPICS = (CONSTANTS.CANONICAL_DSA_TOPICS || []).join(", ");
+
+  const existingTags = problemContext.tags || [];
+  const sparseTagHint =
+    existingTags.length < 2 || (problemContext.platform || "").toLowerCase() === "geeksforgeeks"
+      ? `\n\nThis problem has sparse tags (${existingTags.length} found). Infer 2-5 accurate DSA tags from the code and title. Use ONLY the canonical names listed above.`
+      : "";
+
+  const metadataInstruction = `\n\nAt the very end of your response, you MUST output a metadata block in exactly this format (no other text on these lines):\nMETADATA\nTAGS: Tag One, Tag Two  ← use ONLY from this canonical list: ${CANONICAL_TOPICS}${sparseTagHint}\nTOPIC: Primary Topic\nPATTERN: Optional Pattern Name\nDIFFICULTY: Easy/Medium/Hard\nEND_METADATA`;
+
   const behaviorSection = problemContext._behaviorContext
     ? `\n\n## Learner History:\n${problemContext._behaviorContext}`
     : "";
-  return `${filledTemplate}${behaviorSection}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\`${tagInstruction}`;
+  return `${filledTemplate}${behaviorSection}${currentMetadata}\n\n## Code:\n\`\`\`${lang}\n${code}\n\`\`\`${metadataInstruction}`;
 }
 
 export function buildConversationSystemPrompt(context = {}) {

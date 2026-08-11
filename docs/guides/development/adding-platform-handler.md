@@ -125,11 +125,18 @@ In `src/content/handler-loader.js`, add your platform to the domain router:
 
 ### C. Update Manifest Permissions
 
-Update `src/manifest.json` to allow content scripts to run on the platform and to whitelist it for dynamic module resolution:
+Update **both** `src/manifest-chromium.json` and `src/manifest-firefox.json` to
+allow content scripts to run on the platform and to whitelist it for dynamic
+module resolution:
 
 1. Add domain to `host_permissions`
 2. Add domain to `content_scripts.matches`
 3. Add domain to `web_accessible_resources.matches`
+
+In practice you export `DOMAINS` from the handler's `dom-selectors.js` and run
+`node dev/generate-manifest-domains.js`, which writes all three into both
+manifests for you. Edit by hand only when the generator cannot express what you
+need.
 
 ```json
 "host_permissions": [

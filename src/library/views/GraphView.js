@@ -27,14 +27,11 @@ import { ProblemModal } from "../components/ProblemModal.js";
 import { CONSTANTS } from "../../core/constants.js";
 
 /* ── Force simulation constants ─────────────────────────────────────── */
-const REPULSION = 3500;
-const LINK_DIST = { "topic-problem": 100, similar: 80, canonical: 60 };
-const LINK_STR = { "topic-problem": 0.45, similar: 0.08, canonical: 0.5 };
+const REPULSION = 3800;
+const LINK_DIST = { "topic-problem": 60, similar: 80, canonical: 50 };
+const LINK_STR = { "topic-problem": 0.6, similar: 0.05, canonical: 0.6 };
 // Very weak gravity toward origin — NOT alpha-scaled.
-// At radius 700: force = 700 × 0.0008 = 0.56 px/frame.
-// Repulsion at 50px: 3500/2501 ≈ 1.4 px/frame — repulsion wins at short range.
-// Without alpha-scaling, gravity is constant so it never overwhelms repulsion.
-const GRAVITY = 0.00035;
+const GRAVITY = 0.00045;
 const DAMPING = 0.85;
 const ALPHA_DECAY = 0.013;
 
@@ -54,8 +51,12 @@ function simulationStep(nodes, edges, alpha) {
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const d2 = dx * dx + dy * dy;
+
+      // Distance cutoff: Skip repulsion if nodes are far apart to prevent isolated clusters flying away
+      if (d2 > 202500) continue; // 450px^2 = 202500
+
       // Softening radius: minimum effective distance = 12px
-      const dsoft = Math.sqrt(d2 + 144); // Math.max(Math.sqrt(d2), 12) without sqrt performance cost
+      const dsoft = Math.sqrt(d2 + 144);
       const d2soft = dsoft * dsoft;
       const f = (REPULSION * alpha) / d2soft;
       a.fx -= f * dx;
@@ -83,7 +84,7 @@ function simulationStep(nodes, edges, alpha) {
     b.fy -= (f * dy) / d;
   }
 
-  // Single-topic orbit: problems with exactly one topic connection orbit at ~80px from it
+  // Single-topic orbit: problems with exactly one topic connection orbit at ~60px from it
   const problemTopicCount = new Map();
   const singleTopicMap = new Map();
   for (const e of edges) {
@@ -100,15 +101,18 @@ function simulationStep(nodes, edges, alpha) {
     const dx = t.x - p.x,
       dy = t.y - p.y;
     const d = Math.sqrt(dx * dx + dy * dy) || 1;
-    const pull = (d - 80) * 0.012 * alpha;
+    const pull = (d - 60) * 0.015 * alpha;
     p.fx += (pull * dx) / d;
     p.fy += (pull * dy) / d;
   }
 
-  // Constant weak gravity toward origin — not alpha-scaled so it never dominates repulsion
+  // Gravity toward origin to prevent clusters from flying away forever
   for (const n of nodes) {
-    n.fx -= n.x * GRAVITY;
-    n.fy -= n.y * GRAVITY;
+    const dist2 = n.x * n.x + n.y * n.y;
+    // Increase gravity exponentially if node is very far away (>800px or >1200px)
+    const g = dist2 > 1440000 ? GRAVITY * 12 : dist2 > 640000 ? GRAVITY * 4 : GRAVITY;
+    n.fx -= n.x * g;
+    n.fy -= n.y * g;
   }
 
   // Integrate with velocity cap
@@ -126,10 +130,53 @@ function simulationStep(nodes, edges, alpha) {
 
 /* ── Layout modes ────────────────────────────────────────────────────── */
 const GRAPH_LAYOUT_MODES = [
+  { id: "clustered", label: "Clustered" },
   { id: "layered", label: "Layered" },
   { id: "circular", label: "Circular" },
   { id: "force", label: "Force" },
 ];
+
+/* ── Colour modes ────────────────────────────────────────────────────── */
+
+/**
+ * What the colour of a topic node means.
+ *
+ * "Topic" gives every topic its own hue, which is what a knowledge graph
+ * usually looks like and which carries no information beyond identity — the
+ * picture is pretty and answers nothing. "Mastery" spends the same colour on
+ * how well the topic is held, so the weak areas are the ones that stand out.
+ */
+const GRAPH_COLOR_MODES = [
+  { id: "topic", label: "By topic" },
+  { id: "mastery", label: "By mastery" },
+];
+
+const BAND_COLOR = {
+  strong: "#10b981",
+  working: "#06b6d4",
+  shaky: "#f59e0b",
+  untouched: "#64748b",
+};
+
+const BAND_LABEL = {
+  strong: "solid",
+  working: "coming along",
+  shaky: "shaky",
+  untouched: "untouched",
+};
+
+/**
+ * Point every topic node's `color` at what the current mode means. Mutates in
+ * place: the render loop reads `node.color` each frame, so a repaint needs no
+ * rebuild and no simulation restart.
+ */
+function applyColorMode(nodes, mode) {
+  for (const n of nodes) {
+    if (n.type !== "topic") continue;
+    if (n.paletteColor === undefined) n.paletteColor = n.color;
+    n.color = mode === "mastery" ? BAND_COLOR[n.band] || BAND_COLOR.untouched : n.paletteColor;
+  }
+}
 
 function seedNode(node, x, y) {
   node.x = x;
@@ -250,6 +297,46 @@ function applyForceSeedLayout(nodes) {
   });
 }
 
+function applyClusteredLayout(nodes, edges) {
+  const topicNodes = nodes.filter((n) => n.type === "topic");
+  const problemNodes = nodes.filter((n) => n.type === "problem");
+
+  // Force a very wide ring for topics so clusters do not intersect
+  const topicRadius = Math.max(300, topicNodes.length * 40);
+  const topicPos = new Map();
+
+  topicNodes.forEach((n, i) => {
+    const angle = (i / topicNodes.length) * Math.PI * 2;
+    seedNode(n, Math.cos(angle) * topicRadius, Math.sin(angle) * topicRadius);
+    topicPos.set(n.id, { x: n.x, y: n.y });
+  });
+
+  const primaryTopic = getPrimaryTopics(edges);
+  const perTopicCount = new Map();
+  for (const n of problemNodes) {
+    const tid = primaryTopic.get(n.id);
+    if (tid) perTopicCount.set(tid, (perTopicCount.get(tid) || 0) + 1);
+  }
+  const perTopicIdx = new Map();
+
+  problemNodes.forEach((n) => {
+    const tid = primaryTopic.get(n.id);
+    const base = (tid && topicPos.get(tid)) || { x: 0, y: 0 };
+    const idx = perTopicIdx.get(tid) || 0;
+    const count = perTopicCount.get(tid) || 1;
+    perTopicIdx.set(tid, idx + 1);
+
+    // Distribute the problems evenly in concentric rings if there are many
+    const ringCapacity = 16;
+    const ringIndex = Math.floor(idx / ringCapacity);
+    const ringBaseSpread = n.solved ? 30 : 60;
+    const spread = ringBaseSpread + ringIndex * 35 + Math.random() * 15;
+
+    const angle = ((idx % ringCapacity) / Math.min(count, ringCapacity)) * Math.PI * 2;
+    seedNode(n, base.x + Math.cos(angle) * spread, base.y + Math.sin(angle) * spread);
+  });
+}
+
 function applyGraphLayout(nodes, edges, mode) {
   if (mode === "layered") {
     applyLayeredLayout(nodes, edges);
@@ -259,7 +346,11 @@ function applyGraphLayout(nodes, edges, mode) {
     applyForceSeedLayout(nodes);
     return;
   }
-  applyCircularLayout(nodes, edges);
+  if (mode === "circular") {
+    applyCircularLayout(nodes, edges);
+    return;
+  }
+  applyClusteredLayout(nodes, edges);
 }
 
 /* ── Level-of-detail thresholds ──────────────────────────────────────── */
@@ -316,16 +407,34 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     const a = nodeMap.get(e.source),
       b = nodeMap.get(e.target);
     if (!a || !b) continue;
+
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    // Introduce curvature to all edges for that organic look
+    const curveOffset = e.type === "topic-problem" ? len * 0.15 : e.type === "canonical" ? 35 : 20;
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const cx = mx - (dy / len) * curveOffset;
+    const cy = my + (dx / len) * curveOffset;
+
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = EDGE_GLOW_COLOR[e.type] ?? "#94a3b833";
+    ctx.quadraticCurveTo(cx, cy, b.x, b.y);
+
+    let glowColor = EDGE_GLOW_COLOR[e.type] ?? "#94a3b833";
+    if (e.type === "topic-problem") {
+      const topicNode = a.type === "topic" ? a : b.type === "topic" ? b : null;
+      glowColor = topicNode ? `${topicNode.color}22` : glowColor;
+    }
+
+    ctx.strokeStyle = glowColor;
     ctx.lineWidth = e.type === "canonical" ? 6 : 4;
-    ctx.globalAlpha = (e.type === "topic-problem" ? 0.4 : 0.6) * edgeAlpha;
+    ctx.globalAlpha = (e.type === "topic-problem" ? 0.3 : 0.6) * edgeAlpha;
     ctx.stroke();
   }
 
-  // Pass 2: Main edge (brighter color, thicker)
+  // Pass 2: Main edge (brighter color, thicker, dashes)
   for (const e of edges) {
     if (!showSimilarEdges && e.type === "similar") continue;
     if (!showCanonicalEdges && e.type === "canonical") continue;
@@ -343,10 +452,26 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
     const isNeighborEdge =
       selected && !isSelectedEdge && (neighborIds.has(e.source) || neighborIds.has(e.target));
 
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const curveOffset = e.type === "topic-problem" ? len * 0.15 : e.type === "canonical" ? 35 : 20;
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const cx = mx - (dy / len) * curveOffset;
+    const cy = my + (dx / len) * curveOffset;
+
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = EDGE_COLOR[e.type] ?? "#64748b";
+    ctx.quadraticCurveTo(cx, cy, b.x, b.y);
+
+    let strokeColor = EDGE_COLOR[e.type] ?? "#64748b";
+    if (e.type === "topic-problem") {
+      const topicNode = a.type === "topic" ? a : b.type === "topic" ? b : null;
+      strokeColor = topicNode ? topicNode.color : strokeColor;
+    }
+
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth =
       isHovered || isSelectedEdge
         ? e.type === "canonical"
@@ -354,15 +479,22 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
           : 2.5
         : e.type === "canonical"
           ? 2.5
-          : 1.8;
+          : 1.5;
+
+    // Apply dotted/dashed styles for non-hierarchy edges
+    if (e.type === "similar") ctx.setLineDash([4, 6]);
+    else if (e.type === "canonical") ctx.setLineDash([8, 6]);
+    else ctx.setLineDash([]);
+
     ctx.globalAlpha = isSelectedEdge
-      ? 1
+      ? 0.9
       : isNeighborEdge
-        ? (e.type === "topic-problem" ? 0.42 : 0.55) * edgeAlpha
+        ? (e.type === "topic-problem" ? 0.35 : 0.55) * edgeAlpha
         : isHovered
-          ? 1
-          : (e.type === "topic-problem" ? 0.55 : 0.7) * edgeAlpha;
+          ? 0.8
+          : (e.type === "topic-problem" ? 0.25 : 0.5) * edgeAlpha;
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // Nodes — selected/neighbor emphasis mirrors the graphify-style focal halo
@@ -375,19 +507,40 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
 
     ctx.beginPath();
     ctx.arc(n.x, n.y, r + (isH ? 3 : 0), 0, Math.PI * 2);
-    ctx.shadowBlur = isSel ? 24 : isNeighbor ? 12 : 0;
-    ctx.shadowColor = isSel ? n.color : isNeighbor ? `${n.color}88` : "transparent";
+
+    // Apply Graphify neon glow effect to all nodes
+    ctx.shadowBlur = isSel ? 32 : isNeighbor ? 20 : 10;
+    ctx.shadowColor = isSel ? n.color : isNeighbor ? `${n.color}dd` : `${n.color}99`;
 
     if (n.type === "topic") {
-      ctx.fillStyle = n.color + "33";
+      // Radiant hub for topics
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+      grad.addColorStop(0, n.color);
+      grad.addColorStop(0.5, `${n.color}aa`);
+      grad.addColorStop(1, `${n.color}22`);
+      ctx.fillStyle = grad;
       ctx.fill();
       ctx.strokeStyle = n.color;
-      ctx.lineWidth = isH || isSel ? 3 : isNeighbor ? 2.5 : 2;
+      ctx.lineWidth = isH || isSel ? 3 : isNeighbor ? 2.5 : 1.5;
       ctx.stroke();
+
+      // Double-circle/inner ring for data structures
+      if (n.category === "ds") {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r * 0.65, 0, Math.PI * 2);
+        ctx.strokeStyle = n.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     } else if (n.solved) {
       ctx.fillStyle = n.color;
       ctx.fill();
-      ctx.strokeStyle = isSel ? "#fff" : n.platformColor || PLATFORM_COLOR[n.platform] || "#64748b";
+      const isLight = document.documentElement.getAttribute("data-theme") === "light";
+      ctx.strokeStyle = isSel
+        ? isLight
+          ? "#000"
+          : "#fff"
+        : n.platformColor || PLATFORM_COLOR[n.platform] || "#64748b";
       ctx.lineWidth = isSel ? 2.5 : isNeighbor ? 2.2 : n.isMultiPlatform ? 2.5 : 1.5;
       ctx.globalAlpha = isSel ? 1 : isNeighbor ? 0.82 : 0.85;
       ctx.stroke();
@@ -401,6 +554,10 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+
+    // Clear shadow so it doesn't bleed heavily into text
+    ctx.shadowBlur = 0;
+
     if (n.type === "topic" || isH || isSel || isNeighbor || scale > LOD_PROBLEM_LABEL_SCALE) {
       if (isSel) {
         ctx.shadowBlur = 28;
@@ -416,7 +573,9 @@ function drawGraph(ctx, nodes, edges, transform, hovered, selected) {
         ctx.shadowBlur = 0;
         ctx.shadowColor = "transparent";
       }
-      ctx.fillStyle = "#e2e8f0";
+      ctx.fillStyle =
+        getComputedStyle(document.documentElement).getPropertyValue("--cl-text").trim() ||
+        "#e2e8f0";
       ctx.font =
         n.type === "topic" ? `bold ${Math.max(11, r * 0.7)}px sans-serif` : "11px sans-serif";
       ctx.textAlign = "center";
@@ -465,6 +624,7 @@ const DIFF_ORDER = { Easy: 0, Medium: 1, Hard: 2, Unknown: 3 };
 /* ── Component ───────────────────────────────────────────────────────── */
 export function GraphView({
   problems,
+  settings = null,
   focusProblem = null,
   onFocusProblemHandled = null,
   onProblemDelete = null,
@@ -505,15 +665,28 @@ export function GraphView({
   const [topicB, setTopicB] = useState("");
   const [groupDepth, setGroupDepth] = useState(1);
   const [filterSolved, setFilterSolved] = useState(false);
+  const [filterCanonicalOnly, setFilterCanonicalOnly] = useState(false);
   const [filterDifficultyGraph, setFilterDifficultyGraph] = useState("All");
   const [filterPlatformGraph, setFilterPlatformGraph] = useState("All");
   const [filterTopicGraph, setFilterTopicGraph] = useState("All");
-  const VALID_LAYOUTS = new Set(["layered", "circular", "force"]);
-  const initLayout = getQueryParam("graphLayout", "layered");
+  const VALID_LAYOUTS = new Set(["layered", "circular", "force", "clustered"]);
+  const initLayout = getQueryParam("graphLayout", "clustered");
   const [layoutMode, setLayoutMode] = useState(
-    VALID_LAYOUTS.has(initLayout) ? initLayout : "layered",
+    VALID_LAYOUTS.has(initLayout) ? initLayout : "clustered",
   );
+  const initColor = getQueryParam("graphColor", "topic");
+  const [colorMode, setColorMode] = useState(initColor === "mastery" ? "mastery" : "topic");
   const filterSolvedRef = useRef(false);
+  const filterCanonicalOnlyRef = useRef(false);
+
+  useEffect(() => {
+    filterSolvedRef.current = filterSolved;
+  }, [filterSolved]);
+
+  useEffect(() => {
+    filterCanonicalOnlyRef.current = filterCanonicalOnly;
+  }, [filterCanonicalOnly]);
+
   const graphSearchRef = useRef("");
   const filterDifficultyRef = useRef("All");
   const filterPlatformRef = useRef("All");
@@ -578,10 +751,41 @@ export function GraphView({
   }, []);
   fitViewRef.current = fitView;
 
+  const zoomToNode = useCallback((node) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !node) return;
+    const { w, h } = getLogicalSize(canvas);
+    if (!w || !h) {
+      setTimeout(() => zoomToNodeRef.current?.(node), 60);
+      return;
+    }
+
+    // Animate to node by smoothly interpolating the transform inside the RAF.
+    // For now, setting it directly is fine if no animation system is present,
+    // but the user wanted it to "zoom to that node location".
+    // We'll set a higher scale to zoom in.
+    const targetScale = 1.25;
+    const targetTx = w / 2 - node.x * targetScale;
+    const targetTy = h / 2 - node.y * targetScale;
+
+    // We can just set the transform
+    transformRef.current = {
+      scale: targetScale,
+      tx: targetTx,
+      ty: targetTy,
+    };
+  }, []);
+  const zoomToNodeRef = useRef(null);
+  zoomToNodeRef.current = zoomToNode;
+
   /* ── Build graph when problems change ───────────────────────────── */
   useEffect(() => {
     if (!problems?.length) return;
-    const { nodes: newNodes, edges: newEdges } = buildKnowledgeGraph(problems);
+    const { nodes: newNodes, edges: newEdges } = buildKnowledgeGraph(
+      problems,
+      settings?.topicMappings,
+      settings?.topicKinds,
+    );
 
     const existingMap = new Map(simRef.current.nodes.map((n) => [n.id, n]));
     const isFirstLoad = existingMap.size === 0;
@@ -612,6 +816,7 @@ export function GraphView({
       }
     }
 
+    applyColorMode(newNodes, colorMode);
     simRef.current.nodes = newNodes;
     simRef.current.edges = newEdges;
 
@@ -629,6 +834,12 @@ export function GraphView({
       suggested: newNodes.filter((n) => n.type === "problem" && !n.solved).length,
     });
   }, [problems, layoutMode]);
+
+  // Recolour in place. No rebuild and no re-seed: the layout is where the user
+  // left it, and only what the colours mean has changed.
+  useEffect(() => {
+    applyColorMode(simRef.current.nodes, colorMode);
+  }, [colorMode]);
 
   useEffect(() => {
     filterSolvedRef.current = filterSolved;
@@ -679,10 +890,67 @@ export function GraphView({
       setSelected(match);
       setModalProblem(match);
       updateQueryParams({ problem: match.id || match.titleSlug });
-      setTimeout(() => fitViewRef.current?.(), 20);
+      setTimeout(() => zoomToNodeRef.current?.(match), 20);
     }
     onFocusProblemHandled?.();
   }, [focusProblem, onFocusProblemHandled]);
+
+  // Helper to check if a problem object matches a query parameter ID/slug
+  const isSameProblem = useCallback((prob, urlId) => {
+    if (!prob || !urlId) return false;
+    if (prob.id === urlId) return true;
+    if (prob.titleSlug === urlId) return true;
+    if (prob.mergedProblemIds && prob.mergedProblemIds.includes(urlId)) return true;
+    if (
+      prob.mergedProblemIds &&
+      prob.mergedProblemIds.some((mid) => mid.split(":").pop() === urlId)
+    )
+      return true;
+    const probIdParts = prob.id ? String(prob.id).split(":") : [];
+    if (probIdParts.length > 0 && probIdParts[probIdParts.length - 1] === urlId) return true;
+    return false;
+  }, []);
+
+  // Handle URL problem query param on mount or when problems/nodes are loaded
+  useEffect(() => {
+    if (focusProblem) return; // let focusProblem effect take precedence
+
+    const problemId = getQueryParam("problem");
+    if (!problemId) return;
+
+    // Avoid redundant selection/zoom if the current modal problem already matches
+    if (modalProblem && isSameProblem(modalProblem, problemId)) {
+      return;
+    }
+
+    const nodes = simRef.current.nodes || [];
+    if (!nodes.length) return;
+
+    const match = nodes.find(
+      (node) =>
+        node.type === "problem" &&
+        (node.id === problemId ||
+          node.titleSlug === problemId ||
+          (node.mergedProblemIds &&
+            node.mergedProblemIds.some(
+              (mid) => mid === problemId || mid.split(":").pop() === problemId,
+            ))),
+    );
+
+    if (match) {
+      setSelected(match);
+      setModalProblem(match);
+      setTimeout(() => {
+        zoomToNodeRef.current?.(match);
+      }, 80);
+    }
+  }, [problems, focusProblem, modalProblem, isSameProblem]);
+
+  const [filterTopicsOnly, setFilterTopicsOnly] = useState(false);
+  const filterTopicsOnlyRef = useRef(false);
+  useEffect(() => {
+    filterTopicsOnlyRef.current = filterTopicsOnly;
+  }, [filterTopicsOnly]);
 
   function getVisibleGraphData() {
     const { nodes, edges } = simRef.current;
@@ -690,14 +958,25 @@ export function GraphView({
       .trim()
       .toLowerCase();
     const solvedOnly = !!filterSolvedRef.current;
+    const canonicalOnly = !!filterCanonicalOnlyRef.current;
     const diff = filterDifficultyRef.current;
     const platform = filterPlatformRef.current;
     const topic = filterTopicRef.current;
+    const topicsOnly = !!filterTopicsOnlyRef.current;
 
     const visibleProblemIds = new Set();
+    const visibleTopicIds = new Set();
+
     for (const n of nodes) {
-      if (n.type !== "problem") continue;
+      if (n.type === "topic") {
+        visibleTopicIds.add(n.id);
+        continue;
+      }
+
+      if (topicsOnly) continue; // Skip problem nodes entirely
+
       if (solvedOnly && !n.solved) continue;
+      if (canonicalOnly && !n.hasCanonical) continue;
       if (diff !== "All" && String(n.difficulty || "Unknown") !== diff) continue;
       if (platform !== "All" && String(n.platform || "") !== platform) continue;
       if (topic !== "All") {
@@ -715,12 +994,16 @@ export function GraphView({
 
     const drawNodeIds = new Set(visibleProblemIds);
 
-    // Only add topic nodes directly connected to a VISIBLE problem node.
-    // Scoping to topic-problem edges prevents unrelated topics bleeding in.
-    for (const e of edges) {
-      if (e.type !== "topic-problem") continue;
-      if (visibleProblemIds.has(e.target)) drawNodeIds.add(e.source); // source = topic
-      if (visibleProblemIds.has(e.source)) drawNodeIds.add(e.target); // target = topic
+    // If topicsOnly is active, show all topics (or filtered topics)
+    if (topicsOnly) {
+      for (const t of visibleTopicIds) drawNodeIds.add(t);
+    } else {
+      // Only add topic nodes directly connected to a VISIBLE problem node.
+      for (const e of edges) {
+        if (e.type !== "topic-problem") continue;
+        if (visibleProblemIds.has(e.target)) drawNodeIds.add(e.source); // source = topic
+        if (visibleProblemIds.has(e.source)) drawNodeIds.add(e.target); // target = topic
+      }
     }
 
     // Also draw similar/canonical edges between visible problems
@@ -775,7 +1058,9 @@ export function GraphView({
       // Clear and fill background in physical pixels
       const dpr = window.devicePixelRatio || 1;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#0a0a0f";
+      ctx.fillStyle =
+        getComputedStyle(document.documentElement).getPropertyValue("--cl-surface").trim() ||
+        "#0a0a0f";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Scale once for DPR so all drawing uses logical CSS pixels
@@ -1087,8 +1372,22 @@ export function GraphView({
               ${node.count} problem${node.count !== 1 ? "s" : ""}
             </div>
           </div>
-          <div class="text-[11px] text-slate-400">
-            ${node.count} problem${node.count !== 1 ? "s" : ""} solved
+          <div class="flex items-center gap-2 text-[11px]">
+            <span class="text-slate-400">
+              ${node.solveCount}
+              solved${node.daysSince === null || node.daysSince === undefined
+                ? ""
+                : node.daysSince === 0
+                  ? ", today"
+                  : node.daysSince === 1
+                    ? ", yesterday"
+                    : `, last ${node.daysSince}d ago`}
+            </span>
+            ${node.band
+              ? html`<span style=${{ color: BAND_COLOR[node.band] || BAND_COLOR.untouched }}
+                  >${BAND_LABEL[node.band] || ""}</span
+                >`
+              : ""}
           </div>
           ${!compact && topicProblems.length
             ? html`
@@ -1276,13 +1575,65 @@ export function GraphView({
                   ? "Topics on top, problems grouped by difficulty"
                   : mode.id === "circular"
                     ? "Topics in a ring with clustered problems"
-                    : "Loose force-directed seed layout"}
+                    : mode.id === "clustered"
+                      ? "360-degree clusters around topics"
+                      : "Loose force-directed seed layout"}
               >
                 ${mode.label}
               </button>
             `,
           )}
         </div>
+        <div
+          class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 text-xs text-slate-400"
+        >
+          ${GRAPH_COLOR_MODES.map(
+            (mode) => html`
+              <button
+                onClick=${() => {
+                  setColorMode(mode.id);
+                  updateQueryParams({ graphColor: mode.id });
+                }}
+                class="px-2 py-1 rounded-md transition-colors ${colorMode === mode.id
+                  ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"}"
+                title=${mode.id === "mastery"
+                  ? "Colour topics by how well you hold them — solve count saturating, time since the last solve decaying"
+                  : "Give every topic its own colour"}
+              >
+                ${mode.label}
+              </button>
+            `,
+          )}
+        </div>
+        ${colorMode === "mastery"
+          ? html`
+              <div class="flex items-center gap-2 text-[10px] text-slate-500">
+                ${["strong", "working", "shaky"].map(
+                  (band) => html`
+                    <span key=${band} class="flex items-center gap-1">
+                      <span
+                        class="w-2 h-2 rounded-full"
+                        style=${{ background: BAND_COLOR[band] }}
+                      ></span>
+                      ${BAND_LABEL[band]}
+                    </span>
+                  `,
+                )}
+              </div>
+            `
+          : ""}
+        <label
+          class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white cursor-pointer ml-2"
+        >
+          <input
+            type="checkbox"
+            checked=${filterTopicsOnly}
+            onChange=${(e) => setFilterTopicsOnly(e.target.checked)}
+            class="accent-cyan-500 cursor-pointer"
+          />
+          Topics Only
+        </label>
         <div class="flex items-center gap-2 ml-2">
           <input
             placeholder="Search graph…"
@@ -1391,6 +1742,14 @@ export function GraphView({
           />
           Solved only
         </label>
+        <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer ml-3">
+          <input
+            type="checkbox"
+            checked=${filterCanonicalOnly}
+            onChange=${(e) => setFilterCanonicalOnly(e.target.checked)}
+          />
+          Canonical only
+        </label>
         <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-0.5">
           <button
             onClick=${() => zoomBy(1.25)}
@@ -1478,8 +1837,8 @@ export function GraphView({
 
       <!-- Canvas area -->
       <div
-        class="relative flex-1 rounded-2xl overflow-hidden border border-white/5 bg-[#0a0a0f]"
-        style="min-height:500px"
+        class="relative flex-1 rounded-2xl overflow-hidden border border-white/5"
+        style="min-height:500px; background-color: var(--cl-surface);"
       >
         <canvas
           ref=${canvasRef}
@@ -1491,7 +1850,7 @@ export function GraphView({
 
         <!-- Legend -->
         <div
-          class="absolute bottom-3 left-3 flex flex-col gap-1 text-[10px] text-slate-400 bg-black/60 backdrop-blur px-3 py-2 rounded-lg border border-white/5"
+          class="absolute bottom-3 left-3 flex flex-col gap-1 text-[10px] text-slate-400 bg-white/5 backdrop-blur px-3 py-2 rounded-lg border border-white/5"
         >
           <div class="text-[9px] text-slate-600 uppercase tracking-wider mb-0.5">Difficulty</div>
           <div class="flex items-center gap-2">
@@ -1526,6 +1885,19 @@ export function GraphView({
           <div class="flex items-center gap-2">
             <img src=${PLATFORM_FAVICON.codeforces} class="w-3 h-3 object-contain" alt="" />
             Codeforces
+          </div>
+          <div class="text-[9px] text-slate-600 uppercase tracking-wider mt-1 mb-0.5">
+            Topic Types
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full border border-slate-400 inline-block"></span>
+            Algorithm Hub
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full border border-slate-400 relative inline-block">
+              <span class="absolute inset-[2px] rounded-full border border-slate-400"></span>
+            </span>
+            Data Structure Hub
           </div>
         </div>
 
@@ -1594,26 +1966,63 @@ export function GraphView({
         double-click drag to move a cluster
       </p>
 
-      <${ProblemModal}
-        problem=${modalProblem}
-        onClose=${() => {
-          setModalProblem(null);
-          updateQueryParams({ problem: null });
-        }}
-        problemList=${graphFilteredProblems}
-        onNavigateProblem=${(prob) => {
-          setModalProblem(prob);
-          updateQueryParams({ problem: prob.id || prob.titleSlug });
-        }}
-        onNavigate=${onNavigate}
-        onDelete=${(id) => {
-          if (onProblemDelete) onProblemDelete(id);
-          setModalProblem(null);
-        }}
-        onUpdate=${(updated) => {
-          if (onProblemUpdate) onProblemUpdate(updated);
-        }}
-      />
+      ${modalProblem &&
+      html`
+        <div
+          class="absolute right-0 top-0 bottom-0 w-[420px] bg-slate-900 border-l border-white/10 shadow-2xl z-20 flex flex-col overflow-y-auto"
+        >
+          <div
+            class="sticky top-0 bg-slate-900/90 backdrop-blur-sm p-3 border-b border-white/10 z-30 flex justify-between items-center"
+          >
+            <h3 class="text-sm font-semibold text-slate-200">
+              ${modalProblem.mergedProblemIds?.length > 1
+                ? `Canonical Group (${modalProblem.mergedProblemIds.length} versions)`
+                : "Problem Details"}
+            </h3>
+            <button
+              onClick=${() => {
+                setModalProblem(null);
+                updateQueryParams({ problem: null });
+              }}
+              class="text-slate-400 hover:text-white shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="flex-1 overflow-y-auto p-4 space-y-6">
+            ${(modalProblem.mergedProblemIds || [modalProblem.id]).map((id) => {
+              const raw = rawProblemByNodeId.get(id);
+              if (!raw) return null;
+              return html`
+                <div
+                  class="bg-slate-800/50 rounded-xl overflow-hidden border border-white/5 relative shadow-lg"
+                >
+                  <${ProblemModal}
+                    problem=${raw}
+                    onClose=${() => {}}
+                    problemList=${graphFilteredProblems}
+                    onNavigateProblem=${(prob) => {
+                      setModalProblem(prob);
+                      updateQueryParams({ problem: prob.id || prob.titleSlug });
+                    }}
+                    onNavigate=${onNavigate}
+                    onDelete=${(delId) => {
+                      if (onProblemDelete) onProblemDelete(delId);
+                      setModalProblem(null);
+                      updateQueryParams({ problem: null });
+                    }}
+                    onUpdate=${(updated) => {
+                      if (onProblemUpdate) onProblemUpdate(updated);
+                    }}
+                    isSidePanel=${true}
+                    hideCloseButton=${true}
+                  />
+                </div>
+              `;
+            })}
+          </div>
+        </div>
+      `}
     </div>
   `;
 }

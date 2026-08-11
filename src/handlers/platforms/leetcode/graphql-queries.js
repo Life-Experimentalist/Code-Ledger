@@ -50,6 +50,7 @@ export const QUERIES = {
         memoryPercentile
         code
         timestamp
+        statusCode
         notes
         lang {
           name

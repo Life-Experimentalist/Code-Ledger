@@ -24,11 +24,15 @@ export function detectPage(pathname) {
     return { type: PAGE_TYPES.PROBLEM, slug };
   }
 
-  // GFG profile: /user/{username}
-  if (/^\/user\/[^/]+$/.test(clean)) {
-    const username = clean.split("/user/")[1] || "";
-    dbg.log(`Profile page detected: ${username}`);
-    return { type: PAGE_TYPES.PROFILE, username };
+  // GFG profile: /user/{username} or /profile/{username}
+  if (clean.includes("/user/") || clean.includes("/profile/")) {
+    const key = clean.includes("/user/") ? "/user/" : "/profile/";
+    const parts = clean.split(key)[1]?.split("/") || [];
+    const username = parts[0] || "";
+    if (username) {
+      dbg.log(`Profile page detected: ${username}`);
+      return { type: PAGE_TYPES.PROFILE, username };
+    }
   }
 
   return { type: PAGE_TYPES.UNKNOWN };

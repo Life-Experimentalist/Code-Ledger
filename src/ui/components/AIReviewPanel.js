@@ -145,6 +145,8 @@ export function AIReviewPanel({
   queueError,
   onRemoveFromQueue,
   removeFromQueueBusy,
+  providerId,
+  modelId,
 }) {
   const queueCard = html`<${QueueStatusCard}
     queueStatus=${queueStatus}
@@ -199,9 +201,16 @@ export function AIReviewPanel({
       class="p-6 bg-gradient-to-br from-[#0a0a0f] to-cyan-900/10 rounded-2xl border border-cyan-500/20 flex flex-col gap-4 relative"
     >
       ${queueCard}
-      <div class="flex items-center gap-2 mb-2">
+      <div class="flex items-center gap-2 mb-2 w-full flex-wrap">
         <span class="text-lg">✨</span>
         <h3 class="text-sm font-semibold text-white">AI Analysis</h3>
+        ${providerId || modelId
+          ? html`
+              <span class="text-[10px] text-slate-500 font-mono ml-auto">
+                model: ${modelId || providerId}
+              </span>
+            `
+          : ""}
       </div>
       <div class="max-w-none text-slate-300">
         <${AIMarkdownRenderer} content=${review} />

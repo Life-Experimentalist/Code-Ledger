@@ -15,9 +15,10 @@ import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
 import { extractEditorCode } from "./ace-extractor.js";
 import { setupSubmitHook, isAcceptedVisible } from "./submission-detector.js";
-import { injectProfileImportBtn } from "./profile-import.js";
+import { injectProfileImportBtn, removeProfileImportBtn } from "./profile-import.js";
 import { injectGFGQoL } from "./qol.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
+import { isAIActive } from "../../../core/feature-flags.js";
 
 const dbg = createDebugger("GFG");
 
@@ -167,6 +168,9 @@ Be concise. Max 200 words.`;
   _startAIPanel(slug) {
     Storage.getSettings()
       .then((settings) => {
+        // Nothing to chat with until a provider is switched on. A panel that
+        // can only apologise is worse than no panel.
+        if (!isAIActive(settings)) return;
         if (settings.gfg_ai_panel === false) return;
         if (settings.floatingAIEnabled === false) return;
         if (this._aiPanel && this._aiPanelSlug === slug) return;
@@ -209,8 +213,24 @@ Be concise. Max 200 words.`;
   }
 
   _readProblemStatement() {
-    const el = document.querySelector('[class^="problems_problem_content"], .problem-statement');
-    return el ? (el.textContent || "").trim().slice(0, 3000) : "";
+    const selectors = [
+      '[class*="problems_problem_content"]',
+      '[class*="problem-statement"]',
+      '[class*="ProblemStatement"]',
+      '[class*="problemStatement"]',
+      ".problem-statement",
+      ".problem-description",
+      ".mce-content-body",
+    ];
+    for (const sel of selectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && el.textContent && el.textContent.trim().length > 20) {
+          return el.textContent.trim().slice(0, 3000);
+        }
+      } catch (_) {}
+    }
+    return "";
   }
 
   async _handleOnDemandFetch(page) {
@@ -221,16 +241,180 @@ Be concise. Max 200 words.`;
     const slug = page.slug || params.get("cl_fetch_id");
     if (!slug) return false;
 
+    const isCodeFetch = params.get("codeledger_code_fetch") === "1";
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const pId =
+      params.get("codeledger_problemid") || hashParams.get("cl-pid") || this.makeProblemId(slug);
+
     try {
-      // Wait for editor to load
-      await new Promise((r) => setTimeout(r, 1500));
-      const code = await extractEditorCode();
+      // Wait for GFG Next.js to hydrate and inject __NEXT_DATA__
+      await new Promise((r) => setTimeout(r, 2000));
+
+      // Poll until __NEXT_DATA__ contains problem content or timeout after 8s
+      const waitForNextData = async () => {
+        for (let i = 0; i < 30; i++) {
+          const script = document.getElementById("__NEXT_DATA__");
+          if (script && script.textContent) {
+            try {
+              const json = JSON.parse(script.textContent);
+              // Check if problem data is present (has pname or title field somewhere)
+              const hasData =
+                JSON.stringify(json).includes("pname") ||
+                JSON.stringify(json).includes("problem_body") ||
+                JSON.stringify(json).includes("difficulty");
+              if (hasData) break;
+            } catch (_) {}
+          }
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      };
+      await waitForNextData();
+
+      const is404 =
+        document.title.includes("Page Not Found") ||
+        !!document.querySelector(".error-page") ||
+        !!document.querySelector('[class*="error-page"]') ||
+        (document.body && document.body.textContent.includes("Page Not Found"));
+      if (is404) {
+        throw new Error(
+          "GeeksForGeeks returned 404 Page Not Found. The problem slug might have changed.",
+        );
+      }
+      let code = null;
+      let newMethods = [];
+      let lang = null;
+
+      if (isCodeFetch) {
+        try {
+          // Find and click the Submissions tab
+          const tabs = Array.from(document.querySelectorAll("div, button, a"));
+          const subTab = tabs.find(
+            (el) =>
+              el.textContent.trim().toLowerCase() === "submissions" ||
+              el.textContent.trim().toLowerCase() === "submissions ↗" ||
+              el.textContent.trim().toLowerCase() === "submissions (my)",
+          );
+          if (subTab) {
+            subTab.click();
+            await new Promise((r) => setTimeout(r, 2000));
+
+            for (let i = 0; i < 20; i++) {
+              if (document.querySelector("table tbody tr")) break;
+              await new Promise((r) => setTimeout(r, 300));
+            }
+
+            const table = document.querySelector("table");
+            if (table) {
+              const headerRow = table.querySelector("thead tr") || table.querySelector("tr");
+              if (headerRow) {
+                const colTexts = [...headerRow.querySelectorAll("th, td")].map((el) =>
+                  el.textContent.trim().toLowerCase(),
+                );
+                const statusIdx = colTexts.findIndex((t) => t.includes("status"));
+                const langIdx = colTexts.findIndex((t) => t.includes("lang"));
+                const codeIdx = colTexts.findIndex((t) => t.includes("code"));
+                const timeIdx = colTexts.findIndex((t) => t.includes("time"));
+
+                if (statusIdx !== -1 && codeIdx !== -1) {
+                  const rows = table.querySelectorAll("tbody tr");
+                  const targetRows =
+                    rows.length > 0 ? [...rows] : [...table.querySelectorAll("tr")].slice(1);
+
+                  const correctRows = targetRows.filter((row) => {
+                    const statusCell = row.children[statusIdx];
+                    if (!statusCell) return false;
+                    const statusText = statusCell.textContent.trim().toLowerCase();
+                    return statusText.includes("correct") || statusText.includes("accepted");
+                  });
+
+                  for (let i = 0; i < correctRows.length; i++) {
+                    const row = correctRows[i];
+                    const codeCell = row.children[codeIdx];
+                    const langCell = row.children[langIdx];
+                    const timeCell = row.children[timeIdx];
+                    if (!codeCell) continue;
+
+                    const viewEl =
+                      [...codeCell.querySelectorAll("a, button, span")].find((el) =>
+                        el.textContent.trim().toLowerCase().includes("view"),
+                      ) || codeCell;
+
+                    if (viewEl) {
+                      viewEl.click();
+                      const modal = await this._pollForSubmissionModal();
+                      const extractedCode = this._extractCodeFromPopup(modal);
+                      this._closeSubmissionModal(modal);
+
+                      if (extractedCode && extractedCode.trim()) {
+                        const langText = langCell ? langCell.textContent.trim() : "C++";
+                        const timeText = timeCell ? timeCell.textContent.trim() : "";
+                        const langObj = this._resolveLanguageFromText(langText);
+
+                        let timestamp = Date.now();
+                        if (timeText) {
+                          const formatted = timeText.replace(" ", "T") + "+05:30";
+                          const parsed = Date.parse(formatted);
+                          if (!isNaN(parsed)) timestamp = parsed;
+                        }
+
+                        const normCode = this._normalizeCode(extractedCode);
+                        if (!newMethods.some((m) => this._normalizeCode(m.code) === normCode)) {
+                          newMethods.push({
+                            code: extractedCode,
+                            lang: langObj,
+                            timestamp,
+                            description: `Auto-recovered from submissions — ${timeText}`,
+                            language: langObj.name,
+                          });
+                        }
+                      }
+                      await new Promise((r) => setTimeout(r, 500)); // slight delay between clicks
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          dbg.warn("Failed to scrape submissions tab", err);
+        }
+      }
+
+      if (newMethods.length > 0) {
+        code = newMethods[0].code;
+        lang = newMethods[0].lang;
+      } else {
+        code = await extractEditorCode();
+      }
 
       const meta = this._extractMetadata(slug);
-      const lang = this._extractLanguage();
-      const langSlug = lang.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const finalLang = lang || this._extractLanguage();
+      const langSlug = finalLang.name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
       const existing = await Storage.getProblem(this.makeProblemId(slug)).catch(() => null);
+
+      const methods = existing?.methods || [];
+      for (const m of newMethods) {
+        if (!methods.some((em) => this._normalizeCode(em.code) === this._normalizeCode(m.code))) {
+          methods.push({
+            title: `Approach ${methods.length + 1} (${m.lang.name})`,
+            ...m,
+          });
+        }
+      }
+
+      // If we recovered methods with real timestamps, update the root timestamp to match the latest one.
+      // Otherwise, keep existing timestamp (or use Date.now()).
+      let rootTimestamp = Date.now();
+      if (newMethods.length > 0) {
+        const validTimes = newMethods.map((m) => m.timestamp).filter((t) => t > 0 && !isNaN(t));
+        if (validTimes.length > 0) {
+          rootTimestamp = Math.max(...validTimes);
+        }
+      } else if (existing?.timestamp) {
+        rootTimestamp = existing.timestamp;
+      }
+
       const problem = {
         ...(existing || {}),
         platform: "geeksforgeeks",
@@ -240,23 +424,43 @@ Be concise. Max 200 words.`;
         difficulty: meta.difficulty || existing?.difficulty || null,
         tags: meta.tags?.length ? meta.tags : existing?.tags || [],
         code: code || existing?.code || "",
-        lang: code ? { name: lang.name, ext: lang.ext, slug: langSlug } : existing?.lang,
+        lang: code ? { name: finalLang.name, ext: finalLang.ext, slug: langSlug } : existing?.lang,
         problemStatement: meta.description || existing?.problemStatement || null,
-        timestamp: existing?.timestamp || Date.now(),
+        timestamp: rootTimestamp,
+        methods: methods,
       };
 
       await Storage.saveProblem(problem).catch(() => {});
 
-      await new Promise((resolve) => {
-        try {
-          runtime.sendMessage(
-            { type: "REFRESH_METADATA_DONE", platform: "geeksforgeeks", slug },
-            () => resolve(),
-          );
-        } catch (_) {
-          resolve();
-        }
-      });
+      if (isCodeFetch) {
+        await new Promise((resolve) => {
+          try {
+            runtime.sendMessage(
+              {
+                type: "CODELEDGER_CODE_FETCHED",
+                problemId: pId,
+                code: problem.code,
+                lang: problem.lang,
+                tags: problem.tags,
+              },
+              () => resolve(),
+            );
+          } catch (_) {
+            resolve();
+          }
+        });
+      } else {
+        await new Promise((resolve) => {
+          try {
+            runtime.sendMessage(
+              { type: "REFRESH_METADATA_DONE", platform: "geeksforgeeks", slug },
+              () => resolve(),
+            );
+          } catch (_) {
+            resolve();
+          }
+        });
+      }
 
       try {
         window.close();
@@ -264,6 +468,15 @@ Be concise. Max 200 words.`;
       return true;
     } catch (e) {
       dbg.error("on-demand fetch failed", e);
+      if (isCodeFetch) {
+        try {
+          runtime.sendMessage({
+            type: "CODELEDGER_CODE_FETCHED",
+            problemId: pId,
+            error: e?.message || "On-demand GFG fetch failed",
+          });
+        } catch (_) {}
+      }
       return false;
     }
   }
@@ -274,20 +487,158 @@ Be concise. Max 200 words.`;
       this._processSubmission(detectPage(window.location.pathname)),
     );
 
+    let lastPath = window.location.pathname;
+
     // Fallback: passive MutationObserver for edge cases (e.g., page opened mid-result)
     let debounce = null;
     this.mutationObserver = new MutationObserver(() => {
+      const currentPath = window.location.pathname;
+      if (currentPath !== lastPath) {
+        lastPath = currentPath;
+        this._onNavigate(currentPath);
+      }
+
+      // Ensure profile button is injected if on profile page and missing
+      const page = detectPage(currentPath);
+      if (page.type === PAGE_TYPES.PROFILE) {
+        if (!document.getElementById("cl-gfg-profile-import")) {
+          injectProfileImportBtn((slug) => this.makeProblemId(slug)).catch(() => {});
+        }
+      }
+
       clearTimeout(debounce);
       debounce = setTimeout(() => {
         if (!this._processingLock && isAcceptedVisible()) {
           this._checkSubmission();
         }
+        if (isAcceptedVisible()) {
+          this._injectSyncBtn();
+        }
+        this._checkSubmissionsTable();
       }, 1500);
     });
     this.mutationObserver.observe(document.body, {
       childList: true,
       subtree: true,
     });
+
+    if (isAcceptedVisible()) {
+      this._injectSyncBtn();
+    }
+    this._checkSubmissionsTable();
+  }
+
+  _onNavigate(pathname) {
+    const page = detectPage(pathname);
+    dbg.log("SPA navigate →", page.type, pathname);
+
+    if (page.type === PAGE_TYPES.PROBLEM) {
+      this._cleanupSubmitHook?.();
+      this._cleanupSubmitHook = setupSubmitHook(() =>
+        this._processSubmission(detectPage(window.location.pathname)),
+      );
+      Storage.getSettings()
+        .then((s) => {
+          if (s.gfg_timer !== false && s.floatingTimerEnabled !== false) {
+            this._timer.startFloating(page.slug || "gfg");
+          }
+          const opts = {
+            showCopy: s.gfg_copy_btn !== false,
+            showAI: s.gfg_ai_panel !== false && s.floatingAIEnabled !== false,
+            onAIClick: () => this._aiPanel?.expand(),
+          };
+          setTimeout(() => injectGFGQoL(opts), 1500);
+          if (page.slug) this._startAIPanel(page.slug);
+        })
+        .catch(() => {});
+    } else {
+      this._stopAIPanel();
+      this._timer.stopFloating();
+    }
+
+    if (page.type === PAGE_TYPES.PROFILE) {
+      injectProfileImportBtn((slug) => this.makeProblemId(slug)).catch(() => {});
+    } else {
+      removeProfileImportBtn();
+    }
+  }
+
+  _injectSyncBtn() {
+    if (document.getElementById("cl-gfg-sync-btn")) return;
+
+    const successEl = this._findAcceptedIndicator();
+    if (!successEl) return;
+
+    const btn = document.createElement("button");
+    btn.id = "cl-gfg-sync-btn";
+    btn.title = "Sync this GFG submission to CodeLedger";
+
+    // Style with CSS-in-JS directly so it doesn't rely on Tailwind (which GFG lacks)
+    btn.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      color: #22d3ee;
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      vertical-align: middle;
+      margin-left: 12px;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      outline: none;
+      white-space: nowrap;
+    `;
+
+    btn.onmouseenter = () => {
+      btn.style.background = "rgba(6, 182, 212, 0.18)";
+      btn.style.borderColor = "rgba(6, 182, 212, 0.55)";
+    };
+    btn.onmouseleave = () => {
+      btn.style.background = "rgba(6, 182, 212, 0.08)";
+      btn.style.borderColor = "rgba(6, 182, 212, 0.35)";
+    };
+
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`;
+
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const originalHTML = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.textContent = "⏳ Syncing…";
+
+        const page = detectPage(window.location.pathname);
+        const processed = await this._processSubmission(page, true);
+
+        btn.textContent = processed ? "✓ Synced" : "✓ Already saved";
+        setTimeout(() => {
+          if (btn.parentNode) {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+          }
+        }, 2500);
+      } catch (err) {
+        dbg.error("Manual sync failed", err);
+        btn.textContent = "✗ Failed";
+        btn.disabled = false;
+        setTimeout(() => {
+          if (btn.parentNode) {
+            btn.innerHTML = originalHTML;
+          }
+        }, 3000);
+      }
+    });
+
+    successEl.appendChild(btn);
+    dbg.log("Injected Sync to Ledger button next to success indicator");
   }
 
   /* ── Submission detection ─────────────────────────────────────────── */
@@ -323,25 +674,25 @@ Be concise. Max 200 words.`;
     );
   }
 
-  async _processSubmission(page) {
+  async _processSubmission(page, isManual = false) {
     this._processingLock = true;
     try {
       const settings = await Storage.getSettings();
-      if (!this.isEnabled(settings)) return;
+      if (!this.isEnabled(settings) && !isManual) return false;
 
       const slug = page.slug;
-      if (!slug) return;
+      if (!slug) return false;
 
       // Dedup: skip if already committed this problem this session
       const dedupKey = `cl_committed_gfg_${slug}`;
       const committed = sessionStorage.getItem(dedupKey);
-      if (committed === "1") {
+      if (!isManual && committed === "1") {
         dbg.log("Skipping already-committed GFG problem", slug);
-        return;
+        return false;
       }
 
       // Module-level dedup
-      if (slug === this.lastDetectedId) return;
+      if (!isManual && slug === this.lastDetectedId) return false;
       this.lastDetectedId = slug;
 
       // Extract problem data from DOM
@@ -368,6 +719,7 @@ Be concise. Max 200 words.`;
 
       this.emitSolved({
         id: this.makeProblemId(slug),
+        forceCommit: isManual,
         title: meta.title || slug,
         titleSlug: slug,
         difficulty: meta.difficulty || null,
@@ -387,35 +739,150 @@ Be concise. Max 200 words.`;
         memory: meta.memory || null,
         timestamp: Date.now(),
         elapsedSeconds,
+        _requestAIReview: true,
       });
 
       dbg.log("Solve emitted", { slug, lang: lang.name });
+      return true;
     } catch (err) {
       dbg.error("Failed to process GFG submission", err);
+      return false;
     } finally {
       this._processingLock = false;
     }
   }
 
-  /* ── DOM extractors ──────────────────────────────────────────────── */
   _extractMetadata(slug) {
+    let nextDataTitle = null;
+    let nextDataDiff = null;
+    let nextDataTags = [];
+    let nextDataDesc = null;
+
+    try {
+      const script = document.getElementById("__NEXT_DATA__");
+      if (script && script.textContent) {
+        const json = JSON.parse(script.textContent);
+        const findData = (obj) => {
+          if (!obj || typeof obj !== "object") return null;
+          if (
+            (obj.pname || obj.title || obj.problem_name) &&
+            (obj.difficulty || obj.problem_difficulty) &&
+            (Array.isArray(obj.tags) ||
+              Array.isArray(obj.topicTags) ||
+              Array.isArray(obj.tags_list) ||
+              (obj.tags && typeof obj.tags === "object" && Array.isArray(obj.tags.topic_tags)))
+          ) {
+            return obj;
+          }
+          for (const key of Object.keys(obj)) {
+            if (obj[key] && typeof obj[key] === "object") {
+              const res = findData(obj[key]);
+              if (res) return res;
+            }
+          }
+          return null;
+        };
+
+        const data = findData(json);
+        if (data) {
+          nextDataTitle = data.pname || data.title || data.problem_name;
+          nextDataDiff = data.difficulty || data.problem_difficulty;
+
+          const rawTags = data.tags || data.topicTags || data.tags_list || [];
+          if (rawTags && typeof rawTags === "object" && Array.isArray(rawTags.topic_tags)) {
+            nextDataTags = rawTags.topic_tags;
+          } else if (Array.isArray(rawTags)) {
+            nextDataTags = rawTags
+              .map((t) => {
+                if (typeof t === "string") return t;
+                if (t && typeof t === "object") return t.name || t.pname || t.title || "";
+                return "";
+              })
+              .filter(Boolean);
+          }
+
+          // GFG stores the actual problem body in problem_body or body field
+          nextDataDesc =
+            data.problem_body ||
+            data.body ||
+            data.content ||
+            data.description ||
+            data.problemStatement ||
+            data.pdescription ||
+            null;
+          dbg.log("Extracted GFG problem metadata from __NEXT_DATA__", {
+            nextDataTitle,
+            nextDataDiff,
+            nextDataTags,
+            hasDesc: !!nextDataDesc,
+          });
+        }
+
+        // If no description found from the main data node, do a broader search for problem_body
+        if (!nextDataDesc) {
+          const findDesc = (obj, depth = 0) => {
+            if (!obj || typeof obj !== "object" || depth > 10) return null;
+            // Prioritize problem_body field
+            if (
+              obj.problem_body &&
+              typeof obj.problem_body === "string" &&
+              obj.problem_body.length > 50
+            ) {
+              return obj.problem_body;
+            }
+            if (obj.body && typeof obj.body === "string" && obj.body.length > 100) {
+              return obj.body;
+            }
+            for (const key of Object.keys(obj)) {
+              if (obj[key] && typeof obj[key] === "object") {
+                const res = findDesc(obj[key], depth + 1);
+                if (res) return res;
+              }
+            }
+            return null;
+          };
+          nextDataDesc = findDesc(json);
+          if (nextDataDesc) {
+            dbg.log("Found GFG problem body via broad search", { len: nextDataDesc.length });
+          }
+        }
+      }
+    } catch (err) {
+      dbg.error("Failed to parse __NEXT_DATA__ for metadata", err);
+    }
+
     const titleEl = this._queryFirst([
       SELECTORS.problem.title,
       ...(LEGACY_SELECTORS["problem.title"] || []),
     ]);
     const diffEl = this.safeQuery(SELECTORS.problem.difficulty);
 
+    const rawTitle = titleEl ? titleEl.textContent.trim() : nextDataTitle || slug;
+    // Clean GFG title: remove trailing spaces and numeric IDs (3+ digits) e.g. " 1235" or " 102404"
+    const title = rawTitle
+      .replace(/\s*\d{3,}$/g, "")
+      .replace(/\s*\d{3,}$/g, "")
+      .trim();
+
+    const difficulty = diffEl
+      ? normalizeDifficulty(diffEl.textContent.trim())
+      : nextDataDiff
+        ? normalizeDifficulty(nextDataDiff)
+        : null;
+
     const tags = this._extractTags();
+    const finalTags = tags && tags.length ? tags : nextDataTags;
+
     const runtime = this.safeQuery(SELECTORS.submission.runtime);
     const memory = this.safeQuery(SELECTORS.submission.memory);
 
     return {
-      title: titleEl ? titleEl.textContent.trim() : slug,
-      difficulty: diffEl ? normalizeDifficulty(diffEl.textContent.trim()) : null,
-      tags,
+      title,
+      difficulty,
+      tags: finalTags,
       runtime: runtime ? runtime.textContent.trim() : null,
       memory: memory ? memory.textContent.trim() : null,
-      description: this._extractDescription(),
+      description: this._extractDescription() || nextDataDesc,
       platformId: null,
     };
   }
@@ -427,13 +894,77 @@ Be concise. Max 200 words.`;
       const t = el.textContent.trim();
       if (t && !tags.includes(t)) tags.push(t);
     }
+
+    // Fallback to __NEXT_DATA__ if DOM tags are empty
+    if (tags.length === 0) {
+      try {
+        const script = document.getElementById("__NEXT_DATA__");
+        if (script && script.textContent) {
+          const json = JSON.parse(script.textContent);
+          const findTags = (obj) => {
+            if (!obj || typeof obj !== "object") return null;
+            if (obj.tags && typeof obj.tags === "object" && Array.isArray(obj.tags.topic_tags)) {
+              return obj.tags.topic_tags;
+            }
+            if (
+              Array.isArray(obj.tags) ||
+              Array.isArray(obj.topicTags) ||
+              Array.isArray(obj.tags_list)
+            ) {
+              const list = obj.tags || obj.topicTags || obj.tags_list;
+              if (list.length > 0) return list;
+            }
+            for (const key of Object.keys(obj)) {
+              if (obj[key] && typeof obj[key] === "object") {
+                const res = findTags(obj[key]);
+                if (res) return res;
+              }
+            }
+            return null;
+          };
+          const rawTags = findTags(json);
+          if (Array.isArray(rawTags)) {
+            for (const t of rawTags) {
+              const name = typeof t === "string" ? t : t?.name || t?.pname || t?.title || "";
+              const trimmed = name.trim();
+              if (trimmed && !tags.includes(trimmed)) tags.push(trimmed);
+            }
+          }
+        }
+      } catch (err) {
+        dbg.error("Failed to extract tags from __NEXT_DATA__", err);
+      }
+    }
     return tags;
   }
 
   _extractDescription() {
-    const descEl = this.safeQuery(SELECTORS.problem.description);
-    if (!descEl) return null;
-    return descEl.innerHTML;
+    // Try all known modern GFG DOM selectors for problem content
+    const selectors = [
+      '[class*="problems_problem_content"]',
+      '[class*="problem-statement"]',
+      '[class*="ProblemStatement"]',
+      '[class*="problemStatement"]',
+      ".problem-statement",
+      ".problem-description",
+      '[class*="problem_description"]',
+      '[class*="problems_content"] [class*="content"]',
+      // TinyMCE rendered content container
+      ".mce-content-body",
+      '[class*="tinymce"]',
+      // Newer GFG layout
+      '[class*="problems_header"] ~ div [class*="content"]',
+      'section[class*="problem"]',
+    ];
+    for (const sel of selectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && el.innerHTML && el.innerHTML.trim().length > 50) {
+          return el.innerHTML;
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   _extractCode() {
@@ -586,5 +1117,296 @@ Be concise. Max 200 words.`;
     lines.push("", `**Source:** https://www.geeksforgeeks.org/problems/${slug}/`);
 
     return lines.join("\n");
+  }
+
+  _checkSubmissionsTable() {
+    const tables = document.querySelectorAll("table");
+    for (const table of tables) {
+      const headerRow = table.querySelector("thead tr") || table.querySelector("tr");
+      if (!headerRow) continue;
+      const colTexts = [...headerRow.querySelectorAll("th, td")].map((el) =>
+        el.textContent.trim().toLowerCase(),
+      );
+
+      const timeIdx = colTexts.findIndex((t) => t.includes("time"));
+      const statusIdx = colTexts.findIndex((t) => t.includes("status"));
+      const langIdx = colTexts.findIndex((t) => t.includes("lang"));
+      const codeIdx = colTexts.findIndex((t) => t.includes("code"));
+
+      if (statusIdx === -1 || langIdx === -1 || codeIdx === -1) {
+        continue;
+      }
+
+      const rows = table.querySelectorAll("tbody tr");
+      const targetRows = rows.length > 0 ? [...rows] : [...table.querySelectorAll("tr")].slice(1);
+
+      for (const row of targetRows) {
+        if (row.querySelector(".cl-gfg-row-sync-btn")) {
+          continue;
+        }
+
+        const statusCell = row.children[statusIdx];
+        const codeCell = row.children[codeIdx];
+        if (!statusCell || !codeCell) continue;
+
+        const statusText = statusCell.textContent.trim().toLowerCase();
+        if (!statusText.includes("correct") && !statusText.includes("accepted")) {
+          continue;
+        }
+
+        const viewEl =
+          [...codeCell.querySelectorAll("a, button, span")].find((el) =>
+            el.textContent.trim().toLowerCase().includes("view"),
+          ) || codeCell;
+
+        if (!viewEl) continue;
+
+        const syncBtn = document.createElement("button");
+        syncBtn.className = "cl-gfg-row-sync-btn";
+        syncBtn.title = "Sync this submission to CodeLedger";
+        syncBtn.style.cssText = `
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          padding: 2px 6px;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: inherit;
+          color: #22d3ee;
+          background: rgba(6, 182, 212, 0.08);
+          border: 1px solid rgba(6, 182, 212, 0.35);
+          border-radius: 4px;
+          cursor: pointer;
+          margin-left: 8px;
+          transition: background 0.15s, border-color 0.15s;
+          vertical-align: middle;
+          box-sizing: border-box;
+          outline: none;
+          white-space: nowrap;
+        `;
+
+        syncBtn.onmouseenter = () => {
+          syncBtn.style.background = "rgba(6, 182, 212, 0.18)";
+          syncBtn.style.borderColor = "rgba(6, 182, 212, 0.55)";
+        };
+        syncBtn.onmouseleave = () => {
+          syncBtn.style.background = "rgba(6, 182, 212, 0.08)";
+          syncBtn.style.borderColor = "rgba(6, 182, 212, 0.35)";
+        };
+
+        syncBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync`;
+
+        syncBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const originalHTML = syncBtn.innerHTML;
+          try {
+            syncBtn.disabled = true;
+            syncBtn.textContent = "⏳...";
+
+            const page = detectPage(window.location.pathname);
+            const slug = page.slug;
+            if (!slug) throw new Error("Could not detect problem slug");
+
+            viewEl.click();
+
+            const modal = await this._pollForSubmissionModal();
+            const code = this._extractCodeFromPopup(modal);
+            if (!code || !code.trim()) {
+              throw new Error("Failed to extract code from submission popup");
+            }
+
+            this._closeSubmissionModal(modal);
+
+            const langText = row.children[langIdx]?.textContent || "C++";
+            const lang = this._resolveLanguageFromText(langText);
+            const timeText = row.children[timeIdx]?.textContent;
+
+            let timestamp = Date.now();
+            if (timeText) {
+              const formatted = timeText.trim().replace(" ", "T") + "+05:30";
+              const parsed = Date.parse(formatted);
+              if (!isNaN(parsed)) {
+                timestamp = parsed;
+              }
+            }
+
+            const problemId = this.makeProblemId(slug);
+            const existing = await Storage.getProblem(problemId).catch(() => null);
+            const meta = this._extractMetadata(slug);
+            const topic = resolvePrimaryTopic(meta.tags || []);
+            const canonical = await this.resolveCanonical(slug);
+            const settings = await Storage.getSettings();
+
+            if (existing) {
+              const normScraped = this._normalizeCode(code);
+              const isPrimaryMatch = this._normalizeCode(existing.code) === normScraped;
+              const isMethodMatch = (existing.methods || []).some(
+                (m) => this._normalizeCode(m.code) === normScraped,
+              );
+
+              if (isPrimaryMatch || isMethodMatch) {
+                syncBtn.textContent = "✓ Synced";
+                return;
+              }
+
+              const newMethod = {
+                title: `Approach ${existing.methods?.length + 1 || 1} (${lang.name})`,
+                language: lang.name,
+                code: code,
+                description: `Synced from submissions table — ${timeText || ""}`,
+                timestamp: timestamp,
+              };
+
+              const updatedProblem = {
+                ...existing,
+                methods: [...(existing.methods || []), newMethod],
+              };
+
+              const files = this._buildFileSet(
+                meta,
+                existing.code,
+                existing.lang || lang,
+                settings,
+                slug,
+                canonical,
+              );
+              const readmeFile = files.find((f) => f.path.endsWith("README.md"));
+
+              await Storage.saveProblem(updatedProblem);
+
+              const elapsedSeconds = 0;
+              this.emitSolved({
+                ...updatedProblem,
+                forceCommit: true,
+                readmeContent: readmeFile?.content || null,
+                files,
+                timestamp,
+                elapsedSeconds,
+                _requestAIReview: false,
+              });
+            } else {
+              const files = this._buildFileSet(meta, code, lang, settings, slug, canonical);
+              const readmeFile = files.find((f) => f.path.endsWith("README.md"));
+
+              const problem = {
+                platform: "geeksforgeeks",
+                id: problemId,
+                title: meta.title || slug,
+                titleSlug: slug,
+                difficulty: meta.difficulty || null,
+                topic,
+                tags: meta.tags || [],
+                canonical: canonical
+                  ? {
+                      id: canonical.canonicalId,
+                      title: canonical.canonicalTitle,
+                    }
+                  : null,
+                readmeContent: readmeFile?.content || null,
+                code,
+                files,
+                lang: { name: lang.name, ext: lang.ext, slug: lang.slug },
+                runtime: null,
+                memory: null,
+                timestamp,
+                elapsedSeconds: 0,
+                _requestAIReview: true,
+              };
+
+              await Storage.saveProblem(problem);
+              this.emitSolved(problem);
+            }
+
+            syncBtn.textContent = "✓ Synced";
+          } catch (err) {
+            dbg.error("Row sync failed", err);
+            syncBtn.textContent = "✗ Failed";
+            setTimeout(() => {
+              syncBtn.innerHTML = originalHTML;
+              syncBtn.disabled = false;
+            }, 3000);
+          }
+        });
+
+        if (viewEl.nextSibling) {
+          viewEl.parentNode.insertBefore(syncBtn, viewEl.nextSibling);
+        } else {
+          viewEl.parentNode.appendChild(syncBtn);
+        }
+      }
+    }
+  }
+
+  _pollForSubmissionModal() {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const poll = () => {
+        if (attempts++ > 30) {
+          reject(new Error("Timeout waiting for submission popup"));
+          return;
+        }
+        const modals = document.querySelectorAll(
+          '[role="dialog"], [class*="modal"], [class*="dialog"], [class*="popup"], .modal, .dialog',
+        );
+        for (const m of modals) {
+          if (m.offsetParent !== null) {
+            if (m.querySelector('.CodeMirror, .ace_editor, pre, code, textarea, [class*="code"]')) {
+              resolve(m);
+              return;
+            }
+          }
+        }
+        setTimeout(poll, 100);
+      };
+      poll();
+    });
+  }
+
+  _extractCodeFromPopup(modal) {
+    const cm = modal.querySelector(".CodeMirror-code");
+    if (cm) {
+      return [...cm.querySelectorAll(".CodeMirror-line")].map((l) => l.textContent).join("\n");
+    }
+    const ace = modal.querySelector(".ace_content .ace_text-layer");
+    if (ace) {
+      return [...ace.querySelectorAll(".ace_line")].map((l) => l.textContent).join("\n");
+    }
+    const pre = modal.querySelector("pre, code, textarea");
+    if (pre) {
+      return pre.value || pre.textContent || "";
+    }
+    const lines = modal.querySelectorAll(
+      ".code-line, [class*='code-line'], [class*='line-number']",
+    );
+    if (lines.length > 0) {
+      return [...lines].map((l) => l.textContent).join("\n");
+    }
+    return null;
+  }
+
+  _closeSubmissionModal(modal) {
+    const closeBtn = modal.querySelector(
+      '[class*="close"], [class*="Close"], .close, button[aria-label="Close"], [class*="cancel"]',
+    );
+    if (closeBtn) {
+      closeBtn.click();
+    } else {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }),
+      );
+    }
+  }
+
+  _normalizeCode(code) {
+    return (code || "").trim().replace(/\r\n/g, "\n").replace(/\s+/g, " ");
+  }
+
+  _resolveLanguageFromText(langText) {
+    const raw = langText.trim();
+    const name = raw || "C++";
+    const ext = langExt(name);
+    const langSlug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return { name, ext, slug: langSlug };
   }
 }

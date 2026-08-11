@@ -4,9 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Privacy Policy — CodeLedger</title>
-    <meta name="description" content="CodeLedger privacy policy. Your data stays yours — no servers, no telemetry, no tracking." />
+    <meta
+      name="description"
+      content="CodeLedger privacy policy. Your data stays yours — no servers, no telemetry, no tracking."
+    />
     <link rel="canonical" href="https://codeledger.vkrishna04.me/privacy" />
-    <link rel="icon" href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" />
+    <link rel="icon" href="/assets/icon-128.png" type="image/png" />
     <link rel="stylesheet" href="/assets/landing.css" />
     <style>
       .page-content {
@@ -34,7 +37,8 @@
         color: var(--text);
         margin: 36px 0 12px;
       }
-      .page-content p, .page-content li {
+      .page-content p,
+      .page-content li {
         color: var(--subtle);
         line-height: 1.75;
         margin-bottom: 12px;
@@ -72,90 +76,199 @@
   <body>
     <nav>
       <a class="nav-brand" href="/">
-        <img src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" alt="CodeLedger logo" />
+        <img src="/assets/icon-128.png" alt="" width="28" height="28" />
         CodeLedger
       </a>
       <div class="nav-links">
         <a href="/#features"><span>Features</span></a>
-        <a href="/library">📚 <span>Library</span></a>
-        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">⭐ <span>GitHub</span></a>
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
+          >⭐ <span>GitHub</span></a
+        >
       </div>
     </nav>
 
     <div class="page-content">
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: June 2026</p>
+      <p class="updated">Last updated: August 2026</p>
 
       <div class="highlight-box">
-        <p>TL;DR — CodeLedger never sees your code, your AI keys, or your GitHub token. Everything lives in your browser and your own GitHub repo.</p>
+        <p>
+          TL;DR — CodeLedger never sees your code, your AI keys, or your GitHub token. Everything
+          lives in your browser and your own GitHub repo.
+        </p>
       </div>
 
-      <h2>1. What data we collect</h2>
-      <p><strong>We collect nothing.</strong> CodeLedger does not operate any analytics, telemetry, logging, or tracking infrastructure. The extension runs entirely inside your browser.</p>
-
-      <h2>2. Data stored locally (in your browser)</h2>
-      <p>The extension stores the following data <strong>only in your browser's local storage and IndexedDB</strong>:</p>
+      <h2>1. Data Collection</h2>
+      <p>
+        <strong>By default, nothing is collected on our servers.</strong> CodeLedger runs entirely
+        inside your browser. There is no account, no profile, and no advertising or tracking
+        infrastructure.
+      </p>
+      <p>
+        There is exactly one thing that can be sent to us, and it is off unless you turn it on. If
+        you enable <strong>Anonymous Usage Stats</strong> in Settings → Advanced, then each time a
+        solved problem is committed the extension sends a single counter hit to
+        <code>counter.vkrishna04.me</code> containing only the platform name and the extension
+        version — for example <code>{ "platform": "leetcode", "version": "1.0.0" }</code>. It
+        carries no code, no problem, no token, no account, and no identifier of any kind, and
+        nothing is sent while the setting is off.
+      </p>
+      <p>
+        The extension stores the following data
+        <strong>only in your browser's local storage and IndexedDB</strong>:
+      </p>
       <ul>
         <li>Your GitHub OAuth access token (used to push commits to your repo)</li>
         <li>Your AI provider API keys (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter)</li>
         <li>Extension settings (repository name, commit preferences, AI configuration)</li>
         <li>Solved problem metadata and AI reviews (in IndexedDB)</li>
         <li>AI chat history</li>
+        <li>
+          Your streak state — vacation days taken and which achievements you have already seen
+        </li>
+        <li>
+          The list of friends' repositories you have added, if you use the party comparison. It is a
+          list of public repository names, kept on your side — nobody is notified that you added
+          them.
+        </li>
       </ul>
-      <p>None of this data is transmitted to CodeLedger servers. Your browser storage is under your full control.</p>
+      <p>
+        So a second browser can pick up where the first left off, some of this is also written into
+        your own repository, in a <code>.codeledger/</code> folder beside your solutions:
+        <code>sync.json</code> and <code>config.json</code> hold your settings and your friend list;
+        <code>behaviour-bank.json</code> holds solve times, attempt counts, hint views and short
+        summaries of what an AI review flagged, and Settings → Advanced turns that recording off;
+        <code>roadmaps.json</code> and <code>knowledge.json</code> hold the roadmaps and insights
+        written in the Behaviour Bank tab. Your GitHub token, your AI API keys and your vacation
+        state are deliberately excluded and never leave local storage. Everything else in that
+        folder is as public as the repository you chose.
+      </p>
 
-      <h2>3. Data sent to GitHub</h2>
-      <p>When you solve a problem, CodeLedger commits the following to <strong>your own GitHub repository</strong> using the GitHub API:</p>
+      <h2>2. Data Handling & Usage</h2>
+      <p>
+        Your data is processed strictly to provide the extension's core functionality: pushing code
+        to your GitHub repo and requesting AI code reviews using your provided API keys. CodeLedger
+        does not track your browsing activity, sell your data, or use advertising SDKs.
+      </p>
+
+      <h2>3. Data Storage & Security</h2>
+      <p>
+        All data remains on your device under your control, isolated by the browser's extension
+        storage boundary — other sites and other extensions cannot read it. It is not separately
+        encrypted at rest, so anyone with access to your operating system profile can read it,
+        exactly as with the rest of your browser profile. You can delete all of it at any time by
+        uninstalling the extension or clearing its local data.
+      </p>
+
+      <h2>4. Data Sharing & Third-Party Disclosure</h2>
+      <p>
+        We do not sell or share your data. Data is only transmitted to the third parties you
+        explicitly configure:
+      </p>
       <ul>
-        <li>Your solution code</li>
-        <li>Problem metadata (title, difficulty, tags, platform)</li>
-        <li>AI review text (if AI review is enabled)</li>
-        <li>An updated <code>index.json</code> tracking your solved problems</li>
+        <li>
+          <strong>GitHub</strong>: Your solution code and metadata are sent directly to your own
+          repository using the GitHub API.
+        </li>
+        <li>
+          <strong>AI Providers (Optional)</strong>: Your code and metadata are sent to the provider
+          you select using your own API key. You are subject to their respective privacy policies.
+        </li>
+        <li>
+          <strong>Cloudflare Worker</strong>: Used exclusively to relay the GitHub OAuth code
+          exchange. No tokens or personal data are stored or logged on the worker.
+        </li>
+        <li>
+          <strong>mermaid.ink (optional, one click at a time)</strong>: When an AI review contains a
+          diagram, the extension shows its source alongside a <strong>Render diagram</strong>
+          button. Only if you press that button is the diagram source sent to
+          <code>mermaid.ink</code> to be drawn as an image. The source describes the shape of your
+          solution but is not the code itself, no token is involved, and nothing is sent if you
+          never press it.
+        </li>
+        <li>
+          <strong>shields.io (optional, off by default)</strong>: Streak badges are drawn as SVG
+          files committed to your own repository, with nothing in the middle. If you switch the
+          badge style to shields in Settings → Streaks, your README instead loads images from
+          <code>shields.io</code>, which fetches the numbers from your repository — so shields
+          learns your repository URL and sees a request each time someone views the README. It
+          receives no code and no token, and switching back to the self-hosted style stops it.
+        </li>
+        <li>
+          <strong>raw.githubusercontent.com (only if you add a friend)</strong>: The party
+          comparison reads each added repository's public <code>badges/stats.json</code> with an
+          anonymous request — no token, and nothing of yours is uploaded. GitHub therefore sees your
+          IP address asking for their file. The people you add are not told, and removing everyone
+          from the list stops the requests.
+        </li>
+        <li>
+          <strong>The CodeLedger compare page (only if you share a link)</strong>: The share button
+          builds a URL of the form <code>/compare?repos=owner/repo,…</code>. That page holds no
+          state — it reads the repositories named in the link directly from GitHub in the visitor's
+          own browser. The repository names do appear in the request line to our server, as they do
+          in any URL, and anyone you send the link to can open it.
+        </li>
+        <li>
+          <strong>Anonymous counter (opt-in, off by default)</strong>: If you enable Anonymous Usage
+          Stats, a platform name and version number are sent to
+          <code>counter.vkrishna04.me</code> as described in section 1. Disabling the setting stops
+          it immediately.
+        </li>
       </ul>
-      <p>This data goes directly from your browser to GitHub's API. CodeLedger infrastructure is not involved.</p>
+      <p>
+        Separately from anything sent to a third party: if your ledger repository is public — which
+        is the point for most people, since it is a portfolio you did not have to write — then your
+        solutions, your solve history, your streak badges and the generated GitHub Pages site can be
+        read by anyone with the link. Making the repository private keeps all of it to you and
+        anyone you invite.
+      </p>
+      <p>
+        The extension shows you this same list live under <strong>Settings → Privacy</strong>,
+        computed from your actual configuration rather than written down here, so it cannot fall out
+        of date with what the extension does.
+      </p>
 
-      <h2>4. Data sent to AI providers</h2>
-      <p>If you configure an AI provider, your solution code and problem metadata are sent to that provider using <strong>your own API key</strong>. Review each provider's privacy policy:</p>
-      <ul>
-        <li><a href="https://ai.google.dev/terms" target="_blank" rel="noopener">Google Gemini</a></li>
-        <li><a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">OpenAI</a></li>
-        <li><a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic Claude</a></li>
-        <li><a href="https://www.deepseek.com/privacy" target="_blank" rel="noopener">DeepSeek</a></li>
-        <li>Ollama: runs locally — no external requests</li>
-      </ul>
-      <p>AI review is optional and can be disabled in Settings → AI.</p>
+      <h2>5. Children's privacy</h2>
+      <p>
+        CodeLedger is not directed at children under 13. We do not knowingly collect information
+        from children.
+      </p>
 
-      <h2>5. The OAuth relay server</h2>
-      <p>CodeLedger operates one server at <code>codeledger.vkrishna04.me/api</code>. Its sole purpose is the GitHub OAuth code exchange:</p>
-      <ul>
-        <li>Your browser sends GitHub's temporary <code>code</code> parameter to this server</li>
-        <li>The server exchanges it for an access token via GitHub's API</li>
-        <li>The token is returned to your browser and stored locally</li>
-        <li><strong>The token is never logged, stored, or transmitted elsewhere</strong></li>
-      </ul>
-      <p>The server does not log IP addresses, request bodies, tokens, or any user-identifying information. Cloudflare Workers processes the request in-memory only.</p>
+      <h2>6. Changes to this policy</h2>
+      <p>
+        If we make material changes, we will update the "Last updated" date above and note it in the
+        <a
+          href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/CHANGELOG.md"
+          target="_blank"
+          rel="noopener"
+          >CHANGELOG</a
+        >.
+      </p>
 
-      <h2>6. The Library web app</h2>
-      <p>The Library at <code>codeledger.vkrishna04.me/library</code> reads your problems directly from your GitHub repository via the GitHub API using your token. No data is cached or stored on our servers.</p>
-
-      <h2>7. Cookies and tracking</h2>
-      <p>We use no cookies, no third-party analytics (no Google Analytics, Mixpanel, etc.), no fingerprinting, and no advertising SDKs.</p>
-
-      <h2>8. Children's privacy</h2>
-      <p>CodeLedger is not directed at children under 13. We do not knowingly collect information from children.</p>
-
-      <h2>9. Changes to this policy</h2>
-      <p>If we make material changes, we will update the "Last updated" date above and note it in the <a href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG</a>.</p>
-
-      <h2>10. Contact</h2>
-      <p>Questions? Open an issue on <a href="https://github.com/Life-Experimentalist/Code-Ledger/issues" target="_blank" rel="noopener">GitHub</a> or email <a href="mailto:krishnalsh2004@gmail.com">krishnalsh2004@gmail.com</a>.</p>
+      <h2>7. Contact</h2>
+      <p>
+        Questions? Open an issue on
+        <a
+          href="https://github.com/Life-Experimentalist/Code-Ledger/issues"
+          target="_blank"
+          rel="noopener"
+          >GitHub</a
+        >
+        or email <a href="mailto:github@vkrishna04.me">github@vkrishna04.me</a>.
+      </p>
     </div>
 
     <footer>
-      <span>CodeLedger — Apache 2.0 · Built by <a href="https://github.com/VKrishna04" style="color:var(--accent);text-decoration:none">VKrishna04</a></span>
+      <span
+        >CodeLedger — Apache 2.0 · Built by
+        <a href="https://github.com/VKrishna04" style="color: var(--accent); text-decoration: none"
+          >VKrishna04</a
+        ></span
+      >
       <div class="footer-links">
-        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">GitHub</a>
-        <a href="/library">Library</a>
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
+          >GitHub</a
+        >
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
         <a href="/support">Support</a>

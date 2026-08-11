@@ -98,6 +98,8 @@ export class OpenAIHandler extends BaseAIHandler {
           }),
         });
 
+        this._updateRateLimits(res.headers);
+
         if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
 
         const data = await res.json();

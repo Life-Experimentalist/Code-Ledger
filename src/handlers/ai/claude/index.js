@@ -16,6 +16,7 @@ export class ClaudeHandler extends BaseAIHandler {
   constructor() {
     super("claude", "Anthropic Claude");
     this.keyPool = new APIKeyPool("claude");
+    this.dbg = dbg;
   }
 
   getSettingsSchema() {
@@ -95,6 +96,8 @@ export class ClaudeHandler extends BaseAIHandler {
             messages: [{ role: "user", content: prompt }],
           }),
         });
+
+        this._updateRateLimits(res.headers);
 
         if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
 

@@ -43,7 +43,7 @@ For the Cloudflare Worker:
 
 ```bash
 cd worker && npm install
-npx wrangler dev    # local dev — requires wrangler.toml with secrets (see docs/guides/CODELEDGER_EXECUTION_GUIDE.md)
+npx wrangler dev    # local dev — copy worker/wrangler.toml.example to worker/wrangler.toml first
 ```
 
 ---
@@ -88,7 +88,7 @@ npx wrangler dev    # local dev — requires wrangler.toml with secrets (see doc
 2. Create `dom-selectors.js` with versioned `SELECTORS`, `LEGACY_SELECTORS`, and `DOMAINS` export
 3. Create `page-detector.js` with `detectPage()` and `isSolveCapablePage()`
 4. Add hostname match in `src/content/handler-loader.js`
-5. Run `node dev/generate-manifest-domains.js` to update `manifest.json` `host_permissions`
+5. Run `node dev/generate-manifest-domains.js` to update `host_permissions` in both manifests
 6. See `docs/ADDING_PLATFORM_HANDLER.md` for the full contract and checklist
 
 Open tickets for GFG and Codeforces are in `docs/FEATURE_REQUESTS.md` with acceptance criteria.
@@ -120,10 +120,14 @@ If your change affects canonical mapping:
 
 CodeLedger follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`) and [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-**Version is stored in two canonical places — both must be kept in sync:**
+**Version is stored in three canonical places — all must be kept in sync:**
 
-- `src/manifest.json` → `"version"` field
-- `package.json` → `"version"` field
+- `package.json` → `"version"` field (the source of truth)
+- `src/manifest-chromium.json` → `"version"` field
+- `src/manifest-firefox.json` → `"version"` field
+
+`node dev/sync-manifests.js` copies the `package.json` version into both
+manifests, so you only edit one by hand.
 
 ### When to update the changelog
 
@@ -143,7 +147,7 @@ Only maintainers cut releases, but contributors should be aware of the process:
 
 ```bash
 # 1. Update CHANGELOG.md — move [Unreleased] items to a new [x.y.z] section
-# 2. Bump version in BOTH src/manifest.json AND package.json
+# 2. Bump the version in package.json, then run: node dev/sync-manifests.js
 # 3. Run the publish command:
 npm run publish
 # Produces in releases/:

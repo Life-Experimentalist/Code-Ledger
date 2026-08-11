@@ -331,14 +331,11 @@ export async function addMessageToChat(chatId, message) {
 const DELETED_PATHS_KEY = "_deletedChatPaths";
 
 async function _addDeletedChatPath(path) {
-  const settings = await Storage.getSettings();
-  const existing = Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
-  if (!existing.includes(path)) {
-    await Storage.setSettings({
-      ...settings,
-      [DELETED_PATHS_KEY]: [...existing, path],
-    });
-  }
+  await Storage.updateSettings((settings) => {
+    const existing = Array.isArray(settings[DELETED_PATHS_KEY]) ? settings[DELETED_PATHS_KEY] : [];
+    if (existing.includes(path)) return null;
+    return { [DELETED_PATHS_KEY]: [...existing, path] };
+  });
 }
 
 export async function getDeletedChatPaths() {
@@ -347,8 +344,7 @@ export async function getDeletedChatPaths() {
 }
 
 export async function clearDeletedChatPaths() {
-  const settings = await Storage.getSettings();
-  await Storage.setSettings({ ...settings, [DELETED_PATHS_KEY]: [] });
+  await Storage.updateSettings({ [DELETED_PATHS_KEY]: [] });
 }
 
 export async function getPendingSyncChats() {

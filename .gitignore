@@ -29,8 +29,39 @@ src/manifest.json
 env
 codeledger.zip
 
-# Graphify cache
-graphify-out/cache/*
+# Graphify internal state & cache
+graphify-out/cache/
+graphify-out/.graphify_*
+graphify-out/cost.json
+graphify-out/cypher.txt
+graphify-out/obsidian/
+graphify-out/*.tmp
+
+# Python & testing caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Web & tool caches
+.cache/
+.eslintcache
+.parcel-cache/
+.turbo/
+.next/
+
+# OS & Editor temporary files
+Thumbs.db
+*.tmp
+*.temp
+*.swp
+*~
+.idea/
+.vscode/*.log
 
 # Personal / launch artifacts (keep locally, not in repo)
 LINKEDIN_POST.md
@@ -45,3 +76,10 @@ docs/NEXT_PHASE_ROADMAP.md
 docs/temp/
 
 # .remember/
+.devprune.json
+.devprune-ignore
+ignore.devprune.json
+
+# Release artifacts — built by CI and attached to GitHub Releases.
+# Tracking them permanently inflates every clone.
+releases/

@@ -6,7 +6,7 @@
 import { h } from "../../vendor/preact-bundle.js";
 import { useState, useEffect, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
-import { renderMermaid } from "../../vendor/mermaid-stub.js";
+import { mermaidUrls } from "../../vendor/mermaid-stub.js";
 import { renderMath, substituteLatex } from "../../vendor/katex-stub.js";
 const html = htm.bind(h);
 
@@ -61,7 +61,18 @@ function renderTable(block) {
 }
 
 function _safeLink(_, label, url) {
-  const safeUrl = /^https?:\/\//i.test(url) ? url : "#";
+  // Every caller hands us text that has already been HTML-escaped once, so a
+  // URL like ?a=1&b=2 arrives as ?a=1&amp;b=2. Undo just that one entity before
+  // re-escaping, otherwise the href ships as &amp;amp; and the link is broken.
+  // Only "&" is decoded — < > and " stay encoded, so no markup can be rebuilt.
+  const decoded = String(url).replace(/&amp;/g, "&");
+
+  // Two separate concerns, both required:
+  //  1. Scheme allowlist — blocks javascript:, data:, vbscript: URLs.
+  //  2. Attribute escaping — a URL may pass the scheme test and still contain a
+  //     quote, e.g. https://x" onmouseover="…, which would break out of the
+  //     href attribute and inject an event handler.
+  const safeUrl = /^https?:\/\//i.test(decoded) ? escapeHtml(decoded) : "#";
   return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline">${label}</a>`;
 }
 
@@ -173,29 +184,59 @@ export function parseMarkdown(text) {
   return t;
 }
 
-let _mermaidCounter = 0;
-
 export function AIMarkdownRenderer({ content, copyableEnabled = false }) {
   const [copied, setCopied] = useState(false);
   const [copyPrompt, setCopyPrompt] = useState(null);
   const containerRef = useRef(null);
 
+  // Rendering a diagram sends its source to mermaid.ink. The source describes
+  // the user's problem and solution, so it only leaves the device when they ask
+  // for it — the block shows its code until the button is pressed.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    el.querySelectorAll("[data-mermaid-pending]").forEach(async (div) => {
-      const src = div.getAttribute("data-mermaid-src") || "";
-      if (!src) return;
+    el.querySelectorAll("[data-mermaid-pending]").forEach((div) => {
       div.removeAttribute("data-mermaid-pending");
-      const id = `cl-mermaid-${++_mermaidCounter}`;
-      try {
-        const svg = await renderMermaid(id, src.replace(/&quot;/g, '"'));
-        div.innerHTML = svg;
-        div.style.padding = "1rem";
-      } catch {
-        // keep pre fallback
-      }
+      const urls = mermaidUrls(
+        (div.getAttribute("data-mermaid-src") || "").replace(/&quot;/g, '"'),
+      );
+      if (!urls) return;
+
+      const bar = document.createElement("div");
+      bar.className = "flex items-center gap-3 px-3 py-2 border-t border-cyan-500/10";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Render diagram";
+      button.className = "text-[11px] text-cyan-300 hover:text-cyan-100 underline";
+      button.addEventListener("click", () => {
+        const img = document.createElement("img");
+        img.src = urls.image;
+        img.alt = "Mermaid diagram";
+        img.loading = "lazy";
+        img.className = "block max-w-full h-auto mx-auto my-3 rounded-lg";
+        img.addEventListener("error", () => {
+          img.replaceWith(
+            Object.assign(document.createElement("p"), {
+              className: "px-3 py-2 text-[11px] text-slate-500",
+              textContent: "Could not load the diagram image.",
+            }),
+          );
+        });
+        div.insertBefore(img, bar);
+        button.remove();
+      });
+
+      const live = document.createElement("a");
+      live.href = urls.live;
+      live.target = "_blank";
+      live.rel = "noopener noreferrer";
+      live.textContent = "Open in Mermaid Live ↗";
+      live.className = "text-[11px] text-slate-500 hover:text-slate-300 ml-auto";
+
+      bar.append(button, live);
+      div.appendChild(bar);
     });
   }, [content]);
 

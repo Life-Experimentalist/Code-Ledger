@@ -101,12 +101,14 @@ export async function getAllSkills() {
  */
 export async function saveUserSkill(skill) {
   if (!skill?.id || !skill?.name) throw new Error("Skill must have id and name");
-  const settings = await Storage.getSettings();
-  const existing = Array.isArray(settings[SK_USER_SKILLS]) ? settings[SK_USER_SKILLS] : [];
-  const idx = existing.findIndex((s) => s.id === skill.id);
-  if (idx >= 0) existing[idx] = skill;
-  else existing.push(skill);
-  await Storage.setSettings({ ...settings, [SK_USER_SKILLS]: existing });
+  await Storage.updateSettings((settings) => {
+    const existing = Array.isArray(settings[SK_USER_SKILLS]) ? settings[SK_USER_SKILLS] : [];
+    const idx = existing.findIndex((s) => s.id === skill.id);
+    const next = existing.slice();
+    if (idx >= 0) next[idx] = skill;
+    else next.push(skill);
+    return { [SK_USER_SKILLS]: next };
+  });
   dbg.log(`saveUserSkill: saved skill ${skill.id}`);
 }
 
@@ -115,11 +117,9 @@ export async function saveUserSkill(skill) {
  * @param {string} id
  */
 export async function deleteUserSkill(id) {
-  const settings = await Storage.getSettings();
-  const existing = Array.isArray(settings[SK_USER_SKILLS]) ? settings[SK_USER_SKILLS] : [];
-  await Storage.setSettings({
-    ...settings,
-    [SK_USER_SKILLS]: existing.filter((s) => s.id !== id),
+  await Storage.updateSettings((settings) => {
+    const existing = Array.isArray(settings[SK_USER_SKILLS]) ? settings[SK_USER_SKILLS] : [];
+    return { [SK_USER_SKILLS]: existing.filter((s) => s.id !== id) };
   });
   dbg.log(`deleteUserSkill: deleted ${id}`);
 }

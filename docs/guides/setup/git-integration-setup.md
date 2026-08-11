@@ -4,239 +4,121 @@
 - SPDX-License-Identifier: Apache-2.0
   \*/
 
-# CodeLedger - Git Integration & OAuth Setup Complete
+# Git integration
 
-## Summary of Changes
+CodeLedger commits to **GitHub and only GitHub**. There is one git handler,
+`src/handlers/git/github/`, and it is the only one registered in
+`src/handlers/init.js`. GitLab and Bitbucket handlers existed until 1.7.0 but
+every method threw, so they were deleted rather than left where a user could
+pick them.
 
-This session focused on connecting the git system with GitHub as default and OAuth fallback logic.
+## Settings keys
 
-### ✅ Completed Tasks
+| Key             | Holds                        | Set by                                        |
+| --------------- | ---------------------------- | --------------------------------------------- |
+| `github_owner`  | Account or org that owns it  | Onboarding, from `GET /user`                  |
+| `github_repo`   | Repository name              | Onboarding, or typed in **Settings → Git**    |
+| `github_token`  | Manual personal access token | **Settings → Git**, only when not using OAuth |
+| `git_mirrors[]` | Extra push targets           | **Settings → Git → Mirror Repositories**      |
 
-#### 1. **Git Provider Fallback System**
+OAuth tokens do **not** live in settings. They go to `auth.tokens` via
+`Storage.setAuthToken("github", token)` and are read back with
+`Storage.getAuthToken("github")`. `GitHubHandler.getToken()` checks that path
+first and falls back to `settings.github_token`.
 
-- **File**: `src/core/git-provider-selector.js` (NEW)
-- **Features**:
-  - Priority-based provider selection: GitHub → GitLab → Bitbucket
-  - `getActiveGitProvider(settings)` - returns active provider ID
-  - `getAvailableGitProviders()` - lists all providers with enabled status
-  - `getActiveGitProviderInstance()` - returns active handler instance
-  - Automatic fallback if primary provider is disabled
-- **Usage**: Import and call `getActiveGitProvider(settings)` before commits
+`settings.gitRepo` is a legacy camelCase spelling still honoured on read. Write
+`github_repo`; read `settings.github_repo || settings.gitRepo`.
 
-#### 2. **OAuth Authentication Flow**
-
-- **Added OAuth listener** in `src/library/library.js`
-  - Listens for: `{ type: 'CODELEDGER_AUTH', provider, token }`
-  - Validates origin for security
-  - Saves token to: `Storage.setAuthToken(provider, token)`
-- **Enhanced Connect Button**:
-  - Shows active git provider label
-  - Links to: `https://codeledger.vkrishna04.me/api/auth/github`
-  - Opens in new tab with proper security attributes
-
-#### 3. **SettingsView Cleanup**
-
-- **File**: `src/library/views/SettingsView.js`
-- **Fixed**: Removed duplicate navigation tabs causing duplicate buttons
-- **Result**: Clean, unified settings panel without nav duplication
-
-#### 4. **Git Provider Settings**
-
-- **GitHub**: `github_token` (OAuth or PAT), `github_repo`
-- **GitLab**: `gitlab_token`, `gitlab_repo`
-- **Bitbucket**: `bitbucket_token`, `bitbucket_repo`, `bitbucket_workspace`
-- All registered in handler registry and accessible in Settings UI
-
-#### 5. **Worker Configuration**
-
-- **File**: `worker/public/config.json`
-- **Updates**:
-  ```json
-  {
-    "github": {
-      "app_slug": "code-ledger-github",
-      "app_name": "CodeLedger GitHub"
-    },
-    "oauth_url": "https://codeledger.vkrishna04.me/api/auth/github"
-  }
-  ```
-
-#### 6. **Handler Status Verification**
-
-- **Created**: `dev/diagnose.js` - comprehensive handler diagnostic tool
-- **Current Status** (6/6 handlers OK):
-  - ✅ Platform Handlers: LeetCode, GeeksForGeeks, Codeforces
-  - ✅ Git Providers: GitHub, GitLab, Bitbucket (all have getSettingsSchema)
-  - ✅ Build passes without errors
-- **Note**: AI handlers don't have init() but settings work independently
-
-#### 7. **Documentation**
-
-- **OAUTH_TESTING_GUIDE.md** (NEW)
-  - Complete testing sequence
-  - Phase 1: Local development (no OAuth)
-  - Phase 2: Manual PAT testing
-  - Phase 3: OAuth testing
-  - Phase 4: LeetCode integration
-- **Diagnostic Commands**: Handler status, storage inspection, etc.
-
-## Architecture
-
-### Git Provider System Flow
+## Commit flow
 
 ```
-Problem Submission (LeetCode)
+Accepted submission on LeetCode / GeeksForGeeks / Codeforces
     ↓
-eventBus.emit('problem:solved', data)
+eventBus.emit("problem:solved", data)
     ↓
-Service Worker: git-engine.js
+service-worker.js saves to IndexedDB, optionally runs the AI review
     ↓
-getActiveGitProvider(settings) - checks priority order
+_commitWithFailover(files, message, ...)
     ↓
-GitHub enabled? YES → use GitHub handler
-        NO → check GitLab → check Bitbucket
+resolves the ordered target list — primary repo, then each configured mirror
     ↓
-handler.commit(files, message, repoName)
+GitHubHandler.commit(files, message, repo)
     ↓
-GitHub API / GitLab API / Bitbucket API
+POST /git/trees → POST /git/commits → PATCH /git/refs/heads/{branch}
     ↓
-Repository synced with solution files
+one atomic commit for the whole file set
 ```
 
-### OAuth Token Storage
+`_commitWithFailover()` tries the primary first and only moves to a mirror after
+the primary throws. A mirror is a full push target, not a backup copy: the same
+files go to every active mirror on every commit.
+
+An empty repository has no `refs/heads/{branch}` to patch. `initializeRepository()`
+detects that, builds a **root commit** — no `base_tree`, no `parents` — and
+creates the ref instead of patching it.
+
+## OAuth token flow
 
 ```
-User clicks "Connect" → Opens OAuth window
+"Connect" in the library header opens https://codeledger.vkrishna04.me/api/auth/github
     ↓
-Worker (Cloudflare): /api/auth/github
+Worker mints an HMAC-signed state cookie (10-minute TTL) and redirects to GitHub
     ↓
-GitHub OAuth flow
+GitHub redirects back to /api/auth/github/callback
     ↓
-Worker posts message: { type: 'CODELEDGER_AUTH', provider: 'github', token: '...' }
+Worker verifies the state cookie in constant time, exchanges the code
     ↓
-library.js message listener
+Worker posts { type: "CODELEDGER_AUTH", provider: "github", token }
     ↓
-Storage.setAuthToken('github', token)
-    ↓
-Storage key: auth.tokens = { github: 'ghu_...' }
+library.js listener → Storage.setAuthToken("github", token)
 ```
 
-## Configuration Checklist
+The message type must match exactly. Anything else is dropped in silence.
 
-Before OAuth testing, ensure:
+## Before OAuth will work
 
-### ✅ Code Level
+Worker secrets, set from `worker/` with `npx wrangler secret put NAME` — the
+command takes the name only and prompts for the value, so nothing lands in shell
+history:
 
-- [x] Git provider selector integrated
-- [x] OAuth listener in library.js
-- [x] All handlers have getSettingsSchema()
-- [x] Worker config has OAuth URLs
-- [x] Build passes without errors
+- `CODELEDGER_OAUTH_CLIENT_ID` — classic **OAuth App** client ID, starts `Iv23li`
+- `CODELEDGER_OAUTH_CLIENT_SECRET`
+- `SESSION_SECRET` — 32 random bytes; **sign-in returns 500 without it**
+- `CANONICAL_UPLOAD_TOKEN` (optional) — guards `POST /api/admin/canonical`
+- `CODELEDGER_GH_APP_WEBHOOK_SECRET` (optional) — HMAC for the webhook route
 
-### ⚠️ Deployment Level (needed for full testing)
+A client ID starting `Ov23li` belongs to a **GitHub App**, not an OAuth App.
+GitHub Apps ignore the `scope` parameter and issue expiring user-to-server
+tokens that get `403 Resource not accessible by integration` on
+`POST /user/repos`. The callback detects that token shape and reports it at
+sign-in. See [GitHub OAuth App setup](github-oauth-app-setup.md).
 
-- [ ] Cloudflare Worker secrets set:
-  - CODELEDGER_GH_APP_PRIVATE_KEY (PKCS#8)
-  - CODELEDGER_GH_APP_ID
-  - CODELEDGER_GH_APP_CLIENT_ID
-  - CODELEDGER_GH_APP_CLIENT_SECRET
-  - CODELEDGER_GH_APP_WEBHOOK_SECRET
-  - SESSION_SECRET
-- [ ] GitHub App created and configured
-- [ ] Worker deployed: `npx wrangler deploy`
-- [ ] Health check passes: `curl https://codeledger.vkrishna04.me/api/health`
-
-## Testing Instructions
-
-### Quick Start (No OAuth yet)
+Then deploy and check:
 
 ```bash
-npm run build:fast
-npm run watch
-# Load dist/chromium in chrome://extensions (unpacked)
-# Settings tab should show GitHub, GitLab, Bitbucket options
-```
-
-### Full OAuth Testing (After Worker Deploy)
-
-```bash
-# Deploy worker
 cd worker && npx wrangler deploy
-
-# Test in extension
-# Header "Connect" button → GitHub OAuth
-# After auth, check Storage.getAuthToken('github')
-# Should show token starting with "ghu_"
 ```
-
-### LeetCode Integration Test
 
 ```bash
-# With OAuth token saved:
-# Go to LeetCode, solve problem, submit
-# CodeLedger should detect and commit to GitHub repo
-# Check: GitHub repo should have /problems/leetcode/<problem-slug>/
+curl -sf https://codeledger.vkrishna04.me/api/health
 ```
 
-## Files Modified
+## Adding a second provider
 
-1. `src/core/git-provider-selector.js` - **NEW**
-2. `src/library/views/SettingsView.js` - Cleaned duplicate nav
-3. `src/library/library.js` - Added OAuth listener
-4. `src/handlers/platforms/codeforces/index.js` - Added getSettingsSchema
-5. `src/handlers/git/gitlab/index.js` - Added getSettingsSchema
-6. `src/handlers/git/bitbucket/index.js` - Added getSettingsSchema
-7. `worker/public/config.json` - Added OAuth URLs
-8. `dev/diagnose.js` - **NEW** diagnostic tool
-9. `OAUTH_TESTING_GUIDE.md` - **NEW** comprehensive guide
+The registry, the settings schema, the mirror picker and the failover loop are
+all provider-agnostic already — `_commitWithFailover()` reads `target.provider`
+and asks the registry for it. What a new provider needs is a handler under
+`src/handlers/git/{name}/` implementing `BaseGitHandler`, an entry in
+`CONSTANTS.GIT_PROVIDERS`, a line in the `gits` array in `src/handlers/init.js`,
+and an entry in `PROVIDERS` in `src/ui/components/MirrorsPanel.js` and
+`MIRROR_PROVIDERS` in `src/library/settings-panels/PanelGit.js`.
 
-## Build Status
+The `gitlab_token` and `bitbucket_token` keys are still in the settings-sync
+denylist. A denylist costs nothing, and a future provider should not have to
+remember to add itself to one.
 
-```
-✅ npm run build:fast - PASSING
-✅ npm run build - PASSING
-✅ Both Chromium and Firefox extensions compile
-✅ No TypeScript errors
-✅ git-provider-selector integrated
-✅ OAuth message listener ready
-✅ All critical handlers initialized
-```
+## See also
 
-## Known Limitations (Non-blocking)
-
-- AI handlers (Claude, OpenAI, etc.) don't have init() - they work via settings
-- GitLab and Bitbucket commit() are stubbed (not implemented yet)
-- Can add provider settings dynamically without code changes (configuration-based)
-
-## Success Indicators
-
-When testing OAuth:
-
-- [x] Extension loads without errors
-- [x] Settings shows GitHub/GitLab/Bitbucket options
-- [ ] OAuth "Connect" button opens GitHub auth (after worker deploy)
-- [ ] Token saves to storage (check DevTools → Application → Storage)
-- [ ] LeetCode detects problem submissions
-- [ ] Git commit creates repository on GitHub
-- [ ] Files sync to correct directory structure
-
-## Next Steps
-
-1. **Deploy Worker** with environment secrets
-2. **Test OAuth flow** end-to-end
-3. **Verify LeetCode integration** with real problem
-4. **Enable AI providers** by adding their getSettingsSchema
-5. **Implement GitLab/Bitbucket** commit APIs if needed
-6. **Add Chrome Web Store** packaging and deployment
-
-## Important Links
-
-- OAuth Testing Guide: [OAUTH_TESTING_GUIDE.md](./OAUTH_TESTING_GUIDE.md)
-- Git Provider Selector: [src/core/git-provider-selector.js](../../src/core/git-provider-selector.js)
-- Diagnostic Tool: `node dev/diagnose.js`
-- GitHub Handler: [src/handlers/git/github/index.js](../../src/handlers/git/github/index.js)
-- LeetCode Handler: [src/handlers/platforms/leetcode/index.js](../../src/handlers/platforms/leetcode/index.js)
-
----
-
-**Session Summary**: ✅ Git system fully connected with GitHub as default + fallback logic to GitLab/Bitbucket. OAuth listener implemented. All handlers properly configured. Ready for deployment testing.
+- [OAuth testing guide](oauth-testing-guide.md)
+- [GitHub OAuth App setup](github-oauth-app-setup.md)
+- `node dev/diagnose.js` — reports which handlers are present and wired

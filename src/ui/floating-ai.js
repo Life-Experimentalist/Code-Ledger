@@ -33,29 +33,43 @@ const DEFAULT_PLATFORM = {
   openAIChatsPage: null,
 };
 
-function readMonacoEditorCode() {
-  try {
-    const active = window.monaco?.editor?.getActiveCodeEditor?.()?.getModel?.()?.getValue?.();
-    if (active && active.trim()) return active;
-    const editors = window.monaco?.editor?.getEditors?.();
-    if (editors?.length) {
-      for (const ed of editors) {
-        const val = ed.getModel?.()?.getValue?.();
-        if (val && val.trim()) return val;
+async function readMonacoEditorCode() {
+  return new Promise((resolve) => {
+    const requestId = Math.random().toString(36).substring(2);
+    const responseEvent = `cl-editor-response-${requestId}`;
+
+    const script = document.createElement("script");
+    script.src = chrome.runtime.getURL("content/injected-editor-helper.js");
+    script.setAttribute("data-action", "extract");
+    script.setAttribute("data-request-id", requestId);
+
+    const listener = (e) => {
+      window.removeEventListener(responseEvent, listener);
+      script.remove();
+      if (e.detail?.code) {
+        resolve(e.detail.code);
+        return;
       }
-    }
-    const models = window.monaco?.editor?.getModels?.();
-    if (models?.length) {
-      const val = models[0].getValue?.();
-      if (val && val.trim()) return val;
-    }
-  } catch {}
-  try {
-    const lineEls = [...document.querySelectorAll(".monaco-editor .view-lines .view-line")];
-    lineEls.sort((a, b) => (parseInt(a.style.top, 10) || 0) - (parseInt(b.style.top, 10) || 0));
-    if (lineEls.length > 0) return lineEls.map((l) => l.textContent).join("\n");
-  } catch {}
-  return "";
+      try {
+        const lineEls = [...document.querySelectorAll(".monaco-editor .view-lines .view-line")];
+        lineEls.sort((a, b) => (parseInt(a.style.top, 10) || 0) - (parseInt(b.style.top, 10) || 0));
+        if (lineEls.length > 0) resolve(lineEls.map((l) => l.textContent).join("\n"));
+        else resolve("");
+      } catch {
+        resolve("");
+      }
+    };
+
+    window.addEventListener(responseEvent, listener);
+    (document.body || document.documentElement).appendChild(script);
+
+    // Timeout fallback to prevent hanging
+    setTimeout(() => {
+      window.removeEventListener(responseEvent, listener);
+      if (script.parentNode) script.remove();
+      resolve("");
+    }, 1000);
+  });
 }
 
 function readGenericPageMeta() {
@@ -67,28 +81,8 @@ function readGenericPageMeta() {
   };
 }
 
-/** Attempts to read the current code from the Monaco editor on the page. */
-function readEditorCode() {
-  try {
-    // Monaco global model approach (most reliable)
-    if (window.monaco?.editor) {
-      const models = window.monaco.editor.getModels();
-      if (models?.length) {
-        const code = models[0].getValue();
-        if (code && code.trim()) return code;
-      }
-    }
-  } catch {}
-  try {
-    // Fallback: read visible lines from the DOM
-    const lines = document.querySelectorAll(".monaco-editor .view-lines .view-line");
-    if (lines.length > 0) {
-      return Array.from(lines)
-        .map((l) => l.textContent)
-        .join("\n");
-    }
-  } catch {}
-  return "";
+async function readEditorCode() {
+  return readMonacoEditorCode();
 }
 
 /** Reads generic failure-like output in a platform-agnostic way. */
@@ -139,7 +133,30 @@ export function createFloatingAI(slug = "", opts = {}) {
   let expanded = false;
   let chatId = null;
   let copyableEnabled = false;
+  let isDestroyed = false;
   let chatMode = "guided"; // "guided" (Socratic default) or "direct"
+  let promptHistory = [];
+  let historyIndex = -1;
+  let promptDraft = "";
+  let isNavigatingHistory = false;
+
+  chrome.storage.local.get("cl_prompt_history", (res) => {
+    promptHistory = res.cl_prompt_history || [];
+    historyIndex = promptHistory.length;
+  });
+
+  function addPromptToHistory(prompt) {
+    chrome.storage.local.get("cl_prompt_history", (res) => {
+      let history = res.cl_prompt_history || [];
+      history = history.filter((p) => p !== prompt);
+      history.push(prompt);
+      if (history.length > 50) history.shift();
+      chrome.storage.local.set({ cl_prompt_history: history }, () => {
+        promptHistory = history;
+        historyIndex = history.length;
+      });
+    });
+  }
 
   // Load persisted mode
   chrome.storage.local.get("cl_chat_mode", (res) => {
@@ -336,16 +353,21 @@ export function createFloatingAI(slug = "", opts = {}) {
   // input is not yet a child at this point, so insertBefore would throw.
   inputRow.appendChild(autocompleteEl);
 
-  function showAutocomplete(query) {
-    const cmds = CHAT_COMMANDS.filter(
-      (c) => !query || c.id.startsWith(query) || c.label?.toLowerCase().includes(query),
-    );
-    if (!cmds.length) {
-      hideAutocomplete();
-      return;
-    }
+  let activeAutocompleteIndex = 0;
+  let currentAutocompleteCmds = [];
+
+  function selectAutocompleteItem(cmd) {
+    const val = input.value;
+    const lastSlash = val.lastIndexOf("/");
+    input.value = val.slice(0, lastSlash) + "/" + cmd.id + " ";
+    hideAutocomplete();
+    autoGrow();
+    input.focus();
+  }
+
+  function renderAutocompleteItems() {
     autocompleteEl.innerHTML = "";
-    cmds.forEach((cmd) => {
+    currentAutocompleteCmds.forEach((cmd, idx) => {
       const item = document.createElement("div");
       Object.assign(item.style, {
         padding: "6px 12px",
@@ -355,25 +377,38 @@ export function createFloatingAI(slug = "", opts = {}) {
         gap: "10px",
         fontSize: "11px",
         borderBottom: "1px solid rgba(255,255,255,0.04)",
+        background: idx === activeAutocompleteIndex ? "rgba(6,182,212,0.15)" : "",
+        borderLeft: idx === activeAutocompleteIndex ? "2px solid #06b6d4" : "2px solid transparent",
       });
       item.innerHTML = `<span style="color:#06b6d4;font-family:monospace;font-weight:700;flex-shrink:0">/${cmd.id}</span><span style="color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cmd.description || cmd.label || ""}</span>`;
       item.addEventListener("mouseenter", () => {
-        item.style.background = "rgba(6,182,212,0.1)";
-      });
-      item.addEventListener("mouseleave", () => {
-        item.style.background = "";
+        activeAutocompleteIndex = idx;
+        renderAutocompleteItems();
       });
       item.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        const val = input.value;
-        const lastSlash = val.lastIndexOf("/");
-        input.value = val.slice(0, lastSlash) + "/" + cmd.id + " ";
-        hideAutocomplete();
-        autoGrow();
-        input.focus();
+        selectAutocompleteItem(cmd);
       });
       autocompleteEl.appendChild(item);
     });
+
+    const activeItem = autocompleteEl.children[activeAutocompleteIndex];
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function showAutocomplete(query) {
+    const cmds = CHAT_COMMANDS.filter(
+      (c) => !query || c.id.startsWith(query) || c.label?.toLowerCase().includes(query),
+    );
+    currentAutocompleteCmds = cmds;
+    activeAutocompleteIndex = 0;
+    if (!cmds.length) {
+      hideAutocomplete();
+      return;
+    }
+    renderAutocompleteItems();
     autocompleteEl.style.display = "flex";
   }
 
@@ -471,28 +506,53 @@ export function createFloatingAI(slug = "", opts = {}) {
     }
   } catch (_) {}
 
-  Storage.getSettings()
-    .then((settings) => {
+  let aiConfigured = true;
+  Promise.all([Storage.getSettings(), Storage.getAIKeys()])
+    .then(([settings, aiKeys]) => {
       copyableEnabled = settings?.aiCopyable === true;
+      const provider = settings?.aiProvider || "gemini";
+      if (provider !== "ollama") {
+        const keys = aiKeys?.[provider] || [];
+        const hasKeys = keys.some((k) => String(k || "").trim().length > 0);
+        if (!hasKeys) {
+          aiConfigured = false;
+        }
+      }
+      if (!aiConfigured && messages.length === 0) {
+        renderMessages();
+      }
     })
     .catch(() => {});
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  function applyCodeToEditor(code) {
-    try {
-      const activeEd = window.monaco?.editor?.getActiveCodeEditor?.();
-      if (activeEd) {
-        activeEd.getModel()?.setValue?.(code);
-        return true;
-      }
-      const eds = window.monaco?.editor?.getEditors?.();
-      if (eds?.length) {
-        eds[0].getModel()?.setValue?.(code);
-        return true;
-      }
-    } catch (_) {}
-    return false;
+  async function applyCodeToEditor(code) {
+    return new Promise((resolve) => {
+      const requestId = Math.random().toString(36).substring(2);
+      const responseEvent = `cl-editor-response-${requestId}`;
+
+      const script = document.createElement("script");
+      script.src = chrome.runtime.getURL("content/injected-editor-helper.js");
+      script.setAttribute("data-action", "apply");
+      script.setAttribute("data-request-id", requestId);
+      script.setAttribute("data-code", encodeURIComponent(code || ""));
+
+      const listener = (e) => {
+        window.removeEventListener(responseEvent, listener);
+        script.remove();
+        resolve(e.detail?.success === true);
+      };
+
+      window.addEventListener(responseEvent, listener);
+      (document.body || document.documentElement).appendChild(script);
+
+      // Timeout fallback to prevent hanging
+      setTimeout(() => {
+        window.removeEventListener(responseEvent, listener);
+        if (script.parentNode) script.remove();
+        resolve(false);
+      }, 1000);
+    });
   }
 
   function addApplyButtons(bubble) {
@@ -504,8 +564,8 @@ export function createFloatingAI(slug = "", opts = {}) {
       btn.className = "cl-ai-apply-btn";
       btn.textContent = "Apply to editor";
       btn.title = "Replace editor content with this code block";
-      btn.addEventListener("click", () => {
-        const ok = applyCodeToEditor(codeText);
+      btn.addEventListener("click", async () => {
+        const ok = await applyCodeToEditor(codeText);
         btn.textContent = ok ? "✓ Applied!" : "✗ Editor not found";
         setTimeout(() => {
           btn.textContent = "Apply to editor";
@@ -527,6 +587,23 @@ export function createFloatingAI(slug = "", opts = {}) {
         lineHeight: "1.6",
       });
       empty.textContent = "Ask anything about the problem or your current solution.";
+
+      if (!aiConfigured) {
+        const warn = document.createElement("div");
+        Object.assign(warn.style, {
+          marginTop: "16px",
+          padding: "10px",
+          background: "rgba(239,68,68,0.1)",
+          border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: "8px",
+          color: "#fca5a5",
+          fontSize: "11px",
+        });
+        warn.innerHTML =
+          "<strong>Missing API Key</strong><br/>Please configure your AI provider in the CodeLedger options to use the chat assistant.";
+        empty.appendChild(warn);
+      }
+
       msgList.appendChild(empty);
       return;
     }
@@ -539,6 +616,30 @@ export function createFloatingAI(slug = "", opts = {}) {
         bubble.textContent = msg.content;
       } else {
         bubble.innerHTML = parseMarkdown(msg.content || "");
+        if (msg.modelId || msg.providerId) {
+          const badge = document.createElement("div");
+          badge.className = "cl-ai-msg-model-badge";
+          badge.style.fontSize = "10px";
+          badge.style.fontFamily = "monospace";
+          badge.style.color = "rgba(34, 211, 238, 0.8)"; // cyan-400 equivalent
+          badge.style.marginBottom = "6px";
+          badge.style.display = "flex";
+          badge.style.alignItems = "center";
+          badge.style.gap = "6px";
+
+          // Model ids come from the provider's own model list (OpenRouter and
+          // Ollama serve third-party names), so they are set as text rather
+          // than interpolated into markup.
+          badge.append(`🤖 ${msg.modelId || msg.providerId}`);
+          if (msg.isFallback) {
+            const tag = document.createElement("span");
+            tag.textContent = "backup fallback";
+            tag.style.cssText =
+              "padding: 1px 4px; font-size: 8px; background: rgba(244, 63, 94, 0.2); color: rgb(253, 164, 175); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 4px;";
+            badge.appendChild(tag);
+          }
+          bubble.insertBefore(badge, bubble.firstChild);
+        }
         addApplyButtons(bubble);
         lastAiBubble = bubble;
       }
@@ -579,15 +680,15 @@ export function createFloatingAI(slug = "", opts = {}) {
     return !chatId && Array.isArray(messages) && messages.length > 0;
   }
 
-  function buildSaveRecord() {
+  async function buildSaveRecord() {
     const pageMeta =
       typeof platform.readPageMeta === "function"
-        ? platform.readPageMeta({ slug, window, document })
+        ? await platform.readPageMeta({ slug, window, document })
         : readGenericPageMeta();
     const code =
       (typeof platform.readEditorCode === "function"
-        ? platform.readEditorCode({ slug, window, document })
-        : readEditorCode()) || "";
+        ? await platform.readEditorCode({ slug, window, document })
+        : await readEditorCode()) || "";
     const latestUserMessage =
       [...messages].reverse().find((msg) => msg?.role === "user")?.content || "";
     const context = buildAIChatContext({
@@ -668,7 +769,7 @@ export function createFloatingAI(slug = "", opts = {}) {
 
   async function saveConversationAndOpenChats() {
     if (!messages.length) return;
-    const { context, meta } = buildSaveRecord();
+    const { context, meta } = await buildSaveRecord();
     if (chatId) {
       await updateAIChat(chatId, messages, meta).catch(() => {});
     } else {
@@ -839,10 +940,12 @@ export function createFloatingAI(slug = "", opts = {}) {
     const text = input.value.trim();
     if (!text || pending) return;
 
+    addPromptToHistory(text);
+
     const code =
       (typeof platform.readEditorCode === "function"
-        ? platform.readEditorCode({ slug, window, document })
-        : readEditorCode()) || "";
+        ? await platform.readEditorCode({ slug, window, document })
+        : await readEditorCode()) || "";
     const langName =
       (typeof platform.readEditorLang === "function" ? platform.readEditorLang() : "") || "";
     const problemStatement =
@@ -851,7 +954,7 @@ export function createFloatingAI(slug = "", opts = {}) {
         : "") || "";
     const pageMeta =
       typeof platform.readPageMeta === "function"
-        ? platform.readPageMeta({ slug, window, document })
+        ? await platform.readPageMeta({ slug, window, document })
         : readGenericPageMeta();
     const rawErrors =
       (typeof platform.readTestFailures === "function"
@@ -930,28 +1033,43 @@ export function createFloatingAI(slug = "", opts = {}) {
 
     try {
       const response = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "AI_CHAT",
-            messages: messages.map(({ role, content }) => ({
-              role,
-              content,
-            })),
-            context,
-          },
-          (resp) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-            } else if (resp?.ok) {
-              resolve(resp.response);
-            } else {
-              reject(new Error(resp?.error || "AI request failed"));
-            }
-          },
-        );
+        try {
+          chrome.runtime.sendMessage(
+            {
+              type: "AI_CHAT",
+              messages: messages.map(({ role, content }) => ({
+                role,
+                content,
+              })),
+              context,
+            },
+            (resp) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else if (resp?.ok) {
+                resolve(resp.response);
+              } else {
+                reject(new Error(resp?.error || "AI request failed"));
+              }
+            },
+          );
+        } catch (ctxErr) {
+          // Extension context invalidated (service worker reloaded) — surface a friendly error
+          reject(
+            new Error(
+              "Extension was updated. Please reload this page to continue using CodeLedger AI.",
+            ),
+          );
+        }
       });
 
-      const aiMsg = { role: "assistant", content: response };
+      const aiMsg = {
+        role: "assistant",
+        content: response.response,
+        providerId: response.providerId,
+        modelId: response.modelId,
+        isFallback: response.isFallback,
+      };
       messages = [...messages, aiMsg];
       const problemRecord = {
         problemSlug: slug,
@@ -971,10 +1089,9 @@ export function createFloatingAI(slug = "", opts = {}) {
           : [],
         surface: "floating-panel",
         requestType: context.requestType || "",
-        usedCommands: context.usedCommands || [],
         requestTemplate: text,
         summary: text.slice(0, 120),
-        usedCommands, // include detected commands from this message
+        usedCommands, // detected commands from this message
       };
       if (chatId) {
         await updateAIChat(chatId, messages, problemRecord).catch(() => {});
@@ -983,7 +1100,7 @@ export function createFloatingAI(slug = "", opts = {}) {
           slug,
           window.location.href,
           messages,
-          "leetcode",
+          platform.chatPlatform || "leetcode",
           problemRecord,
         ).catch(() => null);
       }
@@ -1041,6 +1158,91 @@ export function createFloatingAI(slug = "", opts = {}) {
 
   sendBtn.addEventListener("click", sendMessage);
   input.addEventListener("keydown", (e) => {
+    const isAutocompleteOpen = autocompleteEl.style.display !== "none";
+
+    if (isAutocompleteOpen && currentAutocompleteCmds.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeAutocompleteIndex = (activeAutocompleteIndex + 1) % currentAutocompleteCmds.length;
+        renderAutocompleteItems();
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeAutocompleteIndex =
+          (activeAutocompleteIndex - 1 + currentAutocompleteCmds.length) %
+          currentAutocompleteCmds.length;
+        renderAutocompleteItems();
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        const sel = currentAutocompleteCmds[activeAutocompleteIndex];
+        if (sel) {
+          selectAutocompleteItem(sel);
+        }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hideAutocomplete();
+        return;
+      }
+    }
+
+    if (!isAutocompleteOpen) {
+      if (e.key === "ArrowUp") {
+        const isCursorAtStart = input.selectionStart === 0 && input.selectionEnd === 0;
+        const isMultiLine = input.value.includes("\n");
+        if (isCursorAtStart && !isMultiLine && promptHistory.length > 0) {
+          e.preventDefault();
+          let newIndex = historyIndex - 1;
+          if (newIndex < 0) newIndex = 0;
+
+          if (historyIndex === promptHistory.length) {
+            promptDraft = input.value;
+          }
+
+          historyIndex = newIndex;
+          isNavigatingHistory = true;
+          input.value = promptHistory[newIndex];
+          autoGrow();
+          requestAnimationFrame(() => {
+            input.selectionStart = input.selectionEnd = promptHistory[newIndex].length;
+          });
+          return;
+        }
+      } else if (e.key === "ArrowDown") {
+        const isCursorAtEnd =
+          input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+        const isMultiLine = input.value.includes("\n");
+        if (isCursorAtEnd && !isMultiLine && promptHistory.length > 0) {
+          e.preventDefault();
+          let newIndex = historyIndex + 1;
+          if (newIndex > promptHistory.length) {
+            newIndex = promptHistory.length;
+          }
+
+          historyIndex = newIndex;
+          isNavigatingHistory = true;
+          if (newIndex === promptHistory.length) {
+            input.value = promptDraft;
+            autoGrow();
+            requestAnimationFrame(() => {
+              input.selectionStart = input.selectionEnd = promptDraft.length;
+            });
+          } else {
+            input.value = promptHistory[newIndex];
+            autoGrow();
+            requestAnimationFrame(() => {
+              input.selectionStart = input.selectionEnd = promptHistory[newIndex].length;
+            });
+          }
+          return;
+        }
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       hideAutocomplete();
@@ -1053,6 +1255,11 @@ export function createFloatingAI(slug = "", opts = {}) {
 
   input.addEventListener("input", () => {
     autoGrow();
+    if (isNavigatingHistory) {
+      isNavigatingHistory = false;
+    } else {
+      historyIndex = promptHistory.length;
+    }
     const val = input.value;
     const match = val.match(/\/(\w*)$/);
     if (match) {
@@ -1105,6 +1312,7 @@ export function createFloatingAI(slug = "", opts = {}) {
   // ── Persistence: re-attach panel if DOM gets mutated (e.g., tab switch) ─────
   let persistenceObserver = null;
   function ensurePanelAttached() {
+    if (isDestroyed) return;
     if (!root.parentElement) {
       document.body.appendChild(root);
     }
@@ -1139,6 +1347,7 @@ export function createFloatingAI(slug = "", opts = {}) {
         showCloseConfirm();
         return false;
       }
+      isDestroyed = true;
       persistTempChat();
       // Disconnect observer BEFORE DOM removal to prevent ensurePanelAttached
       // from firing on the mutation caused by root.remove().

@@ -4,9 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Support — CodeLedger</title>
-    <meta name="description" content="Get help with CodeLedger. Documentation, GitHub issues, and FAQ." />
+    <meta
+      name="description"
+      content="Get help with CodeLedger. Documentation, GitHub issues, and FAQ."
+    />
     <link rel="canonical" href="https://codeledger.vkrishna04.me/support" />
-    <link rel="icon" href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" />
+    <link rel="icon" href="/assets/icon-128.png" type="image/png" />
     <link rel="stylesheet" href="/assets/landing.css" />
     <style>
       .page-content {
@@ -34,7 +37,8 @@
         color: var(--text);
         margin: 36px 0 12px;
       }
-      .page-content p, .page-content li {
+      .page-content p,
+      .page-content li {
         color: var(--subtle);
         line-height: 1.75;
         margin-bottom: 12px;
@@ -70,7 +74,9 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
-        transition: border-color 0.2s, background 0.2s;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
       }
       .support-card:hover {
         border-color: var(--border-glow);
@@ -105,7 +111,7 @@
         margin-bottom: 8px;
       }
       .debug-steps code {
-        background: rgba(255,255,255,0.06);
+        background: rgba(255, 255, 255, 0.06);
         padding: 2px 6px;
         border-radius: 4px;
         font-size: 0.9em;
@@ -116,13 +122,14 @@
   <body>
     <nav>
       <a class="nav-brand" href="/">
-        <img src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png" alt="CodeLedger logo" />
+        <img src="/assets/icon-128.png" alt="" width="28" height="28" />
         CodeLedger
       </a>
       <div class="nav-links">
         <a href="/#features"><span>Features</span></a>
-        <a href="/library">📚 <span>Library</span></a>
-        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">⭐ <span>GitHub</span></a>
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
+          >⭐ <span>GitHub</span></a
+        >
       </div>
     </nav>
 
@@ -131,25 +138,53 @@
       <p class="subtitle">Get help, report a bug, or request a feature.</p>
 
       <div class="support-cards">
-        <a class="support-card" href="https://github.com/Life-Experimentalist/Code-Ledger/issues/new/choose" target="_blank" rel="noopener">
+        <a
+          class="support-card"
+          href="https://github.com/Life-Experimentalist/Code-Ledger/issues/new/choose"
+          target="_blank"
+          rel="noopener"
+        >
           <div class="card-icon">🐛</div>
           <div class="card-title">Report a Bug</div>
-          <div class="card-desc">Open a GitHub issue with steps to reproduce and your browser + extension version.</div>
+          <div class="card-desc">
+            Open a GitHub issue with steps to reproduce and your browser + extension version.
+          </div>
         </a>
-        <a class="support-card" href="https://github.com/Life-Experimentalist/Code-Ledger/discussions" target="_blank" rel="noopener">
+        <a
+          class="support-card"
+          href="https://github.com/Life-Experimentalist/Code-Ledger/discussions"
+          target="_blank"
+          rel="noopener"
+        >
           <div class="card-icon">💬</div>
           <div class="card-title">Discussions</div>
-          <div class="card-desc">Ask questions, share tips, or suggest features in GitHub Discussions.</div>
+          <div class="card-desc">
+            Ask questions, share tips, or suggest features in GitHub Discussions.
+          </div>
         </a>
-        <a class="support-card" href="https://github.com/Life-Experimentalist/Code-Ledger/releases" target="_blank" rel="noopener">
+        <a
+          class="support-card"
+          href="https://github.com/Life-Experimentalist/Code-Ledger/releases"
+          target="_blank"
+          rel="noopener"
+        >
           <div class="card-icon">📦</div>
           <div class="card-title">Releases</div>
-          <div class="card-desc">Browse release notes, download specific versions, or side-load the extension manually.</div>
+          <div class="card-desc">
+            Browse release notes, download specific versions, or side-load the extension manually.
+          </div>
         </a>
-        <a class="support-card" href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md" target="_blank" rel="noopener">
+        <a
+          class="support-card"
+          href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md"
+          target="_blank"
+          rel="noopener"
+        >
           <div class="card-icon">🔌</div>
           <div class="card-title">Contribute</div>
-          <div class="card-desc">Add a platform, AI provider, or fix a bug. The contribution guide walks you through it.</div>
+          <div class="card-desc">
+            Add a platform, AI provider, or fix a bug. The contribution guide walks you through it.
+          </div>
         </a>
       </div>
 
@@ -159,19 +194,38 @@
       <div class="debug-steps">
         <ol>
           <li>Open the extension popup → check that a repo is connected (owner/repo shown).</li>
-          <li>Open Settings → Git → verify <code>github_owner</code> and <code>github_repo</code> are correct.</li>
-          <li>Check that your GitHub token is valid: Settings → Git → "Re-authenticate with GitHub".</li>
-          <li>Open the browser DevTools console on a platform page and look for errors after submitting.</li>
-          <li>Check the service worker console: <code>chrome://serviceworker-internals</code> → find CodeLedger → "Inspect".</li>
+          <li>
+            Open Settings → Git → verify <code>github_owner</code> and <code>github_repo</code> are
+            correct.
+          </li>
+          <li>
+            Check that your GitHub token is valid: Settings → Git → "Re-authenticate with GitHub".
+          </li>
+          <li>
+            Open the browser DevTools console on a platform page and look for errors after
+            submitting.
+          </li>
+          <li>
+            Check the service worker console: <code>chrome://serviceworker-internals</code> → find
+            CodeLedger → "Inspect".
+          </li>
         </ol>
       </div>
 
       <h2>Extension not detecting solved problems</h2>
       <div class="debug-steps">
         <ol>
-          <li>Make sure you're on a supported page — the extension only activates on LeetCode, GeeksForGeeks, and Codeforces submission pages.</li>
-          <li>Try refreshing the page after a "Wrong Answer" — the extension reattaches on reload.</li>
-          <li>Check that the extension has the necessary permissions: <code>chrome://extensions</code> → CodeLedger → Details → Site access.</li>
+          <li>
+            Make sure you're on a supported page — the extension only activates on LeetCode,
+            GeeksForGeeks, and Codeforces submission pages.
+          </li>
+          <li>
+            Try refreshing the page after a "Wrong Answer" — the extension reattaches on reload.
+          </li>
+          <li>
+            Check that the extension has the necessary permissions:
+            <code>chrome://extensions</code> → CodeLedger → Details → Site access.
+          </li>
           <li>Disable other extensions temporarily to rule out conflicts.</li>
         </ol>
       </div>
@@ -180,26 +234,56 @@
       <div class="debug-steps">
         <ol>
           <li>Open Settings → AI → verify your API key is entered and saved.</li>
-          <li>Check that the selected model is available for your API tier (some models require paid plans).</li>
-          <li>For Ollama, make sure the local server is running at <code>http://localhost:11434</code>.</li>
+          <li>
+            Check that the selected model is available for your API tier (some models require paid
+            plans).
+          </li>
+          <li>
+            For Ollama, make sure the local server is running at
+            <code>http://localhost:11434</code>.
+          </li>
           <li>Check the service worker console for API error responses.</li>
         </ol>
       </div>
 
       <h2>Side-loading the extension</h2>
-      <p>If you prefer not to install from a browser store, you can load CodeLedger directly from a release zip:</p>
+      <p>
+        If you prefer not to install from a browser store, you can load CodeLedger directly from a
+        release zip:
+      </p>
       <div class="debug-steps">
         <ol>
-          <li>Download <code>codeledger-chromium-vX.Y.Z.zip</code> from <a href="https://github.com/Life-Experimentalist/Code-Ledger/releases" target="_blank" rel="noopener">GitHub Releases</a>.</li>
+          <li>
+            Download <code>codeledger-chromium-vX.Y.Z.zip</code> from
+            <a
+              href="https://github.com/Life-Experimentalist/Code-Ledger/releases"
+              target="_blank"
+              rel="noopener"
+              >GitHub Releases</a
+            >.
+          </li>
           <li>Unzip the file to a permanent folder.</li>
-          <li>Go to <code>chrome://extensions</code> → enable "Developer mode" → "Load unpacked" → select the unzipped folder.</li>
-          <li>For Firefox: download the <code>-firefox</code> zip → go to <code>about:debugging</code> → "Load Temporary Add-on".</li>
+          <li>
+            Go to <code>chrome://extensions</code> → enable "Developer mode" → "Load unpacked" →
+            select the unzipped folder.
+          </li>
+          <li>
+            For Firefox: download the <code>-firefox</code> zip → go to
+            <code>about:debugging</code> → "Load Temporary Add-on".
+          </li>
         </ol>
       </div>
 
       <h2>Still stuck?</h2>
       <p>
-        Open a <a href="https://github.com/Life-Experimentalist/Code-Ledger/issues/new" target="_blank" rel="noopener">GitHub issue</a> with:
+        Open a
+        <a
+          href="https://github.com/Life-Experimentalist/Code-Ledger/issues/new"
+          target="_blank"
+          rel="noopener"
+          >GitHub issue</a
+        >
+        with:
       </p>
       <ul>
         <li>Browser name and version</li>
@@ -207,14 +291,23 @@
         <li>Steps to reproduce</li>
         <li>Any errors from the browser console or service worker console</li>
       </ul>
-      <p>You can also email <a href="mailto:krishnalsh2004@gmail.com">krishnalsh2004@gmail.com</a> for urgent issues.</p>
+      <p>
+        You can also email
+        <a href="mailto:github@vkrishna04.me">github@vkrishna04.me</a> for urgent issues.
+      </p>
     </div>
 
     <footer>
-      <span>CodeLedger — Apache 2.0 · Built by <a href="https://github.com/VKrishna04" style="color:var(--accent);text-decoration:none">VKrishna04</a></span>
+      <span
+        >CodeLedger — Apache 2.0 · Built by
+        <a href="https://github.com/VKrishna04" style="color: var(--accent); text-decoration: none"
+          >VKrishna04</a
+        ></span
+      >
       <div class="footer-links">
-        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener">GitHub</a>
-        <a href="/library">Library</a>
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
+          >GitHub</a
+        >
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
         <a href="/support">Support</a>

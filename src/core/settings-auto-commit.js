@@ -10,6 +10,7 @@ import { CONSTANTS } from "./constants.js";
 import { createDebugger } from "../lib/debug.js";
 import { registry } from "./handler-registry.js";
 import { buildCommitMessage, COMMIT_TYPES } from "./commit-messages.js";
+import { isPortableSetting } from "./settings-sync.js";
 
 const dbg = createDebugger("SettingsAutoCommit");
 
@@ -27,11 +28,13 @@ const LAST_COMMITTED_HASH = "settings._last_committed_hash";
  */
 export async function markSettingsPendingCommit() {
   try {
-    const settings = await Storage.getSettings();
-    const hash = _hashPortableSettings(settings);
-    settings[SETTINGS_COMMIT_KEY] = true;
-    settings[LAST_COMMITTED_HASH] = hash;
-    await Storage.setSettings(settings);
+    // The hash is derived inside the lock, so it describes the settings that
+    // are actually about to be committed rather than a snapshot someone else
+    // has since changed.
+    await Storage.updateSettings((current) => ({
+      [SETTINGS_COMMIT_KEY]: true,
+      [LAST_COMMITTED_HASH]: _hashPortableSettings(current),
+    }));
     dbg.log("Settings marked for auto-commit");
   } catch (e) {
     dbg.warn("Failed to mark settings pending:", e);
@@ -81,9 +84,7 @@ export async function getConfigFileForCommit() {
 export async function clearSettingsCommitFlag() {
   dbg.log(`clearSettingsCommitFlag(): clearing auto-commit flag`);
   try {
-    const settings = await Storage.getSettings();
-    settings[SETTINGS_COMMIT_KEY] = false;
-    await Storage.setSettings(settings);
+    await Storage.updateSettings({ [SETTINGS_COMMIT_KEY]: false });
     dbg.log("Settings commit flag cleared");
   } catch (e) {
     dbg.warn("Failed to clear commit flag:", e);
@@ -134,42 +135,22 @@ export async function forceCommitSettingsNow() {
 
 /**
  * Get portable settings (non-secret, user-facing preferences).
- * Must match settings-sync.js PORTABLE_SETTINGS.
+ *
+ * The definition of "portable" lives in `settings-sync.js` and nowhere else.
+ * Keeping a second copy here is what let the two drift apart, and the drift was
+ * invisible: both files kept working, they just backed up different halves of
+ * the user's preferences.
+ *
+ * Sorted so the committed file has a stable key order. Built from a scan of
+ * storage rather than a fixed list, the key order would otherwise follow
+ * whatever order the keys happened to be written in, and the file would show up
+ * as changed in the user's repo without anything about it having changed.
  */
 function _extractPortableSettings(settings) {
-  const PORTABLE_SETTINGS = [
-    "theme_preset",
-    "theme_mode",
-    "theme_accent",
-    "darkMode",
-    "behaviorBankEnabled",
-    "telemetryEnabled",
-    "debugMode",
-    "aiCopyable",
-    "deduplicationThreshold",
-    "autoReview",
-    "autoCommit",
-    "autoSync",
-    "syncInterval",
-    "commitMessageStyle",
-    "showNotifications",
-    "hideCompleted",
-    "hideIgnored",
-    "pages_show_verification",
-    "github_pages",
-    "github_repo_topics_extra",
-    "github_coauthor_enabled",
-    "github_coauthor_trailer",
-    "mcp.config",
-  ];
-
   const portable = {};
-  PORTABLE_SETTINGS.forEach((key) => {
-    if (key in settings) {
-      portable[key] = settings[key];
-    }
-  });
-
+  for (const key of Object.keys(settings).sort()) {
+    if (isPortableSetting(key)) portable[key] = settings[key];
+  }
   return portable;
 }
 

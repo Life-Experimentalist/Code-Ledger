@@ -8,23 +8,23 @@ export const SELECTORS = {
   lastVerified: "2026-05-21",
 
   page: {
-    isProblemPage: '[class^="problems_header"], .problem-statement-container, .problems-header',
+    isProblemPage: '[class*="problems_header"], .problem-statement-container, .problems-header',
   },
 
   problem: {
-    // CSS-module prefixed class — match by prefix
-    title: '[class^="problems_header_content__title"] h3, .problems-header h3, .problem-title h3',
+    // CSS-module prefixed class — match by prefix/contains
+    title: '[class*="problems_header_content__title"] h3, .problems-header h3, .problem-title h3',
     difficulty:
-      '[class^="problems_header_description"] > :first-child, .difficulty-block .difficulty-tag, [class*="difficulty"]',
+      '[class*="problems_header_description"] > :first-child, .difficulty-block .difficulty-tag, [class*="difficulty"]',
     tags: '[class*="problems_tag_container"] [class*="tag"], .topic-tag, [class*="tag_container"] a',
-    description: '[class^="problems_problem_content"], .problem-statement, .problem-description',
+    description: '[class*="problems_problem_content"], .problem-statement, .problem-description',
     platformId: null,
   },
 
   submission: {
     // "Problem Solved Successfully" banner — multiple fallback patterns
     successIndicator:
-      '[class^="problems_content"] [class*="accepted"],' +
+      '[class*="problems_content"] [class*="accepted"],' +
       '[class*="submission-success"],' +
       ".problems-submission-result.accepted," +
       '[class*="correct"]',
@@ -42,8 +42,8 @@ export const SELECTORS = {
   qol: {
     editorContainer: "#editor, .ace_editor, .CodeMirror",
     submitButton:
-      '[class^="ui button problems_submit_button"], .problems-submit-btn, button[type="submit"][class*="submit"]',
-    resultContainer: '[class^="problems_content"], .result-container',
+      '[class*="problems_submit_button"], .problems-submit-btn, button.ui.button[class*="submit"], button[type="submit"][class*="submit"]',
+    resultContainer: '[class*="problems_content"], .result-container',
     toolbar: '.ace_toolbar, [class*="editor_header"], [class*="problems_editor"] [class*="header"]',
   },
 

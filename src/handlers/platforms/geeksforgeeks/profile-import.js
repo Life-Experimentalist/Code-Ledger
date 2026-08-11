@@ -11,43 +11,281 @@ import { Storage } from "../../../core/storage.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { runtime } from "../../../lib/browser-compat.js";
+import { detectPage, PAGE_TYPES } from "./page-detector.js";
+import { cleanGfgSlug } from "../../../core/gfg-utils.js";
 
 const dbg = createDebugger("GFGProfileImport");
 
 const DIFFICULTY_ORDER = ["school", "basic", "easy", "medium", "hard"];
 
+function findSubmissionsObject(obj) {
+  if (!obj || typeof obj !== "object") return null;
+
+  const validKeys = ["school", "basic", "easy", "medium", "hard"];
+  const keys = Object.keys(obj);
+
+  // Check if this object has any of the difficulty keys and contains inner objects
+  const hasDiffKey = keys.some(
+    (k) => validKeys.includes(k.toLowerCase()) && obj[k] && typeof obj[k] === "object",
+  );
+  if (hasDiffKey) {
+    const hasData = keys.some(
+      (k) => validKeys.includes(k.toLowerCase()) && Object.keys(obj[k] || {}).length > 0,
+    );
+    if (hasData) return obj;
+  }
+
+  for (const k of keys) {
+    if (obj[k] && typeof obj[k] === "object") {
+      const res = findSubmissionsObject(obj[k]);
+      if (res) return res;
+    }
+  }
+  return null;
+}
+
+function scrapeDomForSubmissions() {
+  const map = new Map();
+  document.querySelectorAll('a[href*="/problems/"]').forEach((a) => {
+    const href = a.getAttribute("href");
+    const match = href.match(/\/problems\/([^\/\?#]+)/);
+    if (!match) return;
+    const rawSlug = match[1].toLowerCase().trim();
+    let slug = cleanGfgSlug(rawSlug);
+
+    if (slug === "all" || slug.length < 2) return;
+    if (href.includes("/edit") || href.includes("/submissions")) return;
+
+    // Only extract the FIRST direct text node — child spans hold difficulty/date
+    let title = "";
+    for (const node of a.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const t = node.textContent.trim();
+        if (t.length > 1) {
+          title = t;
+          break;
+        }
+      }
+    }
+    // Fallback: try aria-label or title attribute
+    if (!title) title = a.getAttribute("aria-label") || a.getAttribute("title") || "";
+    // Final fallback: humanize slug
+    if (!title || title.length > 120)
+      title = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+    // Clean title: remove trailing spaces and numeric IDs e.g. " 1235 102404" or " 102404"
+    const cleanTitle = title.replace(/[\s\d]+$/, "").trim();
+
+    // Determine difficulty from sibling/child span text
+    let difficulty = "Unknown";
+    const diffText = a.textContent;
+    if (/easy/i.test(diffText)) difficulty = "Easy";
+    else if (/medium/i.test(diffText)) difficulty = "Medium";
+    else if (/hard/i.test(diffText)) difficulty = "Hard";
+
+    if (!map.has(slug)) {
+      map.set(slug, { slug, title: cleanTitle || title, difficulty });
+    }
+  });
+  return Array.from(map.values());
+}
+
+function findUserHandle(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  if (typeof obj.handle === "string" && obj.handle.trim()) return obj.handle.trim();
+  if (typeof obj.userName === "string" && obj.userName.trim()) return obj.userName.trim();
+  if (typeof obj.username === "string" && obj.username.trim()) return obj.username.trim();
+
+  for (const k of Object.keys(obj)) {
+    if (obj[k] && typeof obj[k] === "object") {
+      const res = findUserHandle(obj[k]);
+      if (res) return res;
+    }
+  }
+  return null;
+}
+
+/**
+ * Fetches a URL with automatic retry and exponential backoff.
+ * - Respects the `Retry-After` response header on 429/503.
+ * - Detects Cloudflare challenge pages (status 403/503 with cf-ray header).
+ * - Returns the response body text on success, or null after exhausting retries.
+ *
+ * @param {string} url
+ * @param {RequestInit} opts
+ * @param {{ maxRetries?: number, baseDelayMs?: number }} [retryOpts]
+ * @returns {Promise<string|null>}
+ */
+async function fetchWithBackoff(url, opts = {}, { maxRetries = 3, baseDelayMs = 1000 } = {}) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    let res;
+    try {
+      res = await fetch(url, opts);
+    } catch (networkErr) {
+      // Network failure (offline, DNS, etc.) — wait then retry
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        dbg.warn(
+          `fetchWithBackoff: network error on attempt ${attempt + 1}, retrying in ${delay}ms…`,
+          networkErr.message,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw networkErr;
+    }
+
+    if (res.ok) {
+      return res.text();
+    }
+
+    // Cloudflare challenge — cannot retry meaningfully in content-script context
+    if (res.headers.get("cf-ray")) {
+      dbg.warn("fetchWithBackoff: Cloudflare challenge detected, giving up.");
+      return null;
+    }
+
+    if ((res.status === 429 || res.status === 503) && attempt < maxRetries) {
+      // Honour Retry-After header (value is seconds or an HTTP date)
+      const retryAfterRaw = res.headers.get("Retry-After");
+      let waitMs = baseDelayMs * Math.pow(2, attempt); // default exponential
+
+      if (retryAfterRaw) {
+        const seconds = parseInt(retryAfterRaw, 10);
+        if (!isNaN(seconds)) {
+          waitMs = Math.max(waitMs, seconds * 1000);
+        } else {
+          const date = Date.parse(retryAfterRaw);
+          if (!isNaN(date)) waitMs = Math.max(waitMs, date - Date.now());
+        }
+      }
+
+      // Cap wait at 30 seconds so we don't hang forever in a content script
+      waitMs = Math.min(waitMs, 30_000);
+      dbg.warn(
+        `fetchWithBackoff: ${res.status} on attempt ${attempt + 1}, waiting ${Math.round(waitMs / 1000)}s before retry…`,
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    // Non-retryable error (404, 401, etc.)
+    dbg.warn(`fetchWithBackoff: non-retryable status ${res.status} for ${url}`);
+    return null;
+  }
+  return null;
+}
+
+/**
+ * GFG-polite throttled fetch.
+ * Enforces a minimum gap between consecutive requests so bulk code scraping
+ * doesn't get rate-limited. Shared state is module-level so all callers share
+ * the same token bucket.
+ *
+ * @param {string} url
+ * @param {RequestInit} [opts]
+ * @returns {Promise<string|null>}
+ */
+let _lastGfgFetchAt = 0;
+const GFG_MIN_GAP_MS = 800; // minimum 800ms between GFG page fetches
+
+export async function gfgThrottledFetch(url, opts = {}) {
+  const now = Date.now();
+  const gap = now - _lastGfgFetchAt;
+  if (gap < GFG_MIN_GAP_MS) {
+    await new Promise((r) => setTimeout(r, GFG_MIN_GAP_MS - gap));
+  }
+  _lastGfgFetchAt = Date.now();
+  return fetchWithBackoff(url, opts);
+}
+
 /**
  * Parse the __NEXT_DATA__ script tag on the current GFG profile page.
- * @returns {{ username: string, submissions: Array<{slug, title, difficulty}> } | null}
+ * @returns {Promise<{ username: string, submissions: Array<{slug, title, difficulty}> } | null>}
  */
-function parseProfileData() {
+async function parseProfileData() {
   try {
-    const script = document.getElementById("__NEXT_DATA__");
-    if (!script) return null;
-    const json = JSON.parse(script.textContent || "{}");
-    const props = json?.props?.pageProps;
-    if (!props) return null;
+    let script = document.getElementById("__NEXT_DATA__");
+    let json = script ? JSON.parse(script.textContent || "{}") : null;
+    let username = json ? findUserHandle(json) || "" : "";
 
-    const username = props?.userInfo?.handle || props?.userInfo?.userName || "";
-    const submissionsInfo = props?.userSubmissionsInfo || {};
+    const urlPage = detectPage(window.location.pathname);
+    const urlUsername = urlPage.type === PAGE_TYPES.PROFILE ? urlPage.username : "";
 
-    const submissions = [];
+    const submissionsInfo =
+      json?.props?.pageProps?.userSubmissionsInfo || findSubmissionsObject(json);
+    const hasSubmissions = !!submissionsInfo && Object.keys(submissionsInfo).length > 0;
+    const isMatchingUser =
+      !urlUsername || !username || username.toLowerCase() === urlUsername.toLowerCase();
+
+    if (!script || !hasSubmissions || !isMatchingUser) {
+      dbg.log("NEXT_DATA missing, stale, or mismatching. Fetching fresh page from server...");
+      try {
+        const html = await fetchWithBackoff(window.location.href, {
+          credentials: "include",
+          headers: { Accept: "text/html", "Cache-Control": "no-cache" },
+        });
+        if (html) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+          script = doc.getElementById("__NEXT_DATA__");
+          if (script) {
+            json = JSON.parse(script.textContent || "{}");
+          }
+        }
+      } catch (err) {
+        dbg.error("Fetch fresh page failed after retries:", err);
+      }
+    }
+
+    username = findUserHandle(json) || urlUsername || "Anonymous";
+
+    let finalSubmissionsInfo =
+      json?.props?.pageProps?.userSubmissionsInfo || findSubmissionsObject(json) || {};
+    let submissions = [];
+
     for (const diff of DIFFICULTY_ORDER) {
-      const bucket = submissionsInfo[diff] || {};
+      const bucket =
+        finalSubmissionsInfo[diff] ||
+        finalSubmissionsInfo[diff.charAt(0).toUpperCase() + diff.slice(1)] ||
+        {};
       for (const key of Object.keys(bucket)) {
-        const entry = bucket[key];
+        const entry = bucket[key] || {};
+        const rawSlug = entry.slug || entry.pname?.toLowerCase().replace(/\s+/g, "-") || key;
+        const rawTitle = entry.pname || key;
+
+        // Clean slug: remove double-hyphen numeric ID suffix e.g., --102404
+        const cleanSlug = cleanGfgSlug(rawSlug);
+
+        // Clean title: remove trailing spaces and numeric IDs e.g. " 1235 102404" or " 102404"
+        const cleanTitle = rawTitle.replace(/[\s\d]+$/, "").trim();
+
         submissions.push({
-          slug: entry.slug || entry.pname?.toLowerCase().replace(/\s+/g, "-") || key,
-          title: entry.pname || key,
+          slug: cleanSlug,
+          title: cleanTitle || rawTitle,
           difficulty: normalizeDifficulty(diff),
         });
       }
+    }
+
+    // Fallback: If NEXT_DATA strategy yielded 0 problems, scrape the DOM directly
+    if (submissions.length === 0) {
+      dbg.log("NEXT_DATA strategy yielded 0 problems, attempting DOM scrape...");
+      submissions = scrapeDomForSubmissions();
     }
 
     dbg.log(`parseProfileData(): ${submissions.length} problems for user "${username}"`);
     return { username, submissions };
   } catch (e) {
     dbg.error("parseProfileData() failed", e);
+    // Ultimate fallback if NEXT_DATA parse throws exception
+    const domSubs = scrapeDomForSubmissions();
+    if (domSubs.length > 0) {
+      dbg.log(`DOM scrape fallback found ${domSubs.length} problems`);
+      const urlPage = detectPage(window.location.pathname);
+      const urlUsername = urlPage.type === PAGE_TYPES.PROFILE ? urlPage.username : "Anonymous";
+      return { username: urlUsername, submissions: domSubs };
+    }
     return null;
   }
 }
@@ -65,32 +303,93 @@ export async function injectProfileImportBtn(makeProblemId) {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (document.getElementById("cl-gfg-profile-import")) return;
 
-    // Find a suitable anchor (profile header or stat card)
-    const anchor =
+    // Check if Edit Profile is present on the page (indicating it's the user's own profile)
+    const hasEditProfile = !!(
+      document.querySelector('a[href*="/profile/edit"]') ||
+      document.querySelector('a[href*="profile/edit"]') ||
+      [...document.querySelectorAll("a, button, span, div")].some((el) =>
+        /edit\s+profile/i.test(el.textContent),
+      )
+    );
+
+    if (!hasEditProfile) {
+      if (attempt === MAX_ATTEMPTS - 1) {
+        dbg.log(
+          "injectProfileImportBtn: 'Edit Profile' button not found, skipping button injection (not own profile)",
+        );
+        return;
+      }
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+      continue;
+    }
+
+    // Find a suitable anchor (profile header, stat card, or tabs container)
+    const buttonRow =
+      document.querySelector('a[href*="/profile/edit"]')?.parentElement ||
+      document.querySelector('[class*="profileInfo"] + div') ||
+      document.querySelector('[class*="profileInfo"] ~ div.flex');
+
+    const tabsContainer = document.querySelector('[class*="tabsContainer"]');
+    const profileInfo = document.querySelector('[class*="profileInfo"]');
+    const profileContainer = document.querySelector('[class*="profileContainer"]');
+    const legacyHead =
       document.querySelector('[class*="profile_head"]') ||
       document.querySelector('[class*="scoreCard_head"]') ||
-      document.querySelector('[class*="userHandle"]') ||
-      document.querySelector("h1") ||
-      document.querySelector("main");
+      document.querySelector('[class*="userHandle"]');
+
+    let anchor = null;
+    let injectAsButtonRow = false;
+
+    if (
+      buttonRow &&
+      (buttonRow.classList.contains("flex") ||
+        buttonRow.className.includes("flex") ||
+        buttonRow.querySelector("a"))
+    ) {
+      anchor = buttonRow;
+      injectAsButtonRow = true;
+    } else if (tabsContainer) {
+      anchor = tabsContainer;
+    } else if (profileInfo) {
+      anchor = profileInfo;
+    } else if (profileContainer) {
+      anchor = profileContainer;
+    } else if (legacyHead) {
+      anchor = legacyHead;
+    }
 
     if (anchor) {
-      const container = document.createElement("div");
-      container.style.cssText =
-        "margin:12px 0;display:flex;align-items:center;justify-content:flex-end;gap:10px;width:100%;";
-
       const btn = _createImportButton();
       const prog = document.createElement("div");
       prog.id = "cl-gfg-import-progress";
-      prog.style.cssText = "font-size:12px;color:#94a3b8;display:none;";
+      prog.style.cssText =
+        "font-size:12px;color:#cbd5e1;display:none;position:absolute;top:100%;right:0;margin-top:8px;background:#1e293b;padding:6px 12px;border-radius:6px;border:1px solid #334155;z-index:9999;box-shadow:0 10px 15px -3px rgba(0,0,0,0.5);white-space:nowrap;";
 
-      container.appendChild(btn);
-      container.appendChild(prog);
-
-      const parent = anchor.parentElement;
-      if (parent) {
-        parent.insertBefore(container, anchor);
+      if (injectAsButtonRow) {
+        // Inject with a relative wrapper so absolute positioning works correctly
+        const wrapper = document.createElement("div");
+        wrapper.id = "cl-gfg-profile-import-wrapper";
+        wrapper.style.cssText =
+          "position:relative;display:inline-flex;align-items:center;margin-left:12px;";
+        wrapper.appendChild(btn);
+        wrapper.appendChild(prog);
+        anchor.appendChild(wrapper);
       } else {
-        document.body.appendChild(container);
+        // Use a block container wrapper
+        const container = document.createElement("div");
+        container.id = "cl-gfg-profile-import-wrapper";
+        container.style.cssText =
+          "margin:12px 0;position:relative;display:flex;align-items:center;justify-content:flex-end;gap:10px;width:100%;";
+
+        container.appendChild(btn);
+        container.appendChild(prog);
+
+        const parent = anchor.parentElement;
+        if (parent) {
+          parent.insertBefore(container, anchor);
+        } else {
+          document.body.appendChild(container);
+        }
       }
 
       btn.addEventListener("click", () => runProfileImport(makeProblemId, btn));
@@ -103,6 +402,7 @@ export async function injectProfileImportBtn(makeProblemId) {
   // Floating fallback
   if (!document.getElementById("cl-gfg-profile-import")) {
     const floater = document.createElement("div");
+    floater.id = "cl-gfg-profile-import-floater";
     floater.style.cssText =
       "position:fixed;bottom:80px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:6px;align-items:flex-end;";
     const btn = _createImportButton();
@@ -142,6 +442,8 @@ function _createImportButton() {
 export function removeProfileImportBtn() {
   document.getElementById("cl-gfg-profile-import")?.remove();
   document.getElementById("cl-gfg-import-progress")?.remove();
+  document.getElementById("cl-gfg-profile-import-wrapper")?.remove();
+  document.getElementById("cl-gfg-profile-import-floater")?.remove();
 }
 
 async function runProfileImport(makeProblemId, btn) {
@@ -157,7 +459,7 @@ async function runProfileImport(makeProblemId, btn) {
 
   try {
     show("Reading profile data…");
-    const profileData = parseProfileData();
+    const profileData = await parseProfileData();
 
     if (!profileData) {
       show(
@@ -200,19 +502,111 @@ async function runProfileImport(makeProblemId, btn) {
       };
     });
 
-    show(`Importing ${bulkProblems.length} problems to CodeLedger…`);
+    show(`Checking ${bulkProblems.length} problems against existing library…`);
 
-    const result = await new Promise((resolve) => {
-      runtime.sendMessage({ type: "BULK_IMPORT", problems: bulkProblems }, (res) =>
-        resolve(res || {}),
+    // Fetch all existing problem IDs in one message
+    const existingIds = await new Promise((res) => {
+      runtime.sendMessage({ type: "GET_ALL_PROBLEM_IDS" }, (r) => res(new Set(r?.ids || [])));
+    }).catch(() => new Set());
+
+    // Fetch all GFG problems currently in the library
+    const gfgIdsInLibrary = Array.from(existingIds).filter((id) => id.startsWith("gfg-"));
+    const existingGfgProblems = await new Promise((res) => {
+      if (gfgIdsInLibrary.length === 0) return res([]);
+      runtime.sendMessage({ type: "GET_PROBLEMS_BY_IDS", ids: gfgIdsInLibrary }, (r) =>
+        res(r?.problems || []),
       );
-    });
+    }).catch(() => []);
 
-    const imported = result.saved ?? bulkProblems.length;
-    show(
-      `Done! Imported ${imported} solved problem(s) (code will be fetched when you visit each problem).`,
-    );
-    btn.textContent = `✓ Imported ${imported} solves`;
+    const cleanGfgSlugForComparison = (slug) => {
+      if (!slug) return "";
+      return slug
+        .toLowerCase()
+        .replace(/--\d+$/, "") // remove double hyphen and digits
+        .replace(/\d+$/, "") // remove trailing digits
+        .replace(/[^a-z0-9]/g, ""); // remove non-alphanumeric
+    };
+
+    // Map of clean slug -> existing GFG problem
+    const existingGfgCleanSlugs = new Map();
+    for (const rec of existingGfgProblems) {
+      const cleanSlug = cleanGfgSlugForComparison(rec.titleSlug || rec.id.replace(/^gfg-/, ""));
+      if (cleanSlug) {
+        existingGfgCleanSlugs.set(cleanSlug, rec);
+      }
+    }
+
+    const filteredProblems = [];
+    const idsToDelete = [];
+
+    for (const p of bulkProblems) {
+      const cleanSlug = cleanGfgSlugForComparison(p.titleSlug);
+      const existing = existingGfgCleanSlugs.get(cleanSlug);
+      if (existing) {
+        // If existing has code or was not imported from profile, skip
+        if (existing.code?.trim().length > 0 || !existing._importedFromProfile) {
+          continue;
+        }
+        // If existing is a legacy corrupt import (contains "--"), queue it for deletion and import clean one
+        if (existing.titleSlug?.includes("--")) {
+          idsToDelete.push(existing.id);
+          filteredProblems.push(p);
+        } else {
+          // Already clean in library, skip
+          continue;
+        }
+      } else {
+        filteredProblems.push(p);
+      }
+    }
+
+    // Delete queued legacy problems
+    if (idsToDelete.length > 0) {
+      show(`Cleaning up ${idsToDelete.length} legacy GFG problem placeholders…`);
+      for (const id of idsToDelete) {
+        await new Promise((res) => {
+          runtime.sendMessage({ type: "DELETE_PROBLEM", id }, () => res());
+        }).catch(() => {});
+      }
+    }
+    const skipped = bulkProblems.length - filteredProblems.length;
+
+    if (filteredProblems.length === 0) {
+      show(`All ${bulkProblems.length} problems already imported. Nothing new to add.`);
+      btn.textContent = "✓ Already up to date";
+      btn.style.color = "#34d399";
+      btn.disabled = false;
+      return;
+    }
+
+    // Chunk imports into batches of 15 with 350ms gaps to avoid RTE / message channel pressure
+    const BATCH_SIZE = 15;
+    const BATCH_DELAY_MS = 350;
+    let totalSaved = 0;
+
+    for (let i = 0; i < filteredProblems.length; i += BATCH_SIZE) {
+      const batch = filteredProblems.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(filteredProblems.length / BATCH_SIZE);
+      show(
+        `Saving batch ${batchNum}/${totalBatches} (${Math.min(i + BATCH_SIZE, filteredProblems.length)}/${filteredProblems.length} problems)…` +
+          (skipped > 0 ? ` · ${skipped} skipped (already exist)` : ""),
+      );
+
+      const result = await new Promise((resolve) => {
+        runtime.sendMessage({ type: "BULK_IMPORT", problems: batch }, (res) => resolve(res || {}));
+      }).catch(() => ({}));
+
+      totalSaved += result.saved ?? batch.length;
+
+      // Pause between batches (skip pause after last batch)
+      if (i + BATCH_SIZE < filteredProblems.length) {
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+      }
+    }
+
+    show(`Done! Imported ${totalSaved} problem(s)${skipped > 0 ? ` · ${skipped} skipped` : ""}.`);
+    btn.textContent = `✓ Imported ${totalSaved} solves`;
     btn.style.color = "#34d399";
     btn.style.borderColor = "rgba(52,211,153,0.4)";
   } catch (e) {

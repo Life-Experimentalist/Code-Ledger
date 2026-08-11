@@ -9,6 +9,7 @@ const html = htm.bind(h);
 
 import { createDebugger } from "../../lib/debug.js";
 import { CONSTANTS } from "../../core/constants.js";
+import { cleanGfgSlug } from "../../core/gfg-utils.js";
 
 const dbg = createDebugger("ProblemCard");
 
@@ -23,7 +24,7 @@ const PLATFORM_META = {
     favicon: "https://www.geeksforgeeks.org/favicon.ico",
     label: "GeeksForGeeks",
     color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
-    url: (slug) => CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + slug,
+    url: (slug) => CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + cleanGfgSlug(slug) + "/1",
   },
   codeforces: {
     favicon: "https://codeforces.com/favicon.ico",

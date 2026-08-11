@@ -11,6 +11,7 @@ const html = htm.bind(h);
 import { Storage } from "/core/storage.js";
 import { CONSTANTS } from "/core/constants.js";
 import { initDebug, setDebug, createDebugger, rawError } from "/lib/debug.js";
+import { trustedAuthOrigins, isTrustedAuthMessage } from "/lib/oauth-message.js";
 const dbg = createDebugger("LibraryApp");
 import { applyThemeFromStorage, setupThemeListener } from "/core/theme-engine.js";
 import { getQueryParam, updateQueryParams } from "/core/url-state.js";
@@ -23,6 +24,8 @@ import { SettingsPageView } from "./views/SettingsPageView.js";
 import { CanonicalView } from "./views/CanonicalView.js";
 import { AIChatsView } from "./views/AIChatsView.js";
 import { BehaviourBankView } from "./views/BehaviourBankView.js";
+import { PartyView } from "./views/PartyView.js";
+import { isAIActive, isGamificationActive } from "/core/feature-flags.js";
 import { IncognitoBanner } from "../ui/components/IncognitoBanner.js";
 import { GitHubOnboardingModal } from "../ui/components/GitHubOnboardingModal.js";
 import {
@@ -259,6 +262,7 @@ function LibraryApp() {
       "ai-chats",
       "behaviour-bank",
       "canonical",
+      "party",
       "settings",
       "search",
     ]);
@@ -287,7 +291,7 @@ function LibraryApp() {
   // change listener (COOP relay path via service worker).
   const processOAuthToken = useCallback(async (token, provider = "github") => {
     if (!token || provider !== "github") return;
-    dbg.log(`processOAuthToken(): received ${provider} token (${token.slice(0, 7)}...)`);
+    dbg.log(`processOAuthToken(): received ${provider} token`);
     try {
       dbg.log(`processOAuthToken(): saving token to storage...`);
       await Storage.setAuthToken("github", token);
@@ -300,6 +304,9 @@ function LibraryApp() {
         dbg.error(
           `processOAuthToken(): GitHub /user returned ${userRes.status} — token may be invalid`,
         );
+        alert(
+          `GitHub authentication failed (HTTP ${userRes.status}). Please try connecting again.`,
+        );
         throw new Error(`GitHub /user returned ${userRes.status}`);
       }
       const user = await userRes.json();
@@ -309,15 +316,12 @@ function LibraryApp() {
       const hasRepo = !!(currentSettings?.github_repo || currentSettings?.gitRepo);
       dbg.log(`processOAuthToken(): hasRepo=${hasRepo}`);
 
-      const updatedSettings = { ...currentSettings, github_username: user.login };
-      if (!currentSettings?.github_owner) updatedSettings.github_owner = user.login;
+      const patch = { github_username: user.login };
+      if (!currentSettings?.github_owner) patch.github_owner = user.login;
       // avatars.githubusercontent.com is a public CDN — store URL directly, never fetch().
-      if (user.avatar_url) updatedSettings.github_avatar = user.avatar_url;
-      await Storage.setSettings(updatedSettings);
+      if (user.avatar_url) patch.github_avatar = user.avatar_url;
+      const updatedSettings = await Storage.updateSettings(patch);
       dbg.log(`processOAuthToken(): ✓ settings saved`);
-
-      await Storage.setDebugEnabled(true).catch(() => {});
-      setDebug(true);
 
       if (!hasRepo) {
         dbg.log(`processOAuthToken(): no repo configured — opening onboarding modal`);
@@ -338,19 +342,11 @@ function LibraryApp() {
 
   // Listen for OAuth messages from Worker (popup path, non-COOP browsers)
   useEffect(() => {
+    const allowedOrigins = trustedAuthOrigins(CONSTANTS.URLS.AUTH_WORKER, window.location.origin);
     const handleOAuthMessage = async (event) => {
-      const allowedOrigins = [new URL(CONSTANTS.URLS.AUTH_WORKER).origin, window.location.origin];
-      if (event.origin !== "null" && !allowedOrigins.includes(event.origin)) return;
-      const data = event.data;
-      if (!data || data.type !== "CODELEDGER_AUTH" || data.provider !== "github") return;
-      dbg.log(
-        `handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}, token ${data.token ? "present" : "MISSING"}`,
-      );
-      if (!data.token) {
-        dbg.error("handleOAuthMessage(): OAuth error:", data.error);
-        return;
-      }
-      await processOAuthToken(data.token, data.provider);
+      if (!isTrustedAuthMessage(event, allowedOrigins, "github")) return;
+      dbg.log(`handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}`);
+      await processOAuthToken(event.data.token, event.data.provider);
     };
     window.addEventListener("message", handleOAuthMessage);
     return () => window.removeEventListener("message", handleOAuthMessage);
@@ -569,10 +565,10 @@ function LibraryApp() {
                     e?.message,
                   ),
                 );
-              } else if (++attempts >= 6) {
+              } else if (++attempts >= 20) {
                 clearInterval(checkToken);
                 dbg.log(
-                  `triggerReauth(): no token after 3 s — onChanged relay will handle it if relay succeeded`,
+                  `triggerReauth(): no token after 10 s — onChanged relay will handle it if relay succeeded`,
                 );
               }
             })
@@ -588,18 +584,42 @@ function LibraryApp() {
     setActiveTab("graph");
   }, []);
 
+  // A tab can disappear from the sidebar while it is the one on screen — the
+  // last AI provider gets switched off, or streaks do. Waiting for `loading`
+  // means an old `?tab=ai-chats` link is not bounced before settings arrive.
+  useEffect(() => {
+    if (loading) return;
+    if ((activeTab === "ai-chats" || activeTab === "behaviour-bank") && !isAIActive(settings))
+      setActiveTab("solutions");
+    if (activeTab === "party" && !isGamificationActive(settings)) setActiveTab("solutions");
+  }, [loading, activeTab, settings]);
+
   const navItems = [
     { id: "solutions", label: "Solutions", icon: "💡" },
     { id: "analytics", label: "Analytics", icon: "📈" },
     { id: "graph", label: "Graph", icon: "🔗" },
-    { id: "ai-chats", label: "AI Chats", icon: "🤖" },
-    { id: "behaviour-bank", label: "Behaviour Bank", icon: "🧠" },
+    // Same reasoning as Party below: with no provider switched on there is
+    // nothing here but an explanation of why there is nothing here.
+    ...(isAIActive(settings)
+      ? [
+          { id: "ai-chats", label: "AI Chats", icon: "🤖" },
+          // Insights, roadmap and skills are all written by and read back into
+          // the AI prompts. With no provider they are three empty lists.
+          { id: "behaviour-bank", label: "Behaviour Bank", icon: "🧠" },
+        ]
+      : []),
     { id: "canonical", label: "Canonical", icon: "🔀" },
+    // Party compares streaks and points, so it has nothing to show when the
+    // streak system is off. The tab is hidden rather than shown-and-empty.
+    ...(isGamificationActive(settings) ? [{ id: "party", label: "Party", icon: "🎉" }] : []),
     { id: "settings", label: "Settings", icon: "⚙️" },
   ];
 
   const handleSettingsChange = async (key, value) => {
-    const next = { ...(settings || {}), [key]: value };
+    // Only the keys this change actually touches are written. `settings` here
+    // is React state that may be minutes old, and writing all of it back would
+    // undo everything the service worker stored while this page sat open.
+    const patch = { [key]: value };
 
     if (key === "incognitoMode") {
       const durations = {
@@ -608,19 +628,22 @@ function LibraryApp() {
         "24h": 86400000,
       };
       if (value === "off") {
-        next.incognitoExpiry = 0;
+        patch.incognitoExpiry = 0;
       } else if (value === "forever") {
-        next.incognitoExpiry = -1;
+        patch.incognitoExpiry = -1;
       } else if (durations[value]) {
-        next.incognitoExpiry = Date.now() + durations[value];
+        patch.incognitoExpiry = Date.now() + durations[value];
       }
     }
 
     // When the user changes the target repo or owner, invalidate the cached
     // git_active_primary so commits go to the new repo immediately.
     if (key === "github_repo" || key === "github_owner") {
-      delete next.git_active_primary;
+      patch.git_active_primary = undefined;
     }
+
+    const next = { ...(settings || {}), ...patch };
+    if ("git_active_primary" in patch) delete next.git_active_primary;
 
     // GitHub OAuth tokens should NOT be stored in settings — they belong in auth.tokens.
     // Only update state locally for OAuth fields; actual token was saved by handleOAuth in SettingsSchema.
@@ -632,7 +655,7 @@ function LibraryApp() {
     // For other fields, save normally.
     if (!isOAuthField) {
       try {
-        await Storage.setSettings(next);
+        await Storage.updateSettings(patch);
         if (key === "debugMode") {
           await Storage.setDebugEnabled(value);
           setDebug(value); // update live state in this page without reload
@@ -691,6 +714,12 @@ function LibraryApp() {
     if (activeTab === "behaviour-bank")
       return html`<${BehaviourBankView} problems=${enrichedProblems} onNavigate=${setActiveTab} />`;
     if (activeTab === "canonical") return html`<${CanonicalView} problems=${enrichedProblems} />`;
+    if (activeTab === "party")
+      return html`<${PartyView}
+        problems=${enrichedProblems}
+        settings=${settings}
+        onSettingsChange=${handleSettingsChange}
+      />`;
     if (activeTab === "settings")
       return html`<${SettingsPageView}
         settings=${settings}

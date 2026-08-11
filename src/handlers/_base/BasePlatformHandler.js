@@ -46,12 +46,28 @@ export class BasePlatformHandler {
 
   /**
    * Check if this platform is enabled in settings.
-   * Uses `this._enableKey` (default: `${id}_enable`).
-   * Subclasses with a different key (e.g. "gfg_enable") set `this._enableKey`
-   * in their constructor.
+   * Supports both new (_enabled) and legacy (_enable) keys.
+   * By default, Codeforces (Alpha) is disabled, while others are enabled.
    */
   isEnabled(settings) {
-    return settings?.[this._enableKey] !== false;
+    const enabledKey = `${this.id}_enabled`;
+    const legacyKey =
+      this.id === "geeksforgeeks"
+        ? "gfg_enable"
+        : this.id === "codeforces"
+          ? "cf_enable"
+          : `${this.id}_enable`;
+
+    // Codeforces (Alpha) is disabled by default
+    const defaultValue = this.id !== "codeforces";
+
+    if (settings?.[enabledKey] !== undefined) {
+      return settings[enabledKey] === true;
+    }
+    if (settings?.[legacyKey] !== undefined) {
+      return settings[legacyKey] === true;
+    }
+    return defaultValue;
   }
 
   /**

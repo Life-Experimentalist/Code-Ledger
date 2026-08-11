@@ -49,15 +49,18 @@ What happens the moment you hit "Accept" on LeetCode:
 
 Total time: under 3 seconds.
 
-The commit message looks like: `[solved] Two Sum`
+The commit message looks like: `[solved] Two Sum (Python3) — Arrays`
 
 Your repo gets:
 
 ```
-problems/lc-two-sum/
+problems/two-sum/leetcode/
 ├── lc-two-sum.py     ← your actual code
 └── lc-two-sum.md     ← problem + your runtime + memory stats
 ```
+
+The `two-sum` folder is the canonical problem, so solving the same question on
+LeetCode and on GeeksForGeeks files both under one roof.
 
 No browser refresh. No button. No copy-paste. It just happens.
 
@@ -87,7 +90,7 @@ The service worker is the orchestrator. All dynamic `import()` calls replaced wi
 No Contents API (`PUT /contents/`) — that creates one commit per file and breaks on non-ASCII characters. The Trees API lets me commit multiple files (solution + description + AI review + index.json) in a single SHA. I also built retry logic for GitHub's distributed ref store lag (3 retries, exponential back-off).
 
 **OAuth without a secret in the extension.**
-A Cloudflare Worker (Hono) handles the GitHub App OAuth exchange so the Client Secret never appears in the extension bundle. The worker posts the token back via postMessage — the extension listens for exactly one message type.
+A Cloudflare Worker (Hono) handles the GitHub OAuth exchange so the Client Secret never appears in the extension bundle. The worker posts the token back via postMessage — the extension listens for exactly one message type.
 
 Fully open-source → github.com/Life-Experimentalist/Code-Ledger
 

@@ -14,6 +14,7 @@ const dbg = createDebugger("OllamaHandler");
 export class OllamaHandler extends BaseAIHandler {
   constructor() {
     super("ollama", "Ollama (Local)");
+    this.dbg = dbg;
   }
 
   getSettingsSchema() {

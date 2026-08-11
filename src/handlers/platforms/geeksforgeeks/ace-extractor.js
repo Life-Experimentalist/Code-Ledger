@@ -8,6 +8,7 @@
  */
 
 import { createDebugger } from "../../../lib/debug.js";
+import { runtime } from "../../../lib/browser-compat.js";
 const dbg = createDebugger("GFGAceExtractor");
 
 /**
@@ -15,43 +16,33 @@ const dbg = createDebugger("GFGAceExtractor");
  * @returns {Promise<string>} Editor content, or "" if unavailable.
  */
 export async function extractAceCode() {
-  const metaId = `cl-ace-${Date.now()}`;
+  return new Promise((resolve) => {
+    const requestId = Math.random().toString(36).substring(2);
+    const responseEvent = `cl-editor-response-${requestId}`;
 
-  const script = document.createElement("script");
-  script.textContent = `(function(){
-        try {
-            var ed = ace.edit("ace-editor");
-            var val = ed.getValue();
-            var m = document.createElement("meta");
-            m.name = "${metaId}";
-            m.content = encodeURIComponent(val || "");
-            document.head.appendChild(m);
-        } catch(e) {
-            var m = document.createElement("meta");
-            m.name = "${metaId}";
-            m.content = "";
-            document.head.appendChild(m);
-        }
-    })();`;
+    const script = document.createElement("script");
+    script.src = runtime.getURL("content/injected-editor-helper.js");
+    script.setAttribute("data-action", "extract");
+    script.setAttribute("data-request-id", requestId);
 
-  document.head.appendChild(script);
+    const listener = (e) => {
+      window.removeEventListener(responseEvent, listener);
+      script.remove();
+      const code = e.detail?.code || "";
+      dbg.log(`extractAceCode(): extracted ${code.length} chars`);
+      resolve(code);
+    };
 
-  // Give the synchronous injected script a tick to execute
-  await new Promise((r) => setTimeout(r, 50));
+    window.addEventListener(responseEvent, listener);
+    (document.head || document.documentElement).appendChild(script);
 
-  const meta = document.head.querySelector(`meta[name="${metaId}"]`);
-  const raw = meta ? meta.getAttribute("content") || "" : "";
-  meta?.remove();
-  script.remove();
-
-  try {
-    const code = raw ? decodeURIComponent(raw) : "";
-    dbg.log(`extractAceCode(): ${code.length} chars`);
-    return code;
-  } catch (e) {
-    dbg.warn("extractAceCode(): decode failed", e.message);
-    return "";
-  }
+    // Timeout fallback to prevent hanging
+    setTimeout(() => {
+      window.removeEventListener(responseEvent, listener);
+      if (script.parentNode) script.remove();
+      resolve("");
+    }, 1000);
+  });
 }
 
 /**

@@ -11,12 +11,16 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("SettingsPageView");
 
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
+import { isAIActive } from "../../core/feature-flags.js";
 
 import { PanelGeneral } from "../settings-panels/PanelGeneral.js";
 import { PanelAI } from "../settings-panels/PanelAI.js";
 import { PanelGit } from "../settings-panels/PanelGit.js";
 import { PanelPlatforms } from "../settings-panels/PanelPlatforms.js";
+import { PanelGamification } from "../settings-panels/PanelGamification.js";
+import { PanelPrivacy } from "../settings-panels/PanelPrivacy.js";
 import { PanelBackups } from "../settings-panels/PanelBackups.js";
+import { PanelBehaviorBank } from "../settings-panels/PanelBehaviorBank.js";
 import { PanelAdvanced } from "../settings-panels/PanelAdvanced.js";
 
 const NAV_ITEMS = [
@@ -24,20 +28,47 @@ const NAV_ITEMS = [
   { id: "ai", emoji: "🤖", label: "AI" },
   { id: "git", emoji: "🔗", label: "Git" },
   { id: "platforms", emoji: "🌐", label: "Platforms" },
+  { id: "streaks", emoji: "🔥", label: "Streaks" },
+  { id: "privacy", emoji: "🔒", label: "Privacy" },
   { id: "backups", emoji: "💾", label: "Backups" },
+  { id: "bank", emoji: "🧠", label: "Behaviour Bank" },
   { id: "advanced", emoji: "⚙️", label: "Advanced" },
 ];
 
 export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onConnect }) {
-  const VALID_PANELS = new Set(["general", "ai", "git", "platforms", "backups", "advanced"]);
+  const VALID_PANELS = new Set([
+    "general",
+    "ai",
+    "git",
+    "platforms",
+    "streaks",
+    "privacy",
+    "backups",
+    "bank",
+    "advanced",
+  ]);
   const initPanel = getQueryParam("settingsTab", "general");
   const [activePanel, setActivePanel] = useState(
     VALID_PANELS.has(initPanel) ? initPanel : "general",
   );
 
+  /** Jump to the panel that owns a setting — used by the privacy disclosure list. */
+  function goToPanel(id) {
+    if (!VALID_PANELS.has(id)) return;
+    setActivePanel(id);
+    updateQueryParams({ settingsTab: id });
+  }
+
+  // The bank holds nothing but AI-written insights and the skills they draw on,
+  // so it follows the AI switch. The AI panel itself always stays — it is where
+  // the switch is turned back on.
+  const aiOn = isAIActive(settings);
+  const navItems = NAV_ITEMS.filter((item) => item.id !== "bank" || aiOn);
+  const shownPanel = activePanel === "bank" && !aiOn ? "general" : activePanel;
+
   function renderPanel() {
     const props = { settings, onSettingsChange, onSetupRepo, onConnect };
-    switch (activePanel) {
+    switch (shownPanel) {
       case "general":
         return html`<${PanelGeneral} ...${props} />`;
       case "ai":
@@ -46,8 +77,14 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
         return html`<${PanelGit} ...${props} />`;
       case "platforms":
         return html`<${PanelPlatforms} ...${props} />`;
+      case "streaks":
+        return html`<${PanelGamification} ...${props} />`;
+      case "privacy":
+        return html`<${PanelPrivacy} ...${props} onGoToPanel=${goToPanel} />`;
       case "backups":
         return html`<${PanelBackups} ...${props} />`;
+      case "bank":
+        return html`<${PanelBehaviorBank} ...${props} />`;
       case "advanced":
         return html`<${PanelAdvanced} ...${props} />`;
       default:
@@ -59,16 +96,13 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
     <div class="flex flex-col h-full min-h-0 gap-0">
       <!-- Horizontal tab bar -->
       <div class="flex items-center gap-1 px-1 border-b border-white/5 shrink-0 overflow-x-auto">
-        ${NAV_ITEMS.map(
+        ${navItems.map(
           ({ id, emoji, label }) => html`
             <button
               key=${id}
-              onClick=${() => {
-                setActivePanel(id);
-                updateQueryParams({ settingsTab: id });
-              }}
+              onClick=${() => goToPanel(id)}
               class="flex items-center gap-1.5 px-3 py-2.5 rounded-t-lg text-sm font-medium whitespace-nowrap transition-colors border-b-2
-              ${activePanel === id
+              ${shownPanel === id
                 ? "border-cyan-500 text-cyan-200 bg-cyan-500/5"
                 : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5"}"
             >

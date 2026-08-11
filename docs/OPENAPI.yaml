@@ -12,7 +12,7 @@ info:
     Keep HTTP routes in sync with `worker/src/index.js` and internal contracts in sync
     with `src/background/service-worker.js`, `src/core/event-bus.js`,
     `src/handlers/_base/*`, and `src/handlers/init.js`.
-  version: 1.0.1
+  version: 1.1.0
 
 servers:
   - url: https://codeledger.vkrishna04.me
@@ -27,8 +27,6 @@ tags:
     description: Health and monitoring endpoints
   - name: auth
     description: OAuth flows and callbacks
-  - name: app
-    description: GitHub App related endpoints (requires App JWT)
   - name: webhook
     description: Incoming webhook receivers
   - name: data
@@ -50,7 +48,7 @@ x-extension-urls:
   params:
     tab:
       values:
-        [solutions, analytics, graph, ai-chats, canonical, settings, search]
+        [solutions, analytics, graph, ai-chats, behaviour-bank, canonical, party, settings, search]
       description: Active top-level view
     settingsTab:
       values: [general, ai, git, platforms, backups, advanced]

@@ -160,12 +160,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
     )
       return;
     try {
-      const all = await Storage.getSettings();
-      await Storage.setSettings({
-        ...all,
-        github_username: "",
-        github_owner: "",
-      });
+      await Storage.updateSettings({ github_username: "", github_owner: "" });
       await Storage.setAuthToken("github", "");
       setOauthToken("");
       flash("GitHub unlinked");
@@ -396,8 +391,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
         setImportData({ remoteOnly, conflicts });
       } else {
         await applyImport(remoteOnly);
-        const s = await Storage.getSettings();
-        await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+        await Storage.updateSettings({ _pendingConflicts: 0 });
         loadSyncCount();
         if (remoteOnly.length > 0) {
           setImportMsg(
@@ -493,11 +487,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
     setShowAddMirror(false);
   };
 
-  const MIRROR_PROVIDERS = [
-    { id: "github", label: "GitHub", ready: true },
-    { id: "gitlab", label: "GitLab", ready: false },
-    { id: "bitbucket", label: "Bitbucket", ready: false },
-  ];
+  const MIRROR_PROVIDERS = [{ id: "github", label: "GitHub", ready: true }];
 
   const repoUrl = repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}` : "";
 
@@ -537,8 +527,8 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-3">
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Git Provider</h3>
         <p class="text-[11px] text-slate-500">
-          Only GitHub is fully supported right now. GitLab and Bitbucket are marked under
-          construction and stay disabled until they are ready.
+          GitHub is the only repository provider. Others will appear here if and when they can
+          actually commit.
         </p>
         <div class="flex gap-2">
           ${GIT_PROVIDERS.length
@@ -661,7 +651,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
           ${repoName
             ? html`
                 <button
-                  onClick=${onSetupRepo}
+                  onClick=${() => onSetupRepo()}
                   class="text-[11px] text-slate-500 hover:text-cyan-400 transition-colors"
                 >
                   Change →
@@ -702,7 +692,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
               <div class="flex flex-col items-start gap-2">
                 <p class="text-sm text-slate-500">No repository connected.</p>
                 <button
-                  onClick=${onSetupRepo}
+                  onClick=${() => onSetupRepo()}
                   class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-sm rounded-lg transition-colors"
                 >
                   Set up repository →
@@ -757,12 +747,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                       class="flex items-center gap-2 p-2.5 rounded-lg bg-white/3 border border-white/8"
                     >
                       <span
-                        class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border ${m.provider ===
-                        "github"
-                          ? "bg-slate-800 border-slate-600 text-slate-300"
-                          : m.provider === "gitlab"
-                            ? "bg-orange-900/30 border-orange-700/40 text-orange-300"
-                            : "bg-blue-900/30 border-blue-700/40 text-blue-300"}"
+                        class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border bg-slate-800 border-slate-600 text-slate-300"
                       >
                         ${m.provider}
                       </span>
@@ -1063,8 +1048,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                 await applyImport(resolved, { fromConflictResolution: true });
                 setImportData(null);
                 setSyncNeedsPush(false);
-                const s = await Storage.getSettings();
-                await Storage.setSettings({ ...s, _pendingConflicts: 0 });
+                await Storage.updateSettings({ _pendingConflicts: 0 });
                 onSettingsChange?.("_pendingConflicts", 0);
                 setSyncBusy(true);
                 setImportMsg(
@@ -1113,8 +1097,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                 setImportData(null);
                 setSyncNeedsPush(false);
                 const leftover = Array.isArray(remaining) ? remaining.length : 0;
-                const s = await Storage.getSettings();
-                await Storage.setSettings({ ...s, _pendingConflicts: leftover });
+                await Storage.updateSettings({ _pendingConflicts: leftover });
                 onSettingsChange?.("_pendingConflicts", leftover);
               }}
             />

@@ -3,6 +3,5 @@
   "github_releases": "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
   "chrome_store": "https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb",
   "edge_store": "https://microsoftedge.microsoft.com/addons/detail/codeledger/",
-  "firefox_store": "https://addons.mozilla.org/en-US/firefox/addon/code-ledger/",
-  "github_app_install": "https://github.com/apps/YOUR-APP-SLUG/installations/new"
+  "firefox_store": "https://addons.mozilla.org/en-US/firefox/addon/code-ledger/"
 }

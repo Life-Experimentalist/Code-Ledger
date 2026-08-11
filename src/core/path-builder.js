@@ -34,9 +34,36 @@ export const PROBLEMS_ROOT = "problems";
 export function platformId(platform, id) {
   const prefix = CONSTANTS.PLATFORM_CODE[platform] || String(platform).slice(0, 3).toLowerCase();
   // Strip ::submissionId suffix that LeetCode bulk importer appends (e.g. "two-sum::1427680302")
-  const s = String(id).split("::")[0];
+  const s = safeSegment(String(id).split("::")[0]);
   if (s.startsWith(`${prefix}-`)) return s;
   return `${prefix}-${s}`;
+}
+
+/**
+ * Reduces one path segment to characters that are safe in a git tree path.
+ *
+ * Slugs and titles reach here straight from a scraped page, and every one of
+ * them becomes a directory or filename in the user's repository. Slashes and
+ * dot-segments would change where a file lands; the rest simply produce paths
+ * git or GitHub reject, which surfaces as a commit that silently never happens.
+ *
+ * @param {string} value
+ * @returns {string} A non-empty segment; "untitled" when nothing survives.
+ */
+export function safeSegment(value) {
+  const cleaned = String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[/\\]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/[^A-Za-z0-9._-]/g, "")
+    // Any run of dots collapses to one, so ".." cannot survive anywhere in the
+    // segment — not just at the start. Leading dots are then dropped so nothing
+    // becomes a hidden entry that could collide with .github.
+    .replace(/\.{2,}/g, ".")
+    .replace(/-+/g, "-")
+    .replace(/^[.\-]+|[.\-]+$/g, "");
+  return cleaned || "untitled";
 }
 
 /**
@@ -53,8 +80,8 @@ export function platformId(platform, id) {
  * @param {string} [platform]  Platform name — required when canonical is absent
  */
 export function problemBase(id, canonical, _settings = {}, platform = "") {
-  if (canonical?.canonicalId) return `${PROBLEMS_ROOT}/${canonical.canonicalId}`;
-  const pid = platform ? platformId(platform, id) : id;
+  if (canonical?.canonicalId) return `${PROBLEMS_ROOT}/${safeSegment(canonical.canonicalId)}`;
+  const pid = platform ? platformId(platform, id) : safeSegment(id);
   return `${PROBLEMS_ROOT}/${pid}`;
 }
 
@@ -67,7 +94,7 @@ export function problemBase(id, canonical, _settings = {}, platform = "") {
 export function problemDir(id, platform, canonical) {
   const platId = platformId(platform, id);
   if (canonical?.canonicalId) {
-    return `${PROBLEMS_ROOT}/${canonical.canonicalId}/${platform}`;
+    return `${PROBLEMS_ROOT}/${safeSegment(canonical.canonicalId)}/${safeSegment(platform)}`;
   }
   return `${PROBLEMS_ROOT}/${platId}`;
 }
@@ -89,7 +116,7 @@ export function problemDir(id, platform, canonical) {
 export function solutionPath(id, platform, lang, canonical, _settings = {}, methodTitle = "") {
   const dir = problemDir(id, platform, canonical);
   const pid = platformId(platform, id);
-  const ext = lang?.ext || "txt";
+  const ext = safeSegment(lang?.ext || "txt");
   const method = _safeMethod(methodTitle);
   return `${dir}/${pid}${method ? `-${method}` : ""}.${ext}`;
 }

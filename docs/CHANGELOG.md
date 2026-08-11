@@ -6,7 +6,128 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.7] — 2026-06-26
+## [1.7.0] — 2026-08-11
+
+First public release. Versions up to 1.4.7 were development and store-review
+builds; see [Development history](#development-history) for those notes. The
+version does not restart at 1.0.0 because a `v1.0.0` tag already exists and the
+Chrome Web Store requires each upload to exceed the last.
+
+### Added
+
+**Solve capture**
+
+- Platform handlers for LeetCode, GeeksForGeeks, and Codeforces that detect an accepted submission and capture the code, language, difficulty, tags, and runtime/memory figures.
+- A floating stopwatch on problem pages; the elapsed time is recorded with the solve.
+- Bulk import of past solves from a LeetCode or GeeksForGeeks profile you own.
+- On-demand code recovery for solves whose source was not captured at submission time.
+- Duplicate detection, so re-submitting the same solution updates the existing entry instead of creating a second one.
+
+**GitHub**
+
+- One atomic commit per solve through the Git Trees API — solution file, README, and the repository index land together or not at all.
+- Repository setup wizard: create a new repository or link an existing one, then write the initial layout in a single commit.
+- A generated GitHub Pages dashboard in the repository showing a solve heatmap, language and topic breakdowns, and a searchable problem table.
+- Cross-device sync through the repository's `index.json`, with a conflict resolver for entries that changed in two places.
+- Mirror repositories: a commit that fails against the primary target falls through to a configured mirror rather than being lost.
+- A **Connection check** in Settings → Advanced that answers "why is nothing being committed?" in one press. It reports the four things that have to be true in the order they matter — a token is stored, GitHub still accepts it and says what it can do, the repository exists and this token can push to it, and something has actually landed there — and each line that is not green says what to do about it. It draws the distinctions the old error message could not: a token that reports no scopes is a GitHub App token or a fine-grained PAT, and only the first of those is unable to create a repository; a 404 on the repository means either it is missing or this token cannot see it, and it says both rather than guessing.
+
+**AI**
+
+- Code review from Gemini, OpenAI, Claude, DeepSeek, OpenRouter, or a local Ollama model, using your own API key.
+- A review queue that retries with backoff and respects provider rate limits, so a burst of solves does not drop reviews.
+- A floating chat panel on problem pages with `/` commands for pulling in your code, the problem statement, and your errors.
+- Chat history stored locally and, optionally, synced to the repository as Markdown.
+- MCP tool support for providers that accept it.
+- With no provider configured, every AI surface is gone rather than idle — no review panel on problem pages, no chat tab, no queue banner, and neither the AI Chats nor the Behaviour Bank tab in the library, the latter holding nothing but insights and skills written by and for a model. Reviews you already have stay readable and filterable, because that text is yours. Adding a provider brings the surfaces back without a reload.
+- The chat reads the behaviour bank the same way the review does. How long you took, how many attempts it took, and what a previous review flagged were being recorded on every solve and then only ever shown to the reviewer; the assistant you are talking to now gets the same history for the problem in front of it.
+
+**Library**
+
+- A sidebar and full-page library listing every captured problem, with search, filters, and per-problem detail.
+- Analytics: solve heatmap, topic radar, difficulty breakdown, solve velocity, and language distribution.
+- A force-directed knowledge graph linking problems through shared topics.
+- A canonical topic map so the same concept from three platforms lands under one name.
+- Topics are split onto two axes — data structures and algorithms — everywhere they are counted, because ranking them together lets Array bury Dynamic Programming. Which axis a topic sits on is a judgement call — Binary Search is a technique, Binary Search Tree is a structure — so the canonical topic list in Settings → Platforms lets you overrule any of them, and everything that counts topics follows your call instead.
+- A **Where the gaps are** panel in Analytics that ranks topics by how well you hold them rather than by how often they turn up: solve count saturates, time since the last solve decays, and the two multiply. Structures and algorithms are ranked in separate columns, well-known topics with no solves at all are listed as blind spots, and one number up top says what share of your solves needed a technique rather than just a structure. Any row opens the solves behind it.
+- The knowledge graph can colour topics by mastery instead of by identity. Giving every topic its own hue makes a pretty picture of what you have tagged and answers nothing; the mastery colouring spends the same colour on how well you hold each topic, so the weak areas are the ones that stand out. Switching mode repaints in place — the layout stays exactly where you left it — and a selected topic now shows how many problems you actually solved under it, when you last did, and how solid that leaves it. That solve count no longer includes the unsolved suggestions hanging off the topic.
+- Behaviour bank recording how you interact with problems, with a switch in Settings → Advanced that stops the recording.
+- Backups: manual JSON export, scheduled snapshots, and a snapshot before any bulk import.
+
+**Streaks and badges**
+
+- Points per solve on a fixed scale — Easy 10, Medium 25, Hard 50 — so the number means the same thing in your ledger as in anybody else's. Re-solving a problem you already have earns 40% of the first solve, and only after a three-day cooldown, which pays for spaced repetition without making one easy problem farmable.
+- A daily points target (25 by default, adjustable) closes the day and keeps the streak alive. Doubling the target banks a streak freeze, up to five; a missed day can be bought back the next day at 1.5× the target.
+- Vacation mode, with a three-day ramp at half target afterwards rather than dropping you straight back onto the full one.
+- Ten levels and a set of achievements, both derived from the ledger.
+- The achievements now have a shelf in the library's Analytics tab, locked ones included, instead of only appearing in the README the extension writes. Two of them count reviewed solutions, so they show up once a review provider is configured; with none configured they stay out of the list rather than sitting there permanently unreachable, and any you already earned keep their place. Anything earned since your last visit to the shelf is marked; the first visit marks nothing, because a back catalogue is not news.
+- Streaks start the day you install. An imported back catalogue contributes its points but does not invent a streak you never lived through.
+- The toolbar icon carries the current streak, coloured by whether today's target is already in, and the tooltip spells out the rest. The popup shows the same numbers with today's progress and what a rescue would cost.
+- Badges are generated as SVG files committed into your own repository, with a `badges/stats.json` beside them. Nothing is fetched from a badge service, so a private repository works the same as a public one, and there is nothing to pay for or keep running.
+- The streak card is committed in a light and a dark cut, and the README block uses a `<picture>` element so GitHub serves whichever matches the theme the reader chose. The bar and the numbers animate once as the card loads, and not at all for a reader whose system asks for reduced motion.
+- A **Share** button on the analytics streak card. It renders the same card to a PNG in the page — copy it to the clipboard or save it — alongside an editable sentence and one-click links to X, LinkedIn, and Reddit. The links are each site's own public composer URL, so nothing is uploaded anywhere and no account beyond the one you are posting from is involved. A private repository is not linked in the post, because that link is a 404 to everyone who reads it.
+- An optional GitHub Actions workflow refreshes the badges once a day, at an hour you pick, so a streak reads correctly on a day you have not solved yet.
+- The whole feature has one switch. Turned off, solves are captured and committed exactly as before and every streak surface disappears — including the toolbar badge. The welcome page offers the choice before the first streak exists.
+
+**Party**
+
+- A **Party** tab that lines your ledger up against other people's. You add somebody by writing down their public repository — `owner/repo` or a pasted link — and the extension reads the `badges/stats.json` their own copy commits. There is no server, no account, and no request to be accepted.
+- Rank by points, current streak, longest streak, solves, or level. Opening one friend pulls their full ledger and shows platforms, difficulty spread, top topics, and — the part worth having — the topics they cover that you do not.
+- A share button mints a `codeledger.vkrishna04.me/compare?repos=…` link. The link carries the list and nothing else, so whoever opens it sees exactly what you saw without installing anything.
+- The tab says plainly what it is: one-sided, since adding somebody does not add you to their list and they are never told; and self-reported, since the file lives in a repository its owner controls.
+- Your friend list travels with the rest of your settings, so a second device does not start from an empty list.
+
+**Privacy**
+
+- A **Settings → Privacy** page that names every destination your data can reach: your GitHub repository, the sign-in relay, anyone with the link if the repository is public, the badge SVGs, the generated Pages site, `shields.io` if you pick that badge style, each AI provider you have configured, `mermaid.ink` when you press Render on a diagram, the repositories you add to Party, and the anonymous solve counter.
+- The page opens with the tier your current setup is actually in — Private, Shared, Public, or Code leaves — followed by what is live now and what is available but switched off. Every row says what leaves, where it goes, and links to the panel that turns it off.
+- The list is computed from your settings rather than written down, so it cannot fall out of step with what the extension does. The welcome page shows the same summary during setup.
+
+**Both browsers**
+
+- Chrome and Firefox from one source tree, with every extension API call routed through a single compatibility shim.
+- The download is 3.5 MB rather than 17 MB. The packager copied all of `assets/images/`, which is mostly store promo tiles, a social preview and a screenshot of every tab — none of it opened by anything the extension runs. It now ships the four icons the manifests declare and the three branding images that get committed into your repository, and nothing else. The unpacked build applies the same rule, so what you load locally is what ships.
+- The release command refuses to cut a release over a failing check. It now runs the type gate, the full test suite and the sync regression script, and stops on the first failure; previously it ran only the last of the three, inside a `catch` that turned a failure into a printed warning. It also verifies the Firefox manifest's version, which nothing checked before, and pushes the branch you are actually on rather than whatever `main` happens to point at locally.
+
+### Security
+
+- All third-party HTML — problem statements scraped from platform pages, AI responses, model identifiers — is reduced to an attribute-free allowlist of formatting tags before it reaches the page. Statements render inside a content script, where markup would otherwise execute in the host page's context.
+- The OAuth callback signs its `state` parameter, stores it in an `HttpOnly; Secure; SameSite=Lax` cookie with a ten-minute lifetime, and compares it in constant time.
+- The authentication worker exposes no endpoint that mints GitHub App installation tokens.
+- Repository paths built from scraped titles are constrained: no `..` segments, no leading dots, no path escapes.
+- **AI provider API keys could be written into your repository.** Settings sync waves through every key belonging to a provider — `openai_enabled`, `claude_model` and so on — so that a second device gets the same setup. `openai_keys` is one of those keys, and it is where the provider card puts what you type while you type it, before you press Save. An API key entered and not saved could therefore be committed to `.codeledger/sync.json` and `.codeledger/config.json`, in plaintext, in a repository that is usually public. Anything ending in `_keys`, `_token`, `_secret`, `_apiKey`, `_api_key` or `_password` is now refused regardless of which provider it belongs to, both on the way out and on the way back in, and the next settings commit rewrites both files without it. **Git history is not rewritten by this: if you entered an API key in a previous version, rotate it.**
+- Reading a sync file back applies the same test as writing one, so a file written by an older build cannot reintroduce a key this one would refuse to send.
+- The API-key box no longer writes to storage while you type. It is a staging box — nothing has ever read your keys from there, the providers read them from where **Save** puts them — so keeping a plaintext copy in the settings map bought nothing and was the reason a key could travel anywhere at all. Keys left stranded in settings by an earlier version are moved to where Save would have put them, and then removed; you do not lose them.
+- Mermaid diagrams in AI responses are shown as source with a **Render diagram** button. The diagram is only sent to `mermaid.ink` when you press it, because that source describes your problem and your solution.
+
+### Changed
+
+- The default OAuth scope is `public_repo,workflow`. Creating a private repository needs the wider `repo` scope, which the settings panel offers as an explicit one-click upgrade rather than requesting up front.
+- The extension no longer wakes in the background when it has nothing to do. Two of its periodic timers existed only to notice an empty queue — one of them checking every minute, indefinitely, for work that only exists after a profile import. They are now started when something is queued and stopped when it drains.
+- GitLab and Bitbucket are gone from the interface and from the package. Their handlers were stubs that threw on every call, so presenting them as options — as a provider, as a mirror target, as an `@gitlab` chat mention — meant offering something that could not commit.
+- The privacy policy and the store listings now describe the party comparison and the shared `/compare` link, which had been shipped without appearing in either. The policy also stops claiming that local storage is encrypted at rest; browser extension storage is isolated from other sites and other extensions, but it is readable by anyone who already has the operating system profile, and it now says so.
+- The privacy policy exists in two copies — `PRIVACY.md` and the page at `/privacy` — instead of five. The three copies embedded in the store-submission documents had drifted; each still described a telemetry payload shape the code does not send. They are replaced by pointers to the canonical text.
+
+### Removed
+
+- Eighteen modules that shipped in the package but that nothing imported, including an encryption helper with a hardcoded salt that no code path ever called. Every line in the package is now a line something runs.
+
+### Known limitations
+
+- GitHub is the only working repository provider.
+- The library runs inside the extension. It is not currently served as a standalone web application.
+- Telemetry is off unless you turn it on, and sends only the extension version and which platform a solve came from.
+
+---
+
+## Development history
+
+The entries below cover builds released on GitHub during development, before
+any public listing. They used their own `1.0.0`–`1.4.7` numbering, which the
+public 1.0.0 above supersedes. They are kept because the reasoning in them is
+still useful, not because they describe shipped releases.
+
+### [1.4.7] — 2026-06-26
 
 ### Added
 
@@ -22,7 +143,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Compliance: Privacy Policy Clarified** — Rewrote `PRIVACY.md` to fully declare data collection, handling, storage, and sharing details to fully satisfy Chrome Web Store User Data Privacy requirements.
 - **Build: Release zips no longer duplicated in releases root** — `packager.js`, `package-chrome.js`, and `package-firefox.js` were writing zips to both `releases/` (root) and `releases/{version}/`. Zips now go only to the versioned subdirectory. Existing stray `codeledger-chromium-v1.4.7.zip` and `codeledger-firefox-v1.4.7.zip` from the root have been removed.
 
-## [1.4.6] — 2026-06-18
+### [1.4.6] — 2026-06-18
 
 ### Fixed
 
@@ -53,7 +174,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.5] — 2026-06-15
+### [1.4.5] — 2026-06-15
 
 ### Fixed
 
@@ -71,7 +192,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.4] — 2026-06-11 (resubmission)
+### [1.4.4] — 2026-06-11 (resubmission)
 
 ### Fixed
 
@@ -87,7 +208,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.4] — 2026-06-06
+### [1.4.4] — 2026-06-06
 
 ### Fixed
 
@@ -107,7 +228,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.3] — 2026-06-05
+### [1.4.3] — 2026-06-05
 
 ### Fixed
 
@@ -115,7 +236,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.4.2] — 2026-06-02
+### [1.4.2] — 2026-06-02
 
 ### Added
 
@@ -139,7 +260,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **AI prompts: chatMode respected** — `buildConversationSystemPrompt()` now switches to the direct-answer prompt when `context.chatMode === "direct"`, preventing Socratic rules from leaking into Direct mode sessions.
 - **Floating AI: DOM line sort** — View-lines are now sorted by `style.top` before joining, fixing incorrect line ordering when code spans the visible scroll window.
 
-## [1.4.1] — 2026-05-21
+### [1.4.1] — 2026-05-21
 
 ### Added
 
@@ -158,7 +279,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Codeforces: Title prefix stripped** — CF problem titles like "A. Theatre Square" are stored as "Theatre Square" (letter prefix removed).
 - **Codeforces: Language prefix matching** — verbose CF lang strings ("GNU G++17 7.3.0") resolved by keyword prefix so future compiler bumps don't break detection.
 
-## [1.4.0] — 2026-05-21
+### [1.4.0] — 2026-05-21
 
 ### Added
 
@@ -185,7 +306,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.3.1] — 2026-05-19
+### [1.3.1] — 2026-05-19
 
 ### Fixed
 
@@ -202,7 +323,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.3.0] — 2026-05-17
+### [1.3.0] — 2026-05-17
 
 ### Added
 
@@ -243,7 +364,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **AI review batch size** — background queue processes 2 items per alarm tick (was 10) to avoid rate-limiting AI providers during backfill.
 - **On-demand AI review no longer commits immediately** — `handleRegenerateAIReview` marks the problem as pending for the MAINTENANCE_COMMIT batch instead of making an individual commit per review.
 
-## [1.2.0] — 2026-05-13
+### [1.2.0] — 2026-05-13
 
 ### Added
 
@@ -322,7 +443,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.1.0] — 2026-05-07
+### [1.1.0] — 2026-05-07
 
 ### Added
 
@@ -361,7 +482,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.0.0] — 2026-04 (Initial Release)
+### [1.0.0] — 2026-04 (Initial Release)
 
 ### Added
 
@@ -386,16 +507,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <!-- Add new releases above this line -->
 
-[Unreleased]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.6...HEAD
-[1.4.6]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.5...v1.4.6
-[1.4.5]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.4...v1.4.5
-[1.4.4]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.3...v1.4.4
-[1.4.3]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.2...v1.4.3
-[1.4.2]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.1...v1.4.2
-[1.4.1]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.4.0...v1.4.1
-[1.4.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.3.1...v1.4.0
-[1.3.1]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.3.0...v1.3.1
-[1.3.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/Life-Experimentalist/Code-Ledger/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/Life-Experimentalist/Code-Ledger/releases/tag/v1.0.0
+Release tags and their attached builds: <https://github.com/Life-Experimentalist/CodeLedger/releases>

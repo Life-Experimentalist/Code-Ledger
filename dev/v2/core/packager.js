@@ -1,6 +1,7 @@
 import AdmZip from "adm-zip";
 import { readFileSync, writeFileSync, unlinkSync } from "fs";
 import { resolve } from "path";
+import { shipsInPackage } from "../../pack-filter.js";
 
 export class Packager {
   constructor(ctx, logger) {
@@ -20,16 +21,7 @@ export class Packager {
     writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
 
     const zip = new AdmZip();
-    zip.addLocalFolder(
-      resolve(this.ctx.rootDir, "src"),
-      "",
-      (name) => {
-        return name !== "manifest-chromium.json" &&
-               name !== "manifest-firefox.json" &&
-               name !== "manifest.json" &&
-               !/desktop\.ini$/i.test(name);
-      },
-    );
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", shipsInPackage);
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(
@@ -57,16 +49,7 @@ export class Packager {
     writeFileSync(tmpManifest, JSON.stringify(manifest, null, 4), "utf8");
 
     const zip = new AdmZip();
-    zip.addLocalFolder(
-      resolve(this.ctx.rootDir, "src"),
-      "",
-      (name) => {
-        return name !== "manifest-chromium.json" &&
-               name !== "manifest-firefox.json" &&
-               name !== "manifest.json" &&
-               !/desktop\.ini$/i.test(name);
-      },
-    );
+    zip.addLocalFolder(resolve(this.ctx.rootDir, "src"), "", shipsInPackage);
     zip.addLocalFile(tmpManifest, "", "manifest.json");
 
     const outPath = resolve(
@@ -95,6 +78,9 @@ export class Packager {
       ".prettierrc",
     ];
 
+    // Deliberately not `shipsInPackage` — this archive is the repository, not
+    // the extension. A Firefox reviewer builds from it, so it keeps the source
+    // manifests and the artwork the README and store listings reference.
     const EXCLUDE_SEGMENTS = new Set(["node_modules", "dist"]);
     const shouldInclude = (filePath) =>
       !filePath.split(/[\\/]/).some((seg) => EXCLUDE_SEGMENTS.has(seg)) &&

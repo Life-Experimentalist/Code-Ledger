@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# The API is a machine surface, not content. Crawling it wastes budget and the
+# OAuth routes issue redirects to github.com.
+Disallow: /api/
+
+Sitemap: https://codeledger.vkrishna04.me/sitemap.xml

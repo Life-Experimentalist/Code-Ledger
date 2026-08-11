@@ -256,9 +256,9 @@ async function testPrimaryFailureFailover() {
         isPrimary: false,
       },
       {
-        provider: "gitlab",
+        provider: "github",
         owner: "vkrishna04",
-        repo: "solutions",
+        repo: "solutions-backup",
         isPrimary: false,
       },
     ];

@@ -3,56 +3,60 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050508" />
+    <meta name="color-scheme" content="dark" />
+
+    <!--
+      Everything a search engine needs is in this document already. The page is
+      static HTML served straight from the edge — no framework, no hydration, no
+      client-side routing. landing.js only decorates: it detects the installed
+      extension and animates on scroll. Turn scripting off and the full page,
+      including every install link, still renders and works.
+    -->
 
     <!-- Primary SEO -->
-    <title>CodeLedger — Auto-commit every solved DSA problem to GitHub</title>
+    <title>
+      CodeLedger — Auto-commit every solved LeetCode, GFG & Codeforces problem to GitHub
+    </title>
     <meta
       name="description"
-      content="Browser extension for Chrome, Edge, Brave and Firefox that automatically commits every solved LeetCode, GeeksForGeeks, and Codeforces problem to your own GitHub repository — with AI code review, analytics, and a knowledge graph. Bring your own keys. Your data stays yours."
+      content="Free open-source browser extension for Chrome, Edge, Brave and Firefox that automatically commits every solved LeetCode, GeeksForGeeks and Codeforces problem to your own GitHub repository — with AI code review, analytics, and a knowledge graph. Bring your own keys. Your code never touches our servers."
     />
     <meta
       name="keywords"
-      content="leetcode github commit, dsa problem tracker, competitive programming github, leetcode auto commit, codeforces tracker, geeksforgeeks github, dsa portfolio, browser extension, ai code review, leetcode solutions github"
+      content="leetcode github commit, dsa problem tracker, competitive programming github, leetcode auto commit, codeforces tracker, geeksforgeeks github, dsa portfolio, browser extension, ai code review, leetcode solutions github, leetcode sync github, dsa tracker extension"
     />
+    <meta name="author" content="VKrishna04" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="https://codeledger.vkrishna04.me/" />
-    <meta
-      name="google-site-verification"
-      content="CtBze5j2VmGxl2vUaGmwnLSt1XDqahBuXxe98-EoByA"
-    />
+    <meta name="google-site-verification" content="CtBze5j2VmGxl2vUaGmwnLSt1XDqahBuXxe98-EoByA" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://codeledger.vkrishna04.me/" />
-    <meta
-      property="og:title"
-      content="CodeLedger — Your DSA journey, committed."
-    />
+    <meta property="og:title" content="CodeLedger — Your DSA journey, committed." />
     <meta
       property="og:description"
-      content="Auto-commit every solved DSA problem to your own GitHub repo. AI code review, analytics, knowledge graph. Works on LeetCode, GFG & Codeforces."
+      content="Auto-commit every solved DSA problem to your own GitHub repo. AI code review, analytics, knowledge graph. Works on LeetCode, GeeksForGeeks & Codeforces."
     />
+    <meta property="og:image" content="https://codeledger.vkrishna04.me/assets/og-image.png" />
+    <meta property="og:image:width" content="1774" />
+    <meta property="og:image:height" content="887" />
     <meta
-      property="og:image"
-      content="https://codeledger.vkrishna04.me/assets/og-image.png"
+      property="og:image:alt"
+      content="CodeLedger — a browser extension that commits solved DSA problems to GitHub"
     />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
     <meta property="og:site_name" content="CodeLedger" />
+    <meta property="og:locale" content="en_US" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:title"
-      content="CodeLedger — Auto-commit DSA problems to GitHub"
-    />
+    <meta name="twitter:title" content="CodeLedger — Auto-commit DSA problems to GitHub" />
     <meta
       name="twitter:description"
-      content="Every solved LeetCode / GFG / Codeforces problem, automatically committed to your own repo. With AI review and analytics."
+      content="Every accepted LeetCode / GeeksForGeeks / Codeforces submission, automatically committed to your own repo. With AI review and analytics."
     />
-    <meta
-      name="twitter:image"
-      content="https://codeledger.vkrishna04.me/assets/og-image.png"
-    />
+    <meta name="twitter:image" content="https://codeledger.vkrishna04.me/assets/og-image.png" />
 
     <!-- Structured Data -->
     <script type="application/ld+json">
@@ -60,10 +64,12 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "CodeLedger",
-        "description": "Browser extension that automatically commits every solved DSA problem to your GitHub repository, with AI code review, analytics, and a knowledge graph.",
+        "softwareVersion": "1.0.0",
+        "description": "Browser extension that automatically commits every solved DSA problem to your own GitHub repository, with AI code review, analytics, and a knowledge graph.",
         "url": "https://codeledger.vkrishna04.me",
+        "image": "https://codeledger.vkrishna04.me/assets/og-image.png",
         "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "Chrome, Firefox, Edge, Brave",
+        "operatingSystem": "Chrome, Edge, Brave, Firefox",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "author": {
           "@type": "Person",
@@ -72,6 +78,13 @@
         },
         "license": "https://www.apache.org/licenses/LICENSE-2.0",
         "codeRepository": "https://github.com/Life-Experimentalist/Code-Ledger",
+        "featureList": [
+          "Automatic GitHub commits on accepted submissions",
+          "AI code review with six providers",
+          "Analytics dashboard",
+          "Knowledge graph of solved problems",
+          "Cross-device sync through your own repository"
+        ],
         "keywords": [
           "LeetCode",
           "GitHub",
@@ -83,18 +96,106 @@
       }
     </script>
 
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is CodeLedger free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, completely. It is open source under Apache 2.0. You bring your own GitHub account and, optionally, your own AI API keys. There is no subscription and no paid tier."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does CodeLedger upload my code to any server?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Your code goes directly from your browser to GitHub's API. The only server the project runs is the OAuth relay, which exchanges your GitHub authorisation code for an access token and never sees your code, your AI keys, or your solutions."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which browsers does CodeLedger support?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Chrome, Edge, Brave and other Chromium browsers, plus Firefox. One codebase builds both packages; a small compatibility shim absorbs the API differences."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which coding platforms are supported?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "LeetCode, GeeksForGeeks and Codeforces. Each platform is a self-contained handler directory, so adding another one does not require changes to the core."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which GitHub permissions does CodeLedger request?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "By default public_repo and workflow — enough to create a public repository, push to it, and write the GitHub Pages workflow. If you want your solutions in a private repository you can grant the broader repo scope instead."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do I need AI API keys to use CodeLedger?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. AI review is optional. Without keys CodeLedger still detects accepted submissions and commits your code, metadata and problem statement to your repository."
+            }
+          }
+        ]
+      }
+    </script>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://codeledger.vkrishna04.me/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "How it works",
+            "item": "https://codeledger.vkrishna04.me/#how-it-works"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Features",
+            "item": "https://codeledger.vkrishna04.me/#features"
+          },
+          {
+            "@type": "ListItem",
+            "position": 4,
+            "name": "FAQ",
+            "item": "https://codeledger.vkrishna04.me/#faq"
+          }
+        ]
+      }
+    </script>
+
     <!-- Favicon + PWA -->
-    <link
-      rel="icon"
-      href="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png"
-    />
+    <link rel="icon" href="/assets/icon-128.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/assets/icon-288.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
     <!-- Styles -->
     <link rel="stylesheet" href="/assets/landing.css" />
 
     <style>
-      /* Inline additions that don't need Tailwind compilation */
+      /* Page-specific additions that don't warrant a shared class. */
       .btn-success {
         background: linear-gradient(
           135deg,
@@ -112,30 +213,12 @@
         ) !important;
       }
 
-      #install-btn-group {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-      .install-choice {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-      }
-      .install-choice .browser-label {
-        font-size: 10px;
-        color: var(--muted);
-      }
-
       /* FAQ */
       .faq {
-        max-width: 720px;
+        max-width: 760px;
         margin: 0 auto;
         display: flex;
         flex-direction: column;
-        gap: 0;
       }
       .faq-item {
         border-bottom: 1px solid var(--border);
@@ -149,12 +232,16 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 16px;
+      }
+      .faq-item summary::-webkit-details-marker {
+        display: none;
       }
       .faq-item summary::after {
         content: "＋";
         color: var(--muted);
         font-size: 1.1rem;
-        transition: transform 0.2s;
+        flex: none;
       }
       .faq-item[open] summary::after {
         content: "－";
@@ -163,18 +250,23 @@
         padding: 0 4px 16px;
         color: var(--subtle);
         line-height: 1.7;
+        font-size: 0.92rem;
       }
       .faq-item a {
         color: var(--accent);
+      }
+      .faq-item code {
+        color: var(--accent);
+        font-size: 0.86em;
       }
 
       /* Stats strip */
       .stats-strip {
         display: flex;
-        gap: 32px;
+        gap: 40px;
         justify-content: center;
         flex-wrap: wrap;
-        margin: 32px 0 0;
+        margin: 40px 0 0;
       }
       .stat {
         text-align: center;
@@ -191,6 +283,7 @@
         font-size: 12px;
         color: var(--muted);
         margin-top: 2px;
+        max-width: 130px;
       }
 
       /* Browser badges */
@@ -199,13 +292,13 @@
         gap: 8px;
         justify-content: center;
         flex-wrap: wrap;
-        margin-top: 16px;
+        margin-top: 18px;
       }
       .browser-badge {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 14px;
+        gap: 7px;
+        padding: 7px 15px;
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -218,10 +311,6 @@
         border-color: var(--border-glow);
         color: var(--text);
         background: var(--accent-dim);
-      }
-      .browser-badge img {
-        width: 16px;
-        height: 16px;
       }
 
       /* Extension detected indicator */
@@ -243,32 +332,40 @@
         color: #10b981;
       }
     </style>
+
+    <script>
+      // Set before first paint so the reveal transitions are armed without a
+      // flash of already-visible content. Nothing is hidden unless this runs,
+      // which keeps the no-JS and crawler rendering identical to the final one.
+      document.documentElement.classList.add("js");
+    </script>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div id="scroll-progress"></div>
+
     <!-- ── Nav ───────────────────────────────────────────────────────────── -->
     <nav>
       <a class="nav-brand" href="/">
-        <img
-          src="https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/src/assets/images/icon-transparent.png"
-          alt="CodeLedger logo"
-        />
+        <img src="/assets/icon-128.png" alt="" width="28" height="28" decoding="async" />
         CodeLedger
       </a>
       <div class="nav-links">
         <a href="#how-it-works"><span>How it works</span></a>
         <a href="#features"><span>Features</span></a>
+        <a href="#privacy"><span>Privacy</span></a>
         <a href="#faq"><span>FAQ</span></a>
-        <a href="/library" id="nav-library-link" data-cl-open
-          >📚 <span>Library</span></a
-        >
-        <a
-          href="https://github.com/Life-Experimentalist/Code-Ledger"
-          target="_blank"
-          rel="noopener"
+        <!--
+          The Library is a page inside the extension. There is no hosted copy,
+          so this link has no destination until the extension announces one —
+          landing.js fills the href and unhides it on handshake.
+        -->
+        <a href="#" id="nav-library-link" data-cl-open hidden>📚 <span>Library</span></a>
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
           >⭐ <span>GitHub</span></a
         >
         <a
-          href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md"
+          href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/guides/development/adding-platform-handler.md"
           target="_blank"
           rel="noopener"
           class="nav-cta"
@@ -277,557 +374,839 @@
       </div>
     </nav>
 
-    <!-- ── Hero ──────────────────────────────────────────────────────────── -->
-    <div class="hero">
-      <div id="hero-detected-wrapper">
-        <div id="ext-detected-badge" hidden>Extension installed and ready</div>
-      </div>
+    <main id="main">
+      <!-- ── Hero ────────────────────────────────────────────────────────── -->
+      <div class="hero">
+        <div class="hero-orb one" aria-hidden="true"></div>
+        <div class="hero-orb two" aria-hidden="true"></div>
 
-      <div class="hero-badge">✦ Open source · Apache 2.0 · v1.4.5</div>
-      <h1>Your DSA journey,<br /><span>committed.</span></h1>
-      <p class="tagline">
-        Every accepted LeetCode, GeeksForGeeks, and Codeforces solution is
-        automatically pushed to <strong>your own GitHub repository</strong> —
-        with AI review, analytics, and a knowledge graph. Your data, your keys,
-        your repo.
-      </p>
+        <div id="hero-detected-wrapper">
+          <div id="ext-detected-badge" hidden>Extension installed and ready</div>
+        </div>
 
-      <div class="hero-actions">
-        <a id="install-btn" class="btn btn-primary" href="#">⬇ Get Extension</a>
-        <a
-          href="/library"
-          id="hero-library-btn"
-          class="btn btn-secondary"
-          data-cl-open
-          data-cl-show-when-installed
-          style="display: none"
-          >📚 Open Library</a
-        >
-        <a
-          href="https://github.com/Life-Experimentalist/Code-Ledger"
-          target="_blank"
-          rel="noopener"
-          class="btn btn-ghost"
-          >View Source</a
-        >
-      </div>
-
-      <div class="browser-badges" aria-label="Supported browsers">
-        <a
-          href="#"
-          id="install-btn-chrome"
-          class="browser-badge"
-          title="Install on Chrome / Brave / Edge"
-        >
-          <img
-            src="https://www.google.com/chrome/static/images/chrome-logo.svg"
-            alt="Chrome"
-          />
-          Chrome / Brave / Edge
-        </a>
-        <a
-          href="#"
-          id="install-btn-firefox"
-          class="browser-badge"
-          title="Install on Firefox"
-        >
-          <img
-            src="https://www.mozilla.org/media/img/favicons/firefox/browser/favicon.f093404c0135.ico"
-            alt="Firefox"
-          />
-          Firefox
-        </a>
-        <a
-          href="https://github.com/Life-Experimentalist/Code-Ledger/releases"
-          target="_blank"
-          rel="noopener"
-          id="install-btn-github"
-          class="browser-badge"
-          title="Download from GitHub Releases"
-        >
-          <span>📦</span>
-          GitHub Releases
-        </a>
-      </div>
-
-      <div class="platform-strip">
-        <span>Works with</span>
-        <span class="platform-chip">
-          <img
-            src="https://leetcode.com/favicon.ico"
-            alt="LeetCode"
-            style="
-              width: 14px;
-              height: 14px;
-              vertical-align: middle;
-              border-radius: 2px;
-            "
-          />
-          LeetCode
-        </span>
-        <span class="platform-chip">
-          <img
-            src="https://media.geeksforgeeks.org/gfg-gg-logo.svg"
-            alt="GeeksForGeeks"
-            style="width: 16px; height: 16px; vertical-align: middle"
-          />
-          GeeksForGeeks
-        </span>
-        <span class="platform-chip">
-          <img
-            src="https://codeforces.com/favicon.ico"
-            alt="Codeforces"
-            style="
-              width: 14px;
-              height: 14px;
-              vertical-align: middle;
-              border-radius: 2px;
-            "
-          />
-          Codeforces
-        </span>
-      </div>
-
-      <div class="stats-strip">
-        <div class="stat">
-          <div class="stat-value">3</div>
-          <div class="stat-label">Supported platforms</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">6</div>
-          <div class="stat-label">AI providers</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">∞</div>
-          <div class="stat-label">Problems tracked</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Servers that see your code</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── How it works ──────────────────────────────────────────────────── -->
-    <section id="how-it-works">
-      <p class="section-label">How it works</p>
-      <h2 class="section-title">Three steps to a complete DSA portfolio</h2>
-      <p class="section-sub">
-        No servers. No databases. No accounts. Just an extension, your API keys,
-        and your GitHub repo.
-      </p>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <h3>Install the extension</h3>
-          <p>
-            Available on Chrome, Edge, Brave, and Firefox. Connect your GitHub
-            account via OAuth — we only request the <code>repo</code> scope.
-            Your token never leaves your browser.
-          </p>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <h3>Paste your AI keys</h3>
-          <p>
-            Drop in your own Gemini, OpenAI, Claude, DeepSeek, or Ollama keys in
-            Settings → AI. Keys are stored in your browser's local storage —
-            they never touch our servers.
-          </p>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <h3>Solve as usual</h3>
-          <p>
-            Hit "Accept" on LeetCode, GFG, or Codeforces. CodeLedger detects the
-            accepted submission, fetches metadata, runs an AI review, and
-            commits everything to your repo in one atomic push.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <hr />
-
-    <!-- ── Features ──────────────────────────────────────────────────────── -->
-    <section id="features">
-      <p class="section-label">Features</p>
-      <h2 class="section-title">Everything you need, nothing you don't</h2>
-      <p class="section-sub">
-        Plugin-based architecture — add platforms, AI providers, and git hosts
-        without touching core code.
-      </p>
-      <div class="features">
-        <div class="feature">
-          <div class="feature-icon">⚡</div>
-          <h3>Atomic git commits</h3>
-          <p>
-            Uses the GitHub Tree API to commit your code, metadata JSON, and AI
-            review in a single atomic operation. No partial states or multiple
-            noisy commits.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🤖</div>
-          <h3>AI code review</h3>
-          <p>
-            Gemini, OpenAI, Claude, DeepSeek, or local Ollama. Round-robin key
-            pools with automatic fallback if one provider fails. Full chat
-            interface with <code>/mycode</code> slash commands.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📊</div>
-          <h3>Analytics dashboard</h3>
-          <p>
-            Heatmap, topic radar, difficulty donut, solve velocity — all built
-            from your local IndexedDB. Drilldown to individual problems. No
-            telemetry unless you opt in.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🗺️</div>
-          <h3>Knowledge graph</h3>
-          <p>
-            Problems are linked by topic and algorithmic pattern. Visualize your
-            preparation as an interactive force-directed graph and spot gaps in
-            your coverage.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔌</div>
-          <h3>Plugin architecture</h3>
-          <p>
-            Adding a new platform or AI provider is a single file. The
-            <code>BasePlatformHandler</code> contract makes contribution
-            straightforward — no core changes needed.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🦊</div>
-          <h3>Chrome + Firefox</h3>
-          <p>
-            A single codebase, no bundler. A lightweight compat shim handles API
-            differences. Works on Chrome, Edge, Brave, and Firefox from the same
-            source.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">💬</div>
-          <h3>Problem-level AI chat</h3>
-          <p>
-            Ask anything about a problem directly in the modal — the AI knows
-            your code, the problem statement, constraints, hints, and your past
-            AI review for full context.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📚</div>
-          <h3>Library web app</h3>
-          <p>
-            Browse your problem history from any browser. OAuth login reads
-            directly from your GitHub repo — nothing stored on our side.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔑</div>
-          <h3>Bring your own everything</h3>
-          <p>
-            GitHub repo, AI keys, git provider. We run exactly one server — the
-            OAuth relay — and it never sees your code, keys, or solutions.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <hr />
-
-    <!-- ── BYOK ───────────────────────────────────────────────────────────── -->
-    <section id="byok" style="display: flex; justify-content: center">
-      <div class="byok">
-        <div class="icon">🔑</div>
-        <h2>Bring your own everything</h2>
-        <p>
-          Your solutions live in
-          <strong style="color: #fff">your GitHub repo</strong>. Your AI keys
-          stay in <strong style="color: #fff">your browser</strong>. We run
-          exactly one server — the OAuth relay — and it never sees your code or
-          your keys.
+        <div class="hero-badge">✦ Open source · Apache 2.0 · v1.0.0</div>
+        <h1>Your DSA journey,<br /><span>committed.</span></h1>
+        <p class="tagline">
+          Every accepted LeetCode, GeeksForGeeks, and Codeforces solution is pushed to
+          <strong>your own GitHub repository</strong> — with an optional AI review, analytics, and a
+          knowledge graph. Your data, your keys, your repo.
         </p>
-        <div
-          style="
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-          "
-        >
-          <a href="/api/auth/github" class="btn btn-ghost">Connect GitHub</a>
-          <a href="/library" class="btn btn-secondary">Open Library</a>
+
+        <div class="hero-actions">
+          <a
+            id="install-btn"
+            class="btn btn-primary"
+            href="https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb"
+            >⬇ Get the extension</a
+          >
+          <a href="#" id="hero-library-btn" class="btn btn-secondary" data-cl-open hidden
+            >📚 Open Library</a
+          >
+          <a
+            href="https://github.com/Life-Experimentalist/Code-Ledger"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-ghost"
+            >View source</a
+          >
         </div>
-        <div class="byok-pills">
-          <span class="pill active">✓ Gemini</span>
-          <span class="pill active">✓ OpenAI</span>
-          <span class="pill active">✓ Claude</span>
-          <span class="pill active">✓ DeepSeek</span>
-          <span class="pill active">✓ Ollama</span>
-          <span class="pill active">✓ OpenRouter</span>
-          <span class="pill">GitLab (soon)</span>
-          <span class="pill">Bitbucket (soon)</span>
+
+        <div class="browser-badges" aria-label="Where to install CodeLedger">
+          <a
+            href="https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb"
+            id="install-btn-chrome"
+            class="browser-badge"
+            >🌐 Chrome · Brave · Edge</a
+          >
+          <a
+            href="https://addons.mozilla.org/en-US/firefox/addon/code-ledger/"
+            id="install-btn-firefox"
+            class="browser-badge"
+            >🦊 Firefox</a
+          >
+          <a
+            href="https://github.com/Life-Experimentalist/Code-Ledger/releases/latest"
+            target="_blank"
+            rel="noopener"
+            id="install-btn-github"
+            class="browser-badge"
+            >📦 GitHub Releases</a
+          >
+        </div>
+
+        <div class="platform-strip">
+          <span>Works with</span>
+          <span class="platform-chip">LeetCode</span>
+          <span class="platform-chip">GeeksForGeeks</span>
+          <span class="platform-chip">Codeforces</span>
+        </div>
+
+        <div class="stats-strip">
+          <div class="stat">
+            <div class="stat-value">3</div>
+            <div class="stat-label">Coding platforms</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">6</div>
+            <div class="stat-label">AI providers, all optional</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">1</div>
+            <div class="stat-label">Commit per solved problem</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">0</div>
+            <div class="stat-label">Servers that see your code</div>
+          </div>
         </div>
       </div>
-    </section>
 
-    <hr />
+      <!-- ── How it works ──────────────────────────────────────────────── -->
+      <section id="how-it-works">
+        <div class="section-head reveal">
+          <p class="section-label">How it works</p>
+          <h2 class="section-title">Three steps to a complete DSA portfolio</h2>
+          <p class="section-sub">
+            No accounts. No database. No dashboard to log into. Just an extension, your GitHub repo,
+            and — if you want it — your own AI key.
+          </p>
+        </div>
+        <div class="steps reveal-stagger">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h3>Install and connect GitHub</h3>
+            <p>
+              Sign in with GitHub. CodeLedger asks for
+              <code>public_repo</code> and <code>workflow</code> — enough to create a repository,
+              push to it, and write the GitHub Pages workflow. Choose the broader
+              <code>repo</code> scope instead if you want your solutions private.
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <h3>Add AI keys (optional)</h3>
+            <p>
+              Paste a Gemini, OpenAI, Claude, DeepSeek, OpenRouter, or local Ollama key under
+              Settings → AI. Keys live in your browser's extension storage and are sent only to the
+              provider you chose. Skip this and everything else still works.
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <h3>Solve as usual</h3>
+            <p>
+              Get an accepted verdict on LeetCode, GeeksForGeeks, or Codeforces. CodeLedger notices,
+              collects the metadata and problem statement, runs the review if it is configured, and
+              pushes everything in one commit.
+            </p>
+          </div>
+        </div>
+      </section>
 
-    <!-- ── What's new in v1.2 ─────────────────────────────────────────────── -->
-    <section
-      id="whats-new"
-      style="
-        background: linear-gradient(
-          180deg,
-          rgba(6, 182, 212, 0.04) 0%,
-          transparent 100%
-        );
-      "
-    >
-      <p class="section-label">What's new · v1.4.3</p>
-      <h2 class="section-title">Conflict resolution, mirror dedup, and auto-detected repos</h2>
-      <p class="section-sub">
-        Every feature is still local-first. No telemetry. No servers. Your code
-        never leaves your browser.
-      </p>
-      <div class="features">
-        <div class="feature">
-          <div class="feature-icon">🧠</div>
-          <h3>Behaviour Bank</h3>
-          <p>
-            Capture your personal insights, define custom AI skills that trigger
-            on difficulty or command, and set a learning roadmap. The AI
-            assistant automatically uses these as context in every conversation.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔧</div>
-          <h3>MCP Tool-Calling</h3>
-          <p>
-            The AI assistant can now call tools — save insights to your
-            Knowledge Bank, recall past solutions, open problems, and set
-            roadmap goals — all from the floating chat panel.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔁</div>
-          <h3>Cross-device sync</h3>
-          <p>
-            Your problem library, AI chat history, and settings now sync across
-            devices through your GitHub repo. Import once, solve anywhere — full
-            bidirectional sync on every startup.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">☁️</div>
-          <h3>Rolling GitHub backups</h3>
-          <p>
-            Automatically commit encrypted snapshots of your local data to a
-            <code>backups/</code> folder in your repo. Keep the last N backups
-            and restore from any point in time.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔍</div>
-          <h3>Duplicate detection</h3>
-          <p>
-            AI-powered deduplication detects when you've solved the same problem
-            twice (across platforms or under different names) and proposes
-            merged, improved solutions for your review.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">💬</div>
-          <h3>Chat history sync</h3>
-          <p>
-            Every AI chat is saved as a Markdown file in <code>chats/</code> in
-            your GitHub repo — timestamped, searchable, and portable. View and
-            continue any conversation from the Library.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🏥</div>
-          <h3>Repo diagnostics</h3>
-          <p>
-            The welcome page doubles as a diagnostic tool. Scan for layout
-            mismatches, missing infra files, and uncommitted problems — then
-            repair everything with a single click.
-          </p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🌙</div>
-          <h3>GitHub Pages dark/light theme</h3>
-          <p>
-            Your auto-generated portfolio page now ships with a dark/light
-            toggle, commit timeline, and per-platform stats — all rendered
-            client-side from your <code>index.json</code>.
-          </p>
-        </div>
-      </div>
-    </section>
+      <hr />
 
-    <hr />
+      <!-- ── Pipeline ──────────────────────────────────────────────────── -->
+      <section id="pipeline">
+        <div class="section-head reveal">
+          <p class="section-label">What happens on accept</p>
+          <h2 class="section-title">From verdict to commit, in one pass</h2>
+          <p class="section-sub">
+            The whole path runs inside your browser. The only outbound calls are to the coding
+            platform you are already on, your chosen AI provider, and GitHub.
+          </p>
+        </div>
+        <div class="pipeline reveal-stagger">
+          <div class="pipe-step">
+            <span class="pipe-icon" aria-hidden="true">👁️</span>
+            <h3>Detect</h3>
+            <p>
+              A per-platform handler watches for the accepted verdict — via the page, the platform's
+              own API, or both.
+            </p>
+          </div>
+          <div class="pipe-step">
+            <span class="pipe-icon" aria-hidden="true">📥</span>
+            <h3>Capture</h3>
+            <p>
+              Code, language, difficulty, topics, runtime and memory stats, the problem statement,
+              and your solve time.
+            </p>
+          </div>
+          <div class="pipe-step">
+            <span class="pipe-icon" aria-hidden="true">🧭</span>
+            <h3>Resolve</h3>
+            <p>
+              The same problem on two platforms maps to one canonical folder, so your repo has one
+              entry per problem, not per site.
+            </p>
+          </div>
+          <div class="pipe-step">
+            <span class="pipe-icon" aria-hidden="true">🤖</span>
+            <h3>Review</h3>
+            <p>
+              If AI is configured, your code is reviewed and the result is committed alongside it.
+              Skipped entirely when it is not.
+            </p>
+          </div>
+          <div class="pipe-step">
+            <span class="pipe-icon" aria-hidden="true">⚡</span>
+            <h3>Commit</h3>
+            <p>
+              One atomic push through the GitHub Trees API — solution, README, and the updated
+              <code>index.json</code> together or not at all.
+            </p>
+          </div>
+        </div>
+      </section>
 
-    <!-- ── FAQ ────────────────────────────────────────────────────────────── -->
-    <section id="faq">
-      <p class="section-label">FAQ</p>
-      <h2 class="section-title">Common questions</h2>
-      <div class="faq">
-        <details class="faq-item">
-          <summary>Is CodeLedger free?</summary>
-          <p>
-            Yes, completely. It's open source under Apache 2.0. You bring your
-            own GitHub account and AI API keys — there's no subscription.
+      <hr />
+
+      <!-- ── Repo layout ───────────────────────────────────────────────── -->
+      <section id="your-repo">
+        <div class="section-head reveal">
+          <p class="section-label">Your repository</p>
+          <h2 class="section-title">Readable by a human, not just a tool</h2>
+          <p class="section-sub">
+            CodeLedger writes plain files you would have written yourself. Every problem directory
+            renders on GitHub as a page, because the metadata lives in a <code>README.md</code>.
           </p>
-        </details>
-        <details class="faq-item">
-          <summary>Does it upload my code to any server?</summary>
-          <p>
-            Your code goes directly from your browser to GitHub's API — never to
-            our servers. The only server we run is the OAuth relay at
-            <code>codeledger.vkrishna04.me/api</code>, which exchanges your
-            GitHub auth code for an access token and immediately discards it.
-            There is one optional exception: if you enable <em>Anonymous Usage
-            Stats</em> in Settings (off by default), a solve-event counter
-            (<code>{ platform, version }</code> — no code, no tokens, no
-            identifiers) is sent to our self-hosted counter at
-            <code>counter.vkrishna04.me</code>.
+        </div>
+        <div class="split">
+          <div class="code-card reveal">
+            <header>Repository layout</header>
+            <pre><code><span class="c-dir">problems/</span>
+  <span class="c-dir">two-sum/</span>              <span class="c-dim"># canonical, shared across platforms</span>
+    <span class="c-dir">leetcode/</span>
+      lc-two-sum.py
+      lc-two-sum-hashmap.py  <span class="c-dim"># a second approach</span>
+      README.md            <span class="c-dim"># statement, stats, AI review</span>
+    <span class="c-dir">geeksforgeeks/</span>
+      gfg-two-sum.java
+      README.md
+  <span class="c-dir">cf-1873A/</span>              <span class="c-dim"># no canonical match yet</span>
+    cf-1873A.cpp
+    README.md
+<span class="c-dir">chats/</span>                     <span class="c-dim"># saved AI conversations, as markdown</span>
+index.json               <span class="c-dim"># the manifest every device reads</span>
+README.md</code></pre>
+          </div>
+          <div class="code-card reveal">
+            <header>index.json — one entry per problem</header>
+            <pre><code>{
+  <span class="c-key">"layoutVersion"</span>: <span class="c-str">3</span>,
+  <span class="c-key">"problems"</span>: [
+    {
+      <span class="c-key">"id"</span>: <span class="c-str">"lc-two-sum"</span>,
+      <span class="c-key">"title"</span>: <span class="c-str">"Two Sum"</span>,
+      <span class="c-key">"platform"</span>: <span class="c-str">"leetcode"</span>,
+      <span class="c-key">"difficulty"</span>: <span class="c-str">"Easy"</span>,
+      <span class="c-key">"tags"</span>: [<span class="c-str">"Array"</span>, <span class="c-str">"Hash Table"</span>],
+      <span class="c-key">"canonical"</span>: <span class="c-str">"two-sum"</span>
+    }
+  ]
+}</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      <!-- ── Screenshots ───────────────────────────────────────────────── -->
+      <section id="screens">
+        <div class="section-head reveal">
+          <p class="section-label">Inside the extension</p>
+          <h2 class="section-title">See what you actually get</h2>
+          <p class="section-sub">Every screen below is the shipping build — no mockups.</p>
+        </div>
+        <div class="shots reveal-stagger">
+          <figure class="shot">
+            <img
+              src="/assets/screenshots/problems-modal.png"
+              alt="The problem modal showing a solved problem's code, statement, and metadata"
+              width="1830"
+              height="1079"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <strong>Problem view</strong>
+              <span
+                >Statement, every approach you submitted, your stats, and the AI review — in one
+                place, without leaving the tab.</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="/assets/screenshots/analytics.png"
+              alt="The analytics tab with a solve heatmap, difficulty breakdown and topic coverage"
+              width="1280"
+              height="800"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <strong>Analytics</strong>
+              <span
+                >Heatmap, difficulty split, topic coverage and solve velocity, computed locally from
+                your own history.</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="/assets/screenshots/knowledge-graph.png"
+              alt="The knowledge graph tab showing problems linked by topic"
+              width="1280"
+              height="800"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <strong>Knowledge graph</strong>
+              <span
+                >Problems linked by topic and pattern, so the gaps in your preparation are something
+                you can see.</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="/assets/screenshots/ai-chat.png"
+              alt="The AI chat panel open beside a LeetCode problem"
+              width="1280"
+              height="800"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <strong>Problem-level AI chat</strong>
+              <span
+                >Ask about the problem you are on. The assistant already has your code, the
+                statement, the constraints and your past review.</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="/assets/screenshots/repo.png"
+              alt="A GitHub repository maintained automatically by CodeLedger"
+              width="1280"
+              height="800"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <strong>Your repository, maintained</strong>
+              <span
+                >Clean directories, one commit per solve, and a manifest that keeps every device you
+                use in agreement.</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="/assets/screenshots/portfolio.png"
+              alt="The generated GitHub Pages portfolio site listing solved problems"
+              width="1840"
+              height="1079"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>
+              <strong>Generated portfolio</strong>
+              <span
+                >An optional GitHub Pages site built from your <code>index.json</code> — a link you
+                can put on a résumé.</span
+              >
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <hr />
+
+      <!-- ── Features ──────────────────────────────────────────────────── -->
+      <section id="features">
+        <div class="section-head reveal">
+          <p class="section-label">Features</p>
+          <h2 class="section-title">Everything you need, nothing you don't</h2>
+          <p class="section-sub">
+            Plugin-based architecture — platforms, AI providers and git hosts are self-contained
+            directories, so adding one never means editing the core.
           </p>
-        </details>
-        <details class="faq-item">
-          <summary>Which browsers are supported?</summary>
-          <p>
-            Chrome, Edge, Brave, and other Chromium-based browsers via the
-            Chrome Web Store (or unpacked). Firefox via AMO or side-loading. The
-            same extension package supports both — no separate builds needed for
-            core functionality.
+        </div>
+        <div class="features reveal-stagger">
+          <div class="feature">
+            <div class="feature-icon">⚡</div>
+            <h3>Atomic git commits</h3>
+            <p>
+              The GitHub Trees API writes your code, metadata and review as a single commit. No
+              half-written state, no burst of noisy commits cluttering your history.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🤖</div>
+            <h3>AI code review</h3>
+            <p>
+              Gemini, OpenAI, Claude, DeepSeek, OpenRouter, or local Ollama. Rotate several keys per
+              provider and fall back automatically when one is rate-limited.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">📊</div>
+            <h3>Analytics dashboard</h3>
+            <p>
+              Heatmap, topic radar, difficulty donut, solve velocity — all built from your local
+              database and drillable down to a single problem.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🗺️</div>
+            <h3>Knowledge graph</h3>
+            <p>
+              Problems are linked by topic and algorithmic pattern, drawn as an interactive
+              force-directed graph so coverage gaps are obvious.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🔁</div>
+            <h3>Cross-device sync</h3>
+            <p>
+              Your repository is the sync channel. Problems, chats and portable settings reconcile
+              through <code>index.json</code> — no third-party sync service in the middle.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🧭</div>
+            <h3>Canonical problem mapping</h3>
+            <p>
+              Solve the same problem on two sites and it lands in one folder, with a subdirectory
+              per platform, instead of two unrelated copies.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🔍</div>
+            <h3>Duplicate detection</h3>
+            <p>
+              When you re-solve something, CodeLedger shows you both versions and asks what to keep.
+              It never silently overwrites work you already committed.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">💬</div>
+            <h3>Problem-level AI chat</h3>
+            <p>
+              Ask anything about the problem in front of you. Conversations are saved as markdown
+              under <code>chats/</code>, so they travel with your repo.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🌐</div>
+            <h3>GitHub Pages portfolio</h3>
+            <p>
+              Opt in and CodeLedger commits a workflow that publishes a dark/light portfolio built
+              from your own manifest — no build step on your side.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🦊</div>
+            <h3>Chrome and Firefox</h3>
+            <p>
+              One codebase, no bundler, no transpiler. A small compatibility shim is the only place
+              browser APIs differ.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">📥</div>
+            <h3>Import your back catalogue</h3>
+            <p>
+              Already have hundreds of solves? Import your existing LeetCode or GeeksForGeeks
+              history and backfill the repository in one run.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🔑</div>
+            <h3>Bring your own everything</h3>
+            <p>
+              Your repo, your AI keys, your account. The project runs exactly one server — the OAuth
+              relay — and it never sees any of it.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      <!-- ── Support matrix ────────────────────────────────────────────── -->
+      <section id="support-matrix">
+        <div class="section-head reveal">
+          <p class="section-label">Supported today</p>
+          <h2 class="section-title">What is shipping, stated plainly</h2>
+          <p class="section-sub">
+            This table is the whole list. Anything not on it is not in the build.
           </p>
-        </details>
-        <details class="faq-item">
-          <summary>Which AI providers are supported?</summary>
-          <p>
-            Gemini (Google), OpenAI (GPT-4o, etc.), Anthropic Claude, DeepSeek,
-            and local Ollama. You can configure a primary and fallback provider,
-            and use your own API keys. No keys are required — you can use
-            CodeLedger without AI review entirely.
+        </div>
+        <div class="table-wrap reveal">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th scope="col">Area</th>
+                <th scope="col">Supported</th>
+                <th scope="col">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Coding platforms</th>
+                <td>LeetCode, GeeksForGeeks, Codeforces</td>
+                <td>Each one is an independent handler directory.</td>
+              </tr>
+              <tr>
+                <th scope="row">Browsers</th>
+                <td>Chrome, Edge, Brave, Firefox</td>
+                <td>Manifest V3 in both packages.</td>
+              </tr>
+              <tr>
+                <th scope="row">Git host</th>
+                <td>GitHub</td>
+                <td>The commit path is written against the GitHub Trees API.</td>
+              </tr>
+              <tr>
+                <th scope="row">AI providers</th>
+                <td>Gemini, OpenAI, Claude, DeepSeek, OpenRouter, Ollama</td>
+                <td>All optional; Ollama runs entirely on your machine.</td>
+              </tr>
+              <tr>
+                <th scope="row">Sync</th>
+                <td>Through your own repository</td>
+                <td>Periodic reconciliation plus a check at browser start.</td>
+              </tr>
+              <tr>
+                <th scope="row">Account required</th>
+                <td class="tag-no">None</td>
+                <td>GitHub sign-in is the only identity involved.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <hr />
+
+      <!-- ── Privacy ───────────────────────────────────────────────────── -->
+      <section id="privacy">
+        <div class="section-head reveal">
+          <p class="section-label">Privacy</p>
+          <h2 class="section-title">Where your data actually goes</h2>
+          <p class="section-sub">
+            The honest version, not a reassurance. Two columns: what never leaves your browser, and
+            every destination that does receive something.
           </p>
-        </details>
-        <details class="faq-item">
-          <summary>Can I use my existing GitHub repository?</summary>
+        </div>
+        <div class="ledger reveal-stagger">
+          <div class="ledger-col stays">
+            <h3>Stays in your browser</h3>
+            <ul>
+              <li>Your solutions, before they go to GitHub</li>
+              <li>Your AI API keys, in extension storage</li>
+              <li>Your GitHub access token</li>
+              <li>Analytics, the knowledge graph, and solve history</li>
+              <li>Every setting, including the ones never synced</li>
+            </ul>
+          </div>
+          <div class="ledger-col leaves">
+            <h3>Leaves your browser</h3>
+            <ul>
+              <li>
+                <strong>GitHub</strong> — your code and metadata, sent directly to the API with your
+                own token
+              </li>
+              <li>
+                <strong>Your AI provider</strong> — your code and the problem statement, only when
+                you have configured a key
+              </li>
+              <li>
+                <strong>The OAuth relay</strong> — your GitHub authorisation code, exchanged for a
+                token and not retained
+              </li>
+              <li>
+                <strong>Anyone with the link</strong> — your solutions and streak badges, if you
+                keep the ledger repository public. Making it private keeps both to you.
+              </li>
+              <li>
+                <strong>shields.io</strong> — one request per README view, only if you switch your
+                badges from the self-hosted SVGs to shields. Your numbers still come from your own
+                repository; shields only draws them.
+              </li>
+              <li>
+                <strong>mermaid.ink</strong> — the source of one diagram, and only when you press
+                <em>Render</em> on it. Never automatic.
+              </li>
+              <li>
+                <strong>Anonymous counter</strong> — a solve ping of
+                <code>{ platform, version }</code>, only if you switch on Anonymous Usage Stats. Off
+                by default.
+              </li>
+            </ul>
+          </div>
+        </div>
+        <p style="text-align: center; margin-top: 28px; color: var(--muted); font-size: 0.88rem">
+          Five of those seven are choices you make, and the extension shows you the same list live
+          under <strong>Settings → Privacy</strong>, computed from your own configuration. Full
+          detail in the <a href="/privacy" style="color: var(--accent)">privacy policy</a>.
+        </p>
+      </section>
+
+      <hr />
+
+      <!-- ── BYOK ──────────────────────────────────────────────────────── -->
+      <section id="byok" style="display: flex; justify-content: center">
+        <div class="byok reveal">
+          <div class="icon">🔑</div>
+          <h2>Bring your own everything</h2>
           <p>
-            Yes. During onboarding you can connect an existing repo. CodeLedger
-            will append new problems without modifying your existing files. It
-            updates a single <code>index.json</code> at the repo root to track
-            solved problems.
+            Your solutions live in
+            <strong style="color: #fff">your GitHub repo</strong>. Your AI keys stay in
+            <strong style="color: #fff">your browser</strong>. The project runs exactly one server —
+            the OAuth relay — and it never sees your code or your keys.
           </p>
-        </details>
-        <details class="faq-item">
-          <summary>What platforms are supported?</summary>
-          <p>
-            Currently LeetCode, GeeksForGeeks, and Codeforces. The plugin
-            architecture makes it straightforward to add new platforms — see
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap">
             <a
-              href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md"
+              href="https://github.com/Life-Experimentalist/Code-Ledger"
               target="_blank"
               rel="noopener"
-              >ADDING_PLATFORM_HANDLER.md</a
-            >.
+              class="btn btn-ghost"
+              >Read the source</a
+            >
+            <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
+          </div>
+          <div class="byok-pills">
+            <span class="pill active">✓ Gemini</span>
+            <span class="pill active">✓ OpenAI</span>
+            <span class="pill active">✓ Claude</span>
+            <span class="pill active">✓ DeepSeek</span>
+            <span class="pill active">✓ OpenRouter</span>
+            <span class="pill active">✓ Ollama (local)</span>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      <!-- ── Under the hood ────────────────────────────────────────────── -->
+      <section id="under-the-hood">
+        <div class="section-head reveal">
+          <p class="section-label">Under the hood</p>
+          <h2 class="section-title">Built to be read and contributed to</h2>
+          <p class="section-sub">
+            Plain ES modules, no bundler, no transpiler. Clone it, load the folder unpacked, and the
+            thing you are debugging is the thing that shipped.
           </p>
-        </details>
-        <details class="faq-item">
-          <summary>How does the AI code review work?</summary>
-          <p>
-            After a successful submission is detected, the service worker sends
-            your code and problem metadata to your configured AI provider. The
-            response is committed alongside your code in the same atomic git
-            commit. You can also open a full chat conversation about any problem
-            from within the extension.
-          </p>
-        </details>
-        <details class="faq-item">
-          <summary>What does the Library web app do?</summary>
-          <p>
-            The Library is the same UI as the extension sidebar, but accessible
-            from any browser at <a href="/library">/library</a>. It reads your
-            problems directly from your GitHub repo via the GitHub API — no
-            database, no sync needed.
-          </p>
-        </details>
-        <details class="faq-item">
-          <summary>What is the Behaviour Bank?</summary>
-          <p>
-            The Behaviour Bank is a personal memory layer for the AI assistant.
-            You can store insights ("I always struggle with graph traversal"),
-            define skills that activate on specific commands or difficulty
-            levels, and write a learning roadmap. The AI uses all of these
-            automatically as context in every conversation.
-          </p>
-        </details>
-        <details class="faq-item">
-          <summary>What are MCP tools?</summary>
-          <p>
-            MCP (Model Control Protocol) tools let the AI assistant take actions
-            beyond answering questions — it can save your insight to the
-            Knowledge Bank, recall past solutions, open a specific problem, or
-            update your roadmap, all within the chat panel. You can enable or
-            disable individual tools in Settings → AI.
-          </p>
-        </details>
-        <details class="faq-item">
-          <summary>How does cross-device sync work?</summary>
-          <p>
-            CodeLedger syncs your problem library, AI chat history, and settings
-            through your GitHub repo as structured files. On startup, new
-            problems and chats from other devices are imported automatically. No
-            third-party sync service — just your own repo.
-          </p>
-        </details>
-        <details class="faq-item">
-          <summary>Can I migrate my old problems to the new format?</summary>
-          <p>
-            Yes. The Welcome page (accessible from the extension) has a built-in
-            diagnostic and migration tool. It scans your repo for outdated
-            layout versions and uncommitted problems, then lets you migrate
-            everything with one click.
-          </p>
-        </details>
+        </div>
+        <div class="link-cards reveal-stagger">
+          <a
+            class="link-card"
+            href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/architecture/system-architecture.md"
+            target="_blank"
+            rel="noopener"
+          >
+            <strong>System architecture</strong>
+            <span
+              >How a detected submission becomes a commit, layer by layer, with diagrams that match
+              the code.</span
+            >
+            <span class="arrow">Read the walkthrough →</span>
+          </a>
+          <a
+            class="link-card"
+            href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/guides/development/adding-platform-handler.md"
+            target="_blank"
+            rel="noopener"
+          >
+            <strong>Add a platform</strong>
+            <span
+              >The handler contract in full: detection, selectors, and the payload your handler
+              emits.</span
+            >
+            <span class="arrow">Start here →</span>
+          </a>
+          <a
+            class="link-card"
+            href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/CHANGELOG.md"
+            target="_blank"
+            rel="noopener"
+          >
+            <strong>Changelog</strong>
+            <span>Everything that changed, when, and why — including the security fixes.</span>
+            <span class="arrow">See the history →</span>
+          </a>
+          <a
+            class="link-card"
+            href="https://github.com/Life-Experimentalist/Code-Ledger/issues"
+            target="_blank"
+            rel="noopener"
+          >
+            <strong>Report something</strong>
+            <span
+              >A selector that broke, a platform that changed, a commit that did not land. Issues
+              are read.</span
+            >
+            <span class="arrow">Open an issue →</span>
+          </a>
+        </div>
+      </section>
+
+      <hr />
+
+      <!-- ── FAQ ───────────────────────────────────────────────────────── -->
+      <section id="faq">
+        <div class="section-head reveal">
+          <p class="section-label">FAQ</p>
+          <h2 class="section-title">Common questions</h2>
+        </div>
+        <div class="faq reveal">
+          <details class="faq-item">
+            <summary>Is CodeLedger free?</summary>
+            <p>
+              Yes, completely. It is open source under Apache 2.0. You bring your own GitHub account
+              and, optionally, your own AI API keys. There is no subscription and no paid tier.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Does it upload my code to any server?</summary>
+            <p>
+              Your code goes directly from your browser to GitHub's API — never through ours. The
+              only server this project runs is the OAuth relay at
+              <code>codeledger.vkrishna04.me/api</code>, which exchanges your GitHub authorisation
+              code for an access token and does not retain it. One optional exception: if you switch
+              on <em>Anonymous Usage Stats</em> in Settings (off by default), a solve-event counter
+              — <code>{ platform, version }</code>, no code, no token, no identifier — is sent to
+              <code>counter.vkrishna04.me</code>.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>What GitHub permissions does it ask for?</summary>
+            <p>
+              By default <code>public_repo</code> and <code>workflow</code>.
+              <code>public_repo</code> is what lets CodeLedger create your repository and push to
+              it; <code>workflow</code> is only needed because the optional portfolio writes a file
+              under <code>.github/workflows/</code>. If you would rather keep your solutions
+              private, grant the broader <code>repo</code> scope instead — that is the only
+              difference between the two.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Which browsers are supported?</summary>
+            <p>
+              Chrome, Edge, Brave and other Chromium browsers via the Chrome Web Store, and Firefox
+              via AMO. Both are built from one codebase with separate manifests, so features do not
+              diverge between them.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Do I need an AI key?</summary>
+            <p>
+              No. AI review is entirely optional. Without a key CodeLedger still detects accepted
+              submissions, collects the metadata and statement, and commits everything to your
+              repository — you simply get no review section in the README.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Which AI providers are supported?</summary>
+            <p>
+              Gemini, OpenAI, Anthropic Claude, DeepSeek, OpenRouter, and local Ollama. You can set
+              a primary and a fallback, and hold several keys per provider so a rate limit on one
+              does not stop the review.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I use an existing GitHub repository?</summary>
+            <p>
+              Yes. During onboarding you can point CodeLedger at a repo you already have. It appends
+              under <code>problems/</code> and maintains a single <code>index.json</code> at the
+              root; your existing files are left alone.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>How does cross-device sync work?</summary>
+            <p>
+              Your repository is the sync channel. Each device reconciles against
+              <code>index.json</code> when the browser starts and periodically afterwards, pulling
+              problems and chats it has not seen. There is no sync server and nothing to sign up
+              for.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>What happens if the same problem is solved twice?</summary>
+            <p>
+              CodeLedger detects it and shows you both versions side by side — the one in your
+              repository and the one you just submitted — with a choice of which to keep or how to
+              merge. Nothing already committed is overwritten without you saying so.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Where is the Library?</summary>
+            <p>
+              Inside the extension. It is where your problems, analytics, knowledge graph, chats and
+              settings live. There is no hosted copy to sign into — that is the point: the data is
+              on your machine and in your repository.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I import problems I have already solved?</summary>
+            <p>
+              Yes. LeetCode and GeeksForGeeks profile imports backfill your existing accepted
+              submissions into the same layout, so your repository starts complete rather than from
+              today onward.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>What if a platform changes its page and detection breaks?</summary>
+            <p>
+              Selectors live in a single <code>dom-selectors.js</code> per platform, with a legacy
+              set kept as a fallback, so a fix is usually a few lines. If you hit a break, an issue
+              with the URL and the verdict you saw is enough to act on.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <!-- ── Final CTA ─────────────────────────────────────────────────── -->
+      <div class="library-cta">
+        <h2>Stop losing the work you already did</h2>
+        <p>
+          Every problem you have solved and never saved is a portfolio you do not have. Install
+          once, then solve exactly the way you already do.
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap">
+          <a
+            class="btn btn-primary"
+            href="https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb"
+            >⬇ Get the extension</a
+          >
+          <a href="#" class="btn btn-secondary" data-cl-open hidden>📚 Open Library</a>
+          <a
+            href="https://github.com/Life-Experimentalist/Code-Ledger"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-ghost"
+            >Star on GitHub</a
+          >
+        </div>
       </div>
-    </section>
+    </main>
 
-    <!-- ── Library CTA ────────────────────────────────────────────────────── -->
-    <div class="library-cta">
-      <h2>Browse your solved problems anywhere</h2>
-      <p>
-        The Library works as a web app too — connect with GitHub OAuth to read
-        your DSA repo from any browser, no extension required.
-      </p>
-      <a href="/library" class="btn btn-primary" data-cl-open
-        >📚 Open Library</a
-      >
-    </div>
-
-    <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+    <!-- ── Footer ─────────────────────────────────────────────────────── -->
     <footer>
       <span
         >CodeLedger — Apache 2.0 · Built by
-        <a
-          href="https://github.com/VKrishna04"
-          style="color: var(--accent); text-decoration: none"
+        <a href="https://github.com/VKrishna04" style="color: var(--accent); text-decoration: none"
           >VKrishna04</a
         ></span
       >
       <div class="footer-links">
-        <a
-          href="https://github.com/Life-Experimentalist/Code-Ledger"
-          target="_blank"
-          rel="noopener"
+        <a href="https://github.com/Life-Experimentalist/Code-Ledger" target="_blank" rel="noopener"
           >GitHub</a
         >
         <a
@@ -837,19 +1216,19 @@
           >Releases</a
         >
         <a
-          href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/ADDING_PLATFORM_HANDLER.md"
+          href="https://github.com/Life-Experimentalist/Code-Ledger/blob/main/docs/guides/development/adding-platform-handler.md"
           target="_blank"
           rel="noopener"
           >Contribute</a
         >
-        <a href="/library" data-cl-open>Library</a>
-        <a href="/api/health">API Status</a>
+        <a href="#" data-cl-open hidden>Library</a>
+        <a href="/api/health">API status</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
         <a href="/support">Support</a>
       </div>
     </footer>
 
-    <script src="/assets/landing.js"></script>
+    <script src="/assets/landing.js" defer></script>
   </body>
 </html>

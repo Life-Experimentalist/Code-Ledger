@@ -256,10 +256,7 @@ export const SyncEngine = {
       );
 
       if (conflicts.length > 0) {
-        await Storage.setSettings({
-          ...settings,
-          _pendingConflicts: conflicts.length,
-        });
+        await Storage.updateSettings({ _pendingConflicts: conflicts.length });
         dbg.warn(
           `performSync(): ✗ ${conflicts.length} conflict(s) detected — user action required in Git settings`,
         );
@@ -269,10 +266,7 @@ export const SyncEngine = {
       await applyImport(remoteOnly);
       // Clear any stale conflict flag
       if (settings._pendingConflicts) {
-        await Storage.setSettings({
-          ...settings,
-          _pendingConflicts: 0,
-        });
+        await Storage.updateSettings({ _pendingConflicts: 0 });
       }
       dbg.log(`performSync(): ✓ sync complete — imported ${remoteOnly.length} new problems`);
 
@@ -280,9 +274,16 @@ export const SyncEngine = {
       flushPendingChatSync(owner, repo, git).catch((e) =>
         dbg.warn("performSync(): chat flush failed:", e?.message),
       );
-      importChatsFromRepo(owner, repo, token, getContents, importChatsLocal).catch((e) =>
-        dbg.warn("performSync(): chat import failed:", e?.message),
-      );
+      // Bound, not passed bare: `getContents` is a method on the handler, and
+      // referencing it as a free identifier threw a ReferenceError inside this
+      // try block — which reported every successful sync as a failed one.
+      importChatsFromRepo(
+        owner,
+        repo,
+        token,
+        (o, r, p) => git.getContents(o, r, p),
+        importChatsLocal,
+      ).catch((e) => dbg.warn("performSync(): chat import failed:", e?.message));
     } catch (e) {
       dbg.warn("performSync(): ✗ sync failed:", e?.message);
     }

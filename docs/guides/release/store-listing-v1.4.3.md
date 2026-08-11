@@ -192,7 +192,7 @@ Solutions sync between devices via your repo. A step-by-step conflict modal reso
 ✦ BULK PROFILE IMPORT
 Import your entire LeetCode or GFG history in one click.
 
-Your data lives in your own GitHub repo. No third-party servers store your code. Open-source (MIT) — https://codeledger.vkrishna04.me
+Your data lives in your own GitHub repo. No third-party servers store your code. Open-source (Apache-2.0) — https://codeledger.vkrishna04.me
 ```
 
 ### Categories

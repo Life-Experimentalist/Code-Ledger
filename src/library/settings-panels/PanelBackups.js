@@ -12,12 +12,12 @@ import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("PanelBackups");
 
 import { Storage } from "../../core/storage.js";
+import { buildSnapshot, restoreSnapshot } from "../../core/backup/backup-manager.js";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
 async function exportData() {
-  const [problems, settings] = await Promise.all([Storage.getAllProblems(), Storage.getSettings()]);
-  return { problems: problems || [], settings: settings || {} };
+  return await buildSnapshot();
 }
 
 async function downloadJSON(data, label) {
@@ -35,11 +35,11 @@ async function downloadJSON(data, label) {
 async function importData(file) {
   const text = await file.text();
   const data = JSON.parse(text);
-  if (!data.problems || !Array.isArray(data.problems)) {
-    throw new Error("Invalid backup: missing problems array");
+  if (!data || (!data.problems && !data.behaviorBank && !data.settings && !data.roadmaps)) {
+    throw new Error("Invalid backup payload");
   }
-  for (const p of data.problems) await Storage.saveProblem(p);
-  return data.problems.length;
+  const stats = await restoreSnapshot(data);
+  return stats.problemsCount;
 }
 
 function fmtTime(ts) {
@@ -98,14 +98,14 @@ function ManualBackups({ settings }) {
   const restore = async (b) => {
     if (
       !confirm(
-        `Restore "${b.name}" (${fmtTime(b.ts)})?\n\nThis merges problems — existing problems are not deleted.`,
+        `Restore "${b.name}" (${fmtTime(b.ts)})?\n\nThis merges all problems and configuration — existing data is not deleted.`,
       )
     )
       return;
     setBusy(true);
     try {
-      for (const p of b.data?.problems || []) await Storage.saveProblem(p);
-      flash(`Restored ${(b.data?.problems || []).length} problems`);
+      const stats = await restoreSnapshot(b.data);
+      flash(`Restored ${stats.problemsCount} problems and behavior logs`);
     } catch (e) {
       flash("Restore failed: " + e.message, true);
     } finally {
@@ -266,14 +266,14 @@ function ScheduledBackups({ settings, onSettingsChange }) {
   const restore = async (b) => {
     if (
       !confirm(
-        `Restore scheduled snapshot from ${fmtTime(b.ts)}?\n\nThis merges problems — existing problems are not deleted.`,
+        `Restore scheduled snapshot from ${fmtTime(b.ts)}?\n\nThis merges all problems and configuration — existing data is not deleted.`,
       )
     )
       return;
     setBusy(true);
     try {
-      for (const p of b.data?.problems || []) await Storage.saveProblem(p);
-      flash(`Restored ${(b.data?.problems || []).length} problems`);
+      const stats = await restoreSnapshot(b.data);
+      flash(`Restored ${stats.problemsCount} problems and behavior logs`);
     } catch (e) {
       flash("Restore failed: " + e.message, true);
     } finally {
@@ -435,14 +435,14 @@ function RollingBackup() {
     if (!backup) return;
     if (
       !confirm(
-        `Restore rolling backup from ${fmtTime(backup.ts)}?\n\nThis merges problems — existing problems are not deleted.`,
+        `Restore rolling backup from ${fmtTime(backup.ts)}?\n\nThis merges all problems and configuration — existing data is not deleted.`,
       )
     )
       return;
     setBusy(true);
     try {
-      for (const p of backup.data?.problems || []) await Storage.saveProblem(p);
-      flash(`Restored ${(backup.data?.problems || []).length} problems`);
+      const stats = await restoreSnapshot(backup.data);
+      flash(`Restored ${stats.problemsCount} problems and behavior logs`);
     } catch (e) {
       flash("Restore failed: " + e.message, true);
     } finally {

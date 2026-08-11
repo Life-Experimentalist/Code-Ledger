@@ -6,32 +6,22 @@
 
 # OAuth & Git Provider Testing Guide
 
-## Setup Status
-
-### ✅ Completed
-
-- [x] Git provider fallback system (GitHub → GitLab → Bitbucket)
-- [x] OAuth message listener in library.js
-- [x] SettingsView cleaned (removed duplicate navigation)
-- [x] Connect button enhanced with provider indicator
-- [x] Worker config updated with OAuth URLs
-- [x] All handlers properly initialized (LeetCode ✅, GitHub ✅)
-- [x] Build passing without errors
-
-### ⚠️ Prerequisites for OAuth to Work
+## Prerequisites
 
 Before testing OAuth, you need:
 
-**Worker Secrets (in wrangler.toml):**
+**Worker secrets:**
 
 ```
-CODELEDGER_GH_APP_PRIVATE_KEY=<PKCS#8 format private key>
-CODELEDGER_GH_APP_ID=<numeric GitHub App ID>
-CODELEDGER_GH_APP_CLIENT_ID=<GitHub App Client ID>
-CODELEDGER_GH_APP_CLIENT_SECRET=<GitHub App secret>
-CODELEDGER_GH_APP_WEBHOOK_SECRET=<webhook secret for validation>
-SESSION_SECRET=<random hex 32 bytes>
+CODELEDGER_OAUTH_CLIENT_ID=<OAuth App client ID, starts with Iv23li>
+CODELEDGER_OAUTH_CLIENT_SECRET=<OAuth App client secret>
+SESSION_SECRET=<random hex, 32 bytes>
+CANONICAL_UPLOAD_TOKEN=<random hex, 32 bytes>
 ```
+
+Set these with `npx wrangler secret put NAME` from `worker/`, not in
+`wrangler.toml` — the file is git-ignored, but secrets still do not belong in
+it. See [GitHub OAuth App setup](github-oauth-app-setup.md).
 
 ## Testing Sequence
 
@@ -56,8 +46,9 @@ npm run build:fast
 **Step 1c: Verify git provider detection**
 
 - Settings → Git section
-- Should see "GitHub" as active provider by default
-- Can toggle enable/disable and see fallback work
+- GitHub is the only provider and is shown as such
+- If mirrors are configured they are listed in order; the primary is tried
+  first and a mirror only after it throws
 
 ### Phase 2: Manual PAT Testing (Before OAuth)
 
@@ -136,7 +127,7 @@ npx wrangler deploy
 node dev/diagnose.js
 ```
 
-Expected: LeetCode ✅, GitHub ✅
+Expected: three platform handlers, one git provider, six AI providers, no issues.
 
 ### Verify build output
 
@@ -150,20 +141,21 @@ ls dist/chromium/handlers/git/github/
 
 ```javascript
 // Run in DevTools console of library page
-await chrome.storage.local.get(null, (items) => {
-  console.log("All storage:", items);
-  console.log("Git providers:", items["git.providers"]);
-  console.log("Auth tokens:", items["auth.tokens"]);
-  console.log("Settings:", items["settings"]);
-});
+const items = await chrome.storage.local.get(null);
+console.log("Auth tokens:", items["auth.tokens"]);
+console.log("AI keys:", items["ai.keys"]);
+console.log("Settings:", items.settings);
 ```
 
 ## Troubleshooting
 
 ### OAuth not working
 
-- [ ] Check worker secrets are set in wrangler.toml
-- [ ] Verify GitHub App is created at github.com/settings/apps
+- [ ] Check worker secrets are set: `npx wrangler secret list`
+- [ ] Verify the app is an **OAuth App** at github.com/settings/developers —
+      not a GitHub App. A client ID starting `Ov23li` is a GitHub App and cannot
+      create repositories.
+- [ ] Confirm `SESSION_SECRET` is set; without it every sign-in returns 500
 - [ ] Check worker is deployed: `npx wrangler deploy`
 - [ ] Test health endpoint: `curl https://codeledger.vkrishna04.me/api/health`
 - [ ] Check browser DevTools for auth message
@@ -177,41 +169,27 @@ await chrome.storage.local.get(null, (items) => {
 
 ### Git commit failing
 
-- [ ] Check if token is present: `Storage.getAuthToken('github')`
-- [ ] Verify token has "repo" scope
-- [ ] Check if repository exists or can be created
-- [ ] Look for GitHub API errors in console
+- [ ] Check the token is present: `Storage.getAuthToken('github')`
+- [ ] Check the granted scopes in the `X-OAuth-Scopes` response header from any
+      `api.github.com` call. A private ledger needs `repo`; `public_repo` gets a
+      403 on creation.
+- [ ] Check the repository exists, or that the name is still free if it is about
+      to be created
+- [ ] Look for GitHub API errors in the service worker console — the handler
+      logs status, message and headers on every failure
 
-### Git provider not switching
+### Mirror target not used after a failure
 
-- [ ] Check settings.js has github_enabled flag
-- [ ] Verify getActiveGitProvider() returning correct value
-- [ ] Test fallback by disabling GitHub in settings
+- [ ] Confirm a mirror is configured in **Settings → Git**
+- [ ] `_commitWithFailover()` walks the primary first, then each mirror in order;
+      it only moves on after the primary throws
 
-## Files Modified
+## Success criteria
 
-1. `src/core/git-provider-selector.js` - NEW
-2. `src/library/views/SettingsView.js` - Cleaned duplicate nav
-3. `src/library/library.js` - Added OAuth listener
-4. `worker/public/config.json` - Added OAuth config
-5. `dev/diagnose.js` - NEW diagnostic tool
-
-## Success Criteria
-
-- ✅ Extension loads without errors
-- ✅ Settings page shows Git providers
-- ✅ OAuth Connect button opens GitHub auth
-- ✅ Token saves to storage after OAuth
-- ✅ LeetCode detects submissions
-- ✅ Git commit creates repository on GitHub
-- ✅ Files appear in correct directory structure
-- ✅ Provider fallback works (disable GitHub → use GitLab)
-
-## Next Steps
-
-1. Deploy worker with secrets
-2. Create GitHub App if not exist
-3. Test OAuth flow end-to-end
-4. Add more platform handlers (Codeforces getSettingsSchema)
-5. Add AI provider settings (Claude, OpenAI, etc.)
-6. Document API key setup for each AI provider
+- Extension loads without errors
+- Settings shows GitHub as the git provider
+- The Connect button opens GitHub's authorization screen
+- The token lands in `auth.tokens` after the callback
+- LeetCode detects an accepted submission
+- The commit creates the repository and the first root commit
+- Files land under `problems/{canonicalId}/{platform}/`

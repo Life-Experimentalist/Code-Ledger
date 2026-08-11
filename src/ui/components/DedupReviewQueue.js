@@ -19,6 +19,7 @@ import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
 import { runtime } from "../../lib/browser-compat.js";
 import { normalizeCode } from "../../core/duplicate-detector.js";
+import { isAIActive } from "../../core/feature-flags.js";
 
 const dbg = createDebugger("DedupReviewQueue");
 
@@ -55,7 +56,7 @@ ${code || "(no code)"}</pre
   `;
 }
 
-function ConflictItem({ item, candidate, onResolved, globalFrozen, onShowAIDecision }) {
+function ConflictItem({ item, candidate, onResolved, globalFrozen, onShowAIDecision, aiOn }) {
   const [seconds, setSeconds] = useState(COUNTDOWN_SECONDS);
   const [resolving, setResolving] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
@@ -306,8 +307,12 @@ function ConflictItem({ item, candidate, onResolved, globalFrozen, onShowAIDecis
     `;
   }
 
-  // Start per-item countdown for genuinely different codes (respects freeze state)
+  // Start per-item countdown for genuinely different codes (respects freeze state).
+  // The countdown exists only to hand the decision to a model when the user does
+  // not make one; with no provider switched on there is nothing to hand it to, so
+  // the item simply waits.
   useEffect(() => {
+    if (!aiOn) return;
     if (effectivelyFrozen || seconds <= 0) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
@@ -327,7 +332,7 @@ function ConflictItem({ item, candidate, onResolved, globalFrozen, onShowAIDecis
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [effectivelyFrozen, resolving, requestAIDecision]);
+  }, [aiOn, effectivelyFrozen, resolving, requestAIDecision]);
 
   const progress = Math.round((seconds / COUNTDOWN_SECONDS) * 100);
 
@@ -468,13 +473,17 @@ ${candidate.code || "(no code)"}</pre
           Both as Methods
         </button>
 
-        <button
-          onClick=${requestAIDecision}
-          disabled=${resolving || aiDeciding}
-          class="px-3 py-1.5 text-xs rounded-lg bg-purple-600/15 border border-purple-500/30 text-purple-200 hover:bg-purple-600/30 disabled:opacity-40 transition-colors"
-        >
-          ${aiDeciding ? "Asking AI…" : "Ask AI"}
-        </button>
+        ${aiOn
+          ? html`
+              <button
+                onClick=${requestAIDecision}
+                disabled=${resolving || aiDeciding}
+                class="px-3 py-1.5 text-xs rounded-lg bg-purple-600/15 border border-purple-500/30 text-purple-200 hover:bg-purple-600/30 disabled:opacity-40 transition-colors"
+              >
+                ${aiDeciding ? "Asking AI…" : "Ask AI"}
+              </button>
+            `
+          : ""}
 
         <button
           onClick=${isFrozen ? resumeTimer : freezeTimer}
@@ -487,7 +496,7 @@ ${candidate.code || "(no code)"}</pre
 
         ${resolving
           ? html`<span class="ml-auto text-xs text-slate-400">Resolving…</span>`
-          : seconds > 0 && !effectivelyFrozen
+          : aiOn && seconds > 0 && !effectivelyFrozen
             ? html`
                 <span class="ml-auto flex items-center gap-2 text-xs text-slate-400">
                   Decide in
@@ -502,7 +511,9 @@ ${candidate.code || "(no code)"}</pre
               `
             : effectivelyFrozen
               ? html`<span class="ml-auto text-xs text-orange-400">⏸ Paused</span>`
-              : html`<span class="ml-auto text-xs text-slate-400">Will auto-ask AI…</span>`}
+              : aiOn
+                ? html`<span class="ml-auto text-xs text-slate-400">Will auto-ask AI…</span>`
+                : html`<span class="ml-auto text-xs text-slate-400">Waiting on you</span>`}
       </div>
     </div>
   `;
@@ -514,9 +525,16 @@ export function DedupReviewQueue({ onClose = () => {} }) {
   const [loading, setLoading] = useState(true);
   const [globalFrozen, setGlobalFrozen] = useState(false);
   const [aiDecisionItem, setAiDecisionItem] = useState(null);
+  const [aiOn, setAiOn] = useState(false);
 
   useEffect(() => {
     loadQueue();
+    // Starts false so the five-second auto-ask cannot fire in the gap before
+    // settings arrive — a conflict resolved by a model the user never enabled
+    // is not recoverable by turning the switch back off.
+    Storage.getSettings()
+      .then((s) => setAiOn(isAIActive(s)))
+      .catch(() => {});
   }, []);
 
   async function loadQueue() {
@@ -666,6 +684,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
                             onResolved=${handleResolved}
                             globalFrozen=${globalFrozen}
                             onShowAIDecision=${handleShowAIDecision}
+                            aiOn=${aiOn}
                           />
                         `
                       : html`

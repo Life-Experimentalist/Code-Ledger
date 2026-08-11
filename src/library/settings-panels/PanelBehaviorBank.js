@@ -8,6 +8,7 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
+import { autoPopulateFromHistory } from "../../core/behavior-bank.js";
 import { createDebugger } from "../../lib/debug.js";
 
 const dbg = createDebugger("PanelBehaviorBank");
@@ -19,7 +20,15 @@ export function PanelBehaviorBank() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    loadBankData();
+    const init = async () => {
+      try {
+        await autoPopulateFromHistory();
+      } catch (e) {
+        dbg.warn("Failed to auto-populate behavior bank:", e);
+      }
+      await loadBankData();
+    };
+    init();
   }, []);
 
   const loadBankData = async () => {

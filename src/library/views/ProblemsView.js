@@ -18,6 +18,8 @@ import { QueueModal } from "../../ui/components/QueueModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
+import { cleanGfgSlug } from "../../core/gfg-utils.js";
+import { isAIActive } from "../../core/feature-flags.js";
 
 const PLATFORMS = [
   {
@@ -37,9 +39,8 @@ const PLATFORMS = [
   {
     id: "geeksforgeeks",
     name: "GeeksForGeeks",
-    url: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + "explore",
-    profileUrl: (s) =>
-      s?.gfg_username ? `https://auth.geeksforgeeks.org/user/${s.gfg_username}/` : null,
+    url: "https://www.geeksforgeeks.org/explore",
+    profileUrl: () => "https://www.geeksforgeeks.org/profile",
     color: CONSTANTS.PLATFORMS.geeksforgeeks.color,
     bg: "rgba(47,141,70,0.08)",
     border: "rgba(47,141,70,0.25)",
@@ -96,11 +97,18 @@ export function ProblemsView({
   const [reviewQueueBusy, setReviewQueueBusy] = useState(false);
   const [reviewQueueMsg, setReviewQueueMsg] = useState("");
   const [showQueueModal, setShowQueueModal] = useState(false);
+  const [copyText, setCopyText] = useState("");
 
   const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
+  const aiOn = isAIActive(settings);
+  // Reviews already written stay filterable after the last provider is switched
+  // off — they are the user's own text, not a live feature.
+  const hasStoredReviews = (problems || []).some((p) => p.aiReview);
 
   const fetchQueueStats = () => {
-    if (!isExtension) return;
+    // Nothing can be queued with no provider switched on, so the ten-second
+    // poll is pure noise in the message log.
+    if (!isExtension || !aiOn) return;
     chrome.runtime.sendMessage({ type: "GET_QUEUE_STATS" }, (resp) => {
       if (chrome.runtime.lastError || !resp?.ok) return;
       setQueueStats(resp);
@@ -111,7 +119,8 @@ export function ProblemsView({
     fetchQueueStats();
     const id = setInterval(fetchQueueStats, 10000);
     return () => clearInterval(id);
-  }, []);
+    // Re-armed when the AI switch flips so the poll starts without a reload.
+  }, [aiOn]);
 
   const handleQueueAllReviews = async () => {
     if (!isExtension || reviewQueueBusy) return;
@@ -123,6 +132,55 @@ export function ProblemsView({
         setReviewQueueMsg("Failed to queue reviews.");
       } else {
         setReviewQueueMsg(`Queued ${resp.queued} problem(s) for AI review.`);
+        fetchQueueStats();
+      }
+      setTimeout(() => setReviewQueueMsg(""), 5000);
+    });
+  };
+
+  const handleQueueMissingReviews = async () => {
+    if (!isExtension || reviewQueueBusy) return;
+    setReviewQueueBusy(true);
+    setReviewQueueMsg("");
+    chrome.runtime.sendMessage({ type: "QUEUE_MISSING_AI_REVIEWS" }, (resp) => {
+      setReviewQueueBusy(false);
+      if (chrome.runtime.lastError || !resp?.ok) {
+        setReviewQueueMsg("Failed to queue missing reviews.");
+      } else {
+        setReviewQueueMsg(`Queued ${resp.queued || 0} problem(s) for AI review.`);
+        fetchQueueStats();
+      }
+      setTimeout(() => setReviewQueueMsg(""), 5000);
+    });
+  };
+
+  const handleCancelQueue = async () => {
+    if (!isExtension) return;
+    if (!confirm("Cancel pending reviews? The current one will finish first.")) return;
+    setReviewQueueBusy(true);
+    setReviewQueueMsg("Cancelling...");
+    chrome.runtime.sendMessage({ type: "CANCEL_AI_REVIEW_QUEUE" }, (resp) => {
+      setReviewQueueBusy(false);
+      if (chrome.runtime.lastError || !resp?.ok) {
+        setReviewQueueMsg("Failed to cancel queue.");
+      } else {
+        setReviewQueueMsg(`Cancelled ${resp.cancelled || 0} pending review(s).`);
+        fetchQueueStats();
+      }
+      setTimeout(() => setReviewQueueMsg(""), 5000);
+    });
+  };
+
+  const handleRunQueueNow = async () => {
+    if (!isExtension || reviewQueueBusy) return;
+    setReviewQueueBusy(true);
+    setReviewQueueMsg("Running queue now...");
+    chrome.runtime.sendMessage({ type: "PROCESS_REVIEW_QUEUE_NOW" }, (resp) => {
+      setReviewQueueBusy(false);
+      if (chrome.runtime.lastError || !resp?.ok) {
+        setReviewQueueMsg("Failed to start queue.");
+      } else {
+        setReviewQueueMsg("Queue run triggered.");
         fetchQueueStats();
       }
       setTimeout(() => setReviewQueueMsg(""), 5000);
@@ -339,11 +397,13 @@ export function ProblemsView({
 
   const buildRefreshUrl = (problem) => {
     if (!problem?.titleSlug) return null;
-    const slug = encodeURIComponent(problem.titleSlug);
+    const cleanSlug =
+      problem.platform === "geeksforgeeks" ? cleanGfgSlug(problem.titleSlug) : problem.titleSlug;
+    const slug = encodeURIComponent(cleanSlug);
     const suffix = `?codeledger_fetch=1&cl_fetch_id=${slug}`;
     const base = {
       leetcode: CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/",
-      geeksforgeeks: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + problem.titleSlug,
+      geeksforgeeks: CONSTANTS.PLATFORMS.geeksforgeeks.practiceBase + cleanSlug + "/1",
       codeforces: CONSTANTS.PLATFORMS.codeforces.problemsBase + problem.titleSlug,
     }[problem.platform];
     return base ? base + suffix : null;
@@ -457,10 +517,25 @@ export function ProblemsView({
     }
   };
 
+  const bulkCopySelected = async () => {
+    if (!selectedProblems.length) return;
+    try {
+      const payload = JSON.stringify(selectedProblems, null, 2);
+      await navigator.clipboard.writeText(payload);
+      setCopyText("✓ Copied");
+      setBulkStatus(`Copied ${selectedProblems.length} problem(s) JSON to clipboard.`);
+      setTimeout(() => setCopyText(""), 2000);
+    } catch (e) {
+      setBulkStatus(`Copy failed: ${e.message || e}`);
+    }
+  };
+
   return html`
     <div class="flex flex-col gap-6 w-full">
       <!-- AI Review queue status banner -->
-      ${isExtension && (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg)
+      ${aiOn &&
+      isExtension &&
+      (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg)
         ? html`
             <div
               class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs"
@@ -502,16 +577,31 @@ export function ProblemsView({
                   View queue
                 </button>
                 <button
+                  onClick=${handleRunQueueNow}
+                  disabled=${reviewQueueBusy}
+                  class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors text-[11px] disabled:opacity-40"
+                >
+                  Process now
+                </button>
+                <button
+                  onClick=${handleCancelQueue}
+                  disabled=${reviewQueueBusy}
+                  class="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-colors text-[11px] disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
                   onClick=${handleQueueAllReviews}
                   disabled=${reviewQueueBusy}
-                  class="px-2.5 py-1 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40"
+                  class="px-2.5 py-1 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40 text-[11px]"
                 >
                   ${reviewQueueBusy ? "Queuing…" : "Re-queue all"}
                 </button>
               </div>
             </div>
           `
-        : isExtension &&
+        : aiOn &&
+            isExtension &&
             ((problems || []).filter((p) => !p.aiReview).length > 0 || queueStats?.failed > 0)
           ? html`
               <div
@@ -535,11 +625,11 @@ export function ProblemsView({
                       `
                     : ""}
                   <button
-                    onClick=${handleQueueAllReviews}
+                    onClick=${handleQueueMissingReviews}
                     disabled=${reviewQueueBusy}
                     class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors disabled:opacity-40 text-[11px]"
                   >
-                    ${reviewQueueBusy ? "Queuing…" : "Generate all AI reviews"}
+                    ${reviewQueueBusy ? "Queuing…" : "Generate missing AI reviews"}
                   </button>
                 </div>
               </div>
@@ -630,21 +720,34 @@ export function ProblemsView({
         })}
       </div>
 
-      <!-- Filter bar -->
       <div class="flex flex-col bg-[#0a0a0f] p-4 rounded-xl border border-white/5 gap-3">
-        <div class="flex gap-2 flex-wrap">
-          ${["All", "Easy", "Medium", "Hard"].map(
-            (d) => html`
-              <button
-                onClick=${() => setFilterDifficulty(d)}
-                class="px-3 py-1 text-xs rounded transition-colors ${filterDifficulty === d
-                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
-                  : "bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10"}"
-              >
-                ${d}
-              </button>
-            `,
-          )}
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <div class="flex gap-2 flex-wrap">
+            ${["All", "Easy", "Medium", "Hard"].map(
+              (d) => html`
+                <button
+                  onClick=${() => setFilterDifficulty(d)}
+                  class="px-3 py-1 text-xs rounded transition-colors ${filterDifficulty === d
+                    ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
+                    : "bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10"}"
+                >
+                  ${d}
+                </button>
+              `,
+            )}
+          </div>
+          <button
+            onClick=${() => {
+              const next = !selectionMode;
+              setSelectionMode(next);
+              if (!next) clearSelection();
+            }}
+            class="text-[11px] px-2.5 py-1 rounded border transition-colors ${selectionMode
+              ? "border-cyan-500/50 text-cyan-300 bg-cyan-500/10"
+              : "border-white/15 text-slate-300 hover:bg-white/10"}"
+          >
+            ${selectionMode ? "Exit Select Mode" : "Select Mode"}
+          </button>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <select
@@ -678,15 +781,19 @@ export function ProblemsView({
               (o) => html`<option value=${o}>${o === "All" ? "All Tags" : o}</option>`,
             )}
           </select>
-          <select
-            value=${filterAIReview}
-            onChange=${(e) => setFilterAIReview(e.target.value)}
-            class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
-          >
-            <option value="All">All Reviews</option>
-            <option value="With Review">Has AI Review</option>
-            <option value="Without Review">No AI Review</option>
-          </select>
+          ${aiOn || hasStoredReviews
+            ? html`
+                <select
+                  value=${filterAIReview}
+                  onChange=${(e) => setFilterAIReview(e.target.value)}
+                  class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
+                >
+                  <option value="All">All Reviews</option>
+                  <option value="With Review">Has AI Review</option>
+                  <option value="Without Review">No AI Review</option>
+                </select>
+              `
+            : ""}
           ${query
             ? html`
                 <button
@@ -697,22 +804,6 @@ export function ProblemsView({
                 </button>
               `
             : ""}
-        </div>
-        <div class="flex items-center gap-2 justify-end flex-wrap">
-          <button
-            onClick=${() => {
-              const next = !selectionMode;
-              setSelectionMode(next);
-              if (!next) clearSelection();
-            }}
-            class=${`text-[11px] px-2.5 py-1 rounded border transition-colors ${
-              selectionMode
-                ? "border-cyan-500/50 text-cyan-300 bg-cyan-500/10"
-                : "border-white/15 text-slate-300 hover:bg-white/10"
-            }`}
-          >
-            ${selectionMode ? "Exit Select Mode" : "Select Mode"}
-          </button>
         </div>
       </div>
 
@@ -740,6 +831,13 @@ export function ProblemsView({
                     class="text-[11px] px-2.5 py-1 rounded border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40"
                   >
                     Export JSON
+                  </button>
+                  <button
+                    onClick=${bulkCopySelected}
+                    disabled=${!selectedIds.size || bulkBusy}
+                    class="text-[11px] px-2.5 py-1 rounded border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-40"
+                  >
+                    ${copyText || "Copy JSON"}
                   </button>
                   <button
                     onClick=${bulkDeleteSelected}

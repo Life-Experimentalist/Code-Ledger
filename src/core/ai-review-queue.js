@@ -18,6 +18,10 @@ const RETRY_BASE_DELAY_MS = 5000; // Start with 5s backoff
 const RETRY_MAX_DELAY_MS = 300000; // Cap at 5 minutes
 const MAX_RETRIES = 5;
 const RATE_LIMIT_DELAY_MS = 2000; // Space between review requests
+// Longer than any single review can take: generateAIReview() caps each provider
+// call, and a full fallback chain still finishes well inside this window. Only a
+// terminated service worker leaves an item "processing" for longer.
+const STALE_PROCESSING_MS = 600000; // 10 minutes
 
 /** Queue item status */
 const STATUS = {
@@ -298,6 +302,61 @@ export async function markFailedWithRetry(itemId, error) {
   } catch (e) {
     dbg.warn("Failed to mark failed with retry:", e?.message);
     return false;
+  }
+}
+
+/**
+ * Return items stranded in "processing" back to "pending".
+ *
+ * markProcessing() is followed by an awaited network call, and an MV3 service
+ * worker can be evicted at any point during it. Nothing runs on eviction, so
+ * the item keeps status "processing" forever — and getNextPendingReview() only
+ * ever selects "pending", so that review is never attempted again.
+ *
+ * Retry state is left untouched: this reclaims a lost attempt, it does not
+ * count as a failure.
+ *
+ * @param {number} maxAgeMs — reclaim items untouched for longer than this
+ * @returns {Promise<number>} how many were reclaimed
+ */
+export async function reclaimStaleProcessing(maxAgeMs = STALE_PROCESSING_MS) {
+  try {
+    const db = await _openDB();
+    const tx = db.transaction([QUEUE_STORE], "readwrite");
+    const store = tx.objectStore(QUEUE_STORE);
+
+    return new Promise((resolve) => {
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const cutoff = Date.now() - maxAgeMs;
+        const stale = (req.result || []).filter(
+          (i) => i.status === STATUS.PROCESSING && (i.updatedAt || 0) < cutoff,
+        );
+        if (stale.length === 0) {
+          db.close();
+          resolve(0);
+          return;
+        }
+        let remaining = stale.length;
+        stale.forEach((item) => {
+          const put = store.put({ ...item, status: STATUS.PENDING, updatedAt: Date.now() });
+          put.onsuccess = put.onerror = () => {
+            if (--remaining === 0) {
+              db.close();
+              dbg.warn(`reclaimStaleProcessing: returned ${stale.length} stuck item(s) to pending`);
+              resolve(stale.length);
+            }
+          };
+        });
+      };
+      req.onerror = () => {
+        db.close();
+        resolve(0);
+      };
+    });
+  } catch (e) {
+    dbg.warn("Failed to reclaim stale processing items:", e?.message);
+    return 0;
   }
 }
 

@@ -50,7 +50,7 @@ export async function initMCPConfig() {
   try {
     const existing = await getMCPConfig();
     if (!existing) {
-      await Storage.setSettings({ "mcp.config": DEFAULT_MCP_CONFIG });
+      await Storage.updateSettings({ "mcp.config": DEFAULT_MCP_CONFIG });
       dbg.log("MCP config initialized with defaults");
     }
   } catch (e) {
@@ -96,7 +96,7 @@ export async function setMCPToolEnabled(toolId, enabled) {
   try {
     const config = await getMCPConfig();
     config.enabled[toolId] = enabled;
-    await Storage.setSettings({ "mcp.config": config });
+    await Storage.updateSettings({ "mcp.config": config });
     dbg.log(`MCP tool ${toolId} set to ${enabled}`);
   } catch (e) {
     dbg.error(`Failed to toggle MCP tool ${toolId}:`, e);
@@ -110,7 +110,7 @@ export async function updateMCPConfig(updates) {
   try {
     const config = await getMCPConfig();
     Object.assign(config, updates);
-    await Storage.setSettings({ "mcp.config": config });
+    await Storage.updateSettings({ "mcp.config": config });
     dbg.log("MCP config updated:", updates);
   } catch (e) {
     dbg.error("Failed to update MCP config:", e);
@@ -149,7 +149,7 @@ export async function shouldUseToolsForAI(context) {
  */
 export async function resetMCPConfig() {
   try {
-    await Storage.setSettings({ "mcp.config": DEFAULT_MCP_CONFIG });
+    await Storage.updateSettings({ "mcp.config": DEFAULT_MCP_CONFIG });
     dbg.log("MCP config reset to defaults");
   } catch (e) {
     dbg.error("Failed to reset MCP config:", e);

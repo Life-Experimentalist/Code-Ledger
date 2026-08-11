@@ -65,7 +65,12 @@ function normalizeProblem(problem = {}) {
   };
 }
 
-export function AIChatsView({ copyableEnabled = false, problems = [], settings = {} }) {
+export function AIChatsView({
+  copyableEnabled = false,
+  problems = [],
+  settings = {},
+  onSettingsChange,
+}) {
   const [chats, setChats] = useState([]);
   const [activeTab, setActiveTab] = useState("by-problem");
   const [searchQuery, setSearchQuery] = useState("");
@@ -110,13 +115,23 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
       const allChats = searchQuery.trim()
         ? await searchChats(searchQuery.trim())
         : await getAllChats();
-      setChats(allChats);
+
+      const showProblemChats = settings.showProblemChats !== false;
+      const filtered = showProblemChats
+        ? allChats
+        : allChats.filter(
+            (chat) =>
+              !chat.problemSlug &&
+              (!chat.attachedProblemSlugs || chat.attachedProblemSlugs.length === 0),
+          );
+
+      setChats(filtered);
     } catch (e) {
       setChats([]);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, settings.showProblemChats]);
 
   useEffect(() => {
     loadChats();
@@ -309,7 +324,14 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
       const now = Date.now();
       const messages = [
         { role: "user", content: text, timestamp: now },
-        { role: "assistant", content: response, timestamp: now + 1 },
+        {
+          role: "assistant",
+          content: response.response,
+          providerId: response.providerId,
+          modelId: response.modelId,
+          isFallback: response.isFallback,
+          timestamp: now + 1,
+        },
       ];
 
       const meta = {
@@ -432,7 +454,10 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
         userMessage,
         {
           role: "assistant",
-          content: response,
+          content: response.response,
+          providerId: response.providerId,
+          modelId: response.modelId,
+          isFallback: response.isFallback,
           timestamp: Date.now() + 1,
         },
       ];
@@ -639,6 +664,21 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
             : "border-white/10 text-slate-400"}"
         >
           By Date
+        </button>
+        <button
+          onClick=${() => {
+            const nextVal = settings.showProblemChats !== false ? false : true;
+            onSettingsChange?.("showProblemChats", nextVal);
+          }}
+          class="px-3 py-2 rounded-lg border text-sm flex items-center gap-1.5 ${settings.showProblemChats !==
+          false
+            ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+            : "border-white/10 text-slate-400"}"
+        >
+          <span>Problem Chats</span>
+          <span class="text-[10px] opacity-70"
+            >${settings.showProblemChats !== false ? "ON" : "OFF"}</span
+          >
         </button>
       </div>
 
@@ -851,6 +891,17 @@ export function AIChatsView({ copyableEnabled = false, problems = [], settings =
                             ${msg.role === "user" ? "You" : msg.role === "system" ? "System" : "AI"}
                           </div>
                           <div class="flex-1 bg-slate-800 rounded-lg p-3">
+                            ${msg.role === "assistant" && (msg.modelId || msg.providerId)
+                              ? html`<div class="text-[10px] font-mono text-cyan-400/80 mb-1">
+                                  🤖 ${msg.modelId || msg.providerId}
+                                  ${msg.isFallback
+                                    ? html`<span
+                                        class="ml-2 px-1 text-[8px] bg-rose-500/20 text-rose-300 rounded border border-rose-500/30"
+                                        >backup fallback</span
+                                      >`
+                                    : ""}
+                                </div>`
+                              : ""}
                             ${msg.role === "user"
                               ? html`<div class="text-sm text-slate-100 whitespace-pre-wrap">
                                   ${msg.content}

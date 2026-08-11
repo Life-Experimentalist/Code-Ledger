@@ -15,7 +15,7 @@ import { createDebugger } from "../../lib/debug.js";
 
 const dbg = createDebugger("DifficultyMapPanel");
 
-import { BUILT_IN_MAP } from "../../core/difficulty-map.js";
+import { BUILT_IN_MAP, CANONICAL } from "../../core/difficulty-map.js";
 
 const DIFF_COLOR = {
   Easy: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
@@ -37,8 +37,7 @@ export function DifficultyMapPanel() {
 
   const save = async (map) => {
     try {
-      const settings = await Storage.getSettings();
-      await Storage.setSettings({ ...settings, difficultyMap: map });
+      await Storage.updateSettings({ difficultyMap: map });
       setUserMap(map);
       setStatus("Saved");
       setTimeout(() => setStatus(""), 2000);

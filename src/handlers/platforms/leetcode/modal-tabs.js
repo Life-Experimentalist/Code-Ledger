@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * LeetCode-specific ProblemModal tab definitions.
+ * Universal ProblemModal tab definitions for LeetCode and GeeksForGeeks.
  * Registers with modalTabRegistry on import.
  */
 
@@ -10,17 +10,23 @@ import { h, useState } from "../../../vendor/preact-bundle.js";
 import { htm } from "../../../vendor/preact-bundle.js";
 import { modalTabRegistry } from "../../../core/modal-tab-registry.js";
 import { highlightCode } from "../../../lib/syntax-highlight.js";
+import { sanitizeHtml } from "../../../lib/sanitize-html.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 
 const html = htm.bind(h);
 const IS_EXTENSION = !!globalThis.chrome?.runtime?.id;
 
-function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
+function UniversalCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
   const [recovering, setRecovering] = useState(false);
   const [recoveryError, setRecoveryError] = useState("");
 
   if (!problem.code) {
+    const isGFG = problem.platform === "geeksforgeeks";
+    const platformLabel = isGFG ? "GeeksForGeeks" : "LeetCode";
+    const loginUrl = isGFG
+      ? CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl
+      : CONSTANTS.PLATFORMS.leetcode.baseUrl;
     return html`
       <div class="flex flex-col items-center gap-4 py-12 text-center">
         <p class="text-slate-500 text-sm">Code was not extracted for this submission.</p>
@@ -55,22 +61,22 @@ function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                 disabled=${recovering}
                 class="px-4 py-2 rounded-lg bg-cyan-600/15 border border-cyan-500/30 text-cyan-300 text-xs hover:bg-cyan-600/30 disabled:opacity-40 transition-colors"
               >
-                ${recovering ? "Recovering code…" : "Recover Code from LeetCode"}
+                ${recovering ? "Recovering code…" : `Recover Code from ${platformLabel}`}
               </button>
               ${recoveryError
                 ? html` <p class="text-rose-400 text-xs max-w-xs">${recoveryError}</p>
                     <a
-                      href=${CONSTANTS.PLATFORMS.leetcode.baseUrl}
+                      href=${loginUrl}
                       target="_blank"
                       rel="noopener"
                       class="text-[10px] text-cyan-500 hover:text-cyan-300 underline"
                     >
-                      Open LeetCode to log in, then retry
+                      Open ${platformLabel} to log in, then retry
                     </a>`
                 : ""}
               <p class="text-slate-600 text-[10px] max-w-xs">
-                Opens a background LeetCode tab to fetch your latest accepted submission. Make sure
-                you are logged into LeetCode first.
+                Opens a background tab to fetch your latest accepted submission. Make sure you are
+                logged into ${platformLabel} first.
               </p>
             `
           : html`<p class="text-slate-600 text-xs">
@@ -101,18 +107,25 @@ function LCCodeTab({ problem, langName, copied, copyCode, onUpdate }) {
   </div>`;
 }
 
-modalTabRegistry.register("leetcode", [
+const universalTabs = [
   {
     id: "overview",
     label: "Overview",
-    render(problem, { html, handleRefreshData, refreshing, problemUrl }) {
+    render(
+      problem,
+      { html, handleRefreshData, refreshing, problemUrl, problemList = [], onNavigateProblem },
+    ) {
+      if (!problem) return html`<div></div>`;
       return html` <div class="flex flex-col gap-4">
         ${problem.problemStatement
           ? html`
               <div
                 class="text-sm text-slate-300 leading-relaxed lc-content"
                 dangerouslySetInnerHTML=${{
-                  __html: problem.problemStatement,
+                  // The statement is scraped markup. It renders both in the host
+                  // page's world and in the extension's own library page, so it
+                  // is reduced to attribute-free formatting tags first.
+                  __html: sanitizeHtml(problem.problemStatement),
                 }}
               ></div>
             `
@@ -120,14 +133,14 @@ modalTabRegistry.register("leetcode", [
               <div class="flex flex-col items-center justify-center py-8 gap-3 text-center">
                 <span class="text-2xl">📄</span>
                 <p class="text-slate-400 text-sm">No problem statement cached locally.</p>
-                <p class="text-slate-600 text-xs">Open on LeetCode to view the full description.</p>
+                <p class="text-slate-600 text-xs">Open to view the full description.</p>
                 <div class="flex gap-2 mt-3">
                   <a
                     href=${problemUrl}
                     target="_blank"
                     rel="noopener"
                     class="text-xs text-cyan-400 hover:text-cyan-300"
-                    >Open LeetCode ↗</a
+                    >Open Platform ↗</a
                   >
                   <button
                     onClick=${handleRefreshData}
@@ -161,15 +174,54 @@ ${problem.constraints}</pre
                 </p>
                 <div class="flex flex-col gap-1">
                   ${problem.similar.slice(0, 5).map((s) => {
-                    const sUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
+                    const targetPlatform = problem.platform || "leetcode";
+                    const inLibraryProblem = problemList.find(
+                      (p) => p.platform === targetPlatform && p.titleSlug === s.titleSlug,
+                    );
                     const sDiffClass =
                       {
                         Easy: "text-emerald-400",
                         Medium: "text-amber-400",
                         Hard: "text-rose-400",
                       }[s.difficulty] || "text-slate-400";
+
+                    if (inLibraryProblem) {
+                      return html` <div
+                        onClick=${() => onNavigateProblem?.(inLibraryProblem)}
+                        class="flex items-center justify-between py-1 px-2 rounded hover:bg-white/5 cursor-pointer transition-colors group"
+                      >
+                        <span class="text-xs text-slate-300 group-hover:text-cyan-300"
+                          >${s.title || s.titleSlug}
+                          <span class="text-[9px] opacity-70 ml-1.5 text-emerald-400"
+                            >📚 In Library</span
+                          ></span
+                        >
+                        <span class="text-[10px] ${sDiffClass} ml-2 shrink-0"
+                          >${s.difficulty || ""}</span
+                        >
+                      </div>`;
+                    }
+
+                    const sUrl =
+                      targetPlatform === "geeksforgeeks"
+                        ? `https://www.geeksforgeeks.org/problems/${s.titleSlug}/`
+                        : CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
+
+                    const handleClick = (e) => {
+                      const platformLabel =
+                        targetPlatform === "geeksforgeeks" ? "GeeksForGeeks" : "LeetCode";
+                      if (
+                        !confirm(
+                          `This problem is not in your library. Open it on ${platformLabel} to solve it?`,
+                        )
+                      ) {
+                        e.preventDefault();
+                      }
+                    };
+
                     return html` <a
                       href=${sUrl}
+                      onClick=${handleClick}
                       target="_blank"
                       rel="noopener"
                       class="flex items-center justify-between py-1 px-2 rounded hover:bg-white/5 transition-colors no-underline group"
@@ -192,7 +244,21 @@ ${problem.constraints}</pre
                 <p class="text-[10px] uppercase tracking-wider text-slate-600 mb-2">Hints</p>
                 ${problem.hints.map(
                   (h, i) => html`
-                    <details class="mb-1 group">
+                    <details
+                      class="mb-1 group"
+                      onToggle=${(e) => {
+                        if (e.target.open) {
+                          chrome.runtime
+                            .sendMessage({
+                              type: "RECORD_HINT_VIEW",
+                              slug: problem.titleSlug || problem.id || "",
+                              platform: problem.platform || "leetcode",
+                              hintIndex: i,
+                            })
+                            .catch(() => {});
+                        }
+                      }}
+                    >
                       <summary
                         class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 select-none"
                       >
@@ -213,7 +279,7 @@ ${problem.constraints}</pre
     label: "Code",
     show: () => true,
     render(problem, { langName, copied, copyCode, onUpdate }) {
-      return html`<${LCCodeTab}
+      return html`<${UniversalCodeTab}
         problem=${problem}
         langName=${langName}
         copied=${copied}
@@ -250,26 +316,65 @@ ${problem.constraints}</pre
           queueError=${queueError}
           onRunQueueNow=${onRunQueueNow}
           runQueueBusy=${runQueueBusy}
+          providerId=${problem._aiProvider}
+          modelId=${problem._aiModel}
         />
       `;
     },
   },
   {
     id: "similar",
-    label: (p) => `Similar (${p.similar?.length || 0})`,
-    show: (p) => (p.similar?.length || 0) > 0,
-    render(problem, { html }) {
+    label: (p) => `Similar (${p?.similar?.length || 0})`,
+    show: (p) => p && (p.similar?.length || 0) > 0,
+    render(problem, { html, problemList = [], onNavigateProblem }) {
       return html` <div class="flex flex-col gap-2">
         ${(problem.similar || []).map((s) => {
-          const sUrl = CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
+          const targetPlatform = problem.platform || "leetcode";
+          const inLibraryProblem = problemList.find(
+            (p) => p.platform === targetPlatform && p.titleSlug === s.titleSlug,
+          );
           const sDiffClass =
             {
               Easy: "text-emerald-400",
               Medium: "text-amber-400",
               Hard: "text-rose-400",
             }[s.difficulty] || "text-slate-400";
+
+          if (inLibraryProblem) {
+            return html` <div
+              onClick=${() => onNavigateProblem?.(inLibraryProblem)}
+              class="flex items-center justify-between p-3 bg-white/3 border border-white/5 rounded-xl hover:border-cyan-500/20 hover:bg-white/5 cursor-pointer transition-colors"
+            >
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-slate-200">${s.title || s.titleSlug}</span>
+                <span
+                  class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium"
+                  >📚 In Library</span
+                >
+              </div>
+              <span class="text-xs ${sDiffClass} shrink-0 ml-2">${s.difficulty || ""}</span>
+            </div>`;
+          }
+
+          const sUrl =
+            targetPlatform === "geeksforgeeks"
+              ? `https://www.geeksforgeeks.org/problems/${s.titleSlug}/`
+              : CONSTANTS.PLATFORMS.leetcode.problemsBase + s.titleSlug + "/";
+
+          const handleClick = (e) => {
+            const platformLabel = targetPlatform === "geeksforgeeks" ? "GeeksForGeeks" : "LeetCode";
+            if (
+              !confirm(
+                `This problem is not in your library. Open it on ${platformLabel} to solve it?`,
+              )
+            ) {
+              e.preventDefault();
+            }
+          };
+
           return html` <a
             href=${sUrl}
+            onClick=${handleClick}
             target="_blank"
             rel="noopener"
             class="flex items-center justify-between p-3 bg-white/3 border border-white/5 rounded-xl hover:border-cyan-500/20 hover:bg-white/5 transition-colors no-underline"
@@ -343,9 +448,18 @@ ${problem.constraints}</pre
                                   />
                                 </div>
                               `}
-                          <span class="text-[9px] text-slate-700"
-                            >${msg.role === "user" ? "You" : "AI"}</span
-                          >
+                          <span class="text-[9px] text-slate-700 flex items-center gap-1.5"
+                            >${msg.role === "user" ? "You" : "AI"}
+                            ${msg.role === "assistant" && (msg.modelId || msg.providerId)
+                              ? html`
+                                  <span class="text-[8px] text-slate-500 font-mono">
+                                    (${msg.modelId || msg.providerId}${msg.isFallback
+                                      ? " • backup fallback"
+                                      : ""})
+                                  </span>
+                                `
+                              : ""}
+                          </span>
                         </div>
                       `,
                     )}
@@ -405,4 +519,7 @@ ${problem.constraints}</pre
         },
       ]
     : []),
-]);
+];
+
+modalTabRegistry.register("leetcode", universalTabs);
+modalTabRegistry.register("geeksforgeeks", universalTabs);

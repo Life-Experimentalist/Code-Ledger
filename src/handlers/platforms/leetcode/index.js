@@ -12,6 +12,7 @@ import { Storage } from "../../../core/storage.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
+import { isAIActive } from "../../../core/feature-flags.js";
 import { runtime, tabs } from "../../../lib/browser-compat.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { resolveLang, langExt, LANG_VERBOSE } from "./lang-utils.js";
@@ -306,6 +307,9 @@ Be concise. Max 200 words.`;
   _startAIPanel(slug) {
     Storage.getSettings()
       .then((settings) => {
+        // Nothing to chat with until a provider is switched on. A panel that
+        // can only apologise is worse than no panel.
+        if (!isAIActive(settings)) return;
         if (settings.leetcode_ai_panel === false) return;
         if (settings.floatingAIEnabled === false) return;
         if (this._aiPanel && this._aiPanelSlug === slug) return;
@@ -533,7 +537,7 @@ Be concise. Max 200 words.`;
 
     // Try to hook immediately (page may already be rendered)
     const tryHook = () => {
-      const btn = document.querySelector('[data-e2e-locator="console-submit-button"]');
+      const btn = this.safeQuery(SELECTORS.qol.submitButton);
       if (btn) hookBtn(btn);
       hookKeyboard();
     };
@@ -552,22 +556,32 @@ Be concise. Max 200 words.`;
     return onSubmitFired(this);
   }
 
-  _getCodeFromMonaco() {
-    try {
-      const active = window.monaco?.editor?.getActiveCodeEditor?.()?.getModel?.()?.getValue?.();
-      if (typeof active === "string" && active.trim()) return active;
-      const editors = window.monaco?.editor?.getEditors?.();
-      if (editors?.length) {
-        for (const ed of editors) {
-          const val = ed.getModel?.()?.getValue?.();
-          if (typeof val === "string" && val.trim()) return val;
-        }
-      }
-      const code = window.monaco?.editor?.getModels()?.[0]?.getValue();
-      return typeof code === "string" && code.trim() ? code : null;
-    } catch (_) {
-      return null;
-    }
+  async _getCodeFromMonaco() {
+    return new Promise((resolve) => {
+      const requestId = Math.random().toString(36).substring(2);
+      const responseEvent = `cl-editor-response-${requestId}`;
+
+      const script = document.createElement("script");
+      script.src = runtime.getURL("content/injected-editor-helper.js");
+      script.setAttribute("data-action", "extract");
+      script.setAttribute("data-request-id", requestId);
+
+      const listener = (e) => {
+        window.removeEventListener(responseEvent, listener);
+        script.remove();
+        resolve(e.detail?.code || null);
+      };
+
+      window.addEventListener(responseEvent, listener);
+      (document.body || document.documentElement).appendChild(script);
+
+      // Timeout fallback to prevent hanging
+      setTimeout(() => {
+        window.removeEventListener(responseEvent, listener);
+        if (script.parentNode) script.remove();
+        resolve(null);
+      }, 1000);
+    });
   }
 
   _readFloatingAIPageMeta() {
@@ -584,8 +598,8 @@ Be concise. Max 200 words.`;
     };
   }
 
-  _readFloatingAIEditorCode() {
-    const monacoCode = this._getCodeFromMonaco();
+  async _readFloatingAIEditorCode() {
+    const monacoCode = await this._getCodeFromMonaco();
     if (monacoCode) return monacoCode;
     try {
       const lines = document.querySelectorAll(".monaco-editor .view-lines .view-line");

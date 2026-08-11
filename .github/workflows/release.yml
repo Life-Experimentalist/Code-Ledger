@@ -35,8 +35,14 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Unit and worker tests
+        run: npm test
+
       - name: Sync regression checks
         run: npm run test:sync-regression
+
+      - name: Validate OpenAPI spec
+        run: npm run validate:openapi
 
       # ── Derive version from git tag ──────────────────────────────────────
       - name: Extract version

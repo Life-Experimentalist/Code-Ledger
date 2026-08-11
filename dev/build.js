@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
+import { shipsInPackage } from "./pack-filter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -45,6 +46,9 @@ if (!SKIP_CSS) {
 
 if (fs.existsSync(DIST_DIR)) fs.rmSync(DIST_DIR, { recursive: true, force: true });
 
+// Same filter the release packagers use, so what you load unpacked is what
+// ships. A dist that carries files the zip does not is a dist that can pass a
+// test the release then fails.
 function copyRecursive(src, dest) {
   if (fs.statSync(src).isDirectory()) {
     fs.mkdirSync(dest, { recursive: true });
@@ -52,6 +56,7 @@ function copyRecursive(src, dest) {
       copyRecursive(path.join(src, item), path.join(dest, item)),
     );
   } else {
+    if (!shipsInPackage(path.relative(SRC_DIR, src))) return;
     fs.copyFileSync(src, dest);
   }
 }
@@ -66,9 +71,6 @@ fs.writeFileSync(
   path.join(chromeDir, "manifest.json"),
   JSON.stringify(chromeManifest, null, 4) + "\n",
 );
-// Remove source-specific manifests — only the built manifest.json belongs in dist
-fs.rmSync(path.join(chromeDir, "manifest-chromium.json"), { force: true });
-fs.rmSync(path.join(chromeDir, "manifest-firefox.json"), { force: true });
 
 // Build Firefox dist
 console.log("Building Firefox extension...");
@@ -80,8 +82,5 @@ fs.writeFileSync(
   path.join(firefoxDir, "manifest.json"),
   JSON.stringify(ffManifest, null, 4) + "\n",
 );
-// Remove source-specific manifests — only the built manifest.json belongs in dist
-fs.rmSync(path.join(firefoxDir, "manifest-chromium.json"), { force: true });
-fs.rmSync(path.join(firefoxDir, "manifest-firefox.json"), { force: true });
 
 console.log("Dist build complete. Run `node dev/package.js` to create release zips.");

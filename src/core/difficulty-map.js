@@ -16,6 +16,9 @@ import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("DifficultyMap");
 
+/** The only difficulty values the rest of the app stores or filters on. */
+export const CANONICAL = ["Easy", "Medium", "Hard"];
+
 /**
  * Built-in normalizations for known non-standard difficulty labels.
  * Platform handlers use these automatically so users never need to remap

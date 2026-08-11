@@ -33,9 +33,22 @@ function fmtDateLabel(dateStr) {
   }
 }
 
-function isLeapYear(year) {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-}
+/**
+ * Rolling windows anchored on today rather than on Jan 1.
+ *
+ * `past_year` walks the calendar back a year and forward a day, so it spans
+ * exactly 365 days in an ordinary year and 366 across a leap day — whichever
+ * the window really covers, instead of a fixed count that drifts every fourth
+ * year. Anything numeric selects that calendar year.
+ */
+const PERIODS = [
+  { id: "30d", label: "Last 30 days" },
+  { id: "90d", label: "Last 90 days" },
+  { id: "6m", label: "Last 6 months" },
+  { id: "past_year", label: "Last 12 months" },
+  { id: "24m", label: "Last 2 years" },
+  { id: "all", label: "All time" },
+];
 
 function toDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -76,14 +89,39 @@ export function HeatMap({ problems = [] }) {
       endDate,
       yearStart = null;
 
-    if (selectedPeriod === "past_year") {
-      // Exactly 1 year back, then snap to prior Sunday for column alignment
+    if (!/^\d{4}$/.test(selectedPeriod)) {
       endDate = new Date(today);
-      const oneYearAgo = new Date(today);
-      oneYearAgo.setFullYear(today.getFullYear() - 1);
-      oneYearAgo.setDate(oneYearAgo.getDate() + 1); // start day after same date last year
-      startDate = new Date(oneYearAgo);
+      const from = new Date(today);
+      if (selectedPeriod === "30d") from.setDate(from.getDate() - 29);
+      else if (selectedPeriod === "90d") from.setDate(from.getDate() - 89);
+      else if (selectedPeriod === "6m") {
+        from.setMonth(from.getMonth() - 6);
+        from.setDate(from.getDate() + 1);
+      } else if (selectedPeriod === "24m") {
+        from.setFullYear(from.getFullYear() - 2);
+        from.setDate(from.getDate() + 1);
+      } else if (selectedPeriod === "all") {
+        let earliest = Infinity;
+        for (const p of problems) {
+          const ts = p.timestamp || 0;
+          const ms = ts > 1e10 ? ts : ts * 1000;
+          if (ms && ms < earliest) earliest = ms;
+        }
+        if (Number.isFinite(earliest)) from.setTime(earliest);
+        else {
+          from.setFullYear(from.getFullYear() - 1);
+          from.setDate(from.getDate() + 1);
+        }
+      } else {
+        from.setFullYear(from.getFullYear() - 1);
+        from.setDate(from.getDate() + 1);
+      }
+      startDate = new Date(from);
       startDate.setDate(startDate.getDate() - startDate.getDay()); // snap to Sunday
+      // Snapping to Sunday pulls in up to six days that sit before the window.
+      // They pad the column so the grid stays rectangular, but they are blanked
+      // rather than drawn — a "last 30 days" map that quietly shows 36 is wrong.
+      yearStart = new Date(from);
     } else {
       const year = parseInt(selectedPeriod, 10);
       yearStart = new Date(year, 0, 1); // Jan 1
@@ -226,7 +264,8 @@ export function HeatMap({ problems = [] }) {
       // 28px for day-label col + 2px gap between each column
       const usable = w - 28 - numWeeks * 2;
       const cs = Math.max(7, Math.floor(usable / numWeeks));
-      setCellPx(Math.min(cs, 14));
+      // Capped so a five-column window does not inflate into coloured tiles.
+      setCellPx(Math.min(cs, 18));
     });
     ro.observe(gridRef.current);
     return () => ro.disconnect();
@@ -279,8 +318,8 @@ export function HeatMap({ problems = [] }) {
             }}
             onClick=${(e) => e.stopPropagation()}
           >
-            <option value="past_year">Past Year</option>
-            ${availableYears.map((y) => html`<option value="${y}">${y}</option>`)}
+            ${PERIODS.map((p) => html`<option key=${p.id} value=${p.id}>${p.label}</option>`)}
+            ${availableYears.map((y) => html`<option key=${y} value="${y}">${y}</option>`)}
           </select>
         </div>
       </div>
@@ -326,10 +365,14 @@ export function HeatMap({ problems = [] }) {
           </div>
 
           <!-- Week columns -->
-          <div class="flex" style="gap: 2px; flex: 1; overflow: hidden;">
+          <div class="flex" style="gap: 2px; overflow: hidden;">
             ${grid.map(
               (week, wi) => html`
-                <div key=${wi} class="flex flex-col" style="gap: 2px; flex: 1;">
+                <div
+                  key=${wi}
+                  class="flex flex-col"
+                  style="gap: 2px; flex: 0 0 auto; width: ${cellPx}px;"
+                >
                   ${week.map((day, di) =>
                     day === null
                       ? html`<div

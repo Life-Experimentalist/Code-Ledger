@@ -52,8 +52,22 @@ export const FEATURE_STATUS_META = Object.freeze({
   },
 });
 
+/**
+ * The running extension's version, read from the manifest so it cannot drift
+ * from what was actually packaged. Falls back to the literal only outside an
+ * extension context, where there is no manifest to read.
+ */
+function readVersion() {
+  try {
+    const rt = globalThis.chrome?.runtime ?? globalThis.browser?.runtime;
+    return rt?.getManifest?.()?.version || "1.0.0";
+  } catch {
+    return "1.0.0";
+  }
+}
+
 export const CONSTANTS = Object.freeze({
-  VERSION: "1.0.0",
+  VERSION: readVersion(),
   EXTENSION_NAME: "CodeLedger",
   DEBUG_DEFAULT: false,
   DEBUG_OVERRIDE: null, // null = use stored setting; true/false = force override (dev use)
@@ -82,8 +96,6 @@ export const CONSTANTS = Object.freeze({
     CANONICAL_MAP_SCHEMA:
       "https://raw.githubusercontent.com/Life-Experimentalist/Code-Ledger/main/data/schema/canonical-map.schema.json",
     GITHUB_OAUTH_BASE: "https://github.com/login/oauth",
-    GITLAB_OAUTH_BASE: "https://gitlab.com/oauth",
-    BITBUCKET_OAUTH_BASE: "https://bitbucket.org/site/oauth2",
   },
 
   // ── AI Providers ──
@@ -161,22 +173,6 @@ export const CONSTANTS = Object.freeze({
       oauthBase: "https://github.com/login/oauth",
       clientId: "",
     },
-    gitlab: {
-      id: "gitlab",
-      name: "GitLab",
-      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
-      apiBase: "https://gitlab.com/api/v4",
-      oauthBase: "https://gitlab.com/oauth",
-      clientId: "",
-    },
-    bitbucket: {
-      id: "bitbucket",
-      name: "Bitbucket",
-      status: FEATURE_STATUS.UNDER_CONSTRUCTION,
-      apiBase: "https://api.bitbucket.org/2.0",
-      oauthBase: "https://bitbucket.org/site/oauth2",
-      clientId: "",
-    },
   },
 
   // ── Platforms ──
@@ -212,8 +208,8 @@ export const CONSTANTS = Object.freeze({
       domains: ["geeksforgeeks.org", "practice.geeksforgeeks.org", "www.geeksforgeeks.org"],
       baseUrl: "https://www.geeksforgeeks.org",
       problemsBase: "https://www.geeksforgeeks.org/problems/",
-      practiceBase: "https://practice.geeksforgeeks.org/problems/",
-      status: FEATURE_STATUS.ALPHA,
+      practiceBase: "https://www.geeksforgeeks.org/problems/",
+      status: FEATURE_STATUS.STABLE,
     },
     codeforces: {
       id: "codeforces",
@@ -254,9 +250,6 @@ export const CONSTANTS = Object.freeze({
     IMPORT: "import",
   },
 
-  HEARTBEAT_PORT_NAME: "heartbeat",
-  HEARTBEAT_INTERVAL_MS: 20_000,
-
   // Duplicate-detection modal timings — change here to affect all dedup UI.
   DEDUP: {
     SAME_CODE_COUNTDOWN_S: 10, // seconds before auto-keeping the better version
@@ -272,7 +265,9 @@ export const CONSTANTS = Object.freeze({
     AI_KEYS: "ai.keys",
     AI_KEY_INDICES: "ai.key.indices",
     AI_ENDPOINT_OVERRIDES: "ai.endpoint.overrides",
-    TELEMETRY_OPT_IN: "telemetry.optIn",
+    // Must match the settingKey the Advanced panel writes; a differing value
+    // here reads as authoritative and silently disconnects the toggle.
+    TELEMETRY_OPT_IN: "telemetryOptIn",
     INCOGNITO_MODE: "incognito.mode",
     DISABLED_PLATFORMS: "platforms.disabled",
     CANONICAL_MAP_CACHE: "canonical.map.cache",
@@ -287,6 +282,12 @@ export const CONSTANTS = Object.freeze({
     // Optional per-user difficulty mapping for non-standard difficulty labels.
     // Stored shape: { "extra hard": "Hard", "school": "Easy" }
     DIFFICULTY_MAP: "difficulty.map",
+    // Gamification state that cannot be derived from the ledger: declared
+    // vacation ranges and which achievement toasts have already been shown.
+    // Streaks, points and freezes are always recomputed, never stored.
+    // Shape: { vacations: [{ start, end, note }], seenAchievements: string[],
+    //          achievementsSeeded: boolean }
+    GAMIFICATION: "gamification.state",
   },
 
   IDB_NAME: "codeledger",
@@ -338,6 +339,9 @@ export const CONSTANTS = Object.freeze({
     if (!titleSlug) return "#";
     const p = this.PLATFORMS[platform];
     if (!p?.problemsBase) return "#";
+    if (platform === "geeksforgeeks") {
+      return p.problemsBase + titleSlug + "/1";
+    }
     return p.problemsBase + titleSlug + "/";
   },
 
@@ -355,5 +359,71 @@ export const CONSTANTS = Object.freeze({
     MAX_RETRIES_BEFORE_PAUSE: 2,
     // Duration to pause after hitting error threshold (2 hours)
     PAUSE_DURATION_MS: 1.5 * 60 * 60 * 1000,
+  },
+
+  // ── Canonical Topics List ──
+  CANONICAL_DSA_TOPICS: [
+    "Dynamic Programming",
+    "Greedy",
+    "Recursion",
+    "Backtracking",
+    "Divide and Conquer",
+    "Bit Manipulation",
+    "Math",
+    "Two Pointers",
+    "Sliding Window",
+    "Binary Search",
+    "Sorting",
+    "Depth-First Search",
+    "Breadth-First Search",
+    "Array",
+    "String",
+    "Hash Table",
+    "Linked List",
+    "Stack",
+    "Queue",
+    "Heap (Priority Queue)",
+    "Tree",
+    "Binary Search Tree",
+    "Trie",
+    "Graph",
+    "Union Find",
+    "Segment Tree",
+    "Binary Indexed Tree",
+  ],
+
+  // ── Language Display Name Normalization Map ──
+  LANG_NORM_MAP: {
+    python: "Python",
+    py: "Python",
+    python2: "Python2",
+    py2: "Python2",
+    python3: "Python3",
+    py3: "Python3",
+    cpp: "C++",
+    "c++": "C++",
+    c: "C",
+    java: "Java",
+    javascript: "JavaScript",
+    js: "JavaScript",
+    typescript: "TypeScript",
+    ts: "TypeScript",
+    ruby: "Ruby",
+    golang: "Go",
+    go: "Go",
+    swift: "Swift",
+    kotlin: "Kotlin",
+    scala: "Scala",
+    rust: "Rust",
+    php: "PHP",
+    csharp: "C#",
+    "c#": "C#",
+    dart: "Dart",
+    racket: "Racket",
+    erlang: "Erlang",
+    elixir: "Elixir",
+    mysql: "MySQL",
+    postgresql: "PostgreSQL",
+    bash: "Bash",
   },
 });

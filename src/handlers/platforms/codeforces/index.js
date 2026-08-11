@@ -34,6 +34,7 @@ import {
 } from "./submission-detector.js";
 import { injectCFQoL, removeCFQoL } from "./qol.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
+import { isAIActive } from "../../../core/feature-flags.js";
 
 const dbg = createDebugger("CFHandler");
 
@@ -314,6 +315,9 @@ Be concise. Max 200 words.`;
   _startAIPanel(slug) {
     Storage.getSettings()
       .then((settings) => {
+        // Nothing to chat with until a provider is switched on. A panel that
+        // can only apologise is worse than no panel.
+        if (!isAIActive(settings)) return;
         if (settings.cf_ai_panel === false) return;
         if (settings.floatingAIEnabled === false) return;
         if (this._aiPanel && this._aiPanelSlug === slug) return;

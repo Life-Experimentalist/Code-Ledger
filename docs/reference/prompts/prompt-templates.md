@@ -1,5 +1,19 @@
 # CodeLedger — AI Studio Generation Prompt v2
 
+> **This is a historical artifact, not documentation of the shipped code.**
+>
+> It is the original generation brief that produced the first draft of
+> CodeLedger, kept for provenance. The codebase has moved on: files named here
+> no longer exist (`git-engine.js`, `src/manifest.json`), dependencies are no
+> longer loaded from `esm.sh` (Preact, htm and Chart.js are vendored into
+> `src/vendor/` as committed esbuild bundles built from npm), features sketched
+> here were never built (the hosted `/library` web app, gamification, the
+> portfolio view), and the structure differs throughout.
+>
+> **Do not treat anything below as a description of the current system.** The
+> accurate sources are `CLAUDE.md`, `docs/architecture/system-architecture.md`,
+> and `docs/OPENAPI.yaml`.
+
 # Paste into Google AI Studio with Gemini 2.5 Pro, 1M token context window.
 
 # Generate one top-level directory at a time if context is tight.
@@ -45,12 +59,7 @@ All UI is component-based using **Preact** loaded from CDN (`https://esm.sh/prea
 ```js
 // Every UI file starts with:
 import { h, render, Component } from "https://esm.sh/preact";
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-} from "https://esm.sh/preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "https://esm.sh/preact/hooks";
 import htm from "https://esm.sh/htm";
 const html = htm.bind(h);
 ```
@@ -96,8 +105,7 @@ Instead, use a **self-contained compatibility shim** (`src/lib/browser-compat.js
 // src/lib/browser-compat.js
 // This file is the ONLY place that touches chrome.* or browser.* directly.
 // Everything else in the codebase imports from this file.
-export const ext =
-  typeof browser !== "undefined" && browser.runtime ? browser : chrome;
+export const ext = typeof browser !== "undefined" && browser.runtime ? browser : chrome;
 
 // Promisify callback-based chrome APIs for Firefox compatibility
 export const storage = {
@@ -570,8 +578,7 @@ export const CONSTANTS = Object.freeze({
   DEFAULT_REPO_NAME: "CodeLedger-Sync",
   REPO_BRANCH: "main",
   COMMIT_MESSAGE_TEMPLATE: "[{topic}] {title} — {difficulty} | {language}",
-  IMPORT_COMMIT_MESSAGE:
-    "chore: import {count} solutions from {platform} profile",
+  IMPORT_COMMIT_MESSAGE: "chore: import {count} solutions from {platform} profile",
   INDEX_JSON_PATH: "index.json",
 
   // ── Heartbeat ──
@@ -653,10 +660,9 @@ export async function fetchGeminiModels(apiKey) {
   if (_cache) return _cache;
   dbg.log("Fetching Gemini models from API");
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-    { headers: { "Content-Type": "application/json" } },
-  );
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+    headers: { "Content-Type": "application/json" },
+  });
   if (!res.ok) throw new Error(`Gemini models fetch failed: ${res.status}`);
 
   const { models } = await res.json();
@@ -687,10 +693,7 @@ export function clearModelCache() {
 
 ```js
 // Works for OpenAI AND any OpenAI-compatible endpoint (Groq, Together, etc.)
-export async function fetchOpenAIModels(
-  apiKey,
-  endpoint = "https://api.openai.com/v1",
-) {
+export async function fetchOpenAIModels(apiKey, endpoint = "https://api.openai.com/v1") {
   const res = await fetch(`${endpoint}/models`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
@@ -738,13 +741,7 @@ const html = htm.bind(h);
  * @param {{ providerId: string, apiKey: string, selectedModel: string,
  *           onSelect: (modelId: string) => void, endpoint?: string }} props
  */
-export function ModelSelector({
-  providerId,
-  apiKey,
-  selectedModel,
-  onSelect,
-  endpoint,
-}) {
+export function ModelSelector({ providerId, apiKey, selectedModel, onSelect, endpoint }) {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -762,11 +759,9 @@ export function ModelSelector({
       .finally(() => setLoading(false));
   }, [providerId, apiKey, endpoint]);
 
-  if (loading)
-    return html`<span class="model-selector-loading">Loading models…</span>`;
+  if (loading) return html`<span class="model-selector-loading">Loading models…</span>`;
   if (error) return html`<span class="model-selector-error">⚠ ${error}</span>`;
-  if (!models.length)
-    return html`<span class="model-selector-empty">No models found</span>`;
+  if (!models.length) return html`<span class="model-selector-empty">No models found</span>`;
 
   return html`
     <select
@@ -788,23 +783,19 @@ export function ModelSelector({
 async function loadModels(providerId, apiKey, endpoint) {
   switch (providerId) {
     case "gemini": {
-      const { fetchGeminiModels } =
-        await import("../../handlers/ai/gemini/model-fetcher.js");
+      const { fetchGeminiModels } = await import("../../handlers/ai/gemini/model-fetcher.js");
       return fetchGeminiModels(apiKey);
     }
     case "openai": {
-      const { fetchOpenAIModels } =
-        await import("../../handlers/ai/openai/model-fetcher.js");
+      const { fetchOpenAIModels } = await import("../../handlers/ai/openai/model-fetcher.js");
       return fetchOpenAIModels(apiKey, endpoint);
     }
     case "claude": {
-      const { fetchClaudeModels } =
-        await import("../../handlers/ai/claude/model-fetcher.js");
+      const { fetchClaudeModels } = await import("../../handlers/ai/claude/model-fetcher.js");
       return fetchClaudeModels(apiKey);
     }
     case "ollama": {
-      const { fetchOllamaModels } =
-        await import("../../handlers/ai/ollama/model-fetcher.js");
+      const { fetchOllamaModels } = await import("../../handlers/ai/ollama/model-fetcher.js");
       return fetchOllamaModels(endpoint);
     }
     case "deepseek": {
@@ -873,8 +864,7 @@ export function detectPage(pathname) {
 
   // Profile: /u/{username} or /{username}
   const profileMatch = clean.match(/^\/(u\/)?([^/]+)\/?$/);
-  if (profileMatch)
-    return { type: PAGE_TYPES.PROFILE, username: profileMatch[2] };
+  if (profileMatch) return { type: PAGE_TYPES.PROFILE, username: profileMatch[2] };
 
   return { type: PAGE_TYPES.UNKNOWN };
 }
@@ -906,7 +896,7 @@ The importer:
    - Navigates to the problem page
    - Fetches problem metadata (title, difficulty, tags) via GraphQL
    - Fetches the solution code via GraphQL submissionDetail query
-4. Builds the full file structure locally (topics/{topic}/{problem}/{lang}.{ext})
+4. Builds the full file structure locally via `buildProblemFiles()` — layout v3: `problems/{canonicalId}/{platform}/{platformId}.{ext}` with canonical mapping, or `problems/{platformId}/{platformId}.{ext}` without
 5. Creates `meta.json` and updates `index.json` locally
 6. Makes **ONE single atomic commit** via the GitHub API Tree endpoint with ALL files
 7. Commit message: `chore: import {count} solutions from LeetCode profile`
@@ -963,8 +953,7 @@ export const SELECTORS = {
   // Problem metadata extraction
   problem: {
     title: ".problems-header h3, .problem-title h3",
-    difficulty:
-      ".difficulty-block .difficulty-tag, .problems-header .tag-item:first-child",
+    difficulty: ".difficulty-block .difficulty-tag, .problems-header .tag-item:first-child",
     tags: ".tags-section .tag-item, .topic-tag",
     description: ".problem-statement, .problem-description",
     platformId: null, // extracted from URL
@@ -993,24 +982,12 @@ export const SELECTORS = {
 // Legacy fallbacks for each key — tried in order when primary fails
 export const LEGACY_SELECTORS = {
   "problem.title": [".problem-title", ".question-title", "h1.header-title"],
-  "submission.successIndicator": [
-    ".accepted-banner",
-    "#result-accepted",
-    ".submission-success",
-  ],
-  "submission.code": [
-    ".CodeMirror-code",
-    ".ace_text-layer",
-    "#code-editor pre",
-  ],
+  "submission.successIndicator": [".accepted-banner", "#result-accepted", ".submission-success"],
+  "submission.code": [".CodeMirror-code", ".ace_text-layer", "#code-editor pre"],
 };
 
 // Domain list for manifest.json generation (dev/generate-manifest-domains.js reads this)
-export const DOMAINS = [
-  "geeksforgeeks.org",
-  "practice.geeksforgeeks.org",
-  "www.geeksforgeeks.org",
-];
+export const DOMAINS = ["geeksforgeeks.org", "practice.geeksforgeeks.org", "www.geeksforgeeks.org"];
 ```
 
 The `BasePlatformHandler.safeQuery(key, scope)` uses the `LEGACY_SELECTORS` map automatically when the primary selector fails.
@@ -1208,11 +1185,7 @@ CodeLedger exports a read-only data bridge for the portfolio.
 // Exposes DSA stats for the portfolio to consume via postMessage or direct API read.
 // The portfolio at VKrishna04.github.io reads the DSA repo's index.json from GitHub API.
 
-export async function getDSAStatsForPortfolio(
-  githubToken,
-  repoOwner,
-  repoName,
-) {
+export async function getDSAStatsForPortfolio(githubToken, repoOwner, repoName) {
   const raw = await fetch(
     `https://api.github.com/repos/${repoOwner}/${repoName}/contents/index.json`,
     {

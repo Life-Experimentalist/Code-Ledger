@@ -21,8 +21,13 @@ const SYNC_PATH_ENCODED = ".codeledger%2Fsync.json";
 /**
  * Settings keys that are safe to persist to GitHub.
  * NEVER include: oauth tokens, AI api keys, github_token (PAT), auth.* paths.
+ *
+ * This is the only such list. `settings-auto-commit.js` used to keep its own
+ * copy under a comment saying it had to match this one, and it did not: between
+ * them they disagreed on forty-odd keys, so which of your preferences survived
+ * a reinstall depended on which of the two files happened to carry it.
  */
-const PORTABLE_SETTINGS = [
+export const PORTABLE_SETTINGS = [
   // Git / repo
   "gitEnabled",
   "gitProvider",
@@ -33,6 +38,12 @@ const PORTABLE_SETTINGS = [
   "commitMessageTemplate",
   "autocommitDelay",
   "git_mirrors",
+  "github_coauthor_enabled",
+  "github_coauthor_trailer",
+  "autoCommit",
+  "autoSync",
+  "syncInterval",
+  "commitMessageStyle",
 
   // GitHub Pages
   "github_pages",
@@ -58,9 +69,40 @@ const PORTABLE_SETTINGS = [
   "deduplicationEnabled",
   "deduplicationAutoResolve",
 
+  // Gamification
+  "gamificationEnabled",
+  "dailyTargetPoints",
+  "freezeEarnMultiplier",
+  "maxFreezes",
+  "penaltyMultiplier",
+  "iceBreakerDays",
+  "gamificationBadges",
+  "gamificationReadme",
+  "gamificationBadgeStyle",
+  "gamificationShieldsStyle",
+  "gamificationBadgePicks",
+  "gamificationActions",
+  "gamificationActionsHour",
+  // Party: a list of public repository references. It carries no credentials
+  // and nothing about the people it names beyond what they already publish, so
+  // it travels with the rest of the settings rather than being re-typed on the
+  // second device.
+  "partyFriends",
+
   // Appearance / UX
+  "theme_preset",
+  "theme_mode",
+  "theme_accent",
+  "showNotifications",
+  "hideCompleted",
+  "hideIgnored",
+  "mcp.config",
   "behaviorBankEnabled",
-  "telemetryEnabled",
+  // `CONSTANTS.SK.TELEMETRY_OPT_IN`. The name matters: this list carried
+  // `telemetryEnabled`, which nothing has ever written, so the one setting a
+  // privacy-minded user is most likely to change was the one that did not
+  // travel with them.
+  "telemetryOptIn",
   "debugMode",
   "remember_modal_tab",
   "settingsSyncEnabled",
@@ -86,10 +128,41 @@ const PORTABLE_PREFIXES = [
 const CRITICAL_KEYS = ["github_owner", "github_repo", "github_username"];
 
 /** Keys that must NEVER be written to sync.json. */
-const SECRET_KEYS = ["github_token", "auth", "_defaultsApplied", "_pendingConflicts"];
+const SECRET_KEYS = [
+  "github_token",
+  "gitlab_token",
+  "bitbucket_token",
+  "auth",
+  "_defaultsApplied",
+  "_pendingConflicts",
+];
 
-function _isPortable(key, settings) {
+/**
+ * Key suffixes that mark a value as a credential whatever its prefix says.
+ *
+ * `PORTABLE_PREFIXES` waves through every `openai_*` and `claude_*` key so that
+ * `openai_enabled` and `claude_model` travel between devices. `openai_keys` is
+ * also an `openai_*` key, and it holds the user's API keys: the provider card
+ * writes what you type there straight into settings on every keystroke, and
+ * only moves it to `ai.keys` once you press Save. Anything typed and not saved
+ * therefore sat in a settings key the allow-list called portable, bound for a
+ * plaintext file in a repository that is usually public and never forgets.
+ *
+ * Checked before the allow-list, because a suffix rule that runs second is a
+ * suffix rule that does nothing.
+ */
+const SECRET_SUFFIXES = ["_keys", "_token", "_secret", "_apiKey", "_api_key", "_password"];
+
+/**
+ * Whether a settings key may leave the device.
+ *
+ * @param {string} key
+ * @returns {boolean}
+ */
+export function isPortableSetting(key) {
+  if (typeof key !== "string" || !key) return false;
   if (SECRET_KEYS.some((sk) => key.startsWith(sk))) return false;
+  if (SECRET_SUFFIXES.some((sfx) => key.endsWith(sfx))) return false;
   if (PORTABLE_SETTINGS.includes(key)) return true;
   if (PORTABLE_PREFIXES.some((p) => key.startsWith(p))) return true;
   return false;
@@ -148,6 +221,13 @@ export async function syncSettingsFromGitHub() {
       return { synced: 0, message: "No remote sync file found" };
     }
 
+    const localUpdatedAt = settings.__updatedAt;
+    const remoteSyncedAt = remote.__syncedAt || remote.updatedAt;
+    if (localUpdatedAt && remoteSyncedAt && new Date(localUpdatedAt) >= new Date(remoteSyncedAt)) {
+      dbg.log("syncSettingsFromGitHub(): local settings are newer or equal — skipping pull");
+      return { synced: 0, message: "Local settings are newer" };
+    }
+
     let syncedCount = 0;
 
     // Restore theme separately (stored in its own storage key)
@@ -163,18 +243,22 @@ export async function syncSettingsFromGitHub() {
       }
     }
 
-    // Merge settings keys
+    // Merge settings keys. The same portability test gates the way in as the
+    // way out: a file written by an older build can hold keys this one would
+    // never send, and a sync file is not a reason to start trusting them.
+    const delta = {};
     for (const [key, value] of Object.entries(remote)) {
       if (key === "__theme") continue;
       if (CRITICAL_KEYS.includes(key)) continue;
+      if (!isPortableSetting(key)) continue;
       if (JSON.stringify(settings[key]) !== JSON.stringify(value)) {
-        settings[key] = value;
+        delta[key] = value;
         syncedCount++;
       }
     }
 
-    if (syncedCount > 0) {
-      await Storage.setSettings(settings);
+    if (Object.keys(delta).length > 0) {
+      await Storage.updateSettings(delta);
       dbg.log(`syncSettingsFromGitHub(): ✓ applied ${syncedCount} change(s)`);
     }
 
@@ -206,7 +290,7 @@ export async function syncSettingsToGitHub() {
     // Build portable payload
     const payload = {};
     for (const [key, value] of Object.entries(settings)) {
-      if (_isPortable(key, settings)) payload[key] = value;
+      if (isPortableSetting(key)) payload[key] = value;
     }
 
     // Include theme
@@ -236,7 +320,7 @@ export async function buildSyncPayload() {
   const settings = await Storage.getSettings();
   const payload = {};
   for (const [key, value] of Object.entries(settings)) {
-    if (_isPortable(key, settings)) payload[key] = value;
+    if (isPortableSetting(key)) payload[key] = value;
   }
   const theme = await Storage.getTheme().catch(() => null);
   if (theme) payload.__theme = theme;

@@ -25,25 +25,42 @@ const PLATFORM_DOMAINS = [
   "*://*.codeforces.com/*",
 ];
 
+// The auth worker origin. Required for BOTH the OAuth callback relay
+// (background tabs.onUpdated reads changeInfo.url) and the presence-marker
+// content script. Omitting it silently breaks sign-in.
+const WORKER_ORIGIN = "*://codeledger.vkrishna04.me/*";
+
+// Every remote API the extension actually calls. Keep this list minimal:
+// each entry is a permission the user is prompted to grant and a reviewer
+// has to justify. Do not add a host for a provider that is not shipping.
 const FIXED_HOST_PERMISSIONS = [
   "https://api.github.com/*",
-  "https://api.gitlab.com/*",
-  "https://bitbucket.org/api/*",
   "https://api.openai.com/*",
   "https://api.anthropic.com/*",
   "https://generativelanguage.googleapis.com/*",
   "https://api.deepseek.com/*",
+  "https://openrouter.ai/*",
   "http://localhost:11434/*",
 ];
 
-const allHostPermissions = [...new Set([...PLATFORM_DOMAINS, ...FIXED_HOST_PERMISSIONS])];
+const allHostPermissions = [
+  ...new Set([WORKER_ORIGIN, ...PLATFORM_DOMAINS, ...FIXED_HOST_PERMISSIONS]),
+];
 
 for (const rel of ["src/manifest-chromium.json", "src/manifest-firefox.json"]) {
   const m = readJson(rel);
   m.host_permissions = allHostPermissions;
-  if (m.content_scripts?.[0]) {
-    m.content_scripts[0].matches = PLATFORM_DOMAINS;
+
+  // content_scripts[0] is the platform handler loader; [1] is the presence
+  // marker on the worker origin. Only the former is domain-generated.
+  const loader = (m.content_scripts || []).find((c) => c.js?.includes("content/handler-loader.js"));
+  if (loader) loader.matches = PLATFORM_DOMAINS;
+
+  for (const entry of m.web_accessible_resources || []) {
+    if (entry.resources?.includes("content/presence-marker.js")) continue;
+    entry.matches = PLATFORM_DOMAINS;
   }
+
   writeJson(rel, m);
   console.log(`Updated ${rel}`);
 }

@@ -1,8 +1,12 @@
+# Every route below exists in worker/src/index.js, in this order.
+# The `/api/app/*` token-minting routes and `/api/post_install` were removed
+# when the project moved from a GitHub App to a classic OAuth App.
+
 /api/health:
   get:
     tags: [health]
     summary: Health check
-    description: Returns a minimal JSON health payload for uptime monitoring.
+    description: Returns a minimal JSON health payload for uptime monitoring. Sent with permissive CORS headers.
     responses:
       "200":
         description: Health payload
@@ -11,57 +15,22 @@
             schema:
               $ref: "#/components/schemas/HealthResponse"
 
-/api/app/installations:
-  get:
-    tags: [app]
-    summary: List GitHub App installations
-    description: Returns a list of installations for the configured GitHub App. Requires App JWT.
-    security:
-      - app_jwt: []
-    responses:
-      "200":
-        description: Array of installation objects (proxied from GitHub)
-        content:
-          application/json: {}
-
-/api/app/installations/{id}/access_tokens:
-  post:
-    tags: [app]
-    summary: Create an installation access token
-    parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-    security:
-      - app_jwt: []
-    responses:
-      "201":
-        description: Installation access token created (proxied from GitHub)
-        content:
-          application/json: {}
-
 /api/auth/{provider}:
   get:
     tags: [auth]
-    summary: Initiate OAuth flow
-    parameters:
-      - in: path
-        name: provider
-        required: true
-        schema:
-          type: string
-          enum: [github]
-    responses:
-      "302":
-        description: Redirect to provider authorization URL
+    summary: Initiate the OAuth flow
+    description: |
+      Issues an HMAC-signed `state` value with a 10-minute lifetime, sets it in an
+      `HttpOnly; Secure; SameSite=Lax` cookie scoped to `/api/auth`, and redirects to
+      GitHub's authorization page.
 
-/api/auth/{provider}/callback:
-  get:
-    tags: [auth]
-    summary: OAuth callback receiver
-    description: Returns an HTML page that posts a `CODELEDGER_AUTH` message to the opener window.
+      `SameSite=Lax` is deliberate: the callback arrives as a top-level GET navigation
+      from github.com, which Lax permits and Strict would block.
+
+      The `scope` query parameter is an allow-list, not a pass-through. Anything not
+      recognised falls back to the least-privilege default (`public_repo,workflow`).
+      `repo,workflow` is the only wider value accepted, and only for users who opt in
+      to a private ledger.
     parameters:
       - in: path
         name: provider
@@ -70,7 +39,65 @@
           type: string
           enum: [github]
       - in: query
+        name: scope
+        required: false
+        description: Requested OAuth scope. Unrecognised values silently become the default.
+        schema:
+          type: string
+          enum: [public_repo, workflow, repo, workflow]
+          default: public_repo,workflow
+    responses:
+      "302":
+        description: Redirect to GitHub's authorization URL
+        headers:
+          Location:
+            schema:
+              type: string
+          Set-Cookie:
+            description: The signed `state` cookie, `Max-Age=600`
+            schema:
+              type: string
+      "404":
+        description: Unsupported provider
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      "500":
+        description: |
+          The worker is missing `CODELEDGER_OAUTH_CLIENT_ID` or `SESSION_SECRET`.
+          Without a session secret the state cookie cannot be signed, so sign-in
+          fails closed rather than proceeding unauthenticated.
+        content:
+          text/plain:
+            schema:
+              type: string
+
+/api/auth/github/callback:
+  get:
+    tags: [auth]
+    summary: OAuth callback receiver
+    description: |
+      Verifies the signed `state` cookie in constant time before exchanging the code,
+      clears the cookie, then returns an HTML page that posts
+      `{ type: "CODELEDGER_AUTH", provider, token, error }` to the opener window.
+
+      Always answers `200` with HTML — failures are reported inside the posted message
+      so the extension's listener sees them, rather than as an HTTP status the popup
+      cannot read.
+
+      If GitHub returns an App-shaped token response (`expires_in` or `refresh_token`
+      present, `scope` absent), the worker refuses it and reports the misconfiguration.
+      A GitHub App issues user-to-server tokens that ignore the requested scope and
+      cannot call `POST /user/repos`, which would otherwise surface much later as an
+      unexplained 403 during repository creation.
+    parameters:
+      - in: query
         name: code
+        schema:
+          type: string
+      - in: query
+        name: state
         schema:
           type: string
       - in: query
@@ -83,7 +110,7 @@
           type: string
     responses:
       "200":
-        description: HTML page which posts the token back to the opener window
+        description: HTML page posting the token (or an error string) back to the opener
         content:
           text/html:
             schema:
@@ -93,11 +120,14 @@
   post:
     tags: [webhook]
     summary: GitHub webhook receiver
-    description: Verifies `x-hub-signature-256` header when configured, then processes webhook payloads.
+    description: |
+      Fails closed. An unset `CODELEDGER_GH_APP_WEBHOOK_SECRET` returns 503 rather than
+      skipping verification, which would leave the endpoint open to forged deliveries.
+      The `x-hub-signature-256` HMAC is compared in constant time.
     parameters:
       - in: header
         name: x-hub-signature-256
-        required: false
+        required: true
         schema:
           type: string
     requestBody:
@@ -106,24 +136,36 @@
         application/json: {}
     responses:
       "200":
-        description: Webhook processed
+        description: Signature verified
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/OKResponse"
+      "401":
+        description: Missing or invalid signature
+        content:
+          text/plain:
+            schema:
+              type: string
+      "503":
+        description: No webhook secret configured
+        content:
+          text/plain:
+            schema:
+              type: string
 
 /api/data/canonical-map.json:
   get:
     tags: [data]
     summary: Canonical map (public)
-    description: Returns the canonical map JSON from KV when available, otherwise a raw GitHub fallback.
+    description: Serves the canonical map from KV when bound and populated, otherwise from a raw GitHub fallback. Cached for one hour.
     responses:
       "200":
         description: Canonical map JSON
         content:
           application/json: {}
       "503":
-        description: Canonical map unavailable
+        description: Neither KV nor the GitHub fallback returned a map
         content:
           application/json:
             schema:
@@ -132,8 +174,11 @@
 /api/admin/canonical:
   post:
     tags: [data]
-    summary: "Admin: replace canonical map"
-    description: Requires a bearer token matching the `CANONICAL_UPLOAD_TOKEN` binding. Stores the posted body into KV at key `canonical-map`.
+    summary: "Admin: replace the canonical map"
+    description: |
+      Requires a bearer token matching `CANONICAL_UPLOAD_TOKEN`, compared in constant
+      time. The body must parse as JSON before anything is written. Deliberately sends
+      no CORS headers, so a browser on another origin cannot call it.
     security:
       - canonical_token: []
     requestBody:
@@ -142,34 +187,35 @@
         text/plain: {}
     responses:
       "200":
-        description: Update accepted
+        description: Stored at KV key `canonical-map`
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/OKResponse"
-      "401":
-        description: Unauthorized
+      "400":
+        description: Body is not valid JSON
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ErrorResponse"
-
-/api/post_install:
-  get:
-    tags: [misc]
-    summary: Post-install redirect (GitHub App marketplace)
-    parameters:
-      - in: query
-        name: installation_id
-        schema:
-          type: string
-      - in: query
-        name: setup_action
-        schema:
-          type: string
-    responses:
-      "302":
-        description: Redirect to root with query parameters
+      "401":
+        description: Missing or wrong bearer token
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      "500":
+        description: The `CANONICAL_MAP` KV namespace is not bound
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      "503":
+        description: No `CANONICAL_UPLOAD_TOKEN` configured, so uploads are disabled
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
 
 /favicon.ico:
   get:
@@ -177,4 +223,33 @@
     summary: Favicon redirect
     responses:
       "301":
-        description: Redirect to extension icon URL
+        description: Redirect to the extension icon on raw.githubusercontent.com
+
+/{path}:
+  get:
+    tags: [misc]
+    summary: Static landing page
+    description: |
+      Catch-all, registered last. Serves `worker/public/` through the `ASSETS`
+      binding. There is no `/library` route — the extension's library UI is not
+      deployed as a hosted web app.
+
+      `/compare` is one of these static pages rather than an endpoint. It takes
+      a `?repos=owner/repo,owner/repo` list, and reads each repository's public
+      `badges/stats.json` from `raw.githubusercontent.com` in the browser. The
+      worker never sees the list and stores nothing: the URL is the state.
+    parameters:
+      - in: path
+        name: path
+        required: true
+        schema:
+          type: string
+    responses:
+      "200":
+        description: Static asset
+        content:
+          text/html:
+            schema:
+              type: string
+      "404":
+        description: No such asset

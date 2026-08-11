@@ -118,21 +118,33 @@ function cleanCode(code) {
     .replace(/ /g, " "); // NBSP → regular space
 }
 
-/**
- * Get code from the Monaco editor.
- * Tries the active editor first (most reliable), then falls back to the first
- * non-empty model, then to DOM line scraping.
- */
-function getEditorCode() {
-  // Use Monaco API to get all code (not just rendered lines)
-  try {
-    const models = window.monaco?.editor?.getModels?.();
-    if (models?.length > 0) {
-      const code = models[0].getValue?.();
-      return code ? cleanCode(code) : "";
-    }
-  } catch (_) {}
-  return "";
+async function getEditorCode() {
+  return new Promise((resolve) => {
+    const requestId = Math.random().toString(36).substring(2);
+    const responseEvent = `cl-editor-response-${requestId}`;
+
+    const script = document.createElement("script");
+    script.src = chrome.runtime.getURL("content/injected-editor-helper.js");
+    script.setAttribute("data-action", "extract");
+    script.setAttribute("data-request-id", requestId);
+
+    const listener = (e) => {
+      window.removeEventListener(responseEvent, listener);
+      script.remove();
+      const code = e.detail?.code || "";
+      resolve(code ? cleanCode(code) : "");
+    };
+
+    window.addEventListener(responseEvent, listener);
+    (document.body || document.documentElement).appendChild(script);
+
+    // Timeout fallback to prevent hanging
+    setTimeout(() => {
+      window.removeEventListener(responseEvent, listener);
+      if (script.parentNode) script.remove();
+      resolve("");
+    }, 1000);
+  });
 }
 
 /** Show a brief error flash on the button then restore original HTML. */
@@ -161,7 +173,7 @@ function makeCopyBtn() {
   </div>`;
 
   btn.onclick = async () => {
-    const code = getEditorCode();
+    const code = await getEditorCode();
     const orig = btn.innerHTML;
     if (!code) {
       flashError(btn, orig);

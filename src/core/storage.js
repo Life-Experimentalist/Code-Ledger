@@ -7,7 +7,13 @@ import { storage as browserStorage } from "../lib/browser-compat.js";
 import { CONSTANTS } from "./constants.js";
 import { createDebugger } from "../lib/debug.js";
 import { normalizeAIPrompts } from "./ai-prompts.js";
+import { normalizeTag } from "./topic-resolver.js";
+import { canonicalMapper } from "./canonical-mapper.js";
+import { withLock } from "./async-lock.js";
 const dbg = createDebugger("Storage");
+
+/** One name, so every settings writer in every context queues behind the rest. */
+const SETTINGS_LOCK = "codeledger:settings";
 
 /**
  * Unified storage abstraction.
@@ -39,9 +45,57 @@ export const Storage = {
     return s;
   },
 
+  /**
+   * Replace the entire settings object.
+   *
+   * Whole-object writes are only correct when the caller has just read the
+   * settings and is writing back everything it read. Anything narrower loses
+   * the keys it left out — silently, and permanently. Use `updateSettings`
+   * unless you genuinely mean "these are now all the settings there are".
+   *
+   * @param {Record<string, any>} settings
+   */
   async setSettings(settings) {
     dbg.log(`setSettings(): saving ${Object.keys(settings || {}).length} settings keys`);
-    await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: settings });
+    return withLock(SETTINGS_LOCK, async () => {
+      const s = { ...(settings || {}), __updatedAt: new Date().toISOString() };
+      await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: s });
+      return s;
+    });
+  },
+
+  /**
+   * Merge a patch into the stored settings, atomically with respect to every
+   * other context.
+   *
+   * The read and the write happen inside one lock, so two pages changing two
+   * different settings at the same moment both survive. The old shape —
+   * `setSettings({ ...await getSettings(), key: value })` — reads outside any
+   * lock, and whichever page wrote second erased the other's edit.
+   *
+   * Pass a function to decide the patch from the current values, for cases like
+   * appending to a list where the starting point matters. Return a falsy value
+   * from it to write nothing at all.
+   *
+   * A key set to `undefined` is removed rather than stored, which is how an
+   * unlink drops `github_repo` without having to rewrite the whole object.
+   *
+   * @param {Record<string, any> | ((current: Record<string, any>) => Record<string, any> | Promise<Record<string, any>>)} patch
+   * @returns {Promise<Record<string, any>>} the settings as they now stand
+   */
+  async updateSettings(patch) {
+    return withLock(SETTINGS_LOCK, async () => {
+      const current = await this.getSettings();
+      const delta = typeof patch === "function" ? await patch(current) : patch;
+      if (!delta || typeof delta !== "object") return current;
+      const next = { ...current, ...delta, __updatedAt: new Date().toISOString() };
+      for (const [k, v] of Object.entries(delta)) {
+        if (v === undefined) delete next[k];
+      }
+      dbg.log(`updateSettings(): merged ${Object.keys(delta).length} key(s)`);
+      await browserStorage.local.set({ [CONSTANTS.SK.SETTINGS]: next });
+      return next;
+    });
   },
 
   // AI key helpers: store a mapping { providerId: [keys...] }
@@ -88,6 +142,59 @@ export const Storage = {
     const existing = bank[slug] || {};
     bank[slug] = { ...existing, ...delta };
     await this.setBehaviorBank(bank);
+  },
+
+  // ── Gamification state ──────────────────────────────────────────────────
+  // Only the parts that cannot be derived from the ledger live here. See
+  // src/core/gamification.js for why streaks are never stored.
+  async getGamificationState() {
+    const res = await browserStorage.local.get(CONSTANTS.SK.GAMIFICATION);
+    const s = res[CONSTANTS.SK.GAMIFICATION] || {};
+    return {
+      vacations: Array.isArray(s.vacations) ? s.vacations : [],
+      seenAchievements: Array.isArray(s.seenAchievements) ? s.seenAchievements : [],
+      // Whether the seen-list has ever been written. Without it an empty list
+      // is ambiguous — a fresh install and a long-time user who has not opened
+      // the shelf yet look identical, and only one of them should have their
+      // whole back catalogue announced as new.
+      achievementsSeeded: s.achievementsSeeded === true,
+    };
+  },
+
+  async setGamificationState(state) {
+    await browserStorage.local.set({ [CONSTANTS.SK.GAMIFICATION]: state });
+  },
+
+  async addVacation(start, end = null, note = "") {
+    const state = await this.getGamificationState();
+    state.vacations.push({ start, end, note });
+    await this.setGamificationState(state);
+    return state.vacations;
+  },
+
+  /** Close the open-ended vacation, if there is one. Returns the updated list. */
+  async endVacation(endDay) {
+    const state = await this.getGamificationState();
+    const open = state.vacations.filter((v) => v && !v.end);
+    for (const v of open) v.end = endDay;
+    await this.setGamificationState(state);
+    return state.vacations;
+  },
+
+  async deleteVacation(start) {
+    const state = await this.getGamificationState();
+    state.vacations = state.vacations.filter((v) => v?.start !== start);
+    await this.setGamificationState(state);
+    return state.vacations;
+  },
+
+  /** Record achievements as announced so the same one is never flagged twice. */
+  async markAchievementsSeen(ids) {
+    const state = await this.getGamificationState();
+    state.seenAchievements = [...new Set([...state.seenAchievements, ...ids])];
+    state.achievementsSeeded = true;
+    await this.setGamificationState(state);
+    return state.seenAchievements;
   },
 
   // ── Roadmaps store: Array<Roadmap> ──────────────────────────────────────
@@ -298,9 +405,67 @@ export const Storage = {
   async saveProblem(problem) {
     const problemId = problem?.id || problem?.titleSlug || "unknown";
     dbg.log(`saveProblem(): saving problem ${problemId} (${problem?.platform || "unknown"})`);
+
+    let mergedProblem = problem;
+    let existing = null;
+    try {
+      existing = await this.getProblem(problemId);
+      if (existing) {
+        mergedProblem = {
+          ...existing,
+          ...problem,
+          notes: problem.notes !== undefined ? problem.notes : existing.notes || "",
+          methods: problem.methods !== undefined ? problem.methods : existing.methods || [],
+          manuallyEdited: problem.manuallyEdited ?? existing.manuallyEdited ?? false,
+        };
+      }
+    } catch (e) {
+      dbg.warn(`saveProblem(): merge failed (non-blocking) for ${problemId}:`, e?.message);
+    }
+
+    // Enrich with canonical mapping if not manually edited and we don't have it yet
+    try {
+      if (!mergedProblem.manuallyEdited && (!existing || !existing.canonical)) {
+        const canonicalEntry = await canonicalMapper.resolveAsync(
+          mergedProblem.platform || "",
+          mergedProblem.titleSlug || mergedProblem.id || "",
+        );
+        if (canonicalEntry) {
+          mergedProblem.canonical = canonicalEntry;
+          if (canonicalEntry.topic) {
+            mergedProblem.topic = canonicalEntry.topic;
+          }
+          if (Array.isArray(canonicalEntry.tags) && canonicalEntry.tags.length > 0) {
+            const uniqueTags = new Set([...canonicalEntry.tags, ...(mergedProblem.tags || [])]);
+            mergedProblem.tags = [...uniqueTags];
+          }
+        }
+      }
+    } catch (e) {
+      dbg.warn("saveProblem(): canonical enrichment failed:", e?.message);
+    }
+
+    // Normalize tags and topics using custom settings mappings
+    try {
+      const settings = await this.getSettings();
+      const customMappings = settings?.topicMappings || {};
+      if (mergedProblem.tags && Array.isArray(mergedProblem.tags)) {
+        mergedProblem.tags = [
+          ...new Set(
+            mergedProblem.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean),
+          ),
+        ];
+      }
+      if (mergedProblem.topic) {
+        mergedProblem.topic = normalizeTag(mergedProblem.topic, customMappings);
+      }
+    } catch (e) {
+      dbg.warn(`saveProblem(): tag normalization failed:`, e?.message);
+    }
+
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS, "readwrite");
     return new Promise((resolve, reject) => {
-      const request = store.put(problem);
+      const request = store.put(mergedProblem);
       request.onsuccess = () => {
         dbg.log(`saveProblem(): ✓ saved ${problemId}`);
         resolve();
@@ -316,10 +481,41 @@ export const Storage = {
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS);
     return new Promise((resolve, reject) => {
       const request = store.get(id);
-      request.onsuccess = () => {
-        const found = !!request.result;
+      request.onsuccess = async () => {
+        const p = request.result;
+        if (p) {
+          try {
+            // Resolve canonical dynamically on lookup
+            const canonicalEntry = await canonicalMapper.resolveAsync(
+              p.platform || "",
+              p.titleSlug || p.id || "",
+            );
+            if (canonicalEntry) {
+              p.canonical = canonicalEntry;
+              if (canonicalEntry.topic) {
+                p.topic = canonicalEntry.topic;
+              }
+              if (Array.isArray(canonicalEntry.tags) && canonicalEntry.tags.length > 0) {
+                const uniqueTags = new Set([...canonicalEntry.tags, ...(p.tags || [])]);
+                p.tags = [...uniqueTags];
+              }
+            }
+
+            const settings = await this.getSettings();
+            const customMappings = settings?.topicMappings || {};
+            if (p.tags && Array.isArray(p.tags)) {
+              p.tags = p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+            }
+            if (p.topic) {
+              p.topic = normalizeTag(p.topic, customMappings);
+            }
+          } catch (e) {
+            dbg.warn(`getProblem(): enrichment/normalization failed:`, e?.message);
+          }
+        }
+        const found = !!p;
         dbg.log(`getProblem(${id}): ${found ? "✓ found" : "NOT found"}`);
-        resolve(request.result);
+        resolve(p);
       };
       request.onerror = () => {
         dbg.error(`getProblem(${id}): ✗ error`, request.error);
@@ -329,13 +525,44 @@ export const Storage = {
   },
 
   async getAllProblems() {
+    // Pre-load the canonical map once so all resolve calls are fast/synchronous
+    await canonicalMapper.loadMap().catch(() => {});
+
     const store = await this.queryDB(CONSTANTS.IDB_STORES.PROBLEMS);
     return new Promise((resolve, reject) => {
       const request = store.getAll();
-      request.onsuccess = () => {
-        const count = (request.result || []).length;
-        dbg.log(`getAllProblems(): retrieved ${count} problem(s)`);
-        resolve(request.result);
+      request.onsuccess = async () => {
+        const cleaned = (request.result || []).filter(Boolean);
+        try {
+          const settings = await this.getSettings();
+          const customMappings = settings?.topicMappings || {};
+          for (const p of cleaned) {
+            const canonicalEntry = canonicalMapper.resolve(
+              p.platform || "",
+              p.titleSlug || p.id || "",
+            );
+            if (canonicalEntry) {
+              p.canonical = canonicalEntry;
+              if (canonicalEntry.topic) {
+                p.topic = canonicalEntry.topic;
+              }
+              if (Array.isArray(canonicalEntry.tags) && canonicalEntry.tags.length > 0) {
+                const uniqueTags = new Set([...canonicalEntry.tags, ...(p.tags || [])]);
+                p.tags = [...uniqueTags];
+              }
+            }
+            if (p.tags && Array.isArray(p.tags)) {
+              p.tags = p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+            }
+            if (p.topic) {
+              p.topic = normalizeTag(p.topic, customMappings);
+            }
+          }
+        } catch (e) {
+          dbg.warn(`getAllProblems(): tag normalization failed:`, e?.message);
+        }
+        dbg.log(`getAllProblems(): retrieved ${cleaned.length} problem(s)`);
+        resolve(cleaned);
       };
       request.onerror = () => {
         dbg.error(`getAllProblems(): ✗ error`, request.error);
@@ -507,6 +734,36 @@ export const Storage = {
       return JSON.parse(raw["cl.renames"] || "[]");
     } catch {
       return [];
+    }
+  },
+
+  async repairGFGTimestamps() {
+    dbg.log("repairGFGTimestamps(): checking for problems with mismatched timestamps");
+    try {
+      const problems = await this.getAllProblems();
+      let updatedCount = 0;
+      for (const p of problems) {
+        if (p.platform === "geeksforgeeks" && Array.isArray(p.methods) && p.methods.length > 0) {
+          const validTimes = p.methods.map((m) => m.timestamp).filter((t) => t > 0 && !isNaN(t));
+          if (validTimes.length > 0) {
+            const minTime = Math.min(...validTimes);
+            // If the current timestamp is newer/different than the actual first solve time, update it!
+            if (p.timestamp !== minTime) {
+              dbg.log(
+                `repairGFGTimestamps(): repairing timestamp for ${p.id}: ${p.timestamp} -> ${minTime}`,
+              );
+              p.timestamp = minTime;
+              await this.saveProblem(p);
+              updatedCount++;
+            }
+          }
+        }
+      }
+      if (updatedCount > 0) {
+        dbg.log(`repairGFGTimestamps(): ✓ repaired ${updatedCount} GFG problem timestamps`);
+      }
+    } catch (e) {
+      dbg.error("repairGFGTimestamps(): failed:", e?.message);
     }
   },
 };

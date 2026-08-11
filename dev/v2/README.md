@@ -63,7 +63,7 @@ npm run release -- --dry-run
 ## Release Workflow
 
 1. **Validate**
-   - Checks `package.json` version === `src/manifest.json` version
+   - Checks `package.json` version === the version in both `src/manifest-chromium.json` and `src/manifest-firefox.json`
    - Verifies `docs/CHANGELOG.md` has entry for the version
 
 2. **Build**
@@ -112,7 +112,7 @@ Older releases are preserved; new releases are added in separate folders.
 - `tag` — e.g., "v1.3.0"
 - `releaseVersionDir` — e.g., "releases/1.3.0/"
 - `pkg` — parsed package.json
-- `manifest` — parsed src/manifest.json
+- `manifest` — parsed src/manifest-chromium.json
 
 All tasks use the same context to ensure consistency.
 
