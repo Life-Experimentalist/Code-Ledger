@@ -171,6 +171,12 @@ export function pointsFor(difficulty, opts = {}) {
  * @param {object} [config]
  * @returns {Array<{ day: string, points: number, difficulty: string, recall: boolean, id: string, title: string }>}
  */
+/** A timestamp that names a real moment — not null, not 0, not a string of one. */
+function usableStamp(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0;
+}
+
 export function scoreEvents(problems, config = DEFAULT_CONFIG) {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const events = [];
@@ -184,13 +190,34 @@ export function scoreEvents(problems, config = DEFAULT_CONFIG) {
     // A record carries its first solve on `timestamp`, and any re-solves in
     // `solveHistory` (written by the recall flow). Older records have neither
     // shape, so fall back to whatever timestamp exists.
+    // `> 0`, not just finite: `Number(null)` is 0, and a zero timestamp would
+    // score the solve on 1970-01-01 — a real day, on the calendar, in the
+    // heatmap range, and eligible to be "best day". No solve happened then.
     const stamps = [];
-    if (Number.isFinite(Number(p.timestamp))) stamps.push(Number(p.timestamp));
+    if (usableStamp(p.timestamp)) stamps.push(Number(p.timestamp));
     for (const h of p.solveHistory || []) {
-      const t = Number(h?.timestamp ?? h);
-      if (Number.isFinite(t)) stamps.push(t);
+      const t = h?.timestamp ?? h;
+      if (usableStamp(t)) stamps.push(Number(t));
     }
-    if (!stamps.length) continue;
+    if (!stamps.length) {
+      // A solve whose date the platform never published — GeeksForGeeks lists
+      // what you solved but not when. It is still a solve and still worth its
+      // points; it just does not belong to any calendar day. `day: null` keeps
+      // it out of the streak, the daily buckets and the heatmap, all of which
+      // key on the day, while the point total still counts it.
+      if (p._solveDateUnknown) {
+        events.push({
+          day: null,
+          points: pointsFor(difficulty, { recall: false }),
+          difficulty,
+          recall: false,
+          dateUnknown: true,
+          id,
+          title,
+        });
+      }
+      continue;
+    }
     stamps.sort((a, b) => a - b);
 
     let lastScored = -Infinity;
@@ -209,7 +236,13 @@ export function scoreEvents(problems, config = DEFAULT_CONFIG) {
     });
   }
 
-  events.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  // Undated events sort to the front: they are the back catalogue, and they
+  // precede anything with a known date rather than landing on "today".
+  events.sort((a, b) => {
+    const x = a.day || "";
+    const y = b.day || "";
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
   return events;
 }
 
@@ -223,6 +256,7 @@ export function scoreEvents(problems, config = DEFAULT_CONFIG) {
 export function buildDailyPoints(problems, config = DEFAULT_CONFIG) {
   const days = new Map();
   for (const e of scoreEvents(problems, config)) {
+    if (!e.day) continue; // undated solve — counts for points, belongs to no day
     let d = days.get(e.day);
     if (!d) {
       d = { points: 0, solves: 0, recalls: 0, byDifficulty: {} };

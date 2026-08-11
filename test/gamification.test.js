@@ -185,6 +185,60 @@ describe("scoreEvents", () => {
   });
 });
 
+describe("solves the platform never dated", () => {
+  /** What a GFG profile import writes when the site publishes no solve date. */
+  function undated(id, difficulty = "Medium") {
+    return {
+      canonicalId: id,
+      title: id,
+      platform: "geeksforgeeks",
+      difficulty,
+      timestamp: null,
+      importedAt: at("2026-03-01"),
+      _solveDateUnknown: true,
+    };
+  }
+
+  test("scores an undated solve, with no day attached to it", () => {
+    const events = scoreEvents([undated("a", "Hard")], UTC);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].points, 50);
+    assert.equal(events[0].day, null);
+    assert.equal(events[0].dateUnknown, true);
+  });
+
+  test("a record with no timestamp and no marker is still skipped", () => {
+    // The marker is what separates "the platform did not say" from "this record
+    // is broken". Only the former earns points.
+    assert.equal(scoreEvents([{ title: "x", difficulty: "Easy" }], UTC).length, 0);
+  });
+
+  test("undated solves land on no calendar day", () => {
+    const days = buildDailyPoints([undated("a"), undated("b"), solve("2026-03-01", "Easy")], UTC);
+    assert.equal(days.size, 1);
+    assert.equal(days.get("2026-03-01").points, 10);
+  });
+
+  test("undated solves count toward points and total solves but not the streak", () => {
+    // 200 imported problems must not read as 200 solves on one day, which is
+    // exactly what stamping the import time used to produce.
+    const problems = Array.from({ length: 200 }, (_, i) => undated(`gfg-${i}`, "Easy"));
+    const s = computeSnapshot(problems, { ...UTC, now: at("2026-03-01") });
+    assert.equal(s.totalPoints, 200 * POINTS.Easy);
+    assert.equal(s.totalSolves, 200);
+    assert.equal(s.todayPoints, 0, "the import day is not a solve day");
+    assert.equal(s.currentStreak, 0);
+    assert.equal(s.activeDays, 0);
+    assert.equal(s.bestDay, null);
+  });
+
+  test("undated events sort ahead of dated ones", () => {
+    const events = scoreEvents([solve("2026-03-01", "Easy", { id: "d" }), undated("u")], UTC);
+    assert.equal(events[0].day, null);
+    assert.equal(events[1].day, "2026-03-01");
+  });
+});
+
 describe("buildDailyPoints", () => {
   test("sums a day and counts solves separately from recalls", () => {
     const problems = [

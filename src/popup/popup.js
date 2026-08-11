@@ -99,7 +99,10 @@ function PopupApp() {
       // 0 / 0 / 0 above a non-zero total.
       setStats({ total: problems.length, ...countByDifficulty(problems, diffMap) });
       // Sort by timestamp desc and take top 3
-      setRecent(problems.sort((a, b) => b.timestamp - a.timestamp).slice(0, 3));
+      // `|| 0` matters: an imported solve whose date the platform never
+      // published has no timestamp, and NaN comparisons would float it to the
+      // top of "Recent" — the one place it certainly does not belong.
+      setRecent(problems.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 3));
     });
     Storage.getSettings()
       .then((s) => {

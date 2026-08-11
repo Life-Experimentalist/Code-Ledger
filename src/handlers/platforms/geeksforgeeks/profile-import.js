@@ -199,6 +199,118 @@ export async function gfgThrottledFetch(url, opts = {}) {
   return fetchWithBackoff(url, opts);
 }
 
+// ── Solve dates ─────────────────────────────────────────────────────────────
+//
+// The solved-problems list on the profile carries no dates at all. Stamping the
+// import time on every record meant a back catalogue of 200 problems became 200
+// solves on one day: 200 backdated commits all dated today, one enormous block
+// on the contribution graph, and a points total that all landed in a single
+// square of the heatmap.
+//
+// GFG does publish the dates, just somewhere else — a month-scoped submissions
+// endpoint. Walking it month by month is slow, so it runs once per import and
+// only far enough back to account for the problems on the profile.
+
+const SUBMISSIONS_API = "https://practiceapi.geeksforgeeks.org/api/v1/user/problems/submissions/";
+/** How far back to look. GFG Practice did not exist meaningfully before this. */
+const MAX_MONTHS_BACK = 120;
+/** Give up early once this many consecutive months come back empty. */
+const EMPTY_MONTH_RUN = 18;
+
+/** `YYYY-MM-DD` in any separator, optionally with a time after it. */
+const DATE_KEY_RE = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/;
+
+/**
+ * Pull `{slug: epochMs}` out of one month's response.
+ *
+ * Deliberately strict about what it recognises. A response whose shape does not
+ * match is skipped rather than guessed at — a wrong date written into a commit
+ * is worse than no date, because nothing downstream can tell it is wrong.
+ *
+ * @param {any} result the `result` field of the API response
+ * @returns {Record<string, number>}
+ */
+export function parseSubmissionDates(result) {
+  const out = {};
+  if (!result || typeof result !== "object") return out;
+
+  for (const key of Object.keys(result)) {
+    const m = DATE_KEY_RE.exec(key);
+    if (!m) continue; // not a date-keyed bucket — not the shape we understand
+    const ts = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    if (!Number.isFinite(ts)) continue;
+
+    const bucket = result[key];
+    const entries = Array.isArray(bucket) ? bucket : Object.values(bucket || {});
+    for (const entry of entries) {
+      const raw = entry?.slug || entry?.problem_slug || entry?.pslug;
+      if (typeof raw !== "string" || !raw.trim()) continue;
+      const slug = cleanGfgSlug(raw.toLowerCase().trim());
+      // Earliest wins: a re-submission months later is not when it was solved.
+      if (!(slug in out) || ts < out[slug]) out[slug] = ts;
+    }
+  }
+  return out;
+}
+
+/**
+ * Build a `{slug: epochMs}` map of when each problem was first solved.
+ *
+ * @param {string} handle GFG user handle
+ * @param {number} wanted how many problems are waiting for a date
+ * @param {(msg: string) => void} show progress reporter
+ * @returns {Promise<Record<string, number>>}
+ */
+async function fetchSolveDates(handle, wanted, show) {
+  const dates = {};
+  if (!handle) return dates;
+
+  const now = new Date();
+  let emptyRun = 0;
+
+  for (let back = 0; back < MAX_MONTHS_BACK; back++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+
+    let payload;
+    try {
+      const body = await gfgThrottledFetch(SUBMISSIONS_API, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle, requestType: "", year, month }),
+      });
+      payload = body ? JSON.parse(body) : null;
+    } catch (e) {
+      dbg.warn(`fetchSolveDates(): ${year}-${month} failed:`, e?.message);
+      payload = null;
+    }
+
+    const found = parseSubmissionDates(payload?.result);
+    const added = Object.keys(found).filter((s) => !(s in dates));
+    for (const slug of added) dates[slug] = found[slug];
+
+    emptyRun = added.length ? 0 : emptyRun + 1;
+
+    const have = Object.keys(dates).length;
+    show(
+      `Reading solve dates — ${have}/${wanted} found (back to ${year}-${String(month).padStart(2, "0")})…`,
+    );
+
+    if (have >= wanted) break;
+    if (emptyRun >= EMPTY_MONTH_RUN) {
+      dbg.log(
+        `fetchSolveDates(): ${emptyRun} empty months in a row — stopping at ${year}-${month}`,
+      );
+      break;
+    }
+  }
+
+  dbg.log(`fetchSolveDates(): resolved ${Object.keys(dates).length}/${wanted} solve date(s)`);
+  return dates;
+}
+
 /**
  * Parse the __NEXT_DATA__ script tag on the current GFG profile page.
  * @returns {Promise<{ username: string, submissions: Array<{slug, title, difficulty}> } | null>}
@@ -476,11 +588,25 @@ async function runProfileImport(makeProblemId, btn) {
       return;
     }
 
-    show(`Found ${submissions.length} solved problems. Building import…`);
+    show(`Found ${submissions.length} solved problems. Reading solve dates…`);
+
+    // Dates first: the profile list has none, and a record that says it was
+    // solved today when it was solved two years ago corrupts the commit
+    // history, the heatmap and the streak all at once.
+    const solveDates = await fetchSolveDates(username, submissions.length, show).catch((e) => {
+      dbg.warn("solve date lookup failed:", e?.message);
+      return {};
+    });
+
+    const undated = submissions.filter((s) => !solveDates[s.slug]).length;
+    show(
+      `Building import — ${submissions.length - undated} dated, ${undated} without a published date…`,
+    );
 
     const bulkProblems = submissions.map((sub) => {
       const tags = [];
       const topic = resolvePrimaryTopic(tags);
+      const solvedAt = solveDates[sub.slug] || null;
 
       return {
         id: makeProblemId(`${sub.slug}`),
@@ -493,7 +619,12 @@ async function runProfileImport(makeProblemId, btn) {
         topic,
         code: "",
         files: [],
-        timestamp: Date.now(),
+        // Null, not Date.now(). Everything that groups by day treats an unknown
+        // date as unknown; stamping the import time would put the whole back
+        // catalogue on one square of the calendar and one day of commits.
+        timestamp: solvedAt,
+        importedAt: Date.now(),
+        _solveDateUnknown: !solvedAt,
         runtime: null,
         memory: null,
         problemStatement: null,

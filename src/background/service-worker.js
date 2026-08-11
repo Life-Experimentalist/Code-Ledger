@@ -2051,16 +2051,37 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
       const alreadyRemote = Array.from(remoteByCommitKey.values());
       const sessionCommitted = [];
 
-      const sorted = newProblems
+      // A record with no timestamp is a solve whose date the platform never
+      // published — GeeksForGeeks lists what you solved but not when. Giving
+      // each of those its own commit dated today is how a 200-problem back
+      // catalogue turns into 200 solves on one square of the contribution
+      // graph. They go into a single commit instead, whose message says what
+      // it is, so the history stays readable and stays true.
+      const dated = [];
+      const undated = [];
+      for (const p of newProblems) (p.timestamp ? dated : undated).push(p);
+
+      const sorted = dated
         .map((p) => ({
-          problem: p,
+          problems: [p],
           files: getProblemFiles(p, settings),
           message: "[" + (p.topic || "Untagged") + "] " + (p.title || p.titleSlug) + " solved",
-          date: p.timestamp
-            ? new Date(p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000)
-            : new Date(),
+          date: new Date(p.timestamp > 1e10 ? p.timestamp : p.timestamp * 1000),
         }))
         .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      if (undated.length) {
+        dbg.log(`handleResyncAll(): ${undated.length} problem(s) have no published solve date`);
+        sorted.push({
+          problems: undated,
+          files: undated.flatMap((p) => getProblemFiles(p, settings)),
+          message:
+            `chore: import ${undated.length} solved problem(s) [CodeLedger]\n\n` +
+            `The platform does not publish a solve date for these, so this commit ` +
+            `is dated when they were imported, not when they were solved.`,
+          date: new Date(),
+        });
+      }
 
       for (let i = 0; i < sorted.length; i++) {
         const entry = sorted[i];
@@ -2073,7 +2094,7 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         if (isLast && phaseAIsLast) {
           entry.files.push(...infraBundle);
         } else if (isCheckpoint) {
-          const committedSoFar = [...alreadyRemote, ...sessionCommitted, entry.problem];
+          const committedSoFar = [...alreadyRemote, ...sessionCommitted, ...entry.problems];
           entry.files.push({
             path: "index.json",
             content: _buildIndexJsonFromList(committedSoFar, settings),
@@ -2110,16 +2131,19 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
           settings,
         );
         lastCommitSha = result?.newSha || null;
-        sessionCommitted.push(entry.problem);
-        // Record committed paths — exclude infra bundle paths
+        sessionCommitted.push(...entry.problems);
+        // Record committed paths — exclude infra bundle paths. Derived per
+        // problem rather than from entry.files, which for the undated group
+        // holds every problem's files at once.
         const infraPaths = new Set(infraBundle.map((f) => f.path));
-        const committedPaths = entry.files
-          .filter((f) => !infraPaths.has(f.path))
-          .map((f) => f.path);
-        await Storage.saveProblem({
-          ...entry.problem,
-          _committedPaths: committedPaths,
-        }).catch(() => {});
+        for (const problem of entry.problems) {
+          const committedPaths = getProblemFiles(problem, settings)
+            .map((f) => f.path)
+            .filter((p) => !infraPaths.has(p));
+          await Storage.saveProblem({ ...problem, _committedPaths: committedPaths }).catch(
+            () => {},
+          );
+        }
       }
     } else {
       dbg.log(`handleResyncAll(): Phase A — bulk commit with ${newProblems.length} problem(s)`);
