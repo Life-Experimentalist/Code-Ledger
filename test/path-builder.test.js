@@ -19,6 +19,7 @@ import {
   problemBase,
   problemDir,
   solutionPath,
+  buildProblemMarkdown,
   PROBLEMS_ROOT,
 } from "../src/core/path-builder.js";
 
@@ -108,5 +109,48 @@ describe("path construction stays inside problems/", () => {
       solutionPath("1", "leetcode", { ext: "py" }, { canonicalId: "two-sum" }),
       "problems/two-sum/leetcode/lc-1.py",
     );
+  });
+});
+
+describe("buildProblemMarkdown — the AI-written problem summary", () => {
+  // Codeforces, NeetCode and takeuforward have no statement endpoint, so their
+  // problems used to commit with no statement section at all. The reviewer can
+  // say what the problem asks — but the README goes into a public repository,
+  // so a paraphrase must never be able to pass for the platform's own text.
+  const SUMMARY =
+    "Given an even weight w, decide whether it can be split into two even positive parts.";
+  const base = { platform: "codeforces", id: "4-A", title: "Watermelon" };
+
+  test("renders under its own heading, attributed, when there is no statement", () => {
+    const md = buildProblemMarkdown({ ...base, aiStatementSummary: SUMMARY });
+    assert.match(md, /## Problem Summary/);
+    assert.doesNotMatch(md, /## Problem Statement/);
+    assert.match(md, /> Written by the AI reviewer/);
+    assert.ok(md.includes(SUMMARY));
+    assert.ok(
+      md.indexOf("Written by the AI reviewer") < md.indexOf(SUMMARY),
+      "the attribution must come before the text it disclaims",
+    );
+  });
+
+  test("the real statement always wins, and the summary is not shown beside it", () => {
+    for (const field of ["description", "problemStatement"]) {
+      const md = buildProblemMarkdown({
+        ...base,
+        [field]: "One integer w.",
+        aiStatementSummary: SUMMARY,
+      });
+      assert.match(md, /## Problem Statement/);
+      assert.doesNotMatch(md, /## Problem Summary/);
+      assert.ok(!md.includes(SUMMARY), `expected no AI summary alongside ${field}`);
+    }
+  });
+
+  test("an empty or whitespace summary adds no heading at all", () => {
+    for (const value of [undefined, "", "   \n  "]) {
+      const md = buildProblemMarkdown({ ...base, aiStatementSummary: value });
+      assert.doesNotMatch(md, /## Problem Summary/);
+      assert.doesNotMatch(md, /Written by the AI reviewer/);
+    }
   });
 });

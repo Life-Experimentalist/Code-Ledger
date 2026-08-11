@@ -334,7 +334,9 @@ Be concise. Max 200 words.`;
               const m = this._readDomMetadata();
               return { title: m.title, difficulty: m.difficulty || "" };
             },
-            readEditorCode: () => "",
+            // No override: NeetCode's editor is Monaco, so the panel's own
+            // reader — which asks Monaco for the whole model rather than the
+            // lines that happen to be scrolled into view — is the right one.
             readEditorLang: () => this._readLanguage(),
             readProblemStatement: () =>
               (this.safeQuery(SELECTORS.problem.description)?.textContent || "")

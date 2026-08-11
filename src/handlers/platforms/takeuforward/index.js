@@ -365,7 +365,9 @@ Be concise. Max 200 words.`;
               const m = this._metadataFor(slug);
               return { title: m.title, difficulty: m.difficulty || "" };
             },
-            readEditorCode: () => "",
+            // No override: the TUF+ editor is Monaco, so the panel's own reader
+            // applies. If a page ever ships without Monaco it returns "", which
+            // is exactly what the override used to return anyway.
             readEditorLang: () => "",
             readProblemStatement: () =>
               String(this._metadataFor(slug).statement || "")

@@ -4,6 +4,7 @@
  */
 
 import { Storage } from "./storage.js";
+import { runtime } from "../lib/browser-compat.js";
 import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("AIChatStorage");
@@ -17,8 +18,56 @@ const DB_NAME = "CodeLedger_AIChats";
 const STORE_NAME = "chats";
 let db = null;
 
+/**
+ * Whether this module is running in a page's world rather than the extension's.
+ *
+ * This matters more than it looks. A content script shares the *page's* origin
+ * for IndexedDB, so `indexedDB.open("CodeLedger_AIChats")` from a content
+ * script on leetcode.com opens leetcode.com's database — not the extension's.
+ * The write succeeds, reports success, and nothing ever reads it back, because
+ * the library runs on the extension origin and looks at a different database
+ * entirely. Every conversation held in the floating panel was lost that way,
+ * and lost silently. When we are in a page's world the operation is handed to
+ * the service worker, which is on the extension origin and has the real store.
+ *
+ * The `base === "/"` case is the browser-compat mock: no extension APIs at all,
+ * which is the test environment, where the local path is the correct one.
+ */
+function isPageWorld() {
+  try {
+    const base = runtime.getURL("");
+    if (!base || base === "/") return false;
+    return !String(globalThis.location?.href || "").startsWith(base);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hand one operation to the service worker. Only the operations a content
+ * script actually reaches are bridged; see `AI_CHAT_STORE_OPS` in the service
+ * worker for the receiving end, which accepts that same fixed set and nothing
+ * else.
+ */
+async function bridge(op, args) {
+  const res = await runtime.sendMessage({ type: "AI_CHAT_STORE", op, args });
+  if (!res || res.ok !== true) {
+    throw new Error(res?.error || `AI chat store: ${op} failed in the service worker`);
+  }
+  return res.result;
+}
+
 /** Initialize IndexedDB with proper schema */
 async function initDB() {
+  // Reaching the database directly from a page's world would open the wrong
+  // one. Anything that gets here without a bridge is a bug, so say so rather
+  // than writing where nothing will ever read.
+  if (isPageWorld()) {
+    throw new Error(
+      "AI chat storage was opened from a page's world, where IndexedDB belongs to the page. " +
+        "Bridge the operation through the service worker instead.",
+    );
+  }
   dbg.log(`initDB(): initializing AI chat database`);
   return new Promise((resolve, reject) => {
     if (db) {
@@ -83,6 +132,9 @@ export async function saveAIChat(
   meta = {},
 ) {
   dbg.log(`saveAIChat(): ${platform} problem ${problemSlug} (${(messages || []).length} messages)`);
+  if (isPageWorld()) {
+    return bridge("saveAIChat", [problemSlug, problemURL, messages, platform, meta]);
+  }
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_NAME], "readwrite");
@@ -111,6 +163,7 @@ export async function saveAIChat(
  */
 export async function updateAIChat(chatId, messages, meta = {}) {
   dbg.log(`updateAIChat(): ${chatId} (${(messages || []).length} messages)`);
+  if (isPageWorld()) return bridge("updateAIChat", [chatId, messages, meta]);
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_NAME], "readwrite");
@@ -141,6 +194,7 @@ export async function updateAIChat(chatId, messages, meta = {}) {
  */
 export async function getChatsByProblem(problemSlug) {
   dbg.log(`getChatsByProblem(): ${problemSlug}`);
+  if (isPageWorld()) return bridge("getChatsByProblem", [problemSlug]);
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_NAME], "readonly");
@@ -296,6 +350,7 @@ export async function getChat(chatId) {
  */
 export async function deleteChat(chatId) {
   dbg.log(`deleteChat(): ${chatId}`);
+  if (isPageWorld()) return bridge("deleteChat", [chatId]);
   const db = await initDB();
   // Capture the github path before deleting so the sync can remove it from the repo
   const existing = await getChat(chatId).catch(() => null);

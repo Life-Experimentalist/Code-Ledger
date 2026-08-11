@@ -170,6 +170,29 @@ export async function recordAIInsights({
   dbg.log(`recordAIInsights(): ✓ saved for ${key}`);
 }
 
+/**
+ * Record that an AI review rewrote part of a problem's metadata.
+ *
+ * The review has always been allowed to replace tags, topic, pattern and
+ * difficulty, and until now it did so silently — so nothing could distinguish a
+ * difficulty the platform stated from one a model decided on, and a learner
+ * looking at their own difficulty breakdown had no way to know which they were
+ * reading. `fields` is the list of what actually changed, not what the reviewer
+ * offered; a reviewer restating a value it did not change is not an edit.
+ */
+export async function recordAIMetadataEdit({ slug, platform, fields = [] }) {
+  if (!Array.isArray(fields) || fields.length === 0) return;
+  dbg.log(`recordAIMetadataEdit(): entering for ${platform}::${slug} (${fields.join(", ")})`);
+  if (!(await isEnabled())) return;
+  const bank = await load();
+  const key = `${platform}::${slug}`;
+  const entry = bank[key] || { slug, platform };
+  entry.aiMetadataEdits = [...(entry.aiMetadataEdits || []), { ts: Date.now(), fields }].slice(-5);
+  bank[key] = entry;
+  await save(bank);
+  dbg.log(`recordAIMetadataEdit(): ✓ saved for ${key}`);
+}
+
 /** Return all behavior bank entries as an array for display. */
 export async function getAllEntries() {
   const bank = await load();

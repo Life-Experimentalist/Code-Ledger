@@ -183,12 +183,26 @@ export function buildProblemMarkdown(problem) {
     lines.push("");
   }
 
-  // Problem statement
+  // Problem statement. The real one always wins; the AI reviewer's stand-in is
+  // only reached when there is none, which is the normal case on Codeforces,
+  // NeetCode and takeuforward — none of the three has a statement endpoint. It
+  // gets its own heading and says who wrote it, because a paraphrase filed
+  // under "Problem Statement" would read as the platform's own words, and this
+  // file is committed to a repository other people read.
   const stmt = problem.description || problem.problemStatement;
   if (stmt) {
     lines.push("## Problem Statement");
     lines.push("");
     lines.push(_htmlToMarkdown(stmt));
+    lines.push("");
+  } else if (String(problem.aiStatementSummary || "").trim()) {
+    lines.push("## Problem Summary");
+    lines.push("");
+    lines.push(
+      "> Written by the AI reviewer — no problem statement was recorded for this problem.",
+    );
+    lines.push("");
+    lines.push(String(problem.aiStatementSummary).trim());
     lines.push("");
   }
 

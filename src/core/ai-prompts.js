@@ -171,11 +171,29 @@ export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) 
       ? `\n\nThis problem has sparse tags (${existingTags.length} found). Infer 2-5 accurate DSA tags from the code and title. Use ONLY the canonical names listed above.`
       : "";
 
+  // Three platforms have no statement endpoint at all — Codeforces, NeetCode and
+  // takeuforward — so their problems commit with an empty Problem Statement
+  // section that nothing in the extension can ever fill. The reviewer has the
+  // code and the title in front of it and can say what the problem asks.
+  //
+  // It is asked only when the record has no statement, because a model asked to
+  // describe a problem will describe one whether or not it can tell what the
+  // problem is, and there is no reason to run that risk on a problem whose real
+  // statement is already stored. What it writes is never presented as the
+  // platform's own text: it is stored in its own field and rendered under a
+  // heading that says who wrote it.
+  const hasStatement = !!String(
+    problemContext.problemStatement || problemContext.description || problemContext.statement || "",
+  ).trim();
+  const summaryRequest = hasStatement
+    ? ""
+    : `\nSUMMARY: two or three sentences on ONE line saying what this problem asks — what it is given, what it must return, and the one constraint that shapes the answer. No markdown. This is used only because no problem statement was recorded. If the code and title do not tell you what the problem asks, leave this empty; an empty line is correct and a guess is not.`;
+
   // WEAK_AREAS is what gets written back into the behaviour bank and becomes the
   // learner's recurring-flag profile. A keyword scan over the prose used to
   // guess it and could only ever recognise seven fixed phrases; the reviewer
   // already knows what it flagged, so it may as well say so.
-  const metadataInstruction = `\n\nAt the very end of your response, you MUST output a metadata block in exactly this format (no other text on these lines):\nMETADATA\nTAGS: Tag One, Tag Two  ← use ONLY from this canonical list: ${CANONICAL_TOPICS}${sparseTagHint}\nTOPIC: Primary Topic\nPATTERN: Optional Pattern Name\nDIFFICULTY: Easy/Medium/Hard\nWEAK_AREAS: short, lowercase labels for what this solution actually got wrong or handled poorly, comma-separated (e.g. off-by-one, edge cases, space complexity). Reuse the same wording across reviews so repeats are recognisable. Leave empty if the solution was sound.\nTAKEAWAY: one plain sentence naming the single most useful thing about THIS solution, written so it still makes sense months later with the code out of view. Plain text only — no markdown, no LaTeX, no headings. Say what was done and what it cost, e.g. "Sorted both arrays and walked them with two pointers, which is optimal but makes the O(n log n) sort the floor." Not a grade, not encouragement.\nEND_METADATA`;
+  const metadataInstruction = `\n\nAt the very end of your response, you MUST output a metadata block in exactly this format (no other text on these lines):\nMETADATA\nTAGS: Tag One, Tag Two  ← use ONLY from this canonical list: ${CANONICAL_TOPICS}${sparseTagHint}\nTOPIC: Primary Topic\nPATTERN: Optional Pattern Name\nDIFFICULTY: Easy/Medium/Hard\nWEAK_AREAS: short, lowercase labels for what this solution actually got wrong or handled poorly, comma-separated (e.g. off-by-one, edge cases, space complexity). Reuse the same wording across reviews so repeats are recognisable. Leave empty if the solution was sound.${summaryRequest}\nTAKEAWAY: one plain sentence naming the single most useful thing about THIS solution, written so it still makes sense months later with the code out of view. Plain text only — no markdown, no LaTeX, no headings. Say what was done and what it cost, e.g. "Sorted both arrays and walked them with two pointers, which is optimal but makes the O(n log n) sort the floor." Not a grade, not encouragement.\nEND_METADATA`;
 
   const behaviorSection = problemContext._behaviorContext
     ? `\n\n## Learner History:\n${problemContext._behaviorContext}`
@@ -244,6 +262,46 @@ export function parseTakeaway(raw = "") {
     .replace(/\s+/g, " ")
     .trim();
   if (/^(none|n\/a|na|-|—)$/i.test(s)) return "";
+  return s.length > MAX_CHARS ? s.slice(0, MAX_CHARS - 1).trimEnd() + "…" : s;
+}
+
+/**
+ * Parse the reviewer's SUMMARY line into the stand-in problem statement.
+ *
+ * This one is committed to the learner's repository, so it is held to a
+ * stricter standard than the takeaway is. A refusal, an apology or a single
+ * clause is not a problem statement, and committing one under any heading is
+ * worse than committing nothing: the section would read as though the problem
+ * had been described when it had not. Anything that does not look like a real
+ * description is dropped, and the field simply stays empty.
+ *
+ * @param {string} raw the text following "SUMMARY:"
+ * @returns {string} a plain-text description, or "" if there is nothing usable
+ */
+export function parseStatementSummary(raw = "") {
+  const MIN_CHARS = 40;
+  const MAX_CHARS = 600;
+  let s = String(raw || "")
+    .split("\n")[0]
+    .trim();
+  if (!s) return "";
+  s = s
+    .replace(/\$+([^$]*)\$+/g, "$1")
+    .replace(/\\(?:log|max|min|sqrt|cdot|times|le|ge|approx)\b/g, (m) => m.slice(1))
+    .replace(/`+/g, "")
+    .replace(/\*\*?([^*]+)\*\*?/g, "$1")
+    .replace(/^#+\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  // A model that could not tell what the problem asks was told to leave this
+  // empty. Not all of them do; some answer the instruction instead.
+  if (/^(none|n\/a|na|nothing|not applicable|unknown|unclear|-|—)$/i.test(s)) return "";
+  // "I cannot", "I can't", "I'm unable", "I am unable" — and the curly
+  // apostrophe, which is what a model actually emits about half the time.
+  const REFUSAL =
+    /^(i\s?['’]?(?:m|am)?\s*(?:cannot|can['’]?t|not able|unable)|sorry\b|as an ai\b|unable to)/i;
+  if (REFUSAL.test(s)) return "";
+  if (s.length < MIN_CHARS) return "";
   return s.length > MAX_CHARS ? s.slice(0, MAX_CHARS - 1).trimEnd() + "…" : s;
 }
 

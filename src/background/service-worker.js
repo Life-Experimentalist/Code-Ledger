@@ -14,6 +14,7 @@ import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
 import {
   buildConversationSystemPrompt,
+  parseStatementSummary,
   parseTakeaway,
   parseWeakAreas,
 } from "../core/ai-prompts.js";
@@ -41,7 +42,12 @@ import { canonicalMapper } from "../core/canonical-mapper.js";
 import { countByDifficulty, loadUserDifficultyMap } from "../core/difficulty-map.js";
 import { dayKey } from "../core/gamification.js";
 import { refreshIconBadge, registerBadgeAlarm, BADGE_ALARM } from "./gamification-service.js";
-import { getChatsByProblem } from "../core/ai-chat-storage.js";
+import {
+  getChatsByProblem,
+  saveAIChat,
+  updateAIChat,
+  deleteChat,
+} from "../core/ai-chat-storage.js";
 import { buildCommitMessage, COMMIT_TYPES, resolveCommitType } from "../core/commit-messages.js";
 import {
   migrateRepo,
@@ -108,14 +114,7 @@ import {
 } from "../core/behavior-bank.js";
 import { getProfileContext } from "../core/behavior-profile.js";
 import { getRoadmapContext } from "../core/roadmap-progress.js";
-
-// Lazy reference to topic-resolver (populated on first use)
-let _topicResolver = { normalizeTag: (t) => t };
-import("../core/topic-resolver.js")
-  .then((m) => {
-    _topicResolver = m;
-  })
-  .catch(() => {});
+import { applyInferredMetadata } from "../core/ai-review-metadata.js";
 
 let _syncAlarmBound = false;
 let _reviewQueueAlarmBound = false;
@@ -585,7 +584,17 @@ function _isProblemDrifted(local, remote) {
   // Compare only stable metadata fields. `files` is regenerated from `code` on
   // every commit so it always differs; `canonical` is enriched client-side and
   // never persisted to index.json. Including either causes false-positive drift.
-  const keys = ["title", "difficulty", "code", "tags", "lang", "aiReview", "notes", "methodTitle"];
+  const keys = [
+    "title",
+    "difficulty",
+    "code",
+    "tags",
+    "lang",
+    "aiReview",
+    "notes",
+    "methodTitle",
+    "aiStatementSummary",
+  ];
   return keys.some((k) => _stableJSON(local?.[k]) !== _stableJSON(remote?.[k]));
 }
 
@@ -738,7 +747,7 @@ async function generateAIReview(problem = {}, settings = null) {
           const keptLines = [];
           for (const line of lines) {
             if (
-              /^(TAGS|TOPIC|PATTERN|DIFFICULTY|WEAK_AREAS|TAKEAWAY|METADATA|END_METADATA):/i.test(
+              /^(TAGS|TOPIC|PATTERN|DIFFICULTY|SUMMARY|WEAK_AREAS|TAKEAWAY|METADATA|END_METADATA):/i.test(
                 line,
               )
             ) {
@@ -775,6 +784,13 @@ async function generateAIReview(problem = {}, settings = null) {
         }
         if (diffMatch) {
           meta.difficulty = diffMatch[1].trim();
+        }
+        // Only asked for when the record had no statement, and applied only if
+        // it still has none — see applyInferredMetadata.
+        const summaryMatch = blockText.match(/SUMMARY:\s*(.+)/i);
+        if (summaryMatch) {
+          const s = parseStatementSummary(summaryMatch[1]);
+          if (s) meta.statementSummary = s;
         }
 
         if (Object.keys(meta).length > 0) {
@@ -865,48 +881,6 @@ The structure of your code is clean and readable. The problem-solving logic alig
   throw new Error(
     "AI review failed — all providers returned errors. Check your API keys in Settings → AI.",
   );
-}
-
-function applyInferredMetadata(problem, inferredMetadata) {
-  if (!inferredMetadata) return problem;
-  const updated = { ...problem };
-  if (
-    inferredMetadata.tags &&
-    Array.isArray(inferredMetadata.tags) &&
-    inferredMetadata.tags.length > 0
-  ) {
-    // Normalize AI-returned tags through canonical system
-    const { normalizeTag } = _topicResolver;
-    const normalizedNew = inferredMetadata.tags.map((t) => normalizeTag(t)).filter(Boolean);
-
-    const existingTags = Array.isArray(problem.tags) ? problem.tags : [];
-    const hasUsefulExisting = existingTags.length > 0 && existingTags.some((t) => t !== "Untagged");
-
-    if (hasUsefulExisting) {
-      // Merge: union existing + new (canonical), deduplicated
-      const merged = [...new Set([...existingTags, ...normalizedNew])];
-      updated.tags = merged;
-    } else {
-      // No existing tags — use AI-inferred ones directly
-      updated.tags = normalizedNew;
-    }
-  }
-  if (inferredMetadata.topic) {
-    const { normalizeTag } = _topicResolver;
-    updated.topic = normalizeTag(inferredMetadata.topic) || inferredMetadata.topic;
-  }
-  if (inferredMetadata.pattern) {
-    updated.pattern = inferredMetadata.pattern;
-  }
-  if (inferredMetadata.difficulty) {
-    const d =
-      inferredMetadata.difficulty.charAt(0).toUpperCase() +
-      inferredMetadata.difficulty.slice(1).toLowerCase();
-    if (["Easy", "Medium", "Hard"].includes(d)) {
-      updated.difficulty = d;
-    }
-  }
-  return updated;
 }
 
 async function commitUpdatedProblem(problem, settings) {
@@ -2510,6 +2484,32 @@ async function handleBulkImport(problems = []) {
   _broadcastToContentScripts({ type: "CODELEDGER_IMPORT_COMPLETE", ...report });
 
   return report;
+}
+
+/**
+ * The chat store, on behalf of a content script.
+ *
+ * A content script's `indexedDB` is the page's, not the extension's, so the
+ * floating AI panel cannot write its own history — it would land in
+ * leetcode.com's database and never be read again. It hands the operation here
+ * instead. Only these four are reachable that way; anything else is refused by
+ * name rather than dispatched, so this stays a fixed door and not a way to call
+ * arbitrary module functions from a page.
+ */
+const AI_CHAT_STORE_OPS = {
+  saveAIChat,
+  updateAIChat,
+  getChatsByProblem,
+  deleteChat,
+};
+
+async function handleAIChatStore(op, args) {
+  const fn = Object.prototype.hasOwnProperty.call(AI_CHAT_STORE_OPS, op)
+    ? AI_CHAT_STORE_OPS[op]
+    : null;
+  if (!fn) throw new Error(`Unknown AI chat store operation: ${op}`);
+  dbg.log(`handleAIChatStore(): ${op}`);
+  return fn(...(Array.isArray(args) ? args : []));
 }
 
 async function handleAIChat(messages, context = {}) {
@@ -4129,6 +4129,16 @@ try {
       dbg.log(`onMessage(REFRESH_METADATA_DONE): completed=${result.completed}`);
       sendResponse({ ok: true, ...result });
       return true;
+    }
+
+    if (msg && msg.type === "AI_CHAT_STORE") {
+      handleAIChatStore(msg.op, msg.args)
+        .then((result) => sendResponse({ ok: true, result }))
+        .catch((e) => {
+          dbg.error(`onMessage(AI_CHAT_STORE): ${msg.op} failed:`, e?.message);
+          sendResponse({ ok: false, error: e.message });
+        });
+      return true; // async response
     }
 
     if (msg && msg.type === "AI_CHAT") {
