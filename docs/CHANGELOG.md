@@ -6,7 +6,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.7.0] — 2026-08-10
+## [1.7.0] — 2026-08-11
 
 First public release. Versions up to 1.4.7 were development and store-review
 builds; see [Development history](#development-history) for those notes. The
@@ -87,6 +87,7 @@ Chrome Web Store requires each upload to exceed the last.
 
 - Chrome and Firefox from one source tree, with every extension API call routed through a single compatibility shim.
 - The download is 3.5 MB rather than 17 MB. The packager copied all of `assets/images/`, which is mostly store promo tiles, a social preview and a screenshot of every tab — none of it opened by anything the extension runs. It now ships the four icons the manifests declare and the three branding images that get committed into your repository, and nothing else. The unpacked build applies the same rule, so what you load locally is what ships.
+- The release command refuses to cut a release over a failing check. It now runs the type gate, the full test suite and the sync regression script, and stops on the first failure; previously it ran only the last of the three, inside a `catch` that turned a failure into a printed warning. It also verifies the Firefox manifest's version, which nothing checked before, and pushes the branch you are actually on rather than whatever `main` happens to point at locally.
 
 ### Security
 
