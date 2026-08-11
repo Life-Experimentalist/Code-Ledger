@@ -24,6 +24,7 @@ import { loadUserDifficultyMap, mapDifficulty } from "../../core/difficulty-map.
 import { Storage } from "../../core/storage.js";
 import { ShareStreak } from "../../ui/components/ShareStreak.js";
 import { Achievements } from "../../ui/components/Achievements.js";
+import { TopicGaps } from "../../ui/components/TopicGaps.js";
 import { loadSnapshot } from "../../core/gamification-state.js";
 import { isGamificationActive } from "../../core/feature-flags.js";
 
@@ -1200,6 +1201,13 @@ export function AnalyticsView({ problems, onNavigate }) {
           </div>
         </div>
       </div>
+
+      <!-- Where the gaps are: the same topics ranked by mastery instead of volume -->
+      <${TopicGaps}
+        problems=${problems}
+        topicKinds=${topicKinds}
+        onTopic=${(t) => handleTopicClick(t.topic)}
+      />
 
       <!-- Topic grid + Unsolved Next -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
