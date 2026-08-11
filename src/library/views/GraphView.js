@@ -136,6 +136,48 @@ const GRAPH_LAYOUT_MODES = [
   { id: "force", label: "Force" },
 ];
 
+/* ── Colour modes ────────────────────────────────────────────────────── */
+
+/**
+ * What the colour of a topic node means.
+ *
+ * "Topic" gives every topic its own hue, which is what a knowledge graph
+ * usually looks like and which carries no information beyond identity — the
+ * picture is pretty and answers nothing. "Mastery" spends the same colour on
+ * how well the topic is held, so the weak areas are the ones that stand out.
+ */
+const GRAPH_COLOR_MODES = [
+  { id: "topic", label: "By topic" },
+  { id: "mastery", label: "By mastery" },
+];
+
+const BAND_COLOR = {
+  strong: "#10b981",
+  working: "#06b6d4",
+  shaky: "#f59e0b",
+  untouched: "#64748b",
+};
+
+const BAND_LABEL = {
+  strong: "solid",
+  working: "coming along",
+  shaky: "shaky",
+  untouched: "untouched",
+};
+
+/**
+ * Point every topic node's `color` at what the current mode means. Mutates in
+ * place: the render loop reads `node.color` each frame, so a repaint needs no
+ * rebuild and no simulation restart.
+ */
+function applyColorMode(nodes, mode) {
+  for (const n of nodes) {
+    if (n.type !== "topic") continue;
+    if (n.paletteColor === undefined) n.paletteColor = n.color;
+    n.color = mode === "mastery" ? BAND_COLOR[n.band] || BAND_COLOR.untouched : n.paletteColor;
+  }
+}
+
 function seedNode(node, x, y) {
   node.x = x;
   node.y = y;
@@ -632,6 +674,8 @@ export function GraphView({
   const [layoutMode, setLayoutMode] = useState(
     VALID_LAYOUTS.has(initLayout) ? initLayout : "clustered",
   );
+  const initColor = getQueryParam("graphColor", "topic");
+  const [colorMode, setColorMode] = useState(initColor === "mastery" ? "mastery" : "topic");
   const filterSolvedRef = useRef(false);
   const filterCanonicalOnlyRef = useRef(false);
 
@@ -772,6 +816,7 @@ export function GraphView({
       }
     }
 
+    applyColorMode(newNodes, colorMode);
     simRef.current.nodes = newNodes;
     simRef.current.edges = newEdges;
 
@@ -789,6 +834,12 @@ export function GraphView({
       suggested: newNodes.filter((n) => n.type === "problem" && !n.solved).length,
     });
   }, [problems, layoutMode]);
+
+  // Recolour in place. No rebuild and no re-seed: the layout is where the user
+  // left it, and only what the colours mean has changed.
+  useEffect(() => {
+    applyColorMode(simRef.current.nodes, colorMode);
+  }, [colorMode]);
 
   useEffect(() => {
     filterSolvedRef.current = filterSolved;
@@ -1321,8 +1372,22 @@ export function GraphView({
               ${node.count} problem${node.count !== 1 ? "s" : ""}
             </div>
           </div>
-          <div class="text-[11px] text-slate-400">
-            ${node.count} problem${node.count !== 1 ? "s" : ""} solved
+          <div class="flex items-center gap-2 text-[11px]">
+            <span class="text-slate-400">
+              ${node.solveCount}
+              solved${node.daysSince === null || node.daysSince === undefined
+                ? ""
+                : node.daysSince === 0
+                  ? ", today"
+                  : node.daysSince === 1
+                    ? ", yesterday"
+                    : `, last ${node.daysSince}d ago`}
+            </span>
+            ${node.band
+              ? html`<span style=${{ color: BAND_COLOR[node.band] || BAND_COLOR.untouched }}
+                  >${BAND_LABEL[node.band] || ""}</span
+                >`
+              : ""}
           </div>
           ${!compact && topicProblems.length
             ? html`
@@ -1519,6 +1584,45 @@ export function GraphView({
             `,
           )}
         </div>
+        <div
+          class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 text-xs text-slate-400"
+        >
+          ${GRAPH_COLOR_MODES.map(
+            (mode) => html`
+              <button
+                onClick=${() => {
+                  setColorMode(mode.id);
+                  updateQueryParams({ graphColor: mode.id });
+                }}
+                class="px-2 py-1 rounded-md transition-colors ${colorMode === mode.id
+                  ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"}"
+                title=${mode.id === "mastery"
+                  ? "Colour topics by how well you hold them — solve count saturating, time since the last solve decaying"
+                  : "Give every topic its own colour"}
+              >
+                ${mode.label}
+              </button>
+            `,
+          )}
+        </div>
+        ${colorMode === "mastery"
+          ? html`
+              <div class="flex items-center gap-2 text-[10px] text-slate-500">
+                ${["strong", "working", "shaky"].map(
+                  (band) => html`
+                    <span key=${band} class="flex items-center gap-1">
+                      <span
+                        class="w-2 h-2 rounded-full"
+                        style=${{ background: BAND_COLOR[band] }}
+                      ></span>
+                      ${BAND_LABEL[band]}
+                    </span>
+                  `,
+                )}
+              </div>
+            `
+          : ""}
         <label
           class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white cursor-pointer ml-2"
         >

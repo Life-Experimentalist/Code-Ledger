@@ -5,7 +5,7 @@
 
 import { createDebugger } from "../lib/debug.js";
 import { normalizeTag } from "./topic-resolver.js";
-import { classifyTopic, KIND } from "./topic-taxonomy.js";
+import { classifyTopic, KIND, masteryScore, masteryBand } from "./topic-taxonomy.js";
 
 const dbg = createDebugger("KnowledgeGraph");
 
@@ -107,6 +107,12 @@ export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = 
     return id;
   }
 
+  // Solve counts and last-solved per topic, kept separately from `node.count`.
+  // That one also counts the unsolved suggestions hanging off a topic, which is
+  // the right number for sizing a node and the wrong one for saying how well
+  // somebody holds the topic.
+  const topicStats = new Map();
+
   // Track slug → node IDs (supports same problem on multiple platforms)
   const slugToIds = new Map(); // titleSlug → Set<nodeId>
   const canonicalGroups = new Map(); // canonicalId → [node ids]
@@ -156,9 +162,15 @@ export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = 
     });
 
     // Create edges for ALL topics (not just the first one)
+    const ts = Number(p.timestamp);
     for (const topic of allTopics) {
       const topicId = ensureTopic(topic);
       edges.push({ source: topicId, target: id, type: "topic-problem" });
+
+      let stat = topicStats.get(topic);
+      if (!stat) topicStats.set(topic, (stat = { count: 0, lastSolved: -Infinity }));
+      stat.count += 1;
+      if (Number.isFinite(ts) && ts > stat.lastSolved) stat.lastSolved = ts;
     }
 
     // Canonical grouping
@@ -314,6 +326,21 @@ export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = 
       edgeSet.add(key);
       finalEdges.push(edge);
     }
+  }
+
+  // How well each topic is actually held. Carried on the node so a renderer can
+  // colour by it: the graph coloured by topic identity is a picture of what has
+  // been tagged, which is pretty and says nothing about where to go next.
+  const now = Date.now();
+  for (const node of nodes.values()) {
+    if (node.type !== "topic") continue;
+    const stat = topicStats.get(node.label) || { count: 0, lastSolved: -Infinity };
+    node.solveCount = stat.count;
+    node.mastery = masteryScore(stat, { now });
+    node.band = masteryBand(node.mastery);
+    node.daysSince = Number.isFinite(stat.lastSolved)
+      ? Math.floor((now - stat.lastSolved) / 86_400_000)
+      : null;
   }
 
   const result = {
