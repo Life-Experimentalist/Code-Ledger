@@ -22,6 +22,9 @@ import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
 import { loadUserDifficultyMap, mapDifficulty } from "../../core/difficulty-map.js";
 import { Storage } from "../../core/storage.js";
+import { ShareStreak } from "../../ui/components/ShareStreak.js";
+import { loadSnapshot } from "../../core/gamification-state.js";
+import { isGamificationActive } from "../../core/feature-flags.js";
 
 // Curated Blind 75 / NeetCode 150 — covers all major topics with real LeetCode slugs
 const BLIND75 = [
@@ -386,6 +389,13 @@ export function AnalyticsView({ problems, onNavigate }) {
   const [modalProblem, setModalProblem] = useState(null);
   const [drilldown, setDrilldown] = useState(null); // { label, problems[] }
   const [modalProblemList, setModalProblemList] = useState([]); // list to navigate within modal
+  const [settings, setSettings] = useState(null);
+  // The streak as the rest of the extension understands it — freezes, vacation
+  // days and the install floor included. This page used to count back through
+  // the solve dates itself, which meant the number here could differ from the
+  // one in the popup and on the badge for the same day.
+  const [snapshot, setSnapshot] = useState(null);
+  const [sharing, setSharing] = useState(false);
   useEffect(() => {
     let m = true;
     loadUserDifficultyMap()
@@ -395,11 +405,17 @@ export function AnalyticsView({ problems, onNavigate }) {
       .catch(() => {});
     Storage.getSettings()
       .then((s) => {
-        if (m) setTopicKinds(s?.topicKinds || {});
+        if (!m) return;
+        setTopicKinds(s?.topicKinds || {});
+        setSettings(s || {});
+        if (!isGamificationActive(s)) return;
+        loadSnapshot(s)
+          .then((snap) => m && setSnapshot(snap))
+          .catch((e) => dbg.warn("snapshot failed:", e?.message || e));
       })
       .catch(() => {});
     return () => (m = false);
-  }, []);
+  }, [problems.length]);
 
   const stats = useMemo(() => {
     const s = {
@@ -849,9 +865,13 @@ export function AnalyticsView({ problems, onNavigate }) {
           },
           {
             label: "Current Streak",
-            value: `${stats.currentStreak}d`,
-            sub: `Best: ${stats.longestStreak} days`,
+            // The snapshot wins when it is there. Falling back to the local
+            // count keeps the card populated while it loads and when streaks
+            // are switched off entirely.
+            value: `${snapshot ? snapshot.currentStreak : stats.currentStreak}d`,
+            sub: `Best: ${snapshot ? snapshot.longestStreak : stats.longestStreak} days`,
             color: "#10b981",
+            action: snapshot ? { label: "Share", onClick: () => setSharing(true) } : null,
           },
           {
             label: "Last 7 Days",
@@ -899,6 +919,16 @@ export function AnalyticsView({ problems, onNavigate }) {
               >
               <span class="text-2xl font-bold" style=${{ color: card.color }}>${card.value}</span>
               <span class="text-[10px] text-slate-500 truncate">${card.sub}</span>
+              ${card.action
+                ? html`
+                    <button
+                      onClick=${card.action.onClick}
+                      class="absolute top-3 right-3 px-2 py-0.5 rounded-lg text-[10px] text-slate-400 border border-white/10 hover:text-white hover:bg-white/10 transition-colors"
+                    >
+                      ${card.action.label}
+                    </button>
+                  `
+                : ""}
             </div>
           `,
         )}
@@ -1435,6 +1465,14 @@ export function AnalyticsView({ problems, onNavigate }) {
         onNavigateProblem=${setModalProblem}
         onNavigate=${onNavigate}
       />
+
+      ${sharing && snapshot
+        ? html`<${ShareStreak}
+            snapshot=${snapshot}
+            settings=${settings}
+            onClose=${() => setSharing(false)}
+          />`
+        : ""}
     </div>
   `;
 }

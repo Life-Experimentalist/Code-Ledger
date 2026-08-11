@@ -38,6 +38,7 @@ Chrome Web Store requires each upload to exceed the last.
 - A floating chat panel on problem pages with `/` commands for pulling in your code, the problem statement, and your errors.
 - Chat history stored locally and, optionally, synced to the repository as Markdown.
 - MCP tool support for providers that accept it.
+- With no provider configured, every AI surface is gone rather than idle — no review panel on problem pages, no chat tab, no queue banner, no AI Chats tab in the library. Reviews you already have stay readable and filterable, because that text is yours. Adding a provider brings the surfaces back without a reload.
 
 **Library**
 
@@ -57,6 +58,8 @@ Chrome Web Store requires each upload to exceed the last.
 - Streaks start the day you install. An imported back catalogue contributes its points but does not invent a streak you never lived through.
 - The toolbar icon carries the current streak, coloured by whether today's target is already in, and the tooltip spells out the rest. The popup shows the same numbers with today's progress and what a rescue would cost.
 - Badges are generated as SVG files committed into your own repository, with a `badges/stats.json` beside them. Nothing is fetched from a badge service, so a private repository works the same as a public one, and there is nothing to pay for or keep running.
+- The streak card is committed in a light and a dark cut, and the README block uses a `<picture>` element so GitHub serves whichever matches the theme the reader chose. The bar and the numbers animate once as the card loads, and not at all for a reader whose system asks for reduced motion.
+- A **Share** button on the analytics streak card. It renders the same card to a PNG in the page — copy it to the clipboard or save it — alongside an editable sentence and one-click links to X, LinkedIn, and Reddit. The links are each site's own public composer URL, so nothing is uploaded anywhere and no account beyond the one you are posting from is involved. A private repository is not linked in the post, because that link is a 404 to everyone who reads it.
 - An optional GitHub Actions workflow refreshes the badges once a day, at an hour you pick, so a streak reads correctly on a day you have not solved yet.
 - The whole feature has one switch. Turned off, solves are captured and committed exactly as before and every streak surface disappears — including the toolbar badge. The welcome page offers the choice before the first streak exists.
 
