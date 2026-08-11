@@ -607,10 +607,43 @@ export function getPagesHtml(opts = {}) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // Mirror of BUILT_IN_MAP + the heuristics in src/core/difficulty-map.js.
+    // GeeksForGeeks grades School and Basic, not Easy, and platforms are free to
+    // change the casing at any time — comparing to the literal 'Easy' counted
+    // every one of those as nothing, which is how a repository full of solves
+    // rendered 0 / 0 / 0 in its own report.
+    function normDiff(d) {
+      var s = String(d == null ? '' : d).trim().toLowerCase();
+      if (!s || s === 'unknown') return '';
+      var MAP = {
+        school: 'Easy', basic: 'Easy', trivial: 'Easy', beginner: 'Easy',
+        simple: 'Easy', easy: 'Easy',
+        intermediate: 'Medium', medium: 'Medium', moderate: 'Medium',
+        hard: 'Hard', difficult: 'Hard', advanced: 'Hard', expert: 'Hard',
+        extreme: 'Hard', 'very hard': 'Hard', 'extra hard': 'Hard'
+      };
+      if (MAP[s]) return MAP[s];
+      if (s.indexOf('very hard') > -1 || s.indexOf('extra') > -1 || s.indexOf('extreme') > -1) return 'Hard';
+      if (s.indexOf('hard') > -1) return 'Hard';
+      if (s.indexOf('med') > -1 || s.indexOf('intermediate') > -1 || s.indexOf('moderate') > -1) return 'Medium';
+      if (s.indexOf('easy') > -1 || s.indexOf('simple') > -1 || s.indexOf('beginner') > -1
+        || s.indexOf('school') > -1 || s.indexOf('basic') > -1) return 'Easy';
+      return '';
+    }
+
+    function countDiff(problems, want) {
+      var n = 0;
+      for (var i = 0; i < problems.length; i++) {
+        if (normDiff(problems[i].difficulty) === want) n++;
+      }
+      return n;
+    }
+
     function diffBadge(d) {
-      if (d === 'Easy') return '<span class="badge be">Easy</span>';
-      if (d === 'Medium') return '<span class="badge bm">Med</span>';
-      if (d === 'Hard') return '<span class="badge bh">Hard</span>';
+      var n = normDiff(d);
+      if (n === 'Easy') return '<span class="badge be">Easy</span>';
+      if (n === 'Medium') return '<span class="badge bm">Med</span>';
+      if (n === 'Hard') return '<span class="badge bh">Hard</span>';
       return '<span class="badge" style="color:var(--muted)">' + escHtml(d || '—') + '</span>';
     }
 
@@ -683,7 +716,7 @@ export function getPagesHtml(opts = {}) {
       var diff = document.getElementById('s-diff').value;
       var plat = document.getElementById('s-plat').value;
       return ALL_PROBLEMS.filter(function(p) {
-        if (diff && p.difficulty !== diff) return false;
+        if (diff && normDiff(p.difficulty) !== diff) return false;
         if (plat && (p.platform || '').toLowerCase() !== plat) return false;
         if (q) {
           var hay = [p.title, p.titleSlug, p.platform, p.difficulty,
@@ -762,10 +795,16 @@ export function getPagesHtml(opts = {}) {
         rl.textContent = repo.label + ' ↗';
 
         // Quick stats
-        var sTotal = stats.total !== undefined ? stats.total : problems.length;
-        var sEasy  = stats.easy   !== undefined ? stats.easy   : problems.filter(function(p) { return p.difficulty === 'Easy';   }).length;
-        var sMed   = stats.medium !== undefined ? stats.medium : problems.filter(function(p) { return p.difficulty === 'Medium'; }).length;
-        var sHard  = stats.hard   !== undefined ? stats.hard   : problems.filter(function(p) { return p.difficulty === 'Hard';   }).length;
+        // The problem list wins over stats whenever it is present. Every repo
+        // written before the counters learned to normalize carries a stale
+        // easy/medium/hard in its index.json — often 0 / 0 / 0 — and that block
+        // is only rewritten on the next commit. Counting the list means an
+        // existing report corrects itself on the very next page load instead of
+        // waiting for a solve that may not come for weeks.
+        var sTotal = problems.length || stats.total || 0;
+        var sEasy  = problems.length ? countDiff(problems, 'Easy')   : (stats.easy   || 0);
+        var sMed   = problems.length ? countDiff(problems, 'Medium') : (stats.medium || 0);
+        var sHard  = problems.length ? countDiff(problems, 'Hard')   : (stats.hard   || 0);
         document.getElementById('sn-t').textContent = sTotal;
         document.getElementById('sn-e').textContent = sEasy;
         document.getElementById('sn-m').textContent = sMed;
@@ -778,14 +817,25 @@ export function getPagesHtml(opts = {}) {
 
         // Heatmap
         function resizeHeatmap() {
-          var outer = document.querySelector('.hm-outer');
+          // Measure .hm-scroll, not the card. The card carries padding, and
+          // clientWidth includes it — so the old measurement handed the grid
+          // ~3rem of space that does not exist, sized the cells to fill it, and
+          // the year view spilled into a horizontal scrollbar on every load.
+          // .hm-scroll has no padding of its own, so its content box is exactly
+          // the room the grid has.
+          var scroll = document.querySelector('.hm-scroll');
+          var side = document.querySelector('.hm-side');
           var cols = document.querySelectorAll('.hm-col').length;
-          if (!outer || !cols) return;
-          var sideW = outer.querySelector('.hm-side') ? outer.querySelector('.hm-side').offsetWidth + 8 : 44;
-          var avail = outer.clientWidth - sideW - cols * 3;
-          // Capped both ways: below 8px the cells stop reading as a calendar,
+          if (!scroll || !cols) return;
+          var COL_GAP = 3;   // .hm-cols gap
+          var WRAP_GAP = 4;  // .hm-wrap gap, between the weekday labels and the grid
+          var sideW = side ? side.offsetWidth + WRAP_GAP : 0;
+          // n columns have n-1 gaps between them, not n. Counting one gap too
+          // many is only a few pixels, but it compounds with the padding error.
+          var avail = scroll.clientWidth - sideW - (cols - 1) * COL_GAP;
+          // Capped both ways: below 6px the cells stop reading as a calendar,
           // and above 20px a 30-day window would blow up into coloured tiles.
-          var cell = Math.min(20, Math.max(8, Math.floor(avail / cols)));
+          var cell = Math.min(20, Math.max(6, Math.floor(avail / cols)));
           document.documentElement.style.setProperty('--hm-cell', cell + 'px');
           renderMonthLabels();
         }
@@ -929,10 +979,15 @@ export function getPagesHtml(opts = {}) {
     main();
   </script>
   <script>
-    // Inject server-provided commit list for client-side rendering
-    // "<" is escaped so a commit message containing "</script>" cannot close this
-    // block; U+2028/U+2029 are escaped because JSON.stringify emits them raw and
-    // they are line terminators to any parser predating ES2019.
+    // Inject server-provided commit list for client-side rendering.
+    // "<" is escaped so a commit message carrying a closing script tag cannot end
+    // this block; U+2028/U+2029 are escaped because JSON.stringify emits them raw
+    // and they are line terminators to any parser predating ES2019.
+    //
+    // This comment may not itself spell that tag out. The HTML parser does not
+    // know what a JS comment is: the literal characters used to end this element,
+    // wherever they appear, end it. Writing them here closed the block and dumped
+    // every line below onto the page as visible text.
     window.SERVER_COMMIT_LIST = ${JSON.stringify(commitList || [])
       .replace(/</g, "\\u003c")
       .replace(/\u2028/g, "\\u2028")

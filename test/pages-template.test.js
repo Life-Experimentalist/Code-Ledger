@@ -79,6 +79,54 @@ describe("pages template — embedded commit list", () => {
     assert.ok(html.includes("escHtml(c.author"), "commit author must be escaped at render time");
   });
 
+  test("the template's own script blocks open and close in strict alternation", () => {
+    // The HTML parser has no idea what a JS comment is. A comment that spelled
+    // out the closing script tag — while explaining that commit data must not
+    // contain one — ended the element on the spot, so the commit renderer never
+    // ran and every line below it was painted onto the page as visible text.
+    // The escaping test above only ever checked the injected data, never the
+    // template's own prose, so it passed the entire time the page was broken.
+    const html = getPagesHtml();
+    const tags = [...html.matchAll(/<script\b|<\/script\s*>/gi)].map((m) =>
+      m[0].startsWith("</") ? "close" : "open",
+    );
+    let open = 0;
+    tags.forEach((tag, i) => {
+      if (tag === "open") {
+        assert.equal(open, 0, `script opened while one was already open (tag ${i})`);
+        open = 1;
+      } else {
+        assert.equal(open, 1, `a closing script tag at position ${i} has no element to close`);
+        open = 0;
+      }
+    });
+    assert.equal(open, 0, "a script element was left unclosed");
+  });
+
+  test("the difficulty counters normalize instead of matching a literal label", () => {
+    // GeeksForGeeks grades School and Basic; comparing to the literal 'Easy'
+    // counted those as nothing, so a repo full of solves showed 0 / 0 / 0.
+    const html = getPagesHtml();
+    assert.ok(html.includes("function normDiff("), "the page needs its own normalizer");
+    assert.ok(/school:\s*'Easy'/.test(html), "School must normalize to Easy client-side");
+    assert.ok(
+      !/p\.difficulty === '(Easy|Medium|Hard)'/.test(html),
+      "a strict comparison against a literal difficulty label survived",
+    );
+  });
+
+  test("the stats tiles count the problem list rather than trusting stale stats", () => {
+    // index.json files written before the counters learned to normalize carry a
+    // stale easy/medium/hard. Counting the list means the published report
+    // corrects itself on the next page load, not on the next solve.
+    const html = getPagesHtml();
+    assert.ok(
+      /problems\.length \? countDiff\(problems, 'Easy'\)/.test(html),
+      "the Easy tile must prefer a live count over stats.easy",
+    );
+    assert.ok(html.includes("function countDiff("), "countDiff must exist to do that counting");
+  });
+
   test("the renderer restricts the commit URL to http(s)", () => {
     const html = getPagesHtml();
     assert.ok(

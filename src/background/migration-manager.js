@@ -21,6 +21,7 @@ import { registry } from "../core/handler-registry.js";
 import { createDebugger } from "../lib/debug.js";
 import { CONSTANTS } from "../core/constants.js";
 import { cleanGfgSlug } from "../core/gfg-utils.js";
+import { countByDifficulty } from "../core/difficulty-map.js";
 
 const dbg = createDebugger("MigrationManager");
 
@@ -383,11 +384,13 @@ export async function forceRebuildRepo() {
 }
 
 function _buildIndexJson(problems) {
+  const diff = countByDifficulty(problems);
   const stats = {
     total: problems.length,
-    easy: problems.filter((p) => p.difficulty === "Easy").length,
-    medium: problems.filter((p) => p.difficulty === "Medium").length,
-    hard: problems.filter((p) => p.difficulty === "Hard").length,
+    easy: diff.easy,
+    medium: diff.medium,
+    hard: diff.hard,
+    unknownDifficulty: diff.unknown,
     byPlatform: problems.reduce((acc, p) => {
       const k = p.platform || "unknown";
       acc[k] = (acc[k] || 0) + 1;

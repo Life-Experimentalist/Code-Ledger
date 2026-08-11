@@ -27,6 +27,7 @@ import {
   LAYOUT_VERSION,
 } from "../core/path-builder.js";
 import { canonicalMapper } from "../core/canonical-mapper.js";
+import { countByDifficulty, loadUserDifficultyMap } from "../core/difficulty-map.js";
 import { dayKey } from "../core/gamification.js";
 import { refreshIconBadge, registerBadgeAlarm, BADGE_ALARM } from "./gamification-service.js";
 import { getChatsByProblem } from "../core/ai-chat-storage.js";
@@ -1593,11 +1594,13 @@ async function performPendingRenames() {
  * has actually been committed, not the full local library.
  */
 function _buildIndexJsonFromList(problems, settings) {
+  const diff = countByDifficulty(problems, settings?.difficultyMap || {});
   const stats = {
     total: problems.length,
-    easy: problems.filter((p) => p.difficulty === "Easy").length,
-    medium: problems.filter((p) => p.difficulty === "Medium").length,
-    hard: problems.filter((p) => p.difficulty === "Hard").length,
+    easy: diff.easy,
+    medium: diff.medium,
+    hard: diff.hard,
+    unknownDifficulty: diff.unknown,
     byPlatform: problems.reduce((acc, p) => {
       const k = p.platform || "unknown";
       acc[k] = (acc[k] || 0) + 1;
@@ -1635,11 +1638,14 @@ function _buildIndexJsonFromList(problems, settings) {
 async function buildIndexJson() {
   const problems = await Storage.getAllProblems();
   dbg.log(`buildIndexJson(): building index for ${problems.length} problem(s)`);
+  const userDifficultyMap = await loadUserDifficultyMap();
+  const diff = countByDifficulty(problems, userDifficultyMap);
   const stats = {
     total: problems.length,
-    easy: problems.filter((p) => p.difficulty === "Easy").length,
-    medium: problems.filter((p) => p.difficulty === "Medium").length,
-    hard: problems.filter((p) => p.difficulty === "Hard").length,
+    easy: diff.easy,
+    medium: diff.medium,
+    hard: diff.hard,
+    unknownDifficulty: diff.unknown,
     byPlatform: problems.reduce((acc, p) => {
       const plat = p.platform || "unknown";
       acc[plat] = (acc[plat] || 0) + 1;
@@ -1664,7 +1670,9 @@ async function buildIndexJson() {
     commitsSinceLastSummary: settings._commitsSinceLastSummary || 0,
   };
 
-  dbg.log(`buildIndexJson(): ✓ stats=easy:${stats.easy} med:${stats.medium} hard:${stats.hard}`);
+  dbg.log(
+    `buildIndexJson(): ✓ stats=easy:${stats.easy} med:${stats.medium} hard:${stats.hard} unknown:${stats.unknownDifficulty}`,
+  );
   return JSON.stringify(
     {
       updatedAt: new Date().toISOString(),
@@ -3716,9 +3724,7 @@ try {
             settings: safeSettings,
             stats: {
               total: allProblems.length,
-              easy: allProblems.filter((p) => p.difficulty === "Easy").length,
-              medium: allProblems.filter((p) => p.difficulty === "Medium").length,
-              hard: allProblems.filter((p) => p.difficulty === "Hard").length,
+              ...countByDifficulty(allProblems, settings?.difficultyMap || {}),
             },
           };
           const date = new Date().toISOString().slice(0, 10);

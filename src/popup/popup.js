@@ -13,6 +13,7 @@ import { createDebugger } from "../lib/debug.js";
 import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
 import { isAIActive, isGamificationActive } from "../core/feature-flags.js";
 import { loadSnapshot } from "../core/gamification-state.js";
+import { countByDifficulty, loadUserDifficultyMap } from "../core/difficulty-map.js";
 
 const dbg = createDebugger("PopupApp");
 
@@ -92,13 +93,11 @@ function PopupApp() {
   const [snapshot, setSnapshot] = useState(null);
 
   useEffect(() => {
-    Storage.getAllProblems().then((problems) => {
-      setStats({
-        total: problems.length,
-        easy: problems.filter((p) => p.difficulty === "Easy").length,
-        medium: problems.filter((p) => p.difficulty === "Medium").length,
-        hard: problems.filter((p) => p.difficulty === "Hard").length,
-      });
+    Promise.all([Storage.getAllProblems(), loadUserDifficultyMap()]).then(([problems, diffMap]) => {
+      // Strict equality against "Easy" missed every GeeksForGeeks School/Basic
+      // grade and anything the user had remapped, so the popup could report
+      // 0 / 0 / 0 above a non-zero total.
+      setStats({ total: problems.length, ...countByDifficulty(problems, diffMap) });
       // Sort by timestamp desc and take top 3
       setRecent(problems.sort((a, b) => b.timestamp - a.timestamp).slice(0, 3));
     });

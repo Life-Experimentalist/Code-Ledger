@@ -113,3 +113,41 @@ export async function loadUserDifficultyMap() {
 export function mapDifficulty(raw, userMap = {}) {
   return normalizeDifficulty(raw, userMap);
 }
+
+/**
+ * Count problems into the canonical buckets.
+ *
+ * Every caller that needed these numbers wrote its own
+ * `problems.filter((p) => p.difficulty === "Easy").length`, which is only
+ * correct for a platform that uses that exact word. GeeksForGeeks grades
+ * School and Basic, Codeforces gives numeric ratings, and a user difficulty
+ * map can rename anything — all of which counted as nothing, so a repository
+ * full of solves published 0 / 0 / 0 to its stats page and its badges.
+ *
+ * `unknown` is returned rather than folded into a bucket: a label nobody can
+ * classify is a real answer, and silently filing it under Easy would misreport
+ * the split rather than admit the gap.
+ *
+ * @param {Array<{difficulty?: string}>} problems
+ * @param {Record<string,string>} [userMap] settings.difficultyMap
+ * @returns {{easy: number, medium: number, hard: number, unknown: number}}
+ */
+export function countByDifficulty(problems = [], userMap = {}) {
+  const counts = { easy: 0, medium: 0, hard: 0, unknown: 0 };
+  for (const p of problems || []) {
+    switch (normalizeDifficulty(p?.difficulty, userMap)) {
+      case "Easy":
+        counts.easy++;
+        break;
+      case "Medium":
+        counts.medium++;
+        break;
+      case "Hard":
+        counts.hard++;
+        break;
+      default:
+        counts.unknown++;
+    }
+  }
+  return counts;
+}
