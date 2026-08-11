@@ -214,9 +214,24 @@ app.get("/api/auth/:provider", async (c) => {
     return c.json({ error: `Unsupported provider: ${provider}` }, 404);
   }
 
-  const clientId = env(c, "GH_CLIENT_ID");
+  const clientId = env(c, "GH_CLIENT_ID")?.trim();
   if (!clientId) {
     return c.text("GitHub OAuth not configured — set CODELEDGER_OAUTH_CLIENT_ID", 500);
+  }
+  // A present-but-malformed client ID used to sail through the emptiness check
+  // above and get percent-encoded into the authorize URL, where GitHub bounced
+  // it to a generic login page — a broken sign-in with nothing anywhere saying
+  // why. Production held a single 0x16 byte, which is what a terminal that does
+  // not handle Ctrl+V records when you try to paste into `wrangler secret put`.
+  // GitHub's IDs are 20 characters of `Iv23li…`/`Ov23li…`; anything that is not
+  // plausibly one of those is a misconfiguration, and should say so here.
+  if (!/^[A-Za-z0-9._-]{10,}$/.test(clientId)) {
+    return c.text(
+      "GitHub OAuth is misconfigured: CODELEDGER_OAUTH_CLIENT_ID is set but is not a " +
+        "client ID. Re-set it with `wrangler secret put CODELEDGER_OAUTH_CLIENT_ID` and " +
+        "type or right-click-paste the value — Ctrl+V does not paste in that prompt.",
+      500,
+    );
   }
   const sessionSecret = c.env?.SESSION_SECRET;
   if (!sessionSecret) {

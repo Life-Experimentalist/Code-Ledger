@@ -65,9 +65,12 @@
               $ref: "#/components/schemas/ErrorResponse"
       "500":
         description: |
-          The worker is missing `CODELEDGER_OAUTH_CLIENT_ID` or `SESSION_SECRET`.
-          Without a session secret the state cookie cannot be signed, so sign-in
-          fails closed rather than proceeding unauthenticated.
+          The worker is missing `CODELEDGER_OAUTH_CLIENT_ID` or `SESSION_SECRET`,
+          or the client ID is present but not shaped like one. Without a session
+          secret the state cookie cannot be signed, so sign-in fails closed rather
+          than proceeding unauthenticated; and a malformed client ID is rejected
+          here rather than percent-encoded into the authorize URL, where GitHub
+          answers with a generic login redirect that names no cause.
         content:
           text/plain:
             schema:

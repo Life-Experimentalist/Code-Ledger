@@ -1,0 +1,17 @@
+# The repository stores text as LF, and .prettierrc sets endOfLine: "lf". Without
+# this file Git hands a Windows checkout CRLF working-tree copies, so
+# `npm run format:check` reports every one of the ~135 checked files as
+# misformatted — a check that cannot pass locally is a check people learn to
+# ignore. CI never saw it, because the runners check out on Linux.
+* text=auto eol=lf
+
+# Binary, so Git must never touch the bytes.
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.woff  binary
+*.woff2 binary
+
+# Windows writes these itself and they are excluded from every package.
+desktop.ini text eol=crlf

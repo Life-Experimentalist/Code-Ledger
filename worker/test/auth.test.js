@@ -81,6 +81,37 @@ describe("OAuth authorize redirect", () => {
     const res = await req("/api/auth/gitlab");
     assert.equal(res.status, 404);
   });
+
+  // Production ran for a while with CODELEDGER_OAUTH_CLIENT_ID holding a single
+  // 0x16 byte — what a terminal records for Ctrl+V at the `wrangler secret put`
+  // prompt. It was non-empty, so it passed the configuration check and got
+  // percent-encoded into the authorize URL, and GitHub answered with a generic
+  // login redirect. Sign-in was broken with nothing anywhere naming the cause.
+  test("fails closed on a present but malformed client ID", async () => {
+    const res = await req("/api/auth/github", {}, { ...ENV, CODELEDGER_OAUTH_CLIENT_ID: "\x16" });
+    assert.equal(res.status, 500);
+    assert.match(await res.text(), /not a client ID/i);
+  });
+
+  test("does not redirect to GitHub with a malformed client ID", async () => {
+    const res = await req(
+      "/api/auth/github",
+      { redirect: "manual" },
+      { ...ENV, CODELEDGER_OAUTH_CLIENT_ID: "  " },
+    );
+    assert.equal(res.headers.get("location"), null);
+  });
+
+  test("accepts a well-formed client ID of either app type", async () => {
+    for (const id of ["Iv23liTESTCLIENTID", "Ov23liTESTCLIENTID"]) {
+      const res = await req(
+        "/api/auth/github",
+        { redirect: "manual" },
+        { ...ENV, CODELEDGER_OAUTH_CLIENT_ID: id },
+      );
+      assert.equal(new URL(res.headers.get("location")).searchParams.get("client_id"), id);
+    }
+  });
 });
 
 describe("OAuth callback — CSRF", () => {

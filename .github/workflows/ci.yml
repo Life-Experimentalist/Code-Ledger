@@ -35,6 +35,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The root test glob includes worker/test/**, and those import
+      # worker/src/index.js, which imports hono. Without this the worker suite
+      # fails to load and the run dies on a module-resolution error that looks
+      # nothing like a test failure.
+      - name: Install worker dependencies
+        run: npm ci
+        working-directory: worker
+
       - name: Type check
         run: npm run lint
 
