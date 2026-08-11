@@ -15,12 +15,8 @@ const CATEGORIES = [
     label: "Development",
     color: CYAN,
     scripts: [
-      [
-        "dev",
-        "Full dev mode: initial build → watcher + local server concurrently (Ctrl+C stops both)",
-      ],
-      ["watch", "File watcher only — rebuilds src/ on change, no server"],
-      ["start", "Local dev server only (server.ts via tsx), no watcher"],
+      ["dev", "Full dev mode: initial build, then the file watcher (Ctrl+C stops it)"],
+      ["watch", "File watcher only — rebuilds src/ on change, no initial build"],
     ],
   },
   {
@@ -54,7 +50,13 @@ const CATEGORIES = [
     label: "Code Quality",
     color: MAGENTA,
     scripts: [
-      ["lint", "TypeScript type-check only (tsc --noEmit) — no output files, just errors"],
+      ["test", "Full node:test suite — test/ and worker/test/"],
+      ["test:watch", "Same suite, re-run on change"],
+      [
+        "lint",
+        "Type gate — checks every file and fails only on errors that are never a false positive on untyped JS",
+      ],
+      ["lint:all", "Raw tsc --checkJs output, advisory findings included"],
       ["format", "Prettier write mode over src/, dev/, worker/ JS files"],
       [
         "format:check",
@@ -80,6 +82,10 @@ const CATEGORIES = [
       ],
       ["deploy:worker", "Deploy the Cloudflare Worker static public/ directory via Wrangler"],
       ["test:sync-regression", "Run sync regression tests for cross-device sync edge cases"],
+      ["sync:party", "Regenerate the landing page's copy of the party comparison module"],
+      ["vendor:preact", "Rebuild src/vendor/preact-bundle.js from the npm packages"],
+      ["emoji:scan", "Report source files whose emoji have been mangled by an editor"],
+      ["emoji:repair", "Repair what emoji:scan reports"],
     ],
   },
 ];
