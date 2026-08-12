@@ -19,6 +19,7 @@ import {
   normalizeTag,
 } from "../../core/topic-resolver.js";
 import { classifyTopic, KIND, KIND_LABEL } from "../../core/topic-taxonomy.js";
+import { TIER, TIER_KEY } from "../../handlers/platforms/takeuforward/api.js";
 
 const PLATFORMS = Object.values(CONSTANTS.PLATFORMS);
 const DIFFICULTY_LABELS = ["Easy", "Medium", "Hard"];
@@ -208,6 +209,26 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
               </button>
             </div>
 
+            <!--
+              takeuforward is the one platform whose tracking depends on a
+              subscription CodeLedger cannot buy or check for you. The tier is
+              read off the site's own problem responses, which redact
+              difficulty and tags for non-subscribers, so this line appears
+              only once you have opened a TUF+ problem page.
+            -->
+            ${p.id === "takeuforward" &&
+            settings?.[TIER_KEY] &&
+            html`
+              <p
+                class="text-[11px] ${settings[TIER_KEY] === TIER.PLUS
+                  ? "text-emerald-400/80"
+                  : "text-amber-400/80"}"
+              >
+                ${settings[TIER_KEY] === TIER.PLUS
+                  ? "TUF+ detected — accepted submissions are committed automatically."
+                  : "TUF+ not detected. Sheet mark-up works without it, but a commit needs a TUF+ subscription: takeuforward's judge only runs there."}
+              </p>
+            `}
             ${enabled &&
             html`
               <!-- Difficulty map -->

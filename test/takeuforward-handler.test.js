@@ -23,8 +23,10 @@ import {
   readVerdict,
   readSubmitRequest,
   readProblemMeta,
+  readSubscriptionTier,
   normalizeDifficulty,
   REDACTED,
+  TIER,
 } from "../src/handlers/platforms/takeuforward/api.js";
 import { resolveLang, SUPPORTED } from "../src/handlers/platforms/takeuforward/lang-utils.js";
 import {
@@ -208,6 +210,46 @@ describe("takeuforward/api readProblemMeta", () => {
     assert.equal(readProblemMeta({ success: false }), null);
     assert.equal(readProblemMeta({ success: true, data: { unrelated: 1 } }), null);
     assert.equal(readProblemMeta(null), null);
+  });
+});
+
+describe("takeuforward/api readSubscriptionTier", () => {
+  test("reads free from the difficulty sentinel", () => {
+    const tier = readSubscriptionTier({
+      success: true,
+      data: { problem_slug: "two-sum", difficulty: REDACTED, topic_tags: REDACTED },
+    });
+    assert.equal(tier, TIER.FREE);
+  });
+
+  test("reads free when only the tags are redacted", () => {
+    const tier = readSubscriptionTier({
+      success: true,
+      data: { problem_slug: "two-sum", topic_tags: ["Arrays", REDACTED] },
+    });
+    assert.equal(tier, TIER.FREE);
+  });
+
+  test("reads plus from a real difficulty", () => {
+    const tier = readSubscriptionTier({
+      success: true,
+      data: { problem_slug: "two-sum", difficulty: "Easy", topic_tags: ["Arrays"] },
+    });
+    assert.equal(tier, TIER.PLUS);
+  });
+
+  test("says nothing when the fields are simply absent", () => {
+    assert.equal(readSubscriptionTier({ success: true, data: { problem_slug: "two-sum" } }), null);
+    assert.equal(
+      readSubscriptionTier({ success: true, data: { problem_slug: "two-sum", difficulty: "" } }),
+      null,
+    );
+  });
+
+  test("says nothing about a response that is not a problem", () => {
+    assert.equal(readSubscriptionTier({ success: false }), null);
+    assert.equal(readSubscriptionTier({ success: true, data: { unrelated: 1 } }), null);
+    assert.equal(readSubscriptionTier(null), null);
   });
 });
 
