@@ -77,10 +77,16 @@ describe("isHealable", () => {
     );
   });
 
-  test("Codeforces does not, so it is never attempted", () => {
-    // There is no statement API. The only way to read one is to open the page,
-    // which is exactly what this module exists to avoid doing unasked.
-    assert.equal(isHealable(problem({ platform: "codeforces" })), false);
+  test("Codeforces does too, through its problem page", () => {
+    // No statement API, but the page is public and the worker can GET it.
+    assert.equal(isHealable(problem({ platform: "codeforces", id: "cf-4A" })), true);
+  });
+
+  test("NeetCode and takeuforward publish no statement anywhere", () => {
+    // Theirs is written by the AI review, under a heading that says so. There
+    // is nothing to fetch, so attempting it would only be traffic.
+    assert.equal(isHealable(problem({ platform: "neetcode", id: "nc-x" })), false);
+    assert.equal(isHealable(problem({ platform: "takeuforward", id: "tuf-x" })), false);
   });
 
   test("a record with no slug cannot be asked about", () => {
@@ -146,10 +152,10 @@ describe("selectHealBatch", () => {
   const gap2 = problem({ id: "a", titleSlug: "a", tags: [], problemStatement: "" });
   const gap1 = problem({ id: "b", titleSlug: "b", tags: [] });
   const whole = problem({ id: "c", titleSlug: "c" });
-  const cf = problem({ id: "d", titleSlug: "d", platform: "codeforces", tags: [] });
+  const nc = problem({ id: "d", titleSlug: "d", platform: "neetcode", tags: [] });
 
   test("picks only incomplete, fetchable problems", () => {
-    const batch = selectHealBatch([gap2, gap1, whole, cf], {}, 1000, 10);
+    const batch = selectHealBatch([gap2, gap1, whole, nc], {}, 1000, 10);
     assert.deepEqual(
       batch.map((p) => p.id),
       ["a", "b"],
@@ -377,7 +383,7 @@ describe("healStatus", () => {
     const problems = [
       problem({ id: "lc-a", titleSlug: "a", tags: [] }),
       problem({ id: "lc-b", titleSlug: "b", tags: [] }),
-      problem({ id: "cf-c", titleSlug: "c", platform: "codeforces", tags: [] }),
+      problem({ id: "nc-c", titleSlug: "c", platform: "neetcode", tags: [] }),
       problem({ id: "lc-d", titleSlug: "d" }),
     ];
     const state = { "lc-b": { attempts: MAX_HEAL_ATTEMPTS } };

@@ -418,7 +418,7 @@ Return ONLY a JSON array of objects representing suggestions where the current m
         <${ToggleRow}
           settingKey="selfHealEnabled"
           label="Auto-repair incomplete problems"
-          desc="Quietly refetches missing descriptions and tags for LeetCode and GeeksForGeeks problems, a couple every few minutes. Never overwrites anything you have already written."
+          desc="Quietly refetches missing descriptions and tags for LeetCode, GeeksForGeeks and Codeforces problems, a couple every few minutes. Never overwrites anything you have already written."
           defaultOn=${true}
         />
         <div class="flex items-start justify-between gap-3">

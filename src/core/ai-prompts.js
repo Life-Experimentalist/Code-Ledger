@@ -172,9 +172,11 @@ export function buildReviewPrompt(problemContext = {}, code = "", prompts = {}) 
       : "";
 
   // Three platforms have no statement endpoint at all — Codeforces, NeetCode and
-  // takeuforward — so their problems commit with an empty Problem Statement
-  // section that nothing in the extension can ever fill. The reviewer has the
-  // code and the title in front of it and can say what the problem asks.
+  // takeuforward. Codeforces at least renders one on a page the extension can
+  // read; NeetCode and takeuforward publish nothing, so their problems commit
+  // with an empty Problem Statement section that nothing else can ever fill.
+  // The reviewer has the code and the title in front of it and can say what the
+  // problem asks.
   //
   // It is asked only when the record has no statement, because a model asked to
   // describe a problem will describe one whether or not it can tell what the

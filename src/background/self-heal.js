@@ -41,12 +41,16 @@ export const MAX_HEAL_ATTEMPTS = 5;
 const BACKOFF_MINUTES = [15, 60, 360, 1440, 10080];
 
 /**
- * Platforms with a metadata endpoint the worker can reach on its own.
- * Codeforces is absent deliberately: there is no problem-statement API, and the
- * only way to read one is to open the page — which is the thing this module
- * exists to avoid doing behind the user's back.
+ * Platforms the worker can ask about on its own.
+ *
+ * LeetCode and GeeksForGeeks answer with JSON. Codeforces has no
+ * problem-statement API at all, so its fetcher reads the public problem page
+ * instead — still a plain GET the worker makes itself, with no tab opened and
+ * no cookies sent. NeetCode and takeuforward are absent because neither
+ * publishes a statement anywhere; theirs is written by the AI review, under a
+ * heading that says so.
  */
-export const HEALABLE_PLATFORMS = ["leetcode", "geeksforgeeks"];
+export const HEALABLE_PLATFORMS = ["leetcode", "geeksforgeeks", "codeforces"];
 
 /** Which fields healing can supply, and how it tells one is missing. */
 export const HEALABLE_FIELDS = {
