@@ -180,7 +180,15 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
   // Runs against the merged README rather than the stored one, so the badge
   // block and the stats block are reconciled in a single write instead of
   // fighting over the file across two commits.
-  const gami = await _buildGamificationFiles(owner, repo, branch, settings, merged, pagesUrl);
+  //
+  // The badges get the Pages URL only when Pages is known to be serving them.
+  // `github_pages_url` is written once Pages has actually been enabled, so the
+  // guessed `{owner}.github.io/{repo}` above is a 404 for anyone who never
+  // turned it on — including every private repository, where the settings panel
+  // promises the self-hosted SVGs work. With no URL, `badgeMarkdown` addresses
+  // them relative to the repository, which needs no Pages site at all.
+  const badgeBase = settings?.github_pages === false ? "" : settings?.github_pages_url || "";
+  const gami = await _buildGamificationFiles(owner, repo, branch, settings, merged, badgeBase);
   if (gami) {
     items.push(...gami.items);
     if (typeof gami.readme === "string") merged = gami.readme;
@@ -242,7 +250,8 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
  * @param {string} branch
  * @param {Record<string, any>} settings
  * @param {string} readme  README the rest of this build already merged
- * @param {string} pagesUrl
+ * @param {string} pagesUrl  "" when no Pages site is known — badges then use
+ *   repository-relative paths rather than a URL that would 404
  * @returns {Promise<{items: object[], readme: string|undefined, state: {badgesPublished: boolean, workflowPublished: boolean}}|null>}
  */
 async function _buildGamificationFiles(owner, repo, branch, settings, readme, pagesUrl) {
