@@ -120,7 +120,11 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
     if (settings?.[legacyKey] !== undefined) {
       return settings[legacyKey] === true;
     }
-    return pid !== "codeforces";
+    // Must agree with BasePlatformHandler.isEnabled and with each handler's own
+    // `{platform}_enable` schema default. Codeforces used to be special-cased
+    // off here, so this card read "off" while its own settings section read
+    // "on" — and a user who trusted the second one recorded nothing.
+    return true;
   };
 
   const togglePlatform = (pid) => {

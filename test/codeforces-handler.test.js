@@ -37,6 +37,13 @@ import {
   mergeSolves,
   CF_PAGE_SIZE,
 } from "../src/handlers/platforms/codeforces/api.js";
+import {
+  cfSlugFromHref,
+  matchAcceptedRow,
+  mergeCapturedMetadata,
+  isPendingFresh,
+  PENDING_TTL_MS,
+} from "../src/handlers/platforms/codeforces/verdict-match.js";
 import { CONSTANTS } from "../src/core/constants.js";
 
 describe("splitCFSlug", () => {
@@ -419,5 +426,200 @@ describe("mergeSolves", () => {
   test("a dated submission beats an undated one either way round", () => {
     assert.equal(mergeSolves(new Map(), [at(null), at(1000)]).get("4A").timestamp, 1000);
     assert.equal(mergeSolves(new Map(), [at(1000), at(null)]).get("4A").timestamp, 1000);
+  });
+});
+
+/**
+ * Matching an accepted row to the submission we are waiting for.
+ *
+ * Submitting on Codeforces navigates to /contest/{id}/my, a table of every
+ * submission made in that contest. Committing on the first accepted row there
+ * files whichever problem was solved earliest in the contest, and does it while
+ * the submission actually being waited on is still in the queue — so a run that
+ * ends in Wrong Answer gets recorded as a solve. These pin the rule that stops
+ * that.
+ */
+describe("cfSlugFromHref", () => {
+  test("reads the problem out of every link shape a status table uses", () => {
+    assert.equal(cfSlugFromHref("/contest/1234/problem/A"), "1234A");
+    assert.equal(cfSlugFromHref("/problemset/problem/4/A"), "4A");
+    assert.equal(cfSlugFromHref("/gym/100500/problem/B"), "gym100500B");
+  });
+
+  test("takes an absolute or protocol-relative href apart the same way", () => {
+    assert.equal(cfSlugFromHref("https://codeforces.com/contest/1234/problem/A"), "1234A");
+    assert.equal(cfSlugFromHref("//codeforces.com/contest/1234/problem/A"), "1234A");
+  });
+
+  test("ignores a query string and a fragment", () => {
+    assert.equal(cfSlugFromHref("/contest/1234/problem/A?locale=ru"), "1234A");
+    assert.equal(cfSlugFromHref("/contest/1234/problem/A#input"), "1234A");
+  });
+
+  test("agrees with the slug the page detector builds for the same problem", () => {
+    // A disagreement here would reject our own row and the solve would vanish.
+    for (const path of ["/contest/1234/problem/A", "/gym/100500/problem/B"]) {
+      assert.equal(cfSlugFromHref(path), detectPage(path).slug, path);
+    }
+  });
+
+  test("a link that is not a problem link yields nothing", () => {
+    for (const bad of [
+      "",
+      null,
+      "/profile/tourist",
+      "/contest/1234/submission/98765",
+      "/contest/1234/my",
+      "/blog/entry/1234",
+    ]) {
+      assert.equal(cfSlugFromHref(bad), "", String(bad));
+    }
+  });
+});
+
+describe("matchAcceptedRow", () => {
+  test("accepts the row for the problem we captured code for", () => {
+    assert.equal(matchAcceptedRow({ rowSlug: "1234A", pendingSlug: "1234A" }), "1234A");
+  });
+
+  test("rejects an older solve sitting further down /contest/{id}/my", () => {
+    // The whole point: submitting C lands on a page whose top accepted rows are
+    // A and B from earlier in the contest.
+    assert.equal(matchAcceptedRow({ rowSlug: "1234A", pendingSlug: "1234C" }), null);
+    assert.equal(matchAcceptedRow({ rowSlug: "1234B", pendingSlug: "1234C" }), null);
+  });
+
+  test("a row without a problem link is the inline box, so the capture decides", () => {
+    // The submissions box on a problem page names no problem — there is only
+    // one it could be. Rejecting these would lose every problem-page solve.
+    assert.equal(matchAcceptedRow({ rowSlug: "", pendingSlug: "1234A" }), "1234A");
+    assert.equal(matchAcceptedRow({ rowSlug: "", pageSlug: "1234A" }), "1234A");
+  });
+
+  test("with no capture, only the problem page's own row counts", () => {
+    assert.equal(matchAcceptedRow({ rowSlug: "1234A", pageSlug: "1234A" }), "1234A");
+    assert.equal(matchAcceptedRow({ rowSlug: "1234A", pageSlug: "1234C" }), null);
+  });
+
+  test("browsing a status list commits nothing", () => {
+    // No capture and not on a problem page: /contest/1234/my opened on its own,
+    // or somebody else's submissions. There is no code to commit either way.
+    assert.equal(matchAcceptedRow({ rowSlug: "1234A" }), null);
+    assert.equal(matchAcceptedRow({}), null);
+    assert.equal(matchAcceptedRow(), null);
+  });
+
+  test("a gym row matches its gym capture and not the bare contest id", () => {
+    assert.equal(
+      matchAcceptedRow({ rowSlug: "gym100500B", pendingSlug: "gym100500B" }),
+      "gym100500B",
+    );
+    assert.equal(matchAcceptedRow({ rowSlug: "gym100500B", pendingSlug: "100500B" }), null);
+  });
+});
+
+describe("mergeCapturedMetadata", () => {
+  const captured = {
+    slug: "1234A",
+    title: "Theatre Square",
+    difficulty: "Easy",
+    rating: 1000,
+    tags: ["math"],
+    description: "<p>statement</p>",
+    contestId: "1234",
+    letter: "A",
+  };
+  // What _extractMetadata returns on /contest/1234/my, where there is no
+  // statement on the page at all.
+  const blank = {
+    slug: "1234A",
+    title: null,
+    difficulty: null,
+    rating: null,
+    tags: [],
+    description: null,
+    runtime: null,
+    memory: null,
+    contestId: "1234",
+    letter: "A",
+  };
+
+  test("the capture survives a verdict read on a page that knows nothing", () => {
+    const meta = mergeCapturedMetadata(blank, captured, null);
+    assert.equal(meta.title, "Theatre Square");
+    assert.equal(meta.difficulty, "Easy");
+    assert.equal(meta.rating, 1000);
+    assert.deepEqual(meta.tags, ["math"]);
+    assert.equal(meta.description, "<p>statement</p>");
+  });
+
+  test("the live page wins when it actually has something to say", () => {
+    const live = { ...blank, title: "Theatre Square (updated)", tags: ["math", "geometry"] };
+    const meta = mergeCapturedMetadata(live, captured, null);
+    assert.equal(meta.title, "Theatre Square (updated)");
+    assert.deepEqual(meta.tags, ["math", "geometry"]);
+  });
+
+  test("runtime and memory come off the judged row, never from the capture", () => {
+    // They do not exist at submit time — there is no verdict yet.
+    const meta = mergeCapturedMetadata(
+      blank,
+      { ...captured, runtime: "999 ms" },
+      {
+        runtime: "30 ms",
+        memory: "100 KB",
+      },
+    );
+    assert.equal(meta.runtime, "30 ms");
+    assert.equal(meta.memory, "100 KB");
+  });
+
+  test("an unjudged or unreadable row reports no stats rather than a wrong number", () => {
+    const meta = mergeCapturedMetadata(blank, captured, { runtime: null, memory: null });
+    assert.equal(meta.runtime, null);
+    assert.equal(meta.memory, null);
+  });
+
+  test("works with no capture at all", () => {
+    const live = { ...blank, title: "Theatre Square", tags: ["math"] };
+    const meta = mergeCapturedMetadata(live, null, null);
+    assert.equal(meta.title, "Theatre Square");
+    assert.deepEqual(meta.tags, ["math"]);
+  });
+
+  test("never invents a title from the slug", () => {
+    // A slug-shaped title is how this used to paper over the empty read, and it
+    // is what shipped a library full of problems called "1234A".
+    assert.equal(mergeCapturedMetadata(blank, null, null).title, null);
+  });
+});
+
+describe("isPendingFresh", () => {
+  const now = 1_700_000_000_000;
+
+  test("a capture from moments ago is the one being judged", () => {
+    assert.equal(isPendingFresh(now - 5_000, now), true);
+    assert.equal(isPendingFresh(now, now), true);
+  });
+
+  test("a long contest queue still counts", () => {
+    assert.equal(isPendingFresh(now - (PENDING_TTL_MS - 1), now), true);
+  });
+
+  test("this morning's capture does not attach to this afternoon's verdict", () => {
+    // sessionStorage lives as long as the tab, so without this the code sits
+    // there all day waiting for any accepted row to claim it.
+    assert.equal(isPendingFresh(now - PENDING_TTL_MS - 1, now), false);
+    assert.equal(isPendingFresh(now - 8 * 60 * 60 * 1000, now), false);
+  });
+
+  test("a missing or unreadable stamp expires rather than lasting forever", () => {
+    for (const bad of [null, undefined, "", 0, -1, NaN, "abc"]) {
+      assert.equal(isPendingFresh(bad, now), false, String(bad));
+    }
+  });
+
+  test("a stamp from the future expires too", () => {
+    assert.equal(isPendingFresh(now + 60_000, now), false);
   });
 });

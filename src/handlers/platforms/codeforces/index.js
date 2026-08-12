@@ -2,21 +2,22 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * Codeforces platform handler — Alpha.
+ * Codeforces platform handler.
  *
  * Detection flow:
- *   1. On PROBLEM pages: hookSubmitButton() saves code + slug to sessionStorage.
+ *   1. On PROBLEM pages: hookSubmitButton() saves code, slug *and the problem
+ *      metadata* to sessionStorage. Submitting navigates to /contest/{id}/my,
+ *      where the statement is no longer on the page, so anything not captured
+ *      here is gone.
  *   2. watchForVerdict() observes span[submissionverdict="OK"] on any CF page.
- *   3. On accepted verdict: read saved code, extract DOM metadata, emit solve.
+ *   3. matchAcceptedRow() decides whether the accepted row is the submission we
+ *      are waiting for — /my lists every solve in the contest, and the first OK
+ *      on it is usually an older problem — then the solve is emitted.
  *
  * Your own profile page also carries an "Import All Solves" button, which reads
  * the public `user.status` API. Codeforces publishes the submission list but not
  * the submission text, so imported problems arrive without code — see
  * `profile-import.js`.
- *
- * Alpha limitations:
- *   - Gym contest submissions are detected but the source URL in README points
- *     to the gym contest, not a permanent problemset URL.
  */
 
 import { BasePlatformHandler } from "../../_base/BasePlatformHandler.js";
@@ -28,6 +29,7 @@ import { createDebugger } from "../../../lib/debug.js";
 import { runtime } from "../../../lib/browser-compat.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
+import { cfProblemUrl } from "../../../core/cf-utils.js";
 import { resolveLang, normalizeCFRating } from "./lang-utils.js";
 import {
   hookSubmitButton,
@@ -36,6 +38,7 @@ import {
   clearPendingSubmission,
   readCurrentTestOutput,
 } from "./submission-detector.js";
+import { matchAcceptedRow, mergeCapturedMetadata } from "./verdict-match.js";
 import { injectCFQoL, removeCFQoL } from "./qol.js";
 import { injectProfileImportBtn } from "./profile-import.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
@@ -133,7 +136,11 @@ Be concise. Max 200 words.`;
         })
         .catch(() => {});
 
-      this._cleanupSubmitHook = hookSubmitButton(page);
+      // The metadata reader runs at click time, while the statement is still on
+      // screen — /my has none of it.
+      this._cleanupSubmitHook = hookSubmitButton(page, () =>
+        this._extractMetadata(page.slug, page),
+      );
     }
 
     if (page.type === PAGE_TYPES.PROFILE) {
@@ -149,8 +156,8 @@ Be concise. Max 200 words.`;
     // Watch for accepted verdict on ALL CF pages:
     //   - Problem page: inline submissions section updates via XHR
     //   - /contest/{id}/my: full page load after contest submission
-    this._verdictObserver = watchForVerdict((submissionId, contestId) => {
-      this._handleAcceptedVerdict(submissionId, contestId, page);
+    this._verdictObserver = watchForVerdict((accepted) => {
+      this._handleAcceptedVerdict(accepted, page);
     });
 
     // On-demand metadata fetch: the background metadata refresh opens the
@@ -165,8 +172,24 @@ Be concise. Max 200 words.`;
 
   /* ── Submission processing ─────────────────────────────────────────── */
 
-  async _handleAcceptedVerdict(submissionId, contestId, page) {
+  async _handleAcceptedVerdict({ submissionId, contestId, rowSlug, stats }, page) {
     if (this._processingLock) return;
+
+    const pending = readPendingSubmission();
+
+    // Which problem is this row about? On /contest/{id}/my every solve in the
+    // contest is listed, so an accepted row is only ours if it names the
+    // problem we captured code for. Checked before the dedup guards so that
+    // rejecting somebody else's row does not burn them.
+    const slug = matchAcceptedRow({
+      rowSlug,
+      pendingSlug: pending?.slug || "",
+      pageSlug: page.type === PAGE_TYPES.PROBLEM ? page.slug || "" : "",
+    });
+    if (!slug) {
+      dbg.log("Accepted row is for another problem, ignoring", { submissionId, rowSlug });
+      return;
+    }
 
     const detectionId = `cf-${submissionId}`;
     if (detectionId === this.lastDetectedId) return;
@@ -177,16 +200,6 @@ Be concise. Max 200 words.`;
       const settings = await Storage.getSettings();
       if (!this.isEnabled(settings)) {
         clearPendingSubmission();
-        return;
-      }
-
-      const pending = readPendingSubmission();
-
-      // Resolve slug: pending → current page → bail
-      let slug = pending?.slug;
-      if (!slug && page.type === PAGE_TYPES.PROBLEM) slug = page.slug;
-      if (!slug) {
-        dbg.warn("No slug for accepted verdict, skipping");
         return;
       }
 
@@ -214,7 +227,13 @@ Be concise. Max 200 words.`;
         contestId: pending?.contestId || contestId || page.contestId,
         letter: pending?.letter || page.letter,
       };
-      const meta = this._extractMetadata(slug, pageCtx);
+      // Metadata captured at submit time wins: the verdict is normally read on
+      // /my, where the statement, the title and the tags are simply not there.
+      const meta = mergeCapturedMetadata(
+        this._extractMetadata(slug, pageCtx),
+        pending?.meta,
+        stats,
+      );
       const topic = resolvePrimaryTopic(meta.tags || []);
       const canonical = await this.resolveCanonical(slug);
 
@@ -259,11 +278,22 @@ Be concise. Max 200 words.`;
 
   /* ── DOM extractors ───────────────────────────────────────────────── */
 
+  /**
+   * What the page currently on screen says about the problem.
+   *
+   * Every field is null when the page cannot answer, never a stand-in derived
+   * from the slug: this runs on /contest/{id}/my too, where none of it exists,
+   * and a slug-shaped "title" there would overwrite the real one captured at
+   * submit time. Callers substitute the slug at the point of display.
+   *
+   * Runtime and memory are not read here at all — they belong to a submission,
+   * not to a problem, and they are read off the matched row instead.
+   */
   _extractMetadata(slug, page) {
     const titleEl = document.querySelector(SELECTORS.problem.title);
     const rawTitle = (titleEl?.textContent || "").trim();
     // CF prepends "A. " to titles — strip the letter prefix
-    const title = rawTitle.replace(/^[A-Za-z0-9]+\.\s+/, "").trim() || rawTitle || slug;
+    const title = rawTitle.replace(/^[A-Za-z0-9]+\.\s+/, "").trim() || rawTitle || null;
 
     const rating = this._extractRating();
     const difficulty = rating ? normalizeCFRating(rating) : null;
@@ -271,20 +301,15 @@ Be concise. Max 200 words.`;
     const descEl = document.querySelector(SELECTORS.problem.description);
     const description = descEl?.innerHTML || null;
 
-    // Runtime/memory from the first row in the inline submissions table
-    const firstRow = document.querySelector("tr[data-submission-id]");
-    const cells = firstRow ? [...firstRow.querySelectorAll("td")] : [];
-    const runtime = cells[4] ? (cells[4].textContent || "").trim() || null : null;
-    const memory = cells[5] ? (cells[5].textContent || "").trim() || null : null;
-
     return {
+      slug,
       title,
       difficulty,
       rating,
       tags,
       description,
-      runtime,
-      memory,
+      runtime: null,
+      memory: null,
       contestId: page?.contestId || null,
       letter: page?.letter || null,
     };
@@ -457,13 +482,12 @@ Be concise. Max 200 words.`;
       lines.push("", "## My Submission", "", ...stats.map((s) => `- ${s}`));
     }
 
-    if (meta.contestId) {
-      const letter = meta.letter || slug.replace(String(meta.contestId), "");
-      lines.push(
-        "",
-        `**Source:** https://codeforces.com/contest/${meta.contestId}/problem/${letter}`,
-      );
-    }
+    // Built from the slug, not from the contest id: /contest/{id}/problem/{x}
+    // is the *contest* view, which sends a gym problem to a page that does not
+    // exist and stops resolving for a regular problem once the contest is
+    // archived. cfProblemUrl picks the permanent problemset or gym address.
+    const source = cfProblemUrl(slug);
+    if (source) lines.push("", `**Source:** ${source}`);
 
     return lines.join("\n");
   }
