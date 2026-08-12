@@ -17,9 +17,12 @@
  * answers 200 to anyone, and redacts the subscriber-only fields to the literal
  * string "Subscribe to TUF+".
  *
- * The shape of an accepted verdict is NOT confirmed. The judge is behind the
- * subscription, so there is no way to observe one without paying for an
- * account. `readVerdict` therefore does not pattern-match one known shape; it
+ * The shape of an accepted verdict is NOT confirmed. The judge routes answer
+ * 401 to an anonymous request, so observing one needs an account; no account of
+ * either kind was available. Note that this establishes the judge requires a
+ * *login* — whether it also requires the subscription, despite the `plus` in
+ * its path, is not something these responses settle, and nothing here assumes
+ * either way. `readVerdict` therefore does not pattern-match one known shape; it
  * looks only at fields *named* like a verdict, and accepts only a small
  * vocabulary of pass words. Two rules keep that from turning into a false
  * positive:

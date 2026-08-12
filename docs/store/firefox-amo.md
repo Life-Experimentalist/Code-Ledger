@@ -18,7 +18,7 @@ Solve a problem on LeetCode. The instant it's accepted, Code Ledger commits it t
 
 **FEATURES**
 
-• Five platforms — LeetCode and GeeksForGeeks are stable; Codeforces, NeetCode and takeuforward are marked beta in the extension. On takeuforward the free A2Z and SDE sheets are marked up with what you have solved, but committing a solve there needs a TUF+ subscription, because that is where its judge lives
+• Five platforms — LeetCode and GeeksForGeeks are stable; Codeforces, NeetCode and takeuforward are marked beta in the extension. On takeuforward the free A2Z and SDE sheets are marked up with what you have solved; its own code editor is part of TUF+, and the free sheets link out to other sites, so a solve is normally committed from wherever you actually solved it
 • Zero-click commits — every accepted submission committed automatically via GitHub Trees API
 • Bulk history import — bring your existing LeetCode, GeeksForGeeks or Codeforces history across in one run
 • AI code review — 6 providers: Gemini (free), OpenAI, Claude, DeepSeek, Ollama, OpenRouter

@@ -88,7 +88,9 @@ Be concise. Max 200 words.`;
           type: "toggle",
           default: true,
           description:
-            "Auto-detect accepted TUF+ submissions and save them to CodeLedger. Requires a TUF+ subscription — the free sheets have no judge.",
+            "Auto-detect accepted submissions in takeuforward's own editor and save them to " +
+            "CodeLedger. That editor is part of TUF+; the free A2Z and SDE sheets link out to " +
+            "other sites, so nothing is submitted through takeuforward there.",
         },
         {
           key: "takeuforward_sheet_marks",
