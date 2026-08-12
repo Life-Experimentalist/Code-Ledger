@@ -2,7 +2,7 @@
 
 ## Short Description (132 chars max)
 
-> Your DSA journey, committed. Auto-commit solved LeetCode, GFG and Codeforces problems to GitHub with AI review, streaks and stats.
+> Your DSA journey, committed. Auto-commit solved LeetCode, GFG, Codeforces, NeetCode and takeuforward problems to your own GitHub.
 
 ---
 
@@ -20,13 +20,19 @@ Solve a problem on LeetCode. The instant it's accepted, CodeLedger commits it to
 
 ---
 
+**WORKS ON**
+
+LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward. LeetCode and GeeksForGeeks are stable; Codeforces, NeetCode and takeuforward are marked beta in the extension, which means the flow is built and tested but has had less exposure to real submissions. On takeuforward, the free A2Z and SDE sheets are marked up with what you have already solved; committing a solve there needs a TUF+ subscription, because that is where its judge lives.
+
+---
+
 **WHAT YOU GET**
 
 ⚡ Zero-click commits
 Every accepted submission creates a single atomic git commit in your own GitHub repo — the moment it's accepted.
 
-📥 Bulk LeetCode import
-Already have hundreds of solutions? Import your entire LeetCode history from your Progress page in one click. All past accepted solutions committed with clean paths, problem descriptions, and stats.
+📥 Bulk history import
+Already have hundreds of solutions? Import your LeetCode, GeeksForGeeks or Codeforces history in one click, dated when you actually solved each problem rather than today. Codeforces publishes which problems you solved and when, but not the code, so those arrive as dated entries with an empty solution.
 
 🤖 AI code review
 Connect any AI provider API key and get time/space complexity analysis, optimization suggestions, and hints committed alongside your code. Supports Google Gemini (free tier), OpenAI, Anthropic Claude, DeepSeek, Ollama (local), and OpenRouter.
@@ -101,7 +107,7 @@ The extension includes **optional, opt-in anonymous usage telemetry** (disabled 
 
 _(paste as-is into the form)_
 
-> CodeLedger automatically detects when a user solves a DSA problem on LeetCode, GeeksForGeeks, or Codeforces and commits their solution code to a GitHub repository they own. Every other feature — AI review, analytics, cross-device sync, the knowledge graph, streak badges, and the optional comparison against a friend's public ledger — reads from or writes to that same repository and exists only to serve that single commit workflow.
+> CodeLedger automatically detects when a user solves a DSA problem on LeetCode, GeeksForGeeks, Codeforces, NeetCode or takeuforward and commits their solution code to a GitHub repository they own. Every other feature — AI review, analytics, cross-device sync, the knowledge graph, streak badges, and the optional comparison against a friend's public ledger — reads from or writes to that same repository and exists only to serve that single commit workflow.
 
 ---
 
@@ -117,7 +123,7 @@ _(paste as-is into the form)_
 
 **alarms**
 
-> Schedules the periodic repository sync check (every 30 minutes) and the batched maintenance commit (every 10 minutes) that push new solutions to the user's own GitHub repository. Two further alarms drain the AI-review and code-recovery queues; they are created only while a queue actually has work and are cleared when it empties, so the extension does not wake in the background with nothing to do.
+> Schedules the periodic repository sync check (every 30 minutes) and the batched maintenance commit (every 10 minutes) that push new solutions to the user's own GitHub repository. Three further alarms drain the AI-review, code-recovery and self-heal queues; each is created only while its queue actually has work and is cleared when it empties, so the extension does not wake in the background with nothing to do. One hourly alarm redraws the streak count on the toolbar icon from data already in local storage, without any network request.
 
 **sidePanel**
 
@@ -129,7 +135,7 @@ _(paste as-is into the form)_
 
 **Host permissions**
 
-> • `*.leetcode.com`, `*.geeksforgeeks.org`, `*.codeforces.com` — content scripts detect accepted submissions and inject UI on these platforms.
+> • `*.leetcode.com`, `*.geeksforgeeks.org`, `*.codeforces.com`, `*.neetcode.io`, `*.takeuforward.org` — content scripts detect accepted submissions and inject UI on these platforms. NeetCode and takeuforward are single-page apps whose verdict is rendered and then discarded before a DOM watcher can read it, so on those two hosts — and only those two — a second content script wraps `fetch` and `XMLHttpRequest` and forwards a response only when its URL matches a short fixed list: those sites' own judge endpoints, plus takeuforward's problem-metadata endpoint, whose API replaces `difficulty` and `topic_tags` with the literal text "Subscribe to TUF+" unless the page's own bearer token is attached. Every other request is passed through untouched and never read, request headers are never forwarded, and nothing is modified. The source is `src/content/net-tap.js`; the endpoint list is the `ENDPOINTS` array at the top of it.
 > • `api.github.com` — commits solution files to the user's own repository via the GitHub Trees API.
 > • `codeledger.vkrishna04.me` — starts the GitHub OAuth sign-in flow and serves the shared canonical problem-ID map.
 > • `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `openrouter.ai`, `localhost:11434` — AI code review providers; only contacted if the user has enabled AI review and entered their own API key for that provider.
@@ -158,7 +164,7 @@ _(paste as-is into the form)_
 | Authentication information          | **Yes** | The extension uses GitHub OAuth to commit solved problems to the user's repository. The access token is stored securely in the browser's local storage (`chrome.storage.local`) and is sent only to the official GitHub API (`api.github.com`). No credentials or tokens are ever sent to or stored on the developer's servers. |
 | Personal communications             | **No**  | Not applicable.                                                                                                                                                                                                                                                                                                                 |
 | Location                            | **No**  | No IP, GPS, or region data is collected.                                                                                                                                                                                                                                                                                        |
-| Web history                         | **No**  | Content scripts run only on the three configured coding platforms; no general browsing history is accessed.                                                                                                                                                                                                                     |
+| Web history                         | **No**  | Content scripts run only on the five configured coding platforms; no general browsing history is accessed.                                                                                                                                                                                                                      |
 | **User activity**                   | **Yes** | If the user opts in to "Anonymous Usage Stats" (off by default), a solve hit carrying only `{ platform: "leetcode", version: "1.7.0" }` is sent to `counter.vkrishna04.me`. No clicks, scrolls, or keystrokes. Anonymous, no user identifier.                                                                                   |
 | Website content                     | **No**  | Submitted code is read from the platform DOM and committed to the user's own GitHub repo only — never sent to the developer.                                                                                                                                                                                                    |
 
@@ -185,7 +191,7 @@ Diagnosing a failed setup: **Settings → Advanced → Connection check** runs t
 
 ## Keywords / Tags
 
-leetcode, github, dsa, competitive programming, code review, ai, automation, solutions, algorithms, developer tools
+leetcode, github, dsa, competitive programming, code review, ai, automation, solutions, algorithms, developer tools, neetcode, takeuforward, striver
 
 ---
 

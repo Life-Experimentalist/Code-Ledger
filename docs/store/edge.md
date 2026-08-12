@@ -4,7 +4,7 @@
 
 _(paste into the "Notes for certification" field — must be under 2,000 characters)_
 
-CodeLedger detects accepted DSA submissions on LeetCode, GeeksForGeeks, and Codeforces and commits the solution code to the user's own GitHub repository via the GitHub Trees API.
+CodeLedger detects accepted DSA submissions on LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward and commits the solution code to the user's own GitHub repository via the GitHub Trees API.
 
 **To test:**
 
@@ -18,10 +18,10 @@ CodeLedger detects accepted DSA submissions on LeetCode, GeeksForGeeks, and Code
 
 - storage: persists settings, OAuth token, and problem cache locally. The only external call not covered by a host permission above is opt-in anonymous telemetry (disabled by default) — sends { platform, version } to counter.vkrishna04.me only if the user enables "Anonymous telemetry" in Settings → Advanced.
 - unlimitedStorage: local backup snapshots of the user's own solve history exceed the 10 MB `storage.local` cap past a few hundred solutions. No new data is read.
-- alarms: cross-device sync every 30 min, a batched maintenance commit every 10 min, plus queue-drain alarms that exist only while a queue has work.
+- alarms: cross-device sync every 30 min, a batched maintenance commit every 10 min, an hourly local redraw of the toolbar streak badge, plus queue-drain alarms that exist only while a queue has work.
 - sidePanel: CodeLedger Library panel (solve history, analytics, knowledge graph).
 - tabs: watches the tab URL during the GitHub OAuth redirect on codeledger.vkrishna04.me, and finds open Library tabs to refresh after a commit.
-- Host permissions: leetcode/gfg/codeforces for content scripts; api.github.com for commits; AI provider APIs only contacted when user has configured that provider with their own key; localhost:11434 for local Ollama only.
+- Host permissions: leetcode/gfg/codeforces/neetcode.io/takeuforward.org for content scripts; api.github.com for commits; AI provider APIs only contacted when user has configured that provider with their own key; localhost:11434 for local Ollama only. NeetCode and takeuforward discard their verdict from the DOM before it can be read, so on those two hosts only, a second content script reads the page's own judge response to get the verdict, source and language.
 
 **No remote code.** All JS (Preact, Chart.js, htm) is bundled in src/vendor/. No eval(), no external script tags.
 
@@ -35,7 +35,7 @@ Code Ledger
 
 ## Short Description (150 chars max)
 
-> Auto-commit solved LeetCode, GeeksForGeeks and Codeforces problems to your GitHub — with AI review, streaks, analytics and cross-device sync.
+> Auto-commit solved LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward problems to your own GitHub — with AI review and streaks.
 
 ---
 
@@ -50,8 +50,11 @@ Every time you solve a LeetCode problem and it's accepted, CodeLedger commits it
 **⚡ Zero-click commits**
 Accepted submissions are committed the instant they're accepted via the GitHub Trees API. One commit, all files, atomic.
 
-**📥 Bulk LeetCode import**
-Already have hundreds of solutions? Import your entire LeetCode history from your Progress page in one click. Every accepted solution gets a clean path, problem description, and stats.
+**🌐 Five platforms**
+LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward. LeetCode and GeeksForGeeks are stable; the other three are marked beta in the extension. On takeuforward the free sheets are marked up with what you have already solved, and committing a solve there needs a TUF+ subscription, because that is where its judge lives.
+
+**📥 Bulk history import**
+Already have hundreds of solutions? Import your LeetCode, GeeksForGeeks or Codeforces history in one click, dated when you actually solved each problem. Codeforces publishes which problems you solved and when, but not the code, so those arrive as dated entries with an empty solution.
 
 **🤖 AI code review**
 Connect any AI provider and get complexity analysis, optimization hints, and suggestions committed alongside your code. Supports Google Gemini (free tier), OpenAI, Claude, DeepSeek, Ollama, and OpenRouter.
@@ -108,7 +111,7 @@ https://github.com/Life-Experimentalist/Code-Ledger/issues
 
 ### Single Purpose Description
 
-CodeLedger automatically detects accepted DSA problem submissions on LeetCode, GeeksForGeeks, and Codeforces and commits the solution code, problem metadata, and optional AI review to the user's own GitHub repository via the GitHub Trees API.
+CodeLedger automatically detects accepted DSA problem submissions on LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward and commits the solution code, problem metadata, and optional AI review to the user's own GitHub repository via the GitHub Trees API.
 
 ---
 
@@ -121,7 +124,7 @@ Required to persist user settings (GitHub repository name and owner, AI provider
 Required so the local backups are not truncated by the 10 MB `storage.local` cap. The extension keeps up to sixteen snapshots of the user's own solve history on the device — ten manual, five automatic, one always-current — and each holds the full source of every solution. Past a few hundred solutions those writes begin to fail, which silently disables the recovery path. The permission grants no access to anything new; it only lets the user's existing data be stored whole.
 
 **alarms**
-Required to schedule periodic work via `chrome.alarms`: a cross-device sync check every 30 minutes that reads the user's own GitHub repository index for solutions committed from another device, and a maintenance commit every 10 minutes that batches pending writes into one commit. Two further alarms drain the AI-review and code-recovery queues; they exist only while a queue has work and are cleared when it empties.
+Required to schedule periodic work via `chrome.alarms`: a cross-device sync check every 30 minutes that reads the user's own GitHub repository index for solutions committed from another device, and a maintenance commit every 10 minutes that batches pending writes into one commit. Three further alarms drain the AI-review, code-recovery and self-heal queues; each exists only while its queue has work and is cleared when it empties. One hourly alarm redraws the streak count on the toolbar icon from local data, with no network request.
 
 **tabs**
 Required to observe the browser tab URL during the GitHub sign-in flow on `codeledger.vkrishna04.me`, so the extension knows when the OAuth redirect has completed, and to find open Library tabs in order to refresh the problem list after a commit. No browsing history is read and no other tab's URL is inspected.
@@ -131,7 +134,8 @@ Required to display the CodeLedger Library panel — a full-page view of the use
 
 **Host permissions**
 
-- `*://*.leetcode.com/*`, `*://*.geeksforgeeks.org/*`, `*://*.codeforces.com/*` — Content scripts observe DOM changes on these platforms to detect when a submission is accepted. The only data read from these pages is the user's own submitted code and problem metadata (title, difficulty, tags), which is then committed to the user's own GitHub repo.
+- `*://*.leetcode.com/*`, `*://*.geeksforgeeks.org/*`, `*://*.codeforces.com/*`, `*://*.neetcode.io/*`, `*://*.takeuforward.org/*` — Content scripts observe DOM changes on these platforms to detect when a submission is accepted. The only data read from these pages is the user's own submitted code and problem metadata (title, difficulty, tags), which is then committed to the user's own GitHub repo.
+- NeetCode and takeuforward need one extra mechanism, on those two hosts and nowhere else. Both are single-page apps that render the judge's verdict into a React tree and discard it on navigation, so there is no node for a DOM watcher to find. A second content script on those two hosts wraps `fetch` and `XMLHttpRequest` and forwards a response only when its URL matches a short fixed list: those two sites' own judge endpoints, plus takeuforward's problem-metadata endpoint — its API replaces `difficulty` and `topic_tags` with the literal text "Subscribe to TUF+" unless the page's own bearer token is attached, so reading the page's response is the only way to record a real difficulty. Every other request is passed through untouched and never read, request headers are never forwarded (that is where the session cookie and the bearer token are), and no request or response is modified. The source is `src/content/net-tap.js`, and the endpoint list is the `ENDPOINTS` array at the top of it.
 - `https://api.github.com/*` — Required to commit solutions to the user's GitHub repository via the Trees API, read repository state for cross-device sync, and look up repository/user metadata during onboarding.
 - `*://codeledger.vkrishna04.me/*` — Required for the GitHub sign-in flow. The extension opens this page to start OAuth and listens for the resulting token message; it also fetches the shared canonical problem-ID map from this origin.
 - `https://api.openai.com/*`, `https://api.anthropic.com/*`, `https://generativelanguage.googleapis.com/*`, `https://api.deepseek.com/*`, `https://openrouter.ai/*` — Required to call AI providers for optional AI code review. Each endpoint is only contacted if the user has explicitly configured and enabled that provider. API keys are stored locally via `chrome.storage.local` and never transmitted to the extension developer.
@@ -161,7 +165,7 @@ Answer for each category in the Edge form:
 | Authentication information          | **Yes**               | The extension uses GitHub OAuth to commit solved problems to the user's repository. The access token is stored securely in the browser's local storage (`chrome.storage.local`) and is sent only to the official GitHub API (`api.github.com`). No credentials or tokens are ever sent to or stored on the developer's servers. |
 | Personal communications             | **No**                | Not applicable.                                                                                                                                                                                                                                                                                                                 |
 | Location                            | **No**                | No region, IP, GPS, or proximity data is collected.                                                                                                                                                                                                                                                                             |
-| Web history                         | **No**                | Content scripts run only on the three configured coding platforms (LeetCode, GeeksForGeeks, Codeforces). No browsing history outside those domains is accessed.                                                                                                                                                                 |
+| Web history                         | **No**                | Content scripts run only on the five configured coding platforms (LeetCode, GeeksForGeeks, Codeforces, NeetCode, takeuforward). No browsing history outside those domains is accessed.                                                                                                                                          |
 | User activity                       | **Yes (opt-in only)** | If the user explicitly enables "Anonymous Usage Stats" in Settings → Advanced (off by default), the extension sends `{ platform: "leetcode", version: "1.7.0" }` to `counter.vkrishna04.me` when a problem is solved. No clicks, scrolls, keystrokes, or other activity is tracked.                                             |
 | Website content                     | **No**                | The extension reads the user's own submitted code from the platform DOM solely to commit it to the user's own GitHub repository. This data is never sent to the developer.                                                                                                                                                      |
 

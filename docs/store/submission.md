@@ -64,8 +64,10 @@ Chrome, Firefox and source zips into `releases/`. Then confirm:
 ### Functionality, against a real account
 
 - [ ] Sign in with GitHub and let onboarding create a fresh repository
-- [ ] Solve one problem on each of LeetCode, GeeksForGeeks and Codeforces; each
-      lands as a commit
+- [ ] Solve one problem on each of LeetCode, GeeksForGeeks, Codeforces and
+      NeetCode; each lands as a commit
+- [ ] takeuforward: the free sheets mark up solved problems; a commit needs a
+      TUF+ subscription, so record whether that leg was exercised or skipped
 - [ ] Runtime and memory are captured
 - [ ] An AI review runs when a key is present, and everything still works with no key
 - [ ] The dashboard, the graph and the streak badges render from the committed data
