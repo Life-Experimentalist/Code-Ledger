@@ -1144,10 +1144,13 @@ export function getActionsWorkflow() {
 
 /**
  * Returns a root README.md for the user's CodeLedger repo.
- * pagesUrl is the GitHub Pages URL (or custom domain if configured).
+ * pagesUrl is the GitHub Pages URL (or custom domain if configured), and is
+ * empty when no site is known to exist — the header badges then link to the
+ * repository itself, which always resolves, instead of to a Pages address that
+ * a free private repo can never have.
  */
 export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMeta) {
-  const url = pagesUrl || "https://" + owner + ".github.io/" + repo + "/";
+  const url = pagesUrl || "https://github.com/" + owner + "/" + repo;
   const stats = indexMeta?.stats || null;
 
   const updatedAt = indexMeta?.updatedAt

@@ -164,7 +164,11 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
   }
 
   // ── README: read-before-write so user content outside the markers is kept ──
-  const pagesUrl = settings?.github_pages_url || `https://${owner}.github.io/${repo}/`;
+  // Empty when no Pages site is known, so the README links to the repository
+  // rather than to a guessed `{owner}.github.io` address. That guess is a 404
+  // for anyone who never enabled Pages, and cannot be anything else for a
+  // private repository on a free plan, where Pages is not offered at all.
+  const pagesUrl = settings?.github_pages_url || "";
   const newStatsBlock = getRepoReadme(owner, repo, pagesUrl, pagesTheme, settings, indexMeta);
   let currentText = null;
   let merged = newStatsBlock;

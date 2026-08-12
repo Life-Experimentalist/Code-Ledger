@@ -28,18 +28,61 @@ export function parseScopes(header) {
   );
 }
 
+/** Plans on which a private repository may publish a GitHub Pages site. */
+const PAID_PLANS = new Set(["pro", "team", "business", "enterprise"]);
+
 /**
- * Reads the scopes GitHub actually granted this token.
+ * The account's GitHub plan, from a `GET /user` body.
  *
- * Returns null when the scopes cannot be determined — a GitHub App
- * user-to-server token omits the header entirely, as does a fine-grained PAT.
- * Callers must treat null as "unknown", not as "no permissions": guessing wrong
- * in that direction would hide options that work.
+ * Returns null when the field is absent, which is not the same as "free": the
+ * `plan` object is part of the authenticated user's own profile, and a token
+ * that cannot read private profile fields simply omits it. Callers must treat
+ * null the way they treat unknown scopes — leave every option available and let
+ * the request itself be the check.
+ *
+ * @param {any} user parsed `GET /user` response
+ * @returns {string|null} lowercase plan name, e.g. "free" / "pro"
+ */
+export function readAccountPlan(user) {
+  const name = user?.plan?.name;
+  return typeof name === "string" && name.trim() ? name.trim().toLowerCase() : null;
+}
+
+/**
+ * Whether this account can serve GitHub Pages from a **private** repository.
+ *
+ * Pages is free on public repositories for everyone. From a private one it is a
+ * paid-plan feature, so a free account that makes its ledger private gets no
+ * site at all — which is why the badges must then be addressed relative to the
+ * repository rather than at a Pages URL that will never resolve.
+ *
+ * Unknown plan (null) answers true: the same "do not hide something that might
+ * work" rule the scope helpers follow.
+ *
+ * @param {string|null} plan
+ * @returns {boolean}
+ */
+export function canPagesServePrivateRepo(plan) {
+  if (!plan) return true;
+  return PAID_PLANS.has(plan);
+}
+
+/**
+ * What one `GET /user` call can tell us about the connection.
+ *
+ * Both answers come off the same request because both are wanted at the same
+ * moment — the repository step needs to know whether private repos are
+ * creatable *and* whether a private repo could still have a stats page.
+ *
+ * `scopes` is null when they cannot be determined: a GitHub App user-to-server
+ * token omits the header entirely, as does a fine-grained PAT. `plan` is null
+ * when the body does not carry one. Neither null means "no" — see the helpers
+ * above.
  *
  * @param {string} token
- * @returns {Promise<Set<string>|null>}
+ * @returns {Promise<{scopes: Set<string>|null, plan: string|null}>}
  */
-export async function fetchTokenScopes(token) {
+export async function fetchAccountContext(token) {
   const res = await fetch("https://api.github.com/user", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -47,9 +90,14 @@ export async function fetchTokenScopes(token) {
       "X-GitHub-Api-Version": "2022-11-28",
     },
   });
-  if (!res.ok) return null;
+  if (!res.ok) return { scopes: null, plan: null };
+
   const header = res.headers.get("X-OAuth-Scopes");
-  return header === null ? null : parseScopes(header);
+  const body = await res.json().catch(() => null);
+  return {
+    scopes: header === null ? null : parseScopes(header),
+    plan: readAccountPlan(body),
+  };
 }
 
 /**

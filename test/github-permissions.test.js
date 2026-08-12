@@ -15,6 +15,8 @@ import {
   parseScopes,
   canCreatePrivateRepo,
   canWriteWorkflows,
+  canPagesServePrivateRepo,
+  readAccountPlan,
   describeGitHubError,
 } from "../src/handlers/git/github/permissions.js";
 
@@ -47,6 +49,37 @@ describe("canWriteWorkflows", () => {
   test("committing under .github/workflows needs the workflow scope", () => {
     assert.equal(canWriteWorkflows(parseScopes("public_repo")), false);
     assert.equal(canWriteWorkflows(parseScopes("public_repo,workflow")), true);
+  });
+});
+
+describe("readAccountPlan", () => {
+  test("reads and normalises the plan name", () => {
+    assert.equal(readAccountPlan({ plan: { name: "Pro" } }), "pro");
+    assert.equal(readAccountPlan({ plan: { name: " free " } }), "free");
+  });
+
+  test("a body without a plan is unknown, not free", () => {
+    // A token that cannot read private profile fields omits `plan` entirely.
+    // Reading that as "free" would switch off Pages for paying users.
+    assert.equal(readAccountPlan({ login: "octocat" }), null);
+    assert.equal(readAccountPlan({ plan: {} }), null);
+    assert.equal(readAccountPlan(null), null);
+  });
+});
+
+describe("canPagesServePrivateRepo", () => {
+  test("a free account cannot serve Pages from a private repository", () => {
+    assert.equal(canPagesServePrivateRepo("free"), false);
+  });
+
+  test("the paid plans can", () => {
+    for (const plan of ["pro", "team", "business", "enterprise"]) {
+      assert.equal(canPagesServePrivateRepo(plan), true, plan);
+    }
+  });
+
+  test("an unknown plan leaves the option open, like unknown scopes", () => {
+    assert.equal(canPagesServePrivateRepo(null), true);
   });
 });
 
