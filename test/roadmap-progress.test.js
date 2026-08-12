@@ -42,10 +42,37 @@ describe("countMilestoneSolves", () => {
   });
 
   test("ignores case, because milestones are written for humans and tags are not", () => {
-    // Milestone topics read like "Arrays & Hashing"; tags arrive lowercase and
-    // hyphenated. Case-sensitive matching would score every milestone zero.
     const m = milestone({ topic: "Arrays & Hashing", subtopics: ["Hash-Table"] });
     assert.equal(countMilestoneSolves(m, [solved(["hash-table"])]), 1);
+  });
+
+  test("matches a platform's display tag against a slug subtopic", () => {
+    // The case this got wrong for its whole life. Tags are NOT lowercase and
+    // hyphenated: every handler stores the name the site displays, so LeetCode
+    // sends "Hash Table" and "Depth-First Search". Comparing those to the
+    // template slugs by lowercase alone scored every multi-word milestone zero.
+    const m = milestone({ topic: "Trees", subtopics: ["depth-first-search", "hash-table"] });
+    assert.equal(countMilestoneSolves(m, [solved(["Depth-First Search"])]), 1);
+    assert.equal(countMilestoneSolves(m, [solved(["Hash Table"])]), 1);
+  });
+
+  test("folds punctuation, so one topic is one key however a site spells it", () => {
+    // LeetCode writes "Heap (Priority Queue)"; the templates write the slug.
+    const m = milestone({ subtopics: ["heap-priority-queue"] });
+    assert.equal(countMilestoneSolves(m, [solved(["Heap (Priority Queue)"])]), 1);
+    assert.equal(countMilestoneSolves(m, [solved(["Heap Priority Queue"])]), 1);
+  });
+
+  test("counts a solve from any platform towards the same milestone", () => {
+    // What links NeetCode and takeuforward to the roadmap: each site spells the
+    // topic its own way, and all three spellings have to land on one milestone.
+    const m = milestone({ topic: "Arrays & Hashing", subtopics: ["array", "hash-table"] });
+    const problems = [
+      solved(["Array", "Hash Table"], { platform: "leetcode" }),
+      solved(["Arrays & Hashing"], { platform: "neetcode" }),
+      solved([], { platform: "takeuforward", topic: "Arrays & Hashing" }),
+    ];
+    assert.equal(countMilestoneSolves(m, problems), 3);
   });
 
   test("matches the folder topic when a problem carries no tags", () => {
