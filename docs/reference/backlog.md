@@ -27,6 +27,9 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 | Problem attachment in chats                    | Multiple problems can be attached to one chat and reused in the conversation context.           |
 | Math rendering parity                          | AI markdown rendering supports inline and block math through the KaTeX renderer.                |
 | Mermaid rendering parity                       | AI markdown rendering supports Mermaid fences with inline render and fallback live-link output. |
+| LeetCode profile import overhaul               | GraphQL queries fixed, tags and difficulty fetched, solve timestamps recorded rather than guessed. |
+| Codeforces profile import                      | `user.status` back-catalogue import on your own profile. Arrives without code — CF does not publish submission source. |
+| NeetCode and takeuforward handlers             | Both ship with their own judges tapped at the network layer; TUF sheets are marked, never committed. |
 
 ---
 
@@ -36,7 +39,6 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 | ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------- |
 | Multi-platform analytics integration | partial | Graph has platform colors; analytics is still mostly LeetCode-centric.                            |
 | LeetCode import completeness         | partial | Recent 20 via public API; full history still requires the profile page button.                    |
-| LeetCode profile import overhaul     | active  | GraphQL 400 errors; tags and difficulty are not fetched yet; timestamp still needs fixing.        |
 | Solutions advanced search & filters  | active  | Add dropdowns, tag/topic/language filters, and free-text search across title, tags, and overview. |
 | Documentation revamp and dedupe      | done    | Canonical docs index, archive layout, and root markdown cleanup are complete.                     |
 

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What CodeLedger Is
 
-A **Manifest V3 browser extension** (Chrome + Firefox) that automatically commits solved DSA problems from LeetCode, GeeksForGeeks, and Codeforces to a user-owned GitHub repository. Backed by a **Cloudflare Worker** (Hono) that handles GitHub OAuth and serves the landing page.
+A **Manifest V3 browser extension** (Chrome + Firefox) that automatically commits solved DSA problems from LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward to a user-owned GitHub repository. Backed by a **Cloudflare Worker** (Hono) that handles GitHub OAuth and serves the landing page.
 
 - **Domain:** `codeledger.vkrishna04.me`
 - **Auth worker:** `https://codeledger.vkrishna04.me/api`
@@ -106,7 +106,7 @@ manifest-chromium.json / manifest-firefox.json   — the build emits one manifes
 │   └── presence-marker.js            — injects #codeledger-present on landing page
 ├── handlers/
 │   ├── _base/BasePlatformHandler.js  — safeQuery(), MutationObserver lifecycle
-│   ├── platforms/{leetcode,geeksforgeeks,codeforces}/index.js
+│   ├── platforms/{leetcode,geeksforgeeks,codeforces,neetcode,takeuforward}/index.js
 │   ├── ai/{gemini,openai,claude,deepseek,ollama,openrouter}/index.js
 │   └── git/github/index.js           — the only implemented git provider (see below)
 ├── core/
@@ -500,7 +500,7 @@ The `problem:solved` event payload (emitted by platform handlers, consumed by se
 {
   title: string,
   titleSlug: string,
-  platform: string,           // "leetcode" | "geeksforgeeks" | "codeforces"
+  platform: string,           // a key of CONSTANTS.PLATFORMS
   difficulty: "Easy" | "Medium" | "Hard",
   lang: { name: string, ext: string, slug: string },
   tags: string[],

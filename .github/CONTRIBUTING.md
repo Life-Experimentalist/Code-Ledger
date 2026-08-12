@@ -37,7 +37,16 @@ npm run build:css   # compile Tailwind → src/ui/styles/compiled.css
 npm run lint        # tsc --noEmit type-check (run before every PR)
 ```
 
-Load the extension unpacked from `src/` at `chrome://extensions` (Developer mode → Load unpacked).
+```bash
+npm run build       # CSS + dist packaging
+```
+
+Load the extension unpacked from `dist/chromium` at `chrome://extensions` (Developer
+mode → Load unpacked), or `dist/firefox` at `about:debugging`. Loading `src/` directly
+does not work: neither manifest is named `manifest.json` in the source tree — the build
+picks one of `manifest-chromium.json` / `manifest-firefox.json` per target and writes it
+out. Use `npm run build:fast` as the inner loop; it skips Tailwind, so run
+`npm run build:css` after touching a class.
 
 For the Cloudflare Worker:
 
@@ -82,7 +91,9 @@ npx wrangler dev    # local dev — copy worker/wrangler.toml.example to worker/
 
 ## Adding a platform handler
 
-**GeeksForGeeks and Codeforces handlers are the most-wanted contributions right now.** If you know either platform's DOM structure or submission flow, this is a well-scoped, high-impact first PR — the contract is fully documented and LeetCode's handler is the reference implementation.
+Five platforms ship today: LeetCode, GeeksForGeeks, Codeforces, NeetCode and
+takeuforward. **A sixth platform is the most-wanted contribution right now** — the
+contract is fully documented and LeetCode's handler is the reference implementation.
 
 1. Create `src/handlers/platforms/{name}/index.js` extending `BasePlatformHandler`
 2. Create `dom-selectors.js` with versioned `SELECTORS`, `LEGACY_SELECTORS`, and `DOMAINS` export

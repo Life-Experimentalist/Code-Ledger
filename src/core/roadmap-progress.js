@@ -58,7 +58,10 @@ export function countMilestoneSolves(milestone, problems) {
 export function pickActiveRoadmap(roadmaps) {
   const list = (roadmaps || []).filter(Boolean);
   if (!list.length) return null;
-  return list.reduce((best, r) => ((r.createdAt || 0) >= (best.createdAt || 0) ? r : best), list[0]);
+  return list.reduce(
+    (best, r) => ((r.createdAt || 0) >= (best.createdAt || 0) ? r : best),
+    list[0],
+  );
 }
 
 /**

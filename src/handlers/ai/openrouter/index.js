@@ -102,9 +102,10 @@ export class OpenRouterHandler extends BaseAIHandler {
 
         this._updateRateLimits(res.headers);
 
-        if (!res.ok) throw Object.assign(new Error(`OpenRouter API error: ${res.status}`), {
-          status: res.status,
-        });
+        if (!res.ok)
+          throw Object.assign(new Error(`OpenRouter API error: ${res.status}`), {
+            status: res.status,
+          });
 
         const data = await res.json();
         return data.choices?.[0]?.message?.content || "";

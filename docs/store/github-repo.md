@@ -11,44 +11,55 @@ first, then sweep them at leisure.
 
 ## About — description (≤ 350 chars)
 
-> Auto-commit every accepted LeetCode, GeeksforGeeks and Codeforces solution to
-> your own GitHub repo — with AI code review, a live analytics dashboard, a
-> knowledge graph, bulk history import and cross-device sync. Zero extra steps.
+> Auto-commit every accepted LeetCode, GeeksforGeeks, Codeforces, NeetCode and
+> takeuforward solution to your own GitHub repo — with AI code review, a live
+> analytics dashboard, a knowledge graph, streaks and badges, bulk history
+> import and cross-device sync. No servers, no accounts, no payments.
 
 ## Website
 
 `https://codeledger.vkrishna04.me`
 
-## Topics (20)
+## Topics (GitHub caps these at 20)
 
 ```
-leetcode  geeksforgeeks  codeforces  dsa  competitive-programming
-browser-extension  chrome-extension  firefox-addon  manifest-v3
-ai-code-review  analytics  knowledge-graph  leetcode-solutions
-github-automation  code-tracker  preact  cloudflare-workers  hono
-open-source  developer-tools
+leetcode  geeksforgeeks  codeforces  neetcode  takeuforward
+dsa  competitive-programming  browser-extension  chrome-extension
+firefox-addon  manifest-v3  ai-code-review  analytics
+knowledge-graph  github-automation  code-tracker  preact
+cloudflare-workers  open-source  gfg
 ```
+
+The ceiling is real: GitHub rejects the twenty-first topic rather than
+truncating, so adding one means naming the one it replaces. `knowledge-graphs`,
+`preactjs`, `library` and `github` were the four dropped to make room for the
+two new platforms — the first two were plural/suffix duplicates of topics
+already in the list, and the last two were too generic to bring any search
+traffic.
 
 ---
 
 ## Applying it
 
-Rename first, in **Settings → General → Repository name**. Then, from a shell
-authenticated with `gh auth login`:
+The repository has **not** been renamed yet, so these commands name
+`Code-Ledger`. After a rename, GitHub serves permanent redirects, so both spellings
+keep working and the sweep can happen at leisure.
+
+From a shell authenticated with `gh auth login`:
 
 ```bash
-gh repo edit Life-Experimentalist/CodeLedger --description "Auto-commit every accepted LeetCode, GeeksforGeeks and Codeforces solution to your own GitHub repo — with AI code review, a live analytics dashboard, a knowledge graph, bulk history import and cross-device sync. Zero extra steps." --homepage "https://codeledger.vkrishna04.me"
+gh repo edit Life-Experimentalist/Code-Ledger --description "Auto-commit every accepted LeetCode, GeeksforGeeks, Codeforces, NeetCode and takeuforward solution to your own GitHub repo — with AI code review, a live analytics dashboard, a knowledge graph, streaks and badges, bulk history import and cross-device sync. No servers, no accounts, no payments." --homepage "https://codeledger.vkrishna04.me"
 ```
 
 ```bash
-gh repo edit Life-Experimentalist/CodeLedger --add-topic leetcode --add-topic geeksforgeeks --add-topic codeforces --add-topic dsa --add-topic competitive-programming --add-topic browser-extension --add-topic chrome-extension --add-topic firefox-addon --add-topic manifest-v3 --add-topic ai-code-review --add-topic analytics --add-topic knowledge-graph --add-topic leetcode-solutions --add-topic github-automation --add-topic code-tracker --add-topic preact --add-topic cloudflare-workers --add-topic hono --add-topic open-source --add-topic developer-tools
+gh repo edit Life-Experimentalist/Code-Ledger --add-topic neetcode --add-topic takeuforward --add-topic github-automation --add-topic code-tracker --remove-topic knowledge-graphs --remove-topic preactjs --remove-topic library --remove-topic github
 ```
 
 Enable issues and discussions, and turn off the wiki and projects (nothing uses
 them):
 
 ```bash
-gh repo edit Life-Experimentalist/CodeLedger --enable-issues --enable-discussions --enable-wiki=false --enable-projects=false
+gh repo edit Life-Experimentalist/Code-Ledger --enable-issues --enable-discussions --enable-wiki=false --enable-projects=false
 ```
 
 ## Social preview

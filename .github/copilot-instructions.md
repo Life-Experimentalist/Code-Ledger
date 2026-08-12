@@ -58,7 +58,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project Overview
 
-CodeLedger is a **Manifest V3 Chrome/Firefox extension** that automatically commits solved DSA problems (LeetCode, GeeksForGeeks, Codeforces) to a user-owned GitHub repository. No bundler, no transpiler — pure ES6 modules with Preact + htm.
+CodeLedger is a **Manifest V3 Chrome/Firefox extension** that automatically commits solved DSA problems (LeetCode, GeeksForGeeks, Codeforces, NeetCode, takeuforward) to a user-owned GitHub repository. No bundler, no transpiler — pure ES6 modules with Preact + htm.
 
 ## Stack
 
