@@ -450,11 +450,13 @@
           <span class="platform-chip">LeetCode</span>
           <span class="platform-chip">GeeksForGeeks</span>
           <span class="platform-chip">Codeforces</span>
+          <span class="platform-chip">NeetCode</span>
+          <span class="platform-chip">takeuforward</span>
         </div>
 
         <div class="stats-strip">
           <div class="stat">
-            <div class="stat-value">3</div>
+            <div class="stat-value">5</div>
             <div class="stat-label">Coding platforms</div>
           </div>
           <div class="stat">
@@ -821,6 +823,25 @@ README.md</code></pre>
             </p>
           </div>
           <div class="feature">
+            <div class="feature-icon">🔥</div>
+            <h3>Streaks and self-hosted badges</h3>
+            <p>
+              Set your own daily minimum, bank freezes for the days you miss, and pause it for a
+              holiday. The badges are SVGs committed to <code>badges/</code> in your repository —
+              nothing is fetched from a counter service that could go away.
+            </p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🤝</div>
+            <h3>Compare with friends</h3>
+            <p>
+              Add a friend by pasting their public repository — no invite, no account, and following
+              them does not oblige them to follow you. Progress is read straight from the repository
+              they already publish, and
+              <a href="/compare">the comparison page</a> keeps nothing.
+            </p>
+          </div>
+          <div class="feature">
             <div class="feature-icon">🦊</div>
             <h3>Chrome and Firefox</h3>
             <p>
@@ -832,8 +853,8 @@ README.md</code></pre>
             <div class="feature-icon">📥</div>
             <h3>Import your back catalogue</h3>
             <p>
-              Already have hundreds of solves? Import your existing LeetCode or GeeksForGeeks
-              history and backfill the repository in one run.
+              Already have hundreds of solves? Import your existing LeetCode, GeeksForGeeks or
+              Codeforces history and backfill the repository in one run.
             </p>
           </div>
           <div class="feature">
@@ -1174,6 +1195,17 @@ README.md</code></pre>
             </p>
           </details>
           <details class="faq-item">
+            <summary>What can a friend see if I add them?</summary>
+            <p>
+              Only what their repository already publishes to anyone. Adding a friend stores their
+              repository name on your machine and reads the badge files from it — there is no
+              request to them, nothing is written to their repository, and they are not told. It
+              works in the other direction only if they add you too. A private repository cannot be
+              read this way and is shown as not shared, and turning streaks off removes your own
+              badge files on the next commit.
+            </p>
+          </details>
+          <details class="faq-item">
             <summary>What if a platform changes its page and detection breaks?</summary>
             <p>
               Selectors live in a single <code>dom-selectors.js</code> per platform, with a legacy
@@ -1234,6 +1266,7 @@ README.md</code></pre>
           >Contribute</a
         >
         <a href="#" data-cl-open hidden>Library</a>
+        <a href="/compare">Compare repos</a>
         <a href="/api/health">API status</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>

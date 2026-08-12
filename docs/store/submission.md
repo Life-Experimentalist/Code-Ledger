@@ -45,7 +45,8 @@ npm run publish
 Chrome, Firefox and source zips into `releases/`. Then confirm:
 
 - [ ] `package.json`, `src/manifest-chromium.json` and `src/manifest-firefox.json`
-      all carry the same version — `node dev/sync-manifests.js` is what makes that true
+      all carry the same version — `node dev/sync-manifests.js` is what makes that
+      true, and it updates the landing page's two version strings in the same pass
 - [ ] `docs/CHANGELOG.md` has a dated section for this version
 - [ ] `git status` is clean and the tag is pushed
 - [ ] `unzip -t releases/*.zip` passes
