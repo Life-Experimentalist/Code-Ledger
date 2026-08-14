@@ -8,18 +8,28 @@ compatibility_date = "2026-04-24"
 # Your Cloudflare Account ID (paste the 32-char id here)
 account_id = "<YOUR_ACCOUNT_ID>"
 
-[vars]
-# Client IDs should not be committed. Use Wrangler secrets or set these via the Cloudflare dashboard.
-# GITHUB_CLIENT_ID = "<GITHUB_CLIENT_ID>"
-# GITHUB_CLIENT_SECRET = "<GITHUB_CLIENT_SECRET>"
+# No [vars] block. Every value the Worker reads is a secret and belongs in
+# `wrangler secret put`, never in this file:
+#
+#   CODELEDGER_OAUTH_CLIENT_ID       required — classic OAuth App client id (Ov23li…)
+#   CODELEDGER_OAUTH_CLIENT_SECRET   required — that app's client secret
+#   SESSION_SECRET                   required — 32 random bytes; signs the OAuth state
+#                                    cookie. Sign-in returns 500 until it is set.
+#   CANONICAL_UPLOAD_TOKEN           optional — guards POST /api/admin/canonical
+#   CODELEDGER_GH_APP_WEBHOOK_SECRET optional — HMAC for POST /api/webhook/github
 
 [[kv_namespaces]]
 binding = "CANONICAL_MAP"
 # The KV namespace id looks like: abc123def456...
 id = "<CANONICAL_KV_NAMESPACE_ID>"
 
-[site]
-bucket = "./public"
+# The landing page, /compare and the rest of worker/public. This must be
+# [assets] with binding = "ASSETS" — src/index.js serves static files through
+# `c.env.ASSETS.fetch()`, and the older `[site] bucket` form binds
+# __STATIC_CONTENT instead, which leaves every page 404.
+[assets]
+directory = "./public"
+binding = "ASSETS"
 
 [env.production]
 route = "codeledger.vkrishna04.me/*"

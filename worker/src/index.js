@@ -6,21 +6,22 @@
  * Handles: GitHub OAuth flow, static landing page, canonical map KV
  *
  * Required secrets (set via `wrangler secret put`):
- *   CODELEDGER_GH_APP_CLIENT_ID       — GitHub OAuth App client ID
- *   CODELEDGER_GH_APP_CLIENT_SECRET   — GitHub OAuth App client secret
- *   CANONICAL_UPLOAD_TOKEN            — random token for /api/admin/canonical
+ *   CODELEDGER_OAUTH_CLIENT_ID        — OAuth App client ID
+ *   CODELEDGER_OAUTH_CLIENT_SECRET    — OAuth App client secret
  *   SESSION_SECRET                    — random secret, signs the OAuth state cookie
  *
  * Optional:
+ *   CANONICAL_UPLOAD_TOKEN            — random token for /api/admin/canonical.
+ *                                       When unset, that endpoint is closed.
  *   CODELEDGER_GH_APP_WEBHOOK_SECRET  — webhook HMAC secret. When unset, the
  *                                       webhook endpoint refuses every request.
  *
- * KV binding: CANONICAL_MAP
+ * Bindings: CANONICAL_MAP (KV), ASSETS (worker/public — see wrangler.toml.example)
  *
  * NOTE ON AUTH MODEL: CodeLedger uses a classic OAuth App, not a GitHub App.
  * A GitHub App's user-to-server token silently ignores the `scope` parameter and
  * cannot create repositories on a personal account, which is what onboarding does
- * first. The secret NAMES retain their historical `GH_APP` prefix so existing
+ * first. The historical `CODELEDGER_GH_APP_*` names are still accepted so existing
  * deployments keep working; see env() below.
  */
 

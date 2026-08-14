@@ -407,6 +407,18 @@ describe("badgeMarkdown", () => {
     const md = badgeMarkdown(SNAP, { pagesUrl: `https://x/"onerror="alert(1)` });
     assert.ok(!md.includes(`"onerror="alert(1)"`));
   });
+
+  test("without a Pages site the badges are addressed relative to the repo", () => {
+    // A private repository has no Pages site, and the settings panel promises
+    // the self-hosted SVGs work there. They only do if the README does not
+    // point at a `{owner}.github.io` address that answers 404.
+    for (const opts of [{}, { pagesUrl: "" }, { pagesUrl: null }]) {
+      const md = badgeMarkdown(SNAP, opts);
+      assert.ok(!md.includes("github.io"), `leaked a Pages URL: ${md}`);
+      assert.match(md, /!\[Streak\]\(\.\/badges\/streak\.svg\?v=/);
+      assert.match(md, /<img src="\.\/badges\/card\.svg\?v=/);
+    }
+  });
 });
 
 describe("upsertReadmeBlock", () => {
