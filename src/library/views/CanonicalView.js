@@ -30,17 +30,23 @@ const VOTES_REQUIRED = CONSTANTS.CANONICAL_VOTES_REQUIRED ?? 5;
 const GH_API = "https://api.github.com";
 const ISSUE_LABEL = "canonical-mapping";
 
-const PLATFORMS = ["leetcode", "geeksforgeeks", "codeforces"];
-const PLATFORM_LABEL = {
-  leetcode: "LeetCode",
-  geeksforgeeks: "GeeksForGeeks",
-  codeforces: "Codeforces",
-};
-const PLATFORM_FAVICON = {
-  leetcode: "https://assets.leetcode.com/static_assets/public/icons/favicon.ico",
-  geeksforgeeks: `${CONSTANTS.PLATFORMS.geeksforgeeks.baseUrl}/favicon.ico`,
-  codeforces: `${CONSTANTS.PLATFORMS.codeforces.baseUrl}/favicon.ico`,
-};
+// Derived, not listed. A hand-written list here is how NeetCode and
+// takeuforward shipped without ever becoming linkable: cross-platform identity
+// is the entire point of this screen, and a platform missing from the dropdown
+// cannot be mapped to anything.
+const PLATFORMS = Object.keys(CONSTANTS.PLATFORMS);
+const PLATFORM_LABEL = Object.fromEntries(
+  PLATFORMS.map((id) => [id, CONSTANTS.PLATFORMS[id].name || id]),
+);
+const PLATFORM_FAVICON = Object.fromEntries(
+  PLATFORMS.map((id) => [
+    id,
+    // LeetCode serves nothing at /favicon.ico; the rest do.
+    id === "leetcode"
+      ? "https://assets.leetcode.com/static_assets/public/icons/favicon.ico"
+      : `${CONSTANTS.PLATFORMS[id].baseUrl}/favicon.ico`,
+  ]),
+);
 
 const TOPICS = [
   "arrays",
@@ -459,8 +465,8 @@ ${aliasLines}
       <div class="flex flex-col gap-1">
         <h2 class="text-lg font-semibold text-white">Cross-Platform Problem Linking</h2>
         <p class="text-sm text-slate-400">
-          Link equivalent problems across LeetCode, GeeksForGeeks, and Codeforces. Mappings with
-          ${VOTES_REQUIRED}+ 👍 are merged into the canonical map.
+          Link equivalent problems across every supported platform. Mappings with ${VOTES_REQUIRED}+
+          👍 are merged into the canonical map.
         </p>
         ${!githubToken
           ? html`

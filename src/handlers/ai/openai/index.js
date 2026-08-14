@@ -102,9 +102,10 @@ export class OpenAIHandler extends BaseAIHandler {
 
         this._updateRateLimits(res.headers);
 
-        if (!res.ok) throw Object.assign(new Error(`OpenAI API error: ${res.status}`), {
-          status: res.status,
-        });
+        if (!res.ok)
+          throw Object.assign(new Error(`OpenAI API error: ${res.status}`), {
+            status: res.status,
+          });
 
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content || "";

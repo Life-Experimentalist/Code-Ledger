@@ -1,7 +1,7 @@
 {
   "name": "CodeLedger",
   "short_name": "CodeLedger",
-  "description": "Auto-commit every solved LeetCode, GeeksForGeeks, and Codeforces problem to your own GitHub repository.",
+  "description": "Auto-commit every solved LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward problem to your own GitHub repository.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

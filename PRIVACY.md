@@ -21,7 +21,7 @@ Because Code Ledger runs entirely within your browser context, the following cat
    - Optional AI Provider API Keys (e.g., Google Gemini, OpenAI, Anthropic Claude, DeepSeek, OpenRouter) if you choose to enable automated AI reviews.
 
 2. **Problem and Solution Data**:
-   - Problem details: Title, slug, platform (LeetCode, GeeksForGeeks, Codeforces), difficulty level, and tags.
+   - Problem details: Title, slug, platform (LeetCode, GeeksForGeeks, Codeforces, NeetCode, takeuforward), difficulty level, and tags.
    - Code submissions: The source code of your solved problems.
    - Execution metrics: Time/memory usage and runtime percentiles.
    - User notes: Any manual study notes or descriptions you add.
@@ -53,7 +53,7 @@ Your GitHub token, your AI API keys and your streak state are deliberately exclu
 All data is collected directly from your active inputs and browser interactions:
 
 - **Direct Input**: API keys, repository settings, and personal notes are provided directly by you in the Settings panel.
-- **Browser Automation**: When you submit a correct solution on LeetCode, GeeksForGeeks, or Codeforces, the content script reads the active page elements (problem statement, difficulty, and your submitted code) to automatically save them to your local database.
+- **Browser Automation**: When you submit a correct solution on LeetCode, GeeksForGeeks, Codeforces, NeetCode or takeuforward, the content script reads the active page elements (problem statement, difficulty, and your submitted code) to automatically save them to your local database.
 - **OAuth Authentication**: During GitHub authentication, you are redirected to our temporary authentication relay (a secure Cloudflare Worker) to exchange an authorization code for an access token. This token is instantly sent back to your browser and is never stored, logged, or saved on our worker.
 
 ---

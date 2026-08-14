@@ -511,7 +511,9 @@ function RoadmapSection({ problems, onNavigate }) {
 
         <div class="flex items-center gap-3 pt-1">
           <div class="h-px flex-1 bg-white/8"></div>
-          <span class="text-[10px] uppercase tracking-widest text-slate-600">or build your own</span>
+          <span class="text-[10px] uppercase tracking-widest text-slate-600"
+            >or build your own</span
+          >
           <div class="h-px flex-1 bg-white/8"></div>
         </div>
 

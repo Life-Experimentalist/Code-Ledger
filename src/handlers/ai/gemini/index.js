@@ -103,9 +103,10 @@ export class GeminiHandler extends BaseAIHandler {
 
         this._updateRateLimits(res.headers);
 
-        if (!res.ok) throw Object.assign(new Error(`Gemini API error: ${res.status}`), {
-          status: res.status,
-        });
+        if (!res.ok)
+          throw Object.assign(new Error(`Gemini API error: ${res.status}`), {
+            status: res.status,
+          });
 
         const data = await res.json();
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";

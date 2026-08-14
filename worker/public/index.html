@@ -15,16 +15,20 @@
     -->
 
     <!-- Primary SEO -->
-    <title>
-      CodeLedger — Auto-commit every solved LeetCode, GFG & Codeforces problem to GitHub
-    </title>
+    <!--
+      Kept under ~65 characters so search engines show it whole, which is why it
+      names no platform: five will not fit, and naming three of the five reads as
+      an exhaustive list that is wrong. The platforms are in the description and
+      keywords meta below, where there is room for all of them.
+    -->
+    <title>CodeLedger — Auto-commit every solved DSA problem to GitHub</title>
     <meta
       name="description"
-      content="Free open-source browser extension for Chrome, Edge, Brave and Firefox that automatically commits every solved LeetCode, GeeksForGeeks and Codeforces problem to your own GitHub repository — with AI code review, analytics, and a knowledge graph. Bring your own keys. Your code never touches our servers."
+      content="Free open-source browser extension for Chrome, Edge, Brave and Firefox that automatically commits every solved LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward problem to your own GitHub repository — with AI code review, analytics, streaks, and a knowledge graph. Bring your own keys. Your code never touches our servers."
     />
     <meta
       name="keywords"
-      content="leetcode github commit, dsa problem tracker, competitive programming github, leetcode auto commit, codeforces tracker, geeksforgeeks github, dsa portfolio, browser extension, ai code review, leetcode solutions github, leetcode sync github, dsa tracker extension"
+      content="leetcode github commit, dsa problem tracker, competitive programming github, leetcode auto commit, codeforces tracker, geeksforgeeks github, neetcode tracker, striver a2z sheet tracker, takeuforward tracker, dsa portfolio, browser extension, ai code review, leetcode solutions github, leetcode sync github, dsa tracker extension, dsa streak badge"
     />
     <meta name="author" content="VKrishna04" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -37,7 +41,7 @@
     <meta property="og:title" content="CodeLedger — Your DSA journey, committed." />
     <meta
       property="og:description"
-      content="Auto-commit every solved DSA problem to your own GitHub repo. AI code review, analytics, knowledge graph. Works on LeetCode, GeeksForGeeks & Codeforces."
+      content="Auto-commit every solved DSA problem to your own GitHub repo. AI code review, analytics, knowledge graph. Works on LeetCode, GeeksForGeeks, Codeforces, NeetCode & takeuforward."
     />
     <meta property="og:image" content="https://codeledger.vkrishna04.me/assets/og-image.png" />
     <meta property="og:image:width" content="1774" />
@@ -54,7 +58,7 @@
     <meta name="twitter:title" content="CodeLedger — Auto-commit DSA problems to GitHub" />
     <meta
       name="twitter:description"
-      content="Every accepted LeetCode / GeeksForGeeks / Codeforces submission, automatically committed to your own repo. With AI review and analytics."
+      content="Every accepted LeetCode / GeeksForGeeks / Codeforces / NeetCode / takeuforward submission, automatically committed to your own repo. With AI review and analytics."
     />
     <meta name="twitter:image" content="https://codeledger.vkrishna04.me/assets/og-image.png" />
 
@@ -64,8 +68,8 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "CodeLedger",
-        "softwareVersion": "1.0.0",
-        "description": "Browser extension that automatically commits every solved DSA problem to your own GitHub repository, with AI code review, analytics, and a knowledge graph.",
+        "softwareVersion": "1.7.0",
+        "description": "Browser extension that automatically commits every solved DSA problem to your own GitHub repository, with AI code review, analytics, streaks, and a knowledge graph.",
         "url": "https://codeledger.vkrishna04.me",
         "image": "https://codeledger.vkrishna04.me/assets/og-image.png",
         "applicationCategory": "DeveloperApplication",
@@ -83,10 +87,16 @@
           "AI code review with six providers",
           "Analytics dashboard",
           "Knowledge graph of solved problems",
-          "Cross-device sync through your own repository"
+          "Cross-device sync through your own repository",
+          "Solve streaks with self-hosted SVG badges",
+          "Compare progress with friends by linking their public repository"
         ],
         "keywords": [
           "LeetCode",
+          "GeeksForGeeks",
+          "Codeforces",
+          "NeetCode",
+          "takeuforward",
           "GitHub",
           "DSA",
           "browser extension",
@@ -130,7 +140,7 @@
             "name": "Which coding platforms are supported?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "LeetCode, GeeksForGeeks and Codeforces. Each platform is a self-contained handler directory, so adding another one does not require changes to the core."
+              "text": "LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward. Each platform is a self-contained handler directory, so adding another one does not require changes to the core."
             }
           },
           {
@@ -384,10 +394,11 @@
           <div id="ext-detected-badge" hidden>Extension installed and ready</div>
         </div>
 
-        <div class="hero-badge">✦ Open source · Apache 2.0 · v1.0.0</div>
+        <div class="hero-badge">✦ Open source · Apache 2.0 · v1.7.0</div>
         <h1>Your DSA journey,<br /><span>committed.</span></h1>
         <p class="tagline">
-          Every accepted LeetCode, GeeksForGeeks, and Codeforces solution is pushed to
+          Every accepted LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward solution is
+          pushed to
           <strong>your own GitHub repository</strong> — with an optional AI review, analytics, and a
           knowledge graph. Your data, your keys, your repo.
         </p>
@@ -495,9 +506,9 @@
             <div class="step-num">3</div>
             <h3>Solve as usual</h3>
             <p>
-              Get an accepted verdict on LeetCode, GeeksForGeeks, or Codeforces. CodeLedger notices,
-              collects the metadata and problem statement, runs the review if it is configured, and
-              pushes everything in one commit.
+              Get an accepted verdict on any supported platform. CodeLedger notices, collects the
+              metadata and problem statement, runs the review if it is configured, and pushes
+              everything in one commit.
             </p>
           </div>
         </div>
@@ -859,7 +870,7 @@ README.md</code></pre>
             <tbody>
               <tr>
                 <th scope="row">Coding platforms</th>
-                <td>LeetCode, GeeksForGeeks, Codeforces</td>
+                <td>LeetCode, GeeksForGeeks, Codeforces, NeetCode, takeuforward</td>
                 <td>Each one is an independent handler directory.</td>
               </tr>
               <tr>
