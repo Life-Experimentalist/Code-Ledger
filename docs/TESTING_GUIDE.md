@@ -43,7 +43,7 @@ Quick-reference for manually verifying the extension on each supported platform.
 
 ---
 
-## GeeksForGeeks (Alpha)
+## GeeksForGeeks (Stable)
 
 **Test page:** https://www.geeksforgeeks.org/problems/two-sum--150510/
 
@@ -57,7 +57,7 @@ Quick-reference for manually verifying the extension on each supported platform.
 | AI panel reads test failures | Submit wrong answer → open AI panel, ask about the error — it should include the failure output |
 | Submission captured          | Submit a correct solution → check GitHub repo                                                   |
 
-**Known alpha limitations:**
+**Known limitations:**
 
 - Profile import is manual (click "Open Profile →" in Settings → Platforms).
 - Some GFG problem page layouts may not inject QoL buttons; refresh the page if missing.
@@ -66,30 +66,56 @@ Quick-reference for manually verifying the extension on each supported platform.
 
 ---
 
-## Codeforces (Alpha)
+## Codeforces (Beta)
 
 **Test page:** https://codeforces.com/problemset/problem/1/A
 
-| What to check                  | How                                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------------------- |
-| Extension loads                | Console shows `✓ CodeforcesHandler initialized`                                             |
-| Copy button appears            | `📋 Copy Code` appears above the CF `<textarea>` editor                                     |
-| AI panel button appears        | `✦ AI Review` appears above the editor                                                      |
-| AI panel reads code            | Open AI panel → type anything → code should be included in context                          |
-| Code captured at submit        | Click Submit on CF → check sessionStorage in DevTools: keys `cl_cf_pending_*` should be set |
-| Submission captured (accepted) | Get an Accepted verdict → extension commits to GitHub with difficulty tag                   |
+| What to check                  | How                                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extension loads                | Console shows `✓ CodeforcesHandler initialized`                                                                                                                     |
+| Copy button appears            | `📋 Copy Code` appears above the CF `<textarea>` editor                                                                                                             |
+| AI panel button appears        | `✦ AI Review` appears above the editor                                                                                                                              |
+| AI panel reads code            | Open AI panel → type anything → code should be included in context                                                                                                  |
+| Code captured at submit        | Click Submit on CF → check sessionStorage in DevTools: keys `cl_cf_pending_*` should be set                                                                         |
+| **Metadata captured too**      | `cl_cf_pending_meta` should hold the title, rating, tags and statement. This is the fix for the empty-README bug — see below                                        |
+| Submission captured (accepted) | Get an Accepted verdict → extension commits to GitHub with difficulty tag                                                                                           |
+| **README is not empty**        | The committed README must carry the real title, `**Tags:**`, a `## Problem` section and a rating — not `# 1234A` with `Difficulty: ?`                               |
+| **Source link resolves**       | Click the `**Source:**` link in the committed README. It must be a `/problemset/problem/…` (or `/gym/…`) URL that loads, never `/contest/…/problem/…`               |
+| **An old solve is not stolen** | In a contest where you have already solved A, submit C. While C is still "In queue", nothing should commit; only when C's own row turns Accepted does the commit go |
+
+**Why the metadata check matters:** submitting on Codeforces posts a form and
+lands you on `/contest/{id}/my`, where the problem statement is not on the page
+at all. Everything descriptive — title, tags, rating, statement — is captured at
+submit time and carried across in `cl_cf_pending_meta`. If that key is missing,
+the solve still commits, but it commits as a file named after its own slug with
+a README that says `Difficulty: ?`.
+
+**Why the "old solve" check matters:** `/contest/{id}/my` lists _every_
+submission in the contest, so it is full of accepted rows for problems solved
+earlier. Committing on the first one meant filing the wrong problem, and doing
+it before the judge had answered — a run that ended in Wrong Answer was recorded
+as a solve. An accepted row now has to link to the problem whose code was
+captured before it counts.
 
 **Verify sessionStorage after submit:**
-Open DevTools → Application → Session Storage → `codeforces.com` → look for `cl_cf_pending_code`.
+Open DevTools → Application → Session Storage → `codeforces.com` → look for
+`cl_cf_pending_code` and `cl_cf_pending_meta`. A capture older than 30 minutes is
+discarded on read rather than attaching itself to a later verdict.
 
 **Simple problems for testing:**
 
 - A-level (Easy): https://codeforces.com/problemset/problem/1/A (Theatre Square)
 - Practice without contest: https://codeforces.com/problemset
 
-**Known alpha limitations:**
+**Known beta limitations:**
 
-- CF uses full page reloads; code is preserved across the problem → /my navigation via sessionStorage.
+- The flow above is covered by unit tests but has **not been confirmed against a
+  live contest judge**. That, not a known defect, is what keeps it out of stable.
+- Runtime and memory are read from the accepted row by class name
+  (`.time-consumed-cell`, `.memory-consumed-cell`). If Codeforces renames those,
+  the two stats go missing from the README rather than being reported wrongly —
+  the previous column-index read reported the language and the verdict as the
+  runtime and the memory on `/my`.
 - Gym problems supported (`/gym/{id}/problem/{letter}`) but less tested.
 - A live solve reads its metadata (rating, tags) from the DOM rather than the API, because the page
   already has it. The profile import does use the API (`user.status`, one request per two seconds).
@@ -108,14 +134,14 @@ NeetCode runs its own judge, so nothing here is scraped to decide whether a subm
 passed. `content/net-tap.js` sees the `POST /api/executeCodeFunctionHttp` the page makes,
 and the verdict, source, language and timings all come out of that one exchange.
 
-| What to check           | How                                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Extension loads         | Console shows `✓ NeetCodeHandler initialized`                                                                |
-| Net tap is live         | Console shows the tap subscribing before you submit — it must be installed at document_start, not on demand  |
-| Wrong answer is ignored | Submit a failing solution → no commit, no `problem:solved`                                                   |
-| Submission captured     | Submit a correct solution → check your GitHub repo                                                           |
-| Canonical folding       | Solve a problem you have also solved on LeetCode → both land in one `problems/{canonicalId}/` folder         |
-| AI panel reads code     | Open the floating panel, ask for a review — your editor code should appear                                   |
+| What to check           | How                                                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Extension loads         | Console shows `✓ NeetCodeHandler initialized`                                                               |
+| Net tap is live         | Console shows the tap subscribing before you submit — it must be installed at document_start, not on demand |
+| Wrong answer is ignored | Submit a failing solution → no commit, no `problem:solved`                                                  |
+| Submission captured     | Submit a correct solution → check your GitHub repo                                                          |
+| Canonical folding       | Solve a problem you have also solved on LeetCode → both land in one `problems/{canonicalId}/` folder        |
+| AI panel reads code     | Open the floating panel, ask for a review — your editor code should appear                                  |
 
 NeetCode slugs are its own (`duplicate-integer`, not `contains-duplicate`), so the
 canonical lookup runs on the LeetCode slug derived from the title **as well as** the
@@ -131,13 +157,13 @@ https://takeuforward.org/dsa/strivers-a2z-sheet-learn-dsa-a-to-z (free sheet)
 
 The site is two products and the handler serves both differently:
 
-| What to check                | How                                                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Extension loads              | Console shows `✓ TakeUForwardHandler initialized`                                                     |
-| Sheet rows get marked        | Open the A2Z sheet → problems already in your ledger show a marker. Nothing is ever committed here.   |
-| Sheet commits nothing        | Click through a sheet row → it links out to LeetCode; no commit should originate from a sheet page    |
-| TUF+ metadata is real        | On a TUF+ problem, difficulty and tags must be actual values, not the string `Subscribe to TUF+`      |
-| TUF+ submission captured     | Submit an accepted solution in the TUF+ editor → check your GitHub repo                               |
+| What to check            | How                                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| Extension loads          | Console shows `✓ TakeUForwardHandler initialized`                                                   |
+| Sheet rows get marked    | Open the A2Z sheet → problems already in your ledger show a marker. Nothing is ever committed here. |
+| Sheet commits nothing    | Click through a sheet row → it links out to LeetCode; no commit should originate from a sheet page  |
+| TUF+ metadata is real    | On a TUF+ problem, difficulty and tags must be actual values, not the string `Subscribe to TUF+`    |
+| TUF+ submission captured | Submit an accepted solution in the TUF+ editor → check your GitHub repo                             |
 
 **Known beta limitation — this one needs a real subscription to close:** the TUF+ judge's
 verdict payload has never been observed, because it is behind the subscription.
@@ -150,11 +176,11 @@ one accepted submission with the network tab open is all it takes to confirm the
 
 ## Settings Panel
 
-| What to check           | How                                                                                       |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| Status badges are right  | Open popup → Settings → Platforms. The badge on each card is driven by `status` in `CONSTANTS.PLATFORMS`: LeetCode and GeeksForGeeks carry none (stable), NeetCode and takeuforward show "Beta", Codeforces shows "Alpha". A card whose badge disagrees with `constants.js` is the bug. |
-| Disabling a platform    | Toggle off → reload problem page → extension should not activate for that platform        |
-| Difficulty aliases      | Set "Easy" → "Beginner" for LeetCode → solve an Easy → check commit for "Beginner" folder |
+| What to check           | How                                                                                                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status badges are right | Open popup → Settings → Platforms. The badge on each card is a projection of `status` in `CONSTANTS.PLATFORMS` — read it there rather than from this table. A card whose badge disagrees with `constants.js` is the bug. |
+| Disabling a platform    | Toggle off → reload problem page → extension should not activate for that platform                                                                                                                                       |
+| Difficulty aliases      | Set "Easy" → "Beginner" for LeetCode → solve an Easy → check commit for "Beginner" folder                                                                                                                                |
 
 ---
 
@@ -181,4 +207,4 @@ If AI responses don't include your code, check: Settings → AI → confirm an A
 
 **Commit not appearing in GitHub:** Check the popup → it shows the last commit status. Common causes: token expired (re-auth in Settings → GitHub), repo not set, or network error.
 
-**Verdict not detected on CF:** CF sometimes shows "Accepted" only in the full `/contest/{id}/my` table. Navigate there manually — the observer will catch the DOM change.
+**Verdict not detected on CF:** CF sometimes shows "Accepted" only in the full `/contest/{id}/my` table. Navigate there manually — the observer will catch the DOM change, and the accepted row is matched back to the problem whose code was captured, so an unrelated solve further down the table will not be committed in its place. If nothing commits, check that `cl_cf_pending_slug` matches the problem you submitted and that `cl_cf_pending_ts` is under 30 minutes old.

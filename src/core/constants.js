@@ -225,7 +225,12 @@ export const CONSTANTS = Object.freeze({
       problemsetUrl: "https://codeforces.com/problemset/",
       apiBase: "https://codeforces.com/api",
       contestsBase: "https://codeforces.com/contest/",
-      status: FEATURE_STATUS.ALPHA,
+      // Beta, not stable: the three things that made it alpha are fixed — the
+      // metadata now travels from the problem page to /my with the code, an
+      // accepted row has to name the problem being waited on before it counts,
+      // and the README links to the permanent problemset or gym address — but
+      // none of it has been confirmed against a live contest judge.
+      status: FEATURE_STATUS.BETA,
     },
     neetcode: {
       id: "neetcode",

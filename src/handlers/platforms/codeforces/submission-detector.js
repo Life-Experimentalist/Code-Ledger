@@ -16,9 +16,17 @@
  *   CF does full page reloads between problem and /my pages. sessionStorage
  *   persists across same-origin navigations in the same tab, so code captured
  *   on the problem page survives to the /my page content-script instance.
+ *
+ * Why the metadata travels with it:
+ *   The verdict is read on /my, where the problem statement is not on the page:
+ *   no title, no tags, no rating, no text. Extracting metadata at that point
+ *   yields a solve named after its own slug with an empty README. The title,
+ *   tags and statement are all on screen at submit time, so they are captured
+ *   alongside the code and carried across the navigation.
  */
 
 import { createDebugger } from "../../../lib/debug.js";
+import { cfSlugFromHref, isPendingFresh } from "./verdict-match.js";
 
 const dbg = createDebugger("CFSubmissionDetector");
 
@@ -29,7 +37,18 @@ const KEYS = {
   TS: "cl_cf_pending_ts",
   CONTEST_ID: "cl_cf_pending_contestid",
   LETTER: "cl_cf_pending_letter",
+  META: "cl_cf_pending_meta",
 };
+
+/**
+ * Ceiling on the captured statement, in characters.
+ *
+ * sessionStorage is a few megabytes per origin and a Codeforces statement is
+ * rarely past 30 KB, but an interactive problem with a long sample section can
+ * run much larger, and a quota error at submit time would lose the code as well
+ * as the metadata. The README truncates to 5000 characters anyway.
+ */
+const MAX_STATEMENT_CHARS = 60000;
 
 const SUBMIT_SELECTORS = [
   "#singlePageSubmitButton",
@@ -40,9 +59,14 @@ const SUBMIT_SELECTORS = [
 
 /**
  * Hook the submit button so we capture code + language at click time.
- * Returns a cleanup function that removes the listener / observer.
+ *
+ * @param {object} page the detected page, from `detectPage()`
+ * @param {() => object} [readMeta] returns the problem metadata visible on the
+ *   page. Called at submit time, because /my cannot answer for it. Kept as a
+ *   callback so the DOM extraction stays in the handler.
+ * @returns {() => void} cleanup that removes the listener / observer
  */
-export function hookSubmitButton(page) {
+export function hookSubmitButton(page, readMeta) {
   if (page.type !== "problem") return () => {};
 
   const savePending = () => {
@@ -62,6 +86,24 @@ export function hookSubmitButton(page) {
     sessionStorage.setItem(KEYS.TS, String(Date.now()));
     sessionStorage.setItem(KEYS.CONTEST_ID, page.contestId || "");
     sessionStorage.setItem(KEYS.LETTER, page.letter || "");
+
+    // The statement is only readable here. Losing it costs metadata, not the
+    // solve, so a failure to capture it must not stop the code being saved.
+    try {
+      const meta = readMeta?.();
+      if (meta) {
+        const trimmed = {
+          ...meta,
+          description:
+            typeof meta.description === "string"
+              ? meta.description.slice(0, MAX_STATEMENT_CHARS)
+              : null,
+        };
+        sessionStorage.setItem(KEYS.META, JSON.stringify(trimmed));
+      }
+    } catch (err) {
+      dbg.warn("Could not capture problem metadata at submit", err);
+    }
   };
 
   const tryHook = () => {
@@ -93,9 +135,46 @@ export function hookSubmitButton(page) {
 }
 
 /**
+ * Read the problem a submission row is about.
+ *
+ * Every row on a Codeforces status table links to its problem; the inline box
+ * on a problem page does not, because there is only one problem it could mean.
+ *
+ * @returns {string} the slug, or "" when the row does not say
+ */
+function readRowSlug(row) {
+  for (const a of row?.querySelectorAll?.("a[href]") || []) {
+    const slug = cfSlugFromHref(a.getAttribute("href"));
+    if (slug) return slug;
+  }
+  return "";
+}
+
+/**
+ * Read runtime and memory off a submission row.
+ *
+ * By class, never by column index: the columns differ between the problem
+ * page's inline box and /contest/{id}/my, and the fixed indices this used to
+ * read reported the language and the verdict as the runtime and the memory on
+ * the second of those. A missing cell is reported as nothing, because a wrong
+ * number is worse than an absent one.
+ */
+function readRowStats(row) {
+  const cell = (sel) => (row?.querySelector?.(sel)?.textContent || "").trim() || null;
+  return {
+    runtime: cell(".time-consumed-cell"),
+    memory: cell(".memory-consumed-cell"),
+  };
+}
+
+/**
  * Watch for span[submissionverdict="OK"] appearing anywhere in the DOM.
- * Calls onAccepted(submissionId, contestId) for each new accepted verdict found.
- * Returns the MutationObserver (call .disconnect() to stop).
+ *
+ * Calls `onAccepted({ submissionId, contestId, rowSlug, stats })` once per
+ * accepted row. Deciding whether a row is *ours* is the caller's job — see
+ * `matchAcceptedRow` — because it needs the pending capture to decide.
+ *
+ * @returns {MutationObserver} call .disconnect() to stop
  */
 export function watchForVerdict(onAccepted) {
   const processedIds = new Set();
@@ -109,10 +188,11 @@ export function watchForVerdict(onAccepted) {
 
       const contestIdMatch = window.location.pathname.match(/\/contest\/(\d+)\//);
       const contestId = contestIdMatch?.[1] || null;
+      const rowSlug = readRowSlug(row);
 
-      dbg.log("Accepted verdict detected", { submissionId, contestId });
+      dbg.log("Accepted verdict detected", { submissionId, contestId, rowSlug });
       processedIds.add(submissionId);
-      onAccepted(submissionId, contestId);
+      onAccepted({ submissionId, contestId, rowSlug, stats: readRowStats(row) });
     }
   };
 
@@ -124,6 +204,15 @@ export function watchForVerdict(onAccepted) {
   return obs;
 }
 
+/**
+ * The submission captured at the last submit click, if it is still current.
+ *
+ * A capture older than the TTL is dropped rather than returned: sessionStorage
+ * outlives the solve by the whole tab session, and an expired capture would
+ * attach this morning's code to this afternoon's accepted row.
+ *
+ * @returns {object|null}
+ */
 export function readPendingSubmission() {
   const slug = sessionStorage.getItem(KEYS.SLUG);
   const code = sessionStorage.getItem(KEYS.CODE);
@@ -132,7 +221,22 @@ export function readPendingSubmission() {
   const contestId = sessionStorage.getItem(KEYS.CONTEST_ID);
   const letter = sessionStorage.getItem(KEYS.LETTER);
   if (!slug && !code) return null;
-  return { slug, code, lang, ts: ts ? +ts : Date.now(), contestId, letter };
+
+  if (!isPendingFresh(ts ? +ts : null)) {
+    dbg.log("Discarding a stale pending submission", { slug, ts });
+    clearPendingSubmission();
+    return null;
+  }
+
+  let meta = null;
+  try {
+    const raw = sessionStorage.getItem(KEYS.META);
+    if (raw) meta = JSON.parse(raw);
+  } catch (_) {
+    // Unreadable metadata costs the title and the statement, not the solve.
+  }
+
+  return { slug, code, lang, ts: +ts, contestId, letter, meta };
 }
 
 export function clearPendingSubmission() {

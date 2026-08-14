@@ -46,8 +46,14 @@ export class BasePlatformHandler {
 
   /**
    * Check if this platform is enabled in settings.
-   * Supports both new (_enabled) and legacy (_enable) keys.
-   * By default, Codeforces (Alpha) is disabled, while others are enabled.
+   *
+   * Supports both new (_enabled) and legacy (_enable) keys, and every platform
+   * is on until the user turns it off. Codeforces used to be the exception,
+   * because it was alpha — but its own settings schema declares
+   * `cf_enable: { default: true }`, so the two screens contradicted each other:
+   * the platform card read "off" while the Codeforces settings section read
+   * "on", and a solve went missing either way round. It is beta now, on the
+   * same footing as NeetCode and takeuforward.
    */
   isEnabled(settings) {
     const enabledKey = `${this.id}_enabled`;
@@ -58,8 +64,7 @@ export class BasePlatformHandler {
           ? "cf_enable"
           : `${this.id}_enable`;
 
-    // Codeforces (Alpha) is disabled by default
-    const defaultValue = this.id !== "codeforces";
+    const defaultValue = true;
 
     if (settings?.[enabledKey] !== undefined) {
       return settings[enabledKey] === true;
