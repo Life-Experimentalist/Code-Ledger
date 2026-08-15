@@ -537,13 +537,18 @@ Version is canonical in **three places that must always match**:
 - `src/manifest-chromium.json` → `"version"`
 - `src/manifest-firefox.json` → `"version"`
 
+The landing page states it twice more — the hero badge and the `softwareVersion`
+in its structured data — and those are not gates, but they are public claims.
+
 **Source of truth for releases:** `package.json`. `node dev/sync-manifests.js` copies
-it into both manifests, and the CI release pipeline validates they match before tagging.
+it into both manifests and both landing-page strings, and the CI release pipeline
+validates the manifests match before tagging. The script exits non-zero if either
+landing-page pattern stops matching, so the site cannot quietly fall behind.
 
 ### Release checklist
 
 1. Add a `## [x.y.z] — YYYY-MM-DD` section to `docs/CHANGELOG.md` (Added / Fixed / Changed / Removed / Security).
-2. Bump `package.json`, then run `node dev/sync-manifests.js` to carry the version into both manifests.
+2. Bump `package.json`, then run `node dev/sync-manifests.js` to carry the version into both manifests and the landing page.
 3. Run `npm run release` (validates, builds, commits, tags, pushes all at once).
    - Or `npm run release -- --dry-run` to preview first.
 4. GitHub Actions (`.github/workflows/release.yml`) triggers automatically on tag push → creates GitHub Release with attached zips.
