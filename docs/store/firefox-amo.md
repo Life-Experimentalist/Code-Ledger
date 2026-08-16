@@ -6,7 +6,7 @@ Code Ledger
 
 ## Summary (250 chars max)
 
-> Auto-commit solved LeetCode, GeeksForGeeks and Codeforces problems to your own GitHub repo — with AI code review, streaks, a live analytics dashboard, bulk history import, and cross-device sync. Zero extra steps.
+> Auto-commit solved LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward problems to your own GitHub repo — with AI code review, streaks, analytics, bulk history import, and cross-device sync. Zero extra steps.
 
 ---
 
@@ -18,8 +18,9 @@ Solve a problem on LeetCode. The instant it's accepted, Code Ledger commits it t
 
 **FEATURES**
 
+• Five platforms — LeetCode and GeeksForGeeks are stable; Codeforces, NeetCode and takeuforward are marked beta in the extension. On takeuforward the free A2Z and SDE sheets are marked up with what you have solved, but committing a solve there needs a TUF+ subscription, because that is where its judge lives
 • Zero-click commits — every accepted submission committed automatically via GitHub Trees API
-• Bulk LeetCode import — bring your entire history from the Progress page in one click
+• Bulk history import — bring your existing LeetCode, GeeksForGeeks or Codeforces history across in one run
 • AI code review — 6 providers: Gemini (free), OpenAI, Claude, DeepSeek, Ollama, OpenRouter
 • Live GitHub Pages dashboard — heatmap, topic radar, difficulty chart, solve velocity
 • Knowledge graph — force-directed graph of all solves linked by topic
@@ -64,9 +65,9 @@ Thank you for reviewing CodeLedger.
 - **Strict Permission Scopes:**
   - `storage`: Persists settings, OAuth token, and IndexedDB solve cache locally.
   - `unlimitedStorage`: Local backup snapshots of the user's own solve history — up to sixteen, each holding the full source of every solution — outgrow the default `storage.local` cap past a few hundred solutions. Grants no access to any new data.
-  - `alarms`: Schedules the 30-minute repository sync check and the 10-minute batched maintenance commit. Two further alarms drain the AI-review and code-recovery queues and exist only while a queue has work. Streak badges are refreshed by a GitHub Action inside the user's own repository, not by the extension.
+  - `alarms`: Schedules the 30-minute repository sync check and the 10-minute batched maintenance commit. Three further alarms drain the AI-review, code-recovery and self-heal queues; each is created only while its queue has work and cleared when it empties. One hourly alarm redraws the streak count on the toolbar icon from data already in local storage — it makes no network request. The streak SVG badges themselves are written into the user's own repository as part of each commit; the optional GitHub Action the extension can install there only refreshes them on days with no solve.
   - `tabs`: Detects the OAuth callback URL and refreshes open library tabs after a commit. The extension does not request `scripting`; content scripts are declared statically in the manifest.
-  - Host permissions (`leetcode.com`, `geeksforgeeks.org`, `codeforces.com`): Observes DOM on coding platforms.
+  - Host permissions (`leetcode.com`, `geeksforgeeks.org`, `codeforces.com`, `neetcode.io`, `takeuforward.org`): Content scripts observe the DOM on these five coding platforms to detect an accepted submission and to inject the extension's own UI. NeetCode and takeuforward are single-page apps that render the verdict and discard it before a DOM watcher can read it, so on those two hosts — and only those two — a second content script wraps `fetch` and `XMLHttpRequest` and forwards a response body only when its URL matches a short fixed list: those sites' own judge endpoints, plus takeuforward's problem-metadata endpoint, whose API replaces `difficulty` and `topic_tags` with the literal string "Subscribe to TUF+" unless the page's own bearer token is attached. Every other request passes through untouched and is never read, request headers are never forwarded, and nothing is modified. The source is `src/content/net-tap.js`; the endpoint list is the `ENDPOINTS` array at the top of that file.
   - Host permission `api.github.com`: Commits files directly to the user's repo.
   - Host permission `codeledger.vkrishna04.me`: Starts the OAuth sign-in flow and serves the shared canonical problem-ID map.
   - Host permissions for AI providers (`api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `openrouter.ai`, `localhost:11434`): Contacted only for the provider the user configured a key for.
