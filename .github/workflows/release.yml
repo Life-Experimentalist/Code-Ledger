@@ -40,8 +40,20 @@ jobs:
       - name: Type check
         run: npm run lint
 
-      - name: Format check
-        run: npm run format:check
+      # Drift that a script can fix must not kill a release — ci.yml heals
+      # main the same way on push. Heal the checked-out tree in place and
+      # build the packages from it; the tag stays where it is, and the next
+      # push to main commits the identical fix there. A sync-manifests
+      # failure (landing-page pattern gone) is real breakage and still fails.
+      - name: Auto-heal formatting and generated files
+        run: |
+          node dev/sync-manifests.js
+          node dev/generate-manifest-domains.js
+          npm run format
+          if ! git diff --quiet; then
+            echo "::warning::release tree had fixable drift (healed in place):"
+            git --no-pager diff --stat
+          fi
 
       - name: Unit and worker tests
         run: npm test
