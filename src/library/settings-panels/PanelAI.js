@@ -7,10 +7,6 @@ import { h, useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("PanelAI");
-
 import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { ModelSelector } from "../../ui/components/ModelSelector.js";

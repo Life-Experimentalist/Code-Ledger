@@ -4,9 +4,6 @@
  */
 
 import { getUsedCommands } from "./chat-variables.js";
-import { createDebugger } from "./debug.js";
-
-const dbg = createDebugger("AIChatContext");
 
 const REQUEST_COMMANDS = new Set([
   "explain",

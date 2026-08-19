@@ -8,10 +8,6 @@ import { useState, useMemo, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("ProblemsView");
-
 import { ProblemCard } from "../../ui/components/ProblemCard.js";
 import { ProblemModal } from "../components/ProblemModal.js";
 import { QueueModal } from "../../ui/components/QueueModal.js";

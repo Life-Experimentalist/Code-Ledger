@@ -221,7 +221,6 @@ export function MissingMetadataModal({ problems = [], onClose = () => {} }) {
             </div>
             <div class="space-y-2 max-h-32 overflow-auto">
               ${ignored.map((p) => {
-                const reasons = getMissingReasons(p);
                 return html`
                   <div
                     class="p-2 bg-white/1 rounded border border-white/3 flex items-center gap-2 opacity-60"

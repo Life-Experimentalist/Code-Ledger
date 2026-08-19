@@ -24,7 +24,6 @@
  * - `AI_FALLBACK_CHAIN`: ordered provider ids to try when the primary is unavailable.
  */
 
-import { createDebugger } from "../lib/debug.js";
 import { cfProblemUrl } from "./cf-utils.js";
 
 export const FEATURE_STATUS = Object.freeze({

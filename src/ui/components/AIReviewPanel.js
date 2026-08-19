@@ -8,10 +8,6 @@ import { htm } from "../../vendor/preact-bundle.js";
 import { AIMarkdownRenderer } from "./AIMarkdownRenderer.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("AIReviewPanel");
-
 function formatDuration(ms) {
   if (ms == null) return null;
   const safeMs = Math.max(0, ms);

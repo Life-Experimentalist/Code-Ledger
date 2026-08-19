@@ -13,9 +13,8 @@ import { createDebugger } from "../../../lib/debug.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
 import { isAIActive } from "../../../core/feature-flags.js";
-import { runtime, tabs } from "../../../lib/browser-compat.js";
-import { CONSTANTS } from "../../../core/constants.js";
-import { resolveLang, langExt, LANG_VERBOSE } from "./lang-utils.js";
+import { runtime } from "../../../lib/browser-compat.js";
+import { resolveLang, LANG_VERBOSE } from "./lang-utils.js";
 import { injectProgressImportBtn, removeProgressImportButton } from "./profile-import.js";
 import {
   checkSubmission,

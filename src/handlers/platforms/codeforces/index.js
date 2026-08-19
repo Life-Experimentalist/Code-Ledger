@@ -39,7 +39,7 @@ import {
   readCurrentTestOutput,
 } from "./submission-detector.js";
 import { matchAcceptedRow, mergeCapturedMetadata } from "./verdict-match.js";
-import { injectCFQoL, removeCFQoL } from "./qol.js";
+import { injectCFQoL } from "./qol.js";
 import { injectProfileImportBtn } from "./profile-import.js";
 import { createFloatingAI } from "../../../ui/floating-ai.js";
 import { isAIActive } from "../../../core/feature-flags.js";

@@ -11,10 +11,6 @@ import { useState, useEffect, useCallback } from "../../vendor/preact-bundle.js"
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("QueueModal");
-
 const TABS = [
   { id: "all", label: "All" },
   { id: "pending", label: "Pending" },

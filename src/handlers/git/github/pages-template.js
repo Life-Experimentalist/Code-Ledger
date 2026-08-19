@@ -41,7 +41,6 @@ function assetPath(value) {
  * The page fetches ./index.json at runtime and renders a full dashboard.
  */
 export function getPagesHtml(opts = {}) {
-  const theme = opts.theme || {};
   const settings = opts.settings || {};
   const commitSummary = opts.commitSummary || null;
   const reportImages = Array.isArray(opts.reportImages) ? opts.reportImages : [];

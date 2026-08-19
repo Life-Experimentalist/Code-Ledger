@@ -7,10 +7,6 @@ import { h, useState, useEffect, useCallback } from "../../vendor/preact-bundle.
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("PanelGeneral");
-
 import { Storage } from "../../core/storage.js";
 import {
   DEFAULT_THEME,

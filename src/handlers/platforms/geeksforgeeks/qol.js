@@ -7,9 +7,6 @@
  */
 
 import { extractEditorCode } from "./ace-extractor.js";
-import { createDebugger } from "../../../lib/debug.js";
-
-const dbg = createDebugger("GFGQOL");
 
 let _injected = false;
 let _retryTimer = null;

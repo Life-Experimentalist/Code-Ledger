@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createDebugger } from "../../../lib/debug.js";
-const dbg = createDebugger("LeetCodePageDetector");
-
 export const PAGE_TYPES = {
   PROBLEM: "problem",
   SUBMISSION: "submission",

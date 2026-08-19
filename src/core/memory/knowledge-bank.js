@@ -31,27 +31,6 @@ function _openDB() {
   });
 }
 
-async function _tx(mode, fn) {
-  const db = await _openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction([STORE], mode);
-    const store = tx.objectStore(STORE);
-    const result = fn(store);
-    if (result && typeof result.then === "function") {
-      result.then(resolve).catch(reject);
-    } else {
-      tx.oncomplete = () => {
-        db.close();
-        resolve(result);
-      };
-      tx.onerror = () => {
-        db.close();
-        reject(tx.error);
-      };
-    }
-  });
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**

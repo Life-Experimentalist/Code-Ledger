@@ -19,7 +19,6 @@ import { initializeHandlers } from "/handlers/init.js";
 import { ProblemsView } from "./views/ProblemsView.js";
 import { AnalyticsView } from "./views/AnalyticsView.js";
 import { GraphView } from "./views/GraphView.js";
-import { SettingsView } from "./views/SettingsView.js";
 import { SettingsPageView } from "./views/SettingsPageView.js";
 import { CanonicalView } from "./views/CanonicalView.js";
 import { AIChatsView } from "./views/AIChatsView.js";

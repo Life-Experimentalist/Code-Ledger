@@ -10,10 +10,6 @@ import { mermaidUrls } from "../../vendor/mermaid-stub.js";
 import { renderMath, substituteLatex } from "../../vendor/katex-stub.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("AIMarkdownRenderer");
-
 function escapeHtml(text) {
   return String(text)
     .replace(/&/g, "&amp;")

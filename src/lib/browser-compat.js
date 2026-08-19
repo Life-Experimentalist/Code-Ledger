@@ -6,10 +6,6 @@
  * Everything else in the codebase imports from this file.
  */
 
-import { createDebugger } from "./debug.js";
-
-const dbg = createDebugger("BrowserCompat");
-
 // @ts-ignore
 export const ext =
   typeof browser !== "undefined" && browser.runtime

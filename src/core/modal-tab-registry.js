@@ -7,10 +7,6 @@
  * @ts-check
  */
 
-import { createDebugger } from "../lib/debug.js";
-
-const dbg = createDebugger("ModalTabRegistry");
-
 /**
  *
  * Usage (in a platform handler or handler init):

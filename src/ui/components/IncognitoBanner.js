@@ -7,12 +7,6 @@ import { h, useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("IncognitoBanner");
-
-import { Storage } from "../../core/storage.js";
-
 function formatRemaining(ms) {
   if (ms <= 0) return "expired";
   const h = Math.floor(ms / 3600000);
