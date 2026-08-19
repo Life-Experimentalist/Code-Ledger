@@ -116,6 +116,37 @@ Drop plain text at the bottom of this file (below the tables). Claude/GitHub Cop
 
 ---
 
+## Deferred audit findings 🔍
+
+From the 2026-08 full-source audit. Each was judged real but consciously deferred —
+the fix is either feature-sized, needs a product decision, or carries more regression
+risk than the bug it removes. IDs refer to the audit report.
+
+| ID       | Finding                                                                                            | Why deferred                                                                                                                                            |
+| -------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F10 / M2 | index.json is last-writer-wins across devices; the 422 retry rebuilds from a stale head            | Needs a union-merge of remote index entries by commit key before every index write — a cross-device merge design of its own, not a spot fix.             |
+| F13      | `init()` races `onInstalled`, and some listeners register after `await`s                           | Restructuring SW listener registration risks breaking event delivery in ways only on-device MV3 testing can catch; `initPromise` already dedupes most of it. |
+| F21      | `presence-marker.js` writes `auth.tokens` via two racing paths                                     | The window is one OAuth callback racing itself; collapsing to the SW-relay path needs live OAuth testing to verify no token is dropped.                   |
+| F23      | `manuallyEdited` overwrite guard only applies under `skipCommit`                                   | `saveProblem`'s merge semantics already preserve most manual edits; the residual case needs a field-level merge policy decision.                          |
+| F26      | Pervasive silent `catch {}` around commit-adjacent operations                                      | The worst consequence (invisible errors) was fixed at the root — `console.error` is never gated now. Auditing every catch individually is its own pass.   |
+| F27 / L7 | 271 direct `chrome.*` uses outside `browser-compat.js`                                             | Wholesale mechanical refactor with real regression surface and zero user-visible gain; do it file-by-file as files are touched.                            |
+| L3       | GFG detection includes a body-wide "problem solved successfully" text search                       | Weakest signal in the codebase but guarded by dedup keys; improving it needs live-DOM selector work on GFG.                                               |
+| L5       | TUF slug fallback can attribute a solve to the currently open page                                 | The TTL-guarded pairing already bounds this; fully closing it means carrying the slug through the judge poll.                                             |
+| L11      | pages-template interpolates owner/repo into a JS string raw                                        | Exploit requires GitHub's own owner/repo charset validation to break first.                                                                              |
+
+Resolved since the audit (2026-08): **F16** — the metadata-refresh tab queue now
+lives in `storage.session` and `resumeRefreshQueue()` picks it back up on every
+SW wake; **F17** — the docs now state the true invariant (index.json in every
+commit, order irrelevant to the Trees API); **F24** — the canonical-map TTL clock
+is persisted and the 304 path populates the in-memory map from cache; **F25** —
+`importChatsLocal` dedups by `_githubPath` inside its own transaction; **L1** — an
+unreadable language now commits as `unknown`/`.txt` instead of a guessed "C++";
+**L4** — event-driven handlers queue a second accepted event behind the in-flight
+one instead of dropping it; **L12** — the manifest domain list is derived from the
+`DOMAINS` exports in `dom-selectors.js`.
+
+---
+
 ## Won't Do / Deferred ❌
 
 | Feature                                      | Reason                                                                                        |

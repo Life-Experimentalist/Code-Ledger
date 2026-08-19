@@ -25,6 +25,7 @@ import {
   expandChatVariables,
 } from "../../lib/chat-variables.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
+import { buildGraphDigest } from "../../core/graph-insights.js";
 import {
   getAllChats,
   searchChats,
@@ -32,6 +33,12 @@ import {
   saveAIChat,
   updateAIChat,
 } from "../../core/ai-chat-storage.js";
+
+/**
+ * Chat records persist whatever URL the page handed them, so treat it as data:
+ * only http(s) may reach an href — javascript:/data: URLs are dropped.
+ */
+const httpUrl = (u) => (/^https?:\/\//i.test(String(u || "")) ? u : "");
 
 function formatTime(ts) {
   const date = new Date(ts);
@@ -282,6 +289,7 @@ export function AIChatsView({
         hints: primary?.hints || [],
         similar: primary?.similar || [],
         constraints: primary?.constraints || "",
+        graphDigest: rawText.includes("/graph") ? buildGraphDigest(problems, settings) : "",
       });
       const context = buildAIChatContext({
         surface: "library-chat",
@@ -388,6 +396,7 @@ export function AIChatsView({
       hints: primaryAttachment?.hints || [],
       similar: primaryAttachment?.similar || [],
       constraints: primaryAttachment?.constraints || "",
+      graphDigest: rawText.includes("/graph") ? buildGraphDigest(problems, settings) : "",
     });
 
     const userMessage = {
@@ -797,9 +806,9 @@ export function AIChatsView({
                       <h3 class="font-semibold text-slate-100">
                         ${selectedChat.problemTitle || selectedChat.problemSlug || "AI Chat"}
                       </h3>
-                      ${selectedChat.problemURL
+                      ${httpUrl(selectedChat.problemURL)
                         ? html`<a
-                            href=${selectedChat.problemURL}
+                            href=${httpUrl(selectedChat.problemURL)}
                             target="_blank"
                             rel="noopener"
                             class="text-xs text-cyan-400 hover:text-cyan-300"

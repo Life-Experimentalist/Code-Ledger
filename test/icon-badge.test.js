@@ -77,6 +77,26 @@ test("a missing snapshot says nothing instead of guessing", () => {
   assert.deepEqual(iconBadge(null, {}), { text: "", color: "#10b981", title: DEFAULT_TITLE });
 });
 
+test("stuck commits outrank the streak", () => {
+  const badge = iconBadge(snap(), {}, 3);
+  assert.equal(badge.text, "!");
+  assert.equal(badge.color, "#ef4444");
+  assert.match(badge.title, /3 solves saved locally but not on GitHub yet/);
+});
+
+test("stuck commits show even with gamification off", () => {
+  // The badge is the only place a user finds out without opening the library.
+  const badge = iconBadge(null, { gamificationEnabled: false }, 1);
+  assert.equal(badge.text, "!");
+  assert.match(badge.title, /1 solve saved locally/);
+});
+
+test("zero or garbage pending counts change nothing", () => {
+  assert.equal(iconBadge(snap(), {}, 0).text, "7");
+  assert.equal(iconBadge(snap(), {}, -2).text, "7");
+  assert.equal(iconBadge(snap(), {}, NaN).text, "7");
+});
+
 test("the tooltip carries what the badge has no room for", () => {
   assert.equal(iconBadge(snap(), {}).title, "CodeLedger — 7 day streak · 12/20 points today");
   assert.equal(

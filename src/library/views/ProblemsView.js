@@ -17,10 +17,12 @@ import { ProblemModal } from "../components/ProblemModal.js";
 import { QueueModal } from "../../ui/components/QueueModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { Storage } from "../../core/storage.js";
+import { getProblemCommitKey } from "../../core/lang-utils.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
 import { cfProblemUrl } from "../../core/cf-utils.js";
 import { isAIActive } from "../../core/feature-flags.js";
+import { classifyTopic, KIND_ORDER, KIND_LABEL_PLURAL } from "../../core/topic-taxonomy.js";
 
 const PLATFORMS = [
   {
@@ -84,7 +86,12 @@ export function ProblemsView({
   const [filterDifficulty, setFilterDifficulty] = useState(getQueryParam("difficulty", "All"));
   const [filterPlatform, setFilterPlatform] = useState(getQueryParam("platform", "All"));
   const [filterLanguage, setFilterLanguage] = useState(getQueryParam("language", "All"));
-  const [filterTag, setFilterTag] = useState(getQueryParam("tag", "All"));
+  // The tag filter works in canonical topic names, so a legacy `?tag=` value in
+  // a platform's own spelling is folded onto the canonical name it maps to.
+  const [filterTag, setFilterTag] = useState(() => {
+    const t = getQueryParam("tag", "All");
+    return t === "All" ? "All" : classifyTopic(t).topic || "All";
+  });
   const [filterAIReview, setFilterAIReview] = useState(getQueryParam("aiReview", "All"));
   const [query, setQuery] = useState(searchQuery || getQueryParam("q", ""));
   const [sortBy, setSortBy] = useState(getQueryParam("sort", "newest"));
@@ -286,14 +293,25 @@ export function ProblemsView({
     return ["All", ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b)))];
   }, [problems]);
 
-  const tagOptions = useMemo(() => {
-    const set = new Set();
+  // Canonical topics grouped by axis — algorithms, then data structures, then
+  // the rest — so "Array" no longer sits alphabetically between "Backtracking"
+  // and "Binary Search" as if they were the same kind of thing.
+  const tagGroups = useMemo(() => {
+    const kinds = settings?.topicKinds || {};
+    const groups = new Map(KIND_ORDER.map((k) => [k, []]));
+    const seen = new Set();
     (problems || []).forEach((p) => {
-      (p.tags || []).forEach((t) => t && set.add(t));
-      if (p.topic) set.add(p.topic);
+      for (const t of [...(p.tags || []), p.topic]) {
+        if (!t) continue;
+        const { topic, kind } = classifyTopic(t, kinds);
+        if (!topic || !kind || seen.has(topic)) continue;
+        seen.add(topic);
+        groups.get(kind)?.push(topic);
+      }
     });
-    return ["All", ...Array.from(set).sort((a, b) => String(a).localeCompare(String(b)))];
-  }, [problems]);
+    for (const list of groups.values()) list.sort((a, b) => a.localeCompare(b));
+    return groups;
+  }, [problems, settings]);
 
   const filtered = useMemo(() => {
     let out = problems || [];
@@ -302,7 +320,9 @@ export function ProblemsView({
     if (filterLanguage !== "All")
       out = out.filter((p) => (p.lang?.name || p.language || "") === filterLanguage);
     if (filterTag !== "All")
-      out = out.filter((p) => (p.tags || []).includes(filterTag) || p.topic === filterTag);
+      out = out.filter((p) =>
+        [...(p.tags || []), p.topic].some((t) => t && classifyTopic(t).topic === filterTag),
+      );
     if (filterAIReview === "With Review") out = out.filter((p) => !!p.aiReview);
     if (filterAIReview === "Without Review") out = out.filter((p) => !p.aiReview);
     if (query && String(query).trim()) {
@@ -484,10 +504,7 @@ export function ProblemsView({
           manuallyEdited: true,
         };
         await Storage.saveProblem(updated);
-        const slug = String(updated.titleSlug || updated.id || "").trim();
-        const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
-        const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
-        const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+        const pendingKey = getProblemCommitKey(updated);
         if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => {});
         onProblemUpdate?.(updated);
       }
@@ -778,8 +795,13 @@ export function ProblemsView({
             onChange=${(e) => setFilterTag(e.target.value)}
             class="px-2 py-1.5 bg-black border border-white/10 rounded text-xs text-slate-300"
           >
-            ${tagOptions.map(
-              (o) => html`<option value=${o}>${o === "All" ? "All Tags" : o}</option>`,
+            <option value="All">All Tags</option>
+            ${KIND_ORDER.filter((k) => tagGroups.get(k)?.length).map(
+              (k) => html`
+                <optgroup label=${KIND_LABEL_PLURAL[k]}>
+                  ${tagGroups.get(k).map((t) => html`<option value=${t}>${t}</option>`)}
+                </optgroup>
+              `,
             )}
           </select>
           ${aiOn || hasStoredReviews
@@ -945,6 +967,7 @@ export function ProblemsView({
         onNavigateProblem=${handleSelectProblem}
         onOpenGraphProblem=${onOpenGraphProblem}
         onNavigate=${onNavigate}
+        topicKinds=${settings?.topicKinds || {}}
       />
 
       <!-- Queue detail modal -->

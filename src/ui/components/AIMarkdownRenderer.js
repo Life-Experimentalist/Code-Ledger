@@ -176,9 +176,11 @@ export function parseMarkdown(text) {
 
   t = `<p class="mb-2 leading-relaxed">${t}</p>`;
 
-  // 8. Restore stashes
+  // 8. Restore stashes. The replacer must be a function: a string replacement
+  // interprets $-patterns ($&, $', $1…), and stashed code blocks legitimately
+  // contain them — `$&` in shell or regex examples corrupted the output.
   stash.forEach((fragment, i) => {
-    t = t.replace(`@@S${i}@@`, fragment);
+    t = t.replace(`@@S${i}@@`, () => fragment);
   });
 
   return t;

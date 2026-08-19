@@ -126,6 +126,40 @@ export function canWriteWorkflows(scopes) {
   return scopes.has("workflow");
 }
 
+/**
+ * Remove every tree item under `.github/workflows/` from a prepared commit.
+ *
+ * Called when the token is known to lack the `workflow` scope: GitHub rejects
+ * the entire push over one workflow file, which would cost the user the solve
+ * riding in the same commit. Deletions are dropped too — the same scope guards
+ * them.
+ *
+ * The gamification `workflowPublished` flag is reset to what settings already
+ * record: with the workflow files untouchable, whatever was true before this
+ * commit is still true after it.
+ *
+ * @param {Array<{path?: string}>} items  tree items prepared for the commit
+ * @param {{badgesPublished: boolean, workflowPublished: boolean}|null} gamification
+ * @param {Record<string, any>} [settings]
+ * @returns {{items: object[], gamification: object|null, dropped: string[]}}
+ */
+export function dropWorkflowItems(items, gamification, settings) {
+  const kept = [];
+  const dropped = [];
+  for (const item of items || []) {
+    const isWorkflow = typeof item?.path === "string" && item.path.startsWith(".github/workflows/");
+    (isWorkflow ? dropped : kept).push(item);
+  }
+  return {
+    items: kept,
+    gamification:
+      gamification && dropped.length
+        ? { ...gamification, workflowPublished: settings?.workflowPublished === true }
+        : gamification,
+    dropped: dropped.map((i) => i.path),
+  };
+}
+
 /** The scope string to request when the user wants private repositories. */
 export const PRIVATE_SCOPE = "repo,workflow";
 

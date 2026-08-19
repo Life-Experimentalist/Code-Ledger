@@ -172,8 +172,9 @@ Be concise. Max 200 words.`;
 
   /* ── Submission processing ─────────────────────────────────────────── */
 
-  async _handleAcceptedVerdict({ submissionId, contestId, rowSlug, stats }, page) {
-    if (this._processingLock) return;
+  async _handleAcceptedVerdict(evt, page) {
+    if (this._deferWhileLocked(this._handleAcceptedVerdict, [evt, page])) return;
+    const { submissionId, contestId, rowSlug, stats } = evt;
 
     const pending = readPendingSubmission();
 
@@ -273,6 +274,7 @@ Be concise. Max 200 words.`;
       dbg.error("Failed to process CF submission", err);
     } finally {
       this._processingLock = false;
+      this._drainDeferredEvents();
     }
   }
 
@@ -343,7 +345,10 @@ Be concise. Max 200 words.`;
   _extractLanguage() {
     const sel = document.querySelector(SELECTORS.submission.languageSelector);
     const opt = sel?.options?.[sel.selectedIndex];
-    return (opt?.textContent || opt?.value || "").trim() || "C++";
+    // No guessed default: an unreadable selector flows into resolveLang(),
+    // whose fallback is {name: "unknown", ext: "txt"} — a .txt file is honest,
+    // a fabricated "C++" is not.
+    return (opt?.textContent || opt?.value || "").trim();
   }
 
   /* ── AI panel ─────────────────────────────────────────────────────── */

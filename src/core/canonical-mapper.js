@@ -47,9 +47,18 @@ class CanonicalMapper {
     const cached = await storage.local.get([
       CONSTANTS.SK.CANONICAL_MAP_CACHE,
       CONSTANTS.SK.CANONICAL_MAP_ETAG,
+      CONSTANTS.SK.CANONICAL_MAP_FETCHED_AT,
     ]);
     const etag = cached[CONSTANTS.SK.CANONICAL_MAP_ETAG];
     const data = cached[CONSTANTS.SK.CANONICAL_MAP_CACHE];
+    // The TTL clock is persisted: an in-memory-only lastFetch restarts at 0 on
+    // every MV3 service-worker wake, which turned the TTL into "refetch on
+    // every wake" — never wrong, but a conditional request per wake for a map
+    // that changes rarely.
+    this.lastFetch = Math.max(
+      this.lastFetch,
+      Number(cached[CONSTANTS.SK.CANONICAL_MAP_FETCHED_AT]) || 0,
+    );
 
     if (data && Date.now() - this.lastFetch < CONSTANTS.CANONICAL_CACHE_TTL_MS) {
       dbg.log(`loadMap(): ✓ using cached data (${this.map.size} entries)`);
@@ -73,22 +82,26 @@ class CanonicalMapper {
     try {
       if (res?.status === 304 && data) {
         this.lastFetch = Date.now();
-        await this._mergeLocalEntries();
+        await storage.local.set({ [CONSTANTS.SK.CANONICAL_MAP_FETCHED_AT]: this.lastFetch });
+        // A 304 confirms the cache but populates nothing on a fresh wake, so
+        // the in-memory map must still be built from the cached copy.
+        await this.populate(data);
         return;
       }
 
       if (res?.ok) {
         const json = await res.json();
         const newEtag = res.headers.get("ETag");
+        this.lastFetch = Date.now();
         await storage.local.set({
           [CONSTANTS.SK.CANONICAL_MAP_CACHE]: json,
           [CONSTANTS.SK.CANONICAL_MAP_ETAG]: newEtag,
+          [CONSTANTS.SK.CANONICAL_MAP_FETCHED_AT]: this.lastFetch,
         });
         dbg.log(
           `loadMap(): ✓ loaded remote map (entries: ${normalizeCanonicalEntries(json).length})`,
         );
         await this.populate(json);
-        this.lastFetch = Date.now();
       }
     } catch (err) {
       dbg.error("Failed to load canonical map", err);

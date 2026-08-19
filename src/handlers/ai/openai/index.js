@@ -98,6 +98,7 @@ export class OpenAIHandler extends BaseAIHandler {
             model,
             messages: [{ role: "user", content: prompt }],
           }),
+          signal: AbortSignal.timeout(60_000),
         });
 
         this._updateRateLimits(res.headers);

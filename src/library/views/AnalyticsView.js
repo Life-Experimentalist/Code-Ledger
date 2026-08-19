@@ -16,7 +16,7 @@ import { ProblemModal } from "../components/ProblemModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { normalizeTag } from "../../core/topic-resolver.js";
-import { classifyTopic, KIND } from "../../core/topic-taxonomy.js";
+import { classifyTopic, KIND, masteryOptsFromSettings } from "../../core/topic-taxonomy.js";
 
 import { HeatMap } from "../../ui/components/HeatMap.js";
 import { ChartWrapper } from "../../ui/components/ChartWrapper.js";
@@ -419,6 +419,8 @@ export function AnalyticsView({ problems, onNavigate }) {
     return () => (m = false);
   }, [problems.length]);
 
+  const masteryOpts = useMemo(() => masteryOptsFromSettings(settings), [settings]);
+
   const stats = useMemo(() => {
     const s = {
       easy: 0,
@@ -674,18 +676,38 @@ export function AnalyticsView({ problems, onNavigate }) {
     }
   }, [problems?.length, userMap]);
 
-  const chartData = useMemo(() => {
-    // For the radar, prefer Algorithm topics (lower weight = higher priority) as they're more insightful
-    const sortedTopics = Object.entries(stats.topics).sort((a, b) => {
-      // First by type: algorithms before data structures
-      const typeA = classifyTopic(a[0], topicKinds).kind === KIND.ALGO ? 0 : 1;
-      const typeB = classifyTopic(b[0], topicKinds).kind === KIND.ALGO ? 0 : 1;
-      if (typeA !== typeB) return typeA - typeB;
-      // Then by solve count (desc)
-      return b[1].total - a[1].total;
+  // Split canonical topics into DS and Algorithm groups. Declared ahead of
+  // chartData because the radar reads one axis at a time.
+  const [activeTopicTab, setActiveTopicTab] = useState("algo");
+
+  const topicsByType = useMemo(() => {
+    const ds = [];
+    const algo = [];
+    Object.entries(stats.topics).forEach(([topic, counts]) => {
+      // Database, Shell and Design are neither a structure nor a technique, and
+      // filing them under algorithms (as the old two-way split did) put "SQL"
+      // next to "Dynamic Programming" in the ranking.
+      const kind = classifyTopic(topic, topicKinds).kind;
+      if (kind === KIND.DS) ds.push([topic, counts]);
+      else if (kind === KIND.ALGO) algo.push([topic, counts]);
     });
-    const tpLabels = sortedTopics.slice(0, 8).map((t) => t[0]);
-    const maxTopicTotal = Math.max(1, ...Object.values(stats.topics).map((t) => t.total));
+    // Sort each group by solve count desc
+    ds.sort((a, b) => b[1].total - a[1].total);
+    algo.sort((a, b) => b[1].total - a[1].total);
+    return { ds, algo };
+  }, [stats.topics, topicKinds]);
+
+  const chartData = useMemo(() => {
+    // The radar shows one axis at a time, normalised within that axis — a
+    // near-universal container like Array can no longer set the 100% mark and
+    // flatten every algorithm into the centre of the chart.
+    const radarEntries = (activeTopicTab === "ds" ? topicsByType.ds : topicsByType.algo).slice(
+      0,
+      8,
+    );
+    const tpLabels = radarEntries.map((t) => t[0]);
+    const maxTopicTotal = Math.max(1, ...radarEntries.map(([, c]) => c.total));
+    const radarRgb = activeTopicTab === "ds" ? "245, 158, 11" : "6, 182, 212";
 
     return {
       topicRadar: {
@@ -693,12 +715,10 @@ export function AnalyticsView({ problems, onNavigate }) {
         datasets: [
           {
             label: "Depth (%)",
-            data: tpLabels.map((t) =>
-              Math.min(100, (stats.topics[t].total / Math.max(1, maxTopicTotal)) * 100),
-            ),
-            backgroundColor: "rgba(6, 182, 212, 0.2)",
-            borderColor: "rgba(6, 182, 212, 1)",
-            pointBackgroundColor: "rgba(6, 182, 212, 1)",
+            data: radarEntries.map(([, c]) => Math.min(100, (c.total / maxTopicTotal) * 100)),
+            backgroundColor: `rgba(${radarRgb}, 0.2)`,
+            borderColor: `rgba(${radarRgb}, 1)`,
+            pointBackgroundColor: `rgba(${radarRgb}, 1)`,
           },
         ],
       },
@@ -795,27 +815,7 @@ export function AnalyticsView({ problems, onNavigate }) {
         ],
       },
     };
-  }, [stats, topicKinds]);
-
-  // Split canonical topics into DS and Algorithm groups
-  const [activeTopicTab, setActiveTopicTab] = useState("algo");
-
-  const topicsByType = useMemo(() => {
-    const ds = [];
-    const algo = [];
-    Object.entries(stats.topics).forEach(([topic, counts]) => {
-      // Database, Shell and Design are neither a structure nor a technique, and
-      // filing them under algorithms (as the old two-way split did) put "SQL"
-      // next to "Dynamic Programming" in the ranking.
-      const kind = classifyTopic(topic, topicKinds).kind;
-      if (kind === KIND.DS) ds.push([topic, counts]);
-      else if (kind === KIND.ALGO) algo.push([topic, counts]);
-    });
-    // Sort each group by solve count desc
-    ds.sort((a, b) => b[1].total - a[1].total);
-    algo.sort((a, b) => b[1].total - a[1].total);
-    return { ds, algo };
-  }, [stats.topics, topicKinds]);
+  }, [stats, topicsByType, activeTopicTab]);
 
   const activeTopics = activeTopicTab === "ds" ? topicsByType.ds : topicsByType.algo;
   const topTopics = activeTopics.slice(0, 8);
@@ -1001,22 +1001,21 @@ export function AnalyticsView({ problems, onNavigate }) {
           `
         : ""}
 
-      <!-- Heatmap + Difficulty Split -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2">
-          <${HeatMap} problems=${problems} />
-        </div>
+      <!-- Heatmap: full width, so the cells autofit as large as the row allows -->
+      <${HeatMap} problems=${problems} />
 
+      <!-- Charts row -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div
-          class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3 relative overflow-hidden"
+          class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72 relative overflow-hidden"
         >
           <div
             class="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(6,182,212,0.05),transparent)] pointer-events-none"
           ></div>
-          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest z-10">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest z-10 mb-2">
             Difficulty Split
           </h3>
-          <div class="relative z-10" style="height:180px">
+          <div class="relative z-10 flex-1 min-h-0">
             <${ChartWrapper}
               type="doughnut"
               data=${chartData.difficultyDonut}
@@ -1048,14 +1047,31 @@ export function AnalyticsView({ problems, onNavigate }) {
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Charts row -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72">
-          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-            Topic Depth
-          </h3>
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Topic Depth</h3>
+            <div class="flex rounded-lg border border-white/10 bg-black/40 p-0.5 text-[10px]">
+              <button
+                onClick=${() => setActiveTopicTab("algo")}
+                class="px-1.5 py-0.5 rounded-md transition-colors ${activeTopicTab === "algo"
+                  ? "bg-cyan-500/15 text-cyan-300"
+                  : "text-slate-500 hover:text-slate-300"}"
+                title="Algorithms and techniques"
+              >
+                Algo
+              </button>
+              <button
+                onClick=${() => setActiveTopicTab("ds")}
+                class="px-1.5 py-0.5 rounded-md transition-colors ${activeTopicTab === "ds"
+                  ? "bg-amber-500/15 text-amber-300"
+                  : "text-slate-500 hover:text-slate-300"}"
+                title="Data structures"
+              >
+                DS
+              </button>
+            </div>
+          </div>
           <div class="flex-1 min-h-0">
             <${ChartWrapper}
               type="radar"
@@ -1206,6 +1222,7 @@ export function AnalyticsView({ problems, onNavigate }) {
       <${TopicGaps}
         problems=${problems}
         topicKinds=${topicKinds}
+        masteryOpts=${masteryOpts}
         onTopic=${(t) => handleTopicClick(t.topic)}
       />
 

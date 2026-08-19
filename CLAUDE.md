@@ -66,7 +66,8 @@ node dev/build-canonical-map.js         # validate data/canonical-map.json again
 node dev/package-chrome.js              # produce codeledger-chrome-vX.zip
 node dev/package-firefox.js             # produce codeledger-firefox-vX.zip
 node dev/import-profile/leetcode-importer.js --github-token=TOKEN --repo=owner/repo
-node dev/import-profile/gfg-importer.js --github-token=TOKEN --repo=owner/repo
+# GFG bulk import has no CLI — use the extension's "Import All Solves" button on
+# your GFG profile page (dev/import-profile/gfg-importer.js is a placeholder)
 ```
 
 ### Release (automated)
@@ -150,7 +151,7 @@ Do not reintroduce a provider anywhere in the UI before its `commit()` works.
 - Built with **Hono** framework
 - Routes: `GET /api/health`, `GET /api/auth/:provider`, `GET /api/auth/github/callback`, `POST /api/webhook/github`, `GET /api/data/canonical-map.json`, `POST /api/admin/canonical`
 - `GET /*` serves the static landing page from `worker/public/`
-- OAuth callback posts `{ type: 'CODELEDGER_AUTH', provider, token }` — the extension listens for exactly this message type
+- OAuth callback delivers `{ type: 'CODELEDGER_AUTH', provider, token }` via the `data-auth` attribute on `#codeledger-auth-result` (read by the extension's content script), with an origin-locked same-window `postMessage` as fallback — the extension listens for exactly this message type
 - `GET /api/auth/:provider` mints an HMAC-signed `state` (10-minute TTL) into an
   `HttpOnly; Secure; SameSite=Lax` cookie; the callback verifies it in constant
   time before exchanging the code. A missing or stale cookie is a hard failure,
@@ -211,7 +212,7 @@ built the same way. Never reintroduce an `https://esm.sh` (or any remote) import
 
 ### OAuth message contract
 
-Worker posts: `{ type: 'CODELEDGER_AUTH', provider: 'github', token: '...' }`
+Worker delivers: `{ type: 'CODELEDGER_AUTH', provider: 'github', token: '...' }` — primarily as the `data-auth` attribute of `#codeledger-auth-result`, with a same-window origin-locked `postMessage` fallback.
 Extension listens for exactly `data.type === 'CODELEDGER_AUTH'`. Any mismatch silently drops the token.
 
 ### Token storage paths
@@ -325,7 +326,7 @@ All handlers live in `src/handlers/` and follow a strict structure:
 | Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                         | Distinguish from generic components        |
 | Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                   | Lowercase for utility modules              |
 | Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.TELEMETRY_OPT_IN`                              | Via `CONSTANTS.SK.*` where it has an entry |
-| CSS files           | kebab-case        | `floating-timer.css`                                         | Tailwind input files or compiled           |
+| CSS files           | kebab-case        | `theme-variables.css`                                        | Tailwind input files or compiled           |
 | Data files          | kebab-case        | `canonical-map.json`, `metadata.json`                        | In `src/data/`                             |
 
 ### Storage Key Conventions
@@ -525,7 +526,8 @@ without one:             problems/{platformId}/{platformId}.{ext}
 The `topics/{topic}/…` layout is the **pre-1.5 one**. It survives only in
 `migration-manager.js` and the old-layout detection in `service-worker.js`, which
 exist to move a repository off it — never write a new path in that shape. The SW
-always appends `index.json` as the last file in the commit.
+includes `index.json` in every commit it builds (position in the files array is
+irrelevant — the Trees API takes an unordered set).
 
 ---
 

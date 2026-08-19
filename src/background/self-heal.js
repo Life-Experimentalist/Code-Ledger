@@ -30,6 +30,7 @@
  */
 
 import { normalizeDifficulty } from "../core/difficulty-map.js";
+import { CONSTANTS } from "../core/constants.js";
 
 /** Storage key holding the per-problem attempt bookkeeping. */
 export const HEAL_STATE_KEY = "_selfHealState";
@@ -68,13 +69,21 @@ export function missingParts(problem) {
 
 /** The platform slug to ask about, from either the record or its id. */
 export function healSlug(problem) {
-  const raw = problem?.titleSlug || String(problem?.id || "").replace(/^(lc|gfg|cf)-/, "");
+  const raw =
+    problem?.titleSlug || String(problem?.id || "").replace(CONSTANTS.platformIdRegex(), "");
   return String(raw || "").trim();
 }
 
 /** Can this problem be healed at all — right platform, and a slug to ask with? */
 export function isHealable(problem) {
-  return HEALABLE_PLATFORMS.includes(problem?.platform) && Boolean(healSlug(problem));
+  // urlBroken records verified as dead URLs — every heal attempt would fetch a
+  // 404, burn all five backoff slots, and go permanently silent. The GFG
+  // verification sweep owns those; it clears the flag if the slug is repaired.
+  return (
+    HEALABLE_PLATFORMS.includes(problem?.platform) &&
+    Boolean(healSlug(problem)) &&
+    !problem?.urlBroken
+  );
 }
 
 /** Milliseconds to wait after `attempts` consecutive failures. */

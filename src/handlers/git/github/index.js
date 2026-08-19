@@ -132,10 +132,13 @@ export class GitHubHandler extends BaseGitHandler {
 
   // ── Token resolution ──────────────────────────────────────────────────────
 
-  // OAuth-only: never falls back to a stored PAT.
+  // OAuth first, then the manual PAT from settings — the documented contract.
   // If this returns null the caller must prompt re-authentication.
   async getToken() {
-    return Storage.getAuthToken("github");
+    const oauth = await Storage.getAuthToken("github");
+    if (oauth) return oauth;
+    const settings = await Storage.getSettings();
+    return settings["github_token"] || null;
   }
 
   /**
@@ -166,6 +169,36 @@ export class GitHubHandler extends BaseGitHandler {
     if (!/^Co-authored-by:\s+.+\s+<.+>$/.test(trailer)) return message;
     if (message.includes(trailer)) return message;
     return `${message}\n\n${trailer}`;
+  }
+
+  // ── index.json meta from the commit itself ───────────────────────────────
+
+  /**
+   * Derive the README/infra stats from the fresh `index.json` this commit is
+   * already carrying, when the caller did not pass `indexMetaOverride`.
+   *
+   * Reading the repository's copy instead has two failure modes: the stats lag
+   * one commit behind, and the contents API returns an empty `content` for any
+   * file over 1 MB — which a full index.json crosses easily, after which every
+   * README rebuild would bake zeros into the solved/easy/medium/hard shields.
+   *
+   * @param {Array<{path: string, content: string}>} files
+   * @returns {object|null} shape matching `_readIndexMeta`, or null
+   */
+  _indexMetaFromFiles(files) {
+    const entry = (files || []).find((f) => f?.path === "index.json" && f?.content);
+    if (!entry) return null;
+    try {
+      const parsed = JSON.parse(entry.content);
+      return {
+        stats: parsed.stats || null,
+        summary: parsed.meta?.summary || null,
+        updatedAt: parsed.updatedAt || null,
+        problems: (parsed.problems || []).slice(0, 10),
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── Generic provider interface ────────────────────────────────────────────
@@ -258,25 +291,42 @@ export class GitHubHandler extends BaseGitHandler {
         const isOrg = owner !== userRes.login;
         // Opt-in, not opt-out: the default OAuth scope cannot create a private repo.
         const isPrivate = settings["github_repo_private"] === true;
-        await api.createRepository(name, token, isOrg ? owner : null, isPrivate);
-        isNewRepo = true;
-
-        // auto_init's first commit is not visible immediately and the delay is
-        // not fixed, so poll rather than sleep a guessed interval.
-        latestSha = await this._awaitInitialCommit(owner, name, token);
-        dbg.log(`commit(): new repo HEAD = ${latestSha.slice(0, 7)}`);
-
-        // Cosmetic — a failure here must not lose the user's solution.
         try {
-          await this._configureRepo(owner, name, token, settings);
-        } catch (cfgErr) {
-          dbg.warn(`commit(): repo configuration failed (non-fatal):`, cfgErr.message);
+          await api.createRepository(name, token, isOrg ? owner : null, isPrivate);
+        } catch (createErr) {
+          // 422 "name already exists": the repo is there but the branch is not
+          // — an empty repository created on github.com and linked through
+          // settings. The ref lookup 404s on those forever, so without this
+          // branch every commit to such a repo failed with a name-collision
+          // error. Build a root commit instead. Anything but a 422 is a real
+          // failure.
+          if (createErr.status !== 422) throw createErr;
+          dbg.log(`commit(): ${owner}/${name} exists but is empty — root commit`);
+          isNewRepo = true;
+          latestSha = null;
+        }
+
+        if (latestSha === undefined) {
+          isNewRepo = true;
+
+          // auto_init's first commit is not visible immediately and the delay is
+          // not fixed, so poll rather than sleep a guessed interval.
+          latestSha = await this._awaitInitialCommit(owner, name, token);
+          dbg.log(`commit(): new repo HEAD = ${latestSha.slice(0, 7)}`);
+
+          // Cosmetic — a failure here must not lose the user's solution.
+          try {
+            await this._configureRepo(owner, name, token, settings);
+          } catch (cfgErr) {
+            dbg.warn(`commit(): repo configuration failed (non-fatal):`, cfgErr.message);
+          }
         }
       }
     }
 
     // ── Build tree ────────────────────────────────────────────────────────
-    const commitObj = await api.getCommit(owner, name, latestSha, token);
+    // latestSha is null on the empty-repo path: no parent commit, no base tree.
+    const commitObj = latestSha ? await api.getCommit(owner, name, latestSha, token) : null;
     const baseTreeSha = commitObj?.tree?.sha || null;
 
     const treeItems = buildTreeItems(files, opts.deletes);
@@ -291,7 +341,7 @@ export class GitHubHandler extends BaseGitHandler {
         token,
         settings,
         isNewRepo,
-        opts.indexMetaOverride ?? null,
+        opts.indexMetaOverride ?? this._indexMetaFromFiles(files),
       );
       treeItems.push(...infra.items);
       gamificationState = infra.gamification;
@@ -319,9 +369,14 @@ export class GitHubHandler extends BaseGitHandler {
       dbg.log(`commit(): commit ${commitRes.sha.slice(0, 7)} (attempt ${attempt + 1})`);
 
       try {
-        await api.updateRef(owner, name, BRANCH, commitRes.sha, token);
+        // A root commit creates the branch; PATCH would 404 with no ref to move.
+        if (parentSha) await api.updateRef(owner, name, BRANCH, commitRes.sha, token);
+        else await api.createRef(owner, name, BRANCH, commitRes.sha, token);
         break; // success
       } catch (refErr) {
+        // 422 covers both "not a fast-forward" and "Reference already exists"
+        // (someone else's root commit won the race) — the refresh below picks
+        // up the new HEAD and rebuilds on top of it either way.
         if (refErr.status !== 422 || attempt === 2) throw refErr;
         dbg.warn(`commit(): 422 non-fast-forward (attempt ${attempt + 1}) — refreshing ref`);
         await _sleep(500 * (attempt + 1)); // 500ms, then 1000ms

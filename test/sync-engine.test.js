@@ -138,14 +138,36 @@ describe("importFromRepo", () => {
   });
 
   test("a conflict already resolved locally is not raised again before the push", async () => {
+    // Realistic epoch values: anything under 1e10 is treated as Unix seconds
+    // and normalized to ms before the comparison.
     Storage.getAllProblems = async () => [
-      problem({ code: "resolved", _conflictResolvedAt: 5_000 }),
+      problem({ code: "resolved", _conflictResolvedAt: 1_700_000_005_000 }),
     ];
     const git = fakeGit({
-      "index.json": JSON.stringify({ problems: [problem({ code: "stale", timestamp: 1_000 })] }),
+      "index.json": JSON.stringify({
+        problems: [problem({ code: "stale", timestamp: 1_700_000_000_000 })],
+      }),
     });
     const { conflicts } = await importFromRepo("o", "r", git);
     assert.deepEqual(conflicts, [], "the local resolution is newer than the remote copy");
+  });
+
+  test("a seconds-unit remote timestamp is normalized before the resolved-at comparison", async () => {
+    // Codeforces records timestamps in Unix seconds. Comparing 1.7e9 (seconds)
+    // against a ms resolved-at made the remote lose every comparison, so its
+    // conflicts were suppressed forever after a single resolution.
+    Storage.getAllProblems = async () => [
+      problem({ code: "resolved", _conflictResolvedAt: 1_700_000_005_000 }),
+    ];
+    const git = fakeGit({
+      "index.json": JSON.stringify({
+        // 1_700_000_100 s → 1_700_000_100_000 ms: newer than the resolution,
+        // so this IS a live conflict and must be raised.
+        problems: [problem({ code: "newer remote", timestamp: 1_700_000_100 })],
+      }),
+    });
+    const { conflicts } = await importFromRepo("o", "r", git);
+    assert.equal(conflicts.length, 1, "a remote edit newer than the resolution must surface");
   });
 
   test("a field the older record simply never had is not a conflict", async () => {

@@ -439,13 +439,23 @@ export async function importChatsLocal(items) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_NAME], "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    items.forEach((item) =>
-      store.add({
-        ...normalizeChatRecord(item),
-        _githubPath: item._githubPath,
-        _pendingSync: false,
-      }),
-    );
+    // The store keys on an auto-increment id, so add() never conflicts — a
+    // caller that re-imports a chat it already holds would silently duplicate
+    // it. Dedup by _githubPath here, inside the same transaction, instead of
+    // trusting every caller to have filtered first.
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const seen = new Set((req.result || []).map((c) => c._githubPath).filter(Boolean));
+      for (const item of items) {
+        if (item._githubPath && seen.has(item._githubPath)) continue;
+        if (item._githubPath) seen.add(item._githubPath);
+        store.add({
+          ...normalizeChatRecord(item),
+          _githubPath: item._githubPath,
+          _pendingSync: false,
+        });
+      }
+    };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

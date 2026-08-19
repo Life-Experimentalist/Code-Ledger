@@ -40,7 +40,14 @@ export async function refreshIconBadge(settings) {
   try {
     const s = settings || (await Storage.getSettings().catch(() => ({})));
     const snapshot = await loadSnapshot(s);
-    const badge = iconBadge(snapshot, s);
+    // Keys younger than the stale window are commits in flight or ones the
+    // 10-minute maintenance retry has not reached yet — not worth alarming over.
+    const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
+    const staleBefore = Date.now() - CONSTANTS.PENDING_COMMIT_STALE_MS;
+    const pendingCommits = Object.values(pendingMap || {}).filter(
+      (t) => Number(t) < staleBefore,
+    ).length;
+    const badge = iconBadge(snapshot, s, pendingCommits);
     await applyBadge(badge);
     return badge;
   } catch (e) {

@@ -35,6 +35,7 @@ import {
   executeAction,
   pickBetter,
 } from "./components/DuplicateDetectionModal.js";
+import { BrokenImportsModal } from "./components/BrokenImportsModal.js";
 import { markSettingsPendingCommit } from "/core/settings-auto-commit.js";
 
 initializeHandlers();
@@ -67,7 +68,10 @@ function LibraryApp() {
   const [setupDismissed, setSetupDismissed] = useState(false);
   const [tokenExpired, setTokenExpired] = useState(false);
   const [reauthBusy, setReauthBusy] = useState(false);
+  const [pendingCommitCount, setPendingCommitCount] = useState(0);
+  const [retryBusy, setRetryBusy] = useState(false);
   const [importReport, setImportReport] = useState(null);
+  const [showBrokenImports, setShowBrokenImports] = useState(false);
 
   // Ref tracks whether a conflict-resolution modal is currently active.
   // Used by reloadProblems to avoid interrupting an in-progress resolution.
@@ -79,10 +83,17 @@ function LibraryApp() {
   // Reload problems from IndexedDB (used after import or external change).
   // Also re-checks for duplicates when no conflict modal is currently showing,
   // so that any conflicts re-created by a background sync are shown correctly.
+  // Only the first load may blank the workspace with the loading screen. Later
+  // reloads arrive from background broadcasts (PROBLEM_SAVED fires after every
+  // auto-detected solve, AI-review write-back and self-heal pass), and swapping
+  // the active view for a spinner unmounts it — wiping whatever the user has
+  // half-typed into a chat box or filter. Those refresh silently instead.
+  const initialLoadDoneRef = useRef(false);
   const reloadProblems = useCallback(() => {
-    setLoading(true);
+    if (!initialLoadDoneRef.current) setLoading(true);
     Storage.getAllProblems()
       .then((p) => {
+        initialLoadDoneRef.current = true;
         setProblems(p || []);
         if (!conflictActiveRef.current) {
           const dups = findDuplicates(p || []).sort((a, b) => {
@@ -97,6 +108,39 @@ function LibraryApp() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Count solves stuck uncommitted past the automatic-retry window. Younger
+  // keys are commits in flight or ones the 10-minute maintenance alarm has not
+  // reached yet, so they don't warrant a banner.
+  const refreshPendingCommits = useCallback(() => {
+    Storage.getPendingProblemKeys()
+      .then((map) => {
+        const staleBefore = Date.now() - CONSTANTS.PENDING_COMMIT_STALE_MS;
+        setPendingCommitCount(
+          Object.values(map || {}).filter((t) => Number(t) < staleBefore).length,
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshPendingCommits();
+  }, [refreshPendingCommits]);
+
+  const retryPendingCommits = useCallback(() => {
+    if (!window.chrome?.runtime?.sendMessage) return;
+    setRetryBusy(true);
+    chrome.runtime
+      .sendMessage({ type: "RESYNC_ALL", mode: "bulk" })
+      .catch(() => {})
+      .finally(() => {
+        setRetryBusy(false);
+        refreshPendingCommits();
+      });
+  }, [refreshPendingCommits]);
+
+  // Records verification flagged as matching no live URL on their platform.
+  const brokenProblems = useMemo(() => problems.filter((p) => p.urlBroken), [problems]);
 
   // Update a single problem in state (called after modal edit saves to IndexedDB)
   const handleProblemUpdate = useCallback((updated) => {
@@ -421,6 +465,18 @@ function LibraryApp() {
     return () => chrome.runtime.onMessage.removeListener(handleProblemSaved);
   }, [reloadProblems]);
 
+  // The GFG verification sweep finished — pick up repaired slugs and any new
+  // urlBroken flags so the review banner appears without a manual refresh.
+  useEffect(() => {
+    if (!window.chrome?.runtime?.onMessage) return;
+    const handleVerifyDone = (msg) => {
+      if (msg?.type !== "GFG_VERIFY_DONE") return;
+      reloadProblems();
+    };
+    chrome.runtime.onMessage.addListener(handleVerifyDone);
+    return () => chrome.runtime.onMessage.removeListener(handleVerifyDone);
+  }, [reloadProblems]);
+
   const handleOnboardingComplete = async () => {
     setShowGitHubOnboarding(false);
     // Refresh settings to reflect repo setup
@@ -698,6 +754,7 @@ function LibraryApp() {
     if (activeTab === "graph")
       return html`<${GraphView}
         problems=${enrichedProblems}
+        settings=${settings}
         focusProblem=${graphFocusProblem}
         onFocusProblemHandled=${() => setGraphFocusProblem(null)}
         onProblemDelete=${handleProblemDelete}
@@ -1078,6 +1135,61 @@ function LibraryApp() {
                   </div>
                 `
               : ""}
+          ${!tokenExpired && pendingCommitCount > 0
+            ? html`
+                <div
+                  class="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-amber-400 shrink-0 text-base">⚠</span>
+                    <div class="min-w-0">
+                      <p class="text-xs font-semibold text-amber-300">
+                        ${pendingCommitCount}
+                        solve${pendingCommitCount === 1 ? " hasn't" : "s haven't"} reached GitHub
+                        yet
+                      </p>
+                      <p class="text-[11px] text-amber-400/80 mt-0.5">
+                        They're saved locally and retried automatically every 10 minutes.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick=${retryPendingCommits}
+                    disabled=${retryBusy}
+                    class="shrink-0 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/35 disabled:opacity-60 border border-amber-500/30 rounded-lg text-xs font-medium text-amber-200 transition-colors whitespace-nowrap"
+                  >
+                    ${retryBusy ? "Retrying…" : "Retry now"}
+                  </button>
+                </div>
+              `
+            : ""}
+          ${brokenProblems.length > 0
+            ? html`
+                <div
+                  class="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-amber-400 shrink-0 text-base">⚠</span>
+                    <div class="min-w-0">
+                      <p class="text-xs font-semibold text-amber-300">
+                        ${brokenProblems.length} imported
+                        problem${brokenProblems.length === 1 ? " has" : "s have"} a broken link
+                      </p>
+                      <p class="text-[11px] text-amber-400/80 mt-0.5">
+                        Their URLs no longer exist on their platform. Review them and remove the
+                        ones you don't want — nothing is deleted automatically.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick=${() => setShowBrokenImports(true)}
+                    class="shrink-0 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/30 rounded-lg text-xs font-medium text-amber-200 transition-colors whitespace-nowrap"
+                  >
+                    Review
+                  </button>
+                </div>
+              `
+            : ""}
           ${(() => {
             const mode = settings.incognitoMode;
             const expiry = settings.incognitoExpiry ?? 0;
@@ -1099,6 +1211,16 @@ function LibraryApp() {
           ${renderActiveView()}
         </div>
       </main>
+
+      ${showBrokenImports
+        ? html`
+            <${BrokenImportsModal}
+              problems=${brokenProblems}
+              onClose=${() => setShowBrokenImports(false)}
+              onChanged=${reloadProblems}
+            />
+          `
+        : ""}
 
       <${GitHubOnboardingModal}
         isOpen=${showGitHubOnboarding}

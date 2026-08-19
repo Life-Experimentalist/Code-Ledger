@@ -96,6 +96,14 @@ describe("isHealable", () => {
   test("the slug is recovered from the id when the field is missing", () => {
     assert.equal(isHealable({ platform: "leetcode", id: "lc-two-sum" }), true);
   });
+
+  test("a urlBroken record is not healable — every attempt would 404", () => {
+    // The GFG verification sweep owns these; it clears the flag on repair.
+    assert.equal(
+      isHealable(problem({ platform: "geeksforgeeks", id: "gfg-x", titleSlug: "x", urlBroken: true })),
+      false,
+    );
+  });
 });
 
 describe("applyMetadata", () => {

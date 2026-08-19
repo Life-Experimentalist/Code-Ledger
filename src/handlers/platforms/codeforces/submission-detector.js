@@ -26,7 +26,7 @@
  */
 
 import { createDebugger } from "../../../lib/debug.js";
-import { cfSlugFromHref, isPendingFresh } from "./verdict-match.js";
+import { cfSlugFromHref, isPendingFresh, isRowOwn } from "./verdict-match.js";
 
 const dbg = createDebugger("CFSubmissionDetector");
 
@@ -73,7 +73,8 @@ export function hookSubmitButton(page, readMeta) {
     const code = document.querySelector("#editor")?.value || "";
     const langSel = document.querySelector('#programTypeForTesting, select[name="programTypeId"]');
     const opt = langSel?.options?.[langSel.selectedIndex];
-    const lang = (opt?.textContent || opt?.value || "").trim() || "C++";
+    // No guessed default — an empty string resolves to .txt downstream.
+    const lang = (opt?.textContent || opt?.value || "").trim();
 
     dbg.log("Submit fired — saving pending code", {
       slug: page.slug,
@@ -151,6 +152,28 @@ function readRowSlug(row) {
 }
 
 /**
+ * Read the handle a submission row belongs to.
+ *
+ * Status tables link each row's party cell to `/profile/{handle}`; the inline
+ * box on a problem page shows only the user's own submissions and has no such
+ * link, which is why "" is a valid answer.
+ */
+function readRowOwner(row) {
+  for (const a of row?.querySelectorAll?.("a[href]") || []) {
+    const m = /\/profile\/([^/?#]+)/.exec(a.getAttribute("href") || "");
+    if (m) return decodeURIComponent(m[1]);
+  }
+  return "";
+}
+
+/** The signed-in user's handle, from the profile link in the page header. */
+function readOwnHandle() {
+  const a = document.querySelector('#header a[href*="/profile/"]');
+  const m = /\/profile\/([^/?#]+)/.exec(a?.getAttribute("href") || "");
+  return m ? decodeURIComponent(m[1]) : "";
+}
+
+/**
  * Read runtime and memory off a submission row.
  *
  * By class, never by column index: the columns differ between the problem
@@ -185,6 +208,16 @@ export function watchForVerdict(onAccepted) {
       const row = span.closest("tr[data-submission-id]");
       const submissionId = row?.getAttribute("data-submission-id");
       if (!submissionId || processedIds.has(submissionId)) continue;
+
+      // Contest-wide /status tables list everyone's submissions — a row that
+      // provably belongs to another handle is never ours, whatever problem it
+      // names. See isRowOwn for why unknowns pass.
+      const rowOwner = readRowOwner(row);
+      if (!isRowOwn(rowOwner, readOwnHandle())) {
+        processedIds.add(submissionId);
+        dbg.log("Accepted row belongs to another user, ignoring", { submissionId, rowOwner });
+        continue;
+      }
 
       const contestIdMatch = window.location.pathname.match(/\/contest\/(\d+)\//);
       const contestId = contestIdMatch?.[1] || null;

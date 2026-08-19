@@ -26,13 +26,39 @@ import { LAYOUT_VERSION } from "../../../core/path-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { decodeBase64Utf8 } from "../../../lib/base64.js";
 import { getPagesHtml, getRepoReadme } from "./pages-template.js";
-import { getCommitHistory, getContents, listDirectory, createBlob } from "./api-client.js";
+import { fetchAccountContext, canWriteWorkflows, dropWorkflowItems } from "./permissions.js";
+import {
+  apiFetch,
+  getCommitHistory,
+  getContents,
+  listDirectory,
+  createBlob,
+} from "./api-client.js";
 import { DEFAULT_THEME, getThemePalette } from "../../../core/theme-engine.js";
 import { computeSnapshot, configFromSettings } from "../../../core/gamification.js";
 import { buildPublishPlan } from "../../../core/gamification-publisher.js";
 import { REFRESH_BADGES_SCRIPT } from "../../../vendor/refresh-badges-source.js";
 
 const dbg = createDebugger("GitHubInfra");
+
+// token → Promise<Set<string>|null>. One GET /user per token per service-worker
+// lifetime; scope grants cannot change under a live token without a reconnect,
+// which also produces a new token string.
+const _scopesByToken = new Map();
+
+function _getScopes(token) {
+  if (!_scopesByToken.has(token)) {
+    _scopesByToken.set(
+      token,
+      fetchAccountContext(token)
+        .then((ctx) => ctx.scopes)
+        .catch(() => null),
+    );
+  }
+  return _scopesByToken.get(token);
+}
+
+let _warnedNoWorkflowScope = false;
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
@@ -71,8 +97,32 @@ export async function buildInfraFiles(
     items.push(...(await _buildBootstrapFiles(owner, repo, token, settings)));
   }
 
+  let gamification = dynamic.gamification;
+
+  // A token without the `workflow` scope cannot touch anything under
+  // .github/workflows/ — GitHub rejects the whole push over the one file, a 422
+  // that would cost the user the solve riding in the same commit. Drop the
+  // workflow items (writes and deletions alike) and let everything else land.
+  // Unknown scopes (fine-grained PAT, GitHub App) fail open: the push itself
+  // stays the real check, exactly as the option-hiding helpers do.
+  if (items.some((i) => typeof i?.path === "string" && i.path.startsWith(".github/workflows/"))) {
+    if (!canWriteWorkflows(await _getScopes(token))) {
+      const gated = dropWorkflowItems(items, gamification, settings);
+      items.length = 0;
+      items.push(...gated.items);
+      gamification = gated.gamification;
+      if (!_warnedNoWorkflowScope) {
+        _warnedNoWorkflowScope = true;
+        dbg.warn(
+          `buildInfraFiles(): token lacks the \`workflow\` scope — skipped ${gated.dropped.join(", ")}. ` +
+            "Reconnect GitHub to let CodeLedger manage the Pages deploy workflow.",
+        );
+      }
+    }
+  }
+
   dbg.log(`buildInfraFiles(): ${items.length} infra file(s) (isNewRepo=${isNewRepo})`);
-  return { items, gamification: dynamic.gamification };
+  return { items, gamification };
 }
 
 // ── Dynamic files (index.html + README.md + deploy workflow) ─────────────────
@@ -143,6 +193,57 @@ jobs:
         uses: actions/deploy-pages@v4
 `;
 
+// How long a recorded Pages URL is trusted before it is re-read from the API.
+const PAGES_URL_RECHECK_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The Pages URL to build badges and README links against, re-checked against
+ * `GET /repos/{owner}/{repo}/pages` at most once a day.
+ *
+ * `github_pages_url` was previously written once at onboarding and never again,
+ * so it silently rotted the moment the site's address changed — a user who
+ * later put a custom domain on the Pages site kept a README full of badge URLs
+ * pointing at the old address, which in the observed case was an unrelated SPA
+ * answering every path with HTML. The nightly refresh then faithfully
+ * regenerated the broken block from the stale URL baked into badges/config.json.
+ *
+ * Only a URL GitHub itself returned is recorded (same rule as onboarding). A
+ * 404 means Pages is no longer enabled, so the stored URL is cleared and the
+ * badges fall back to repo-relative paths. Any other failure keeps the stored
+ * value and leaves the recheck timestamp unstamped so the next build retries.
+ *
+ * @returns {Promise<string>} "" when no Pages site is known to exist
+ */
+async function _refreshPagesUrl(owner, repo, token, settings) {
+  const stored = settings?.github_pages_url || "";
+  const last = Number(settings?.github_pages_url_checked_at) || 0;
+  if (Date.now() - last < PAGES_URL_RECHECK_MS) return stored;
+
+  let fresh;
+  try {
+    const pages = await apiFetch(`/repos/${owner}/${repo}/pages`, token);
+    let url = typeof pages?.html_url === "string" ? pages.html_url : "";
+    // GitHub reports `http://` for a custom domain until HTTPS is enforced;
+    // once it is, address the badges over HTTPS so the README never mixes
+    // schemes.
+    if (url && pages?.https_enforced) url = url.replace(/^http:\/\//, "https://");
+    fresh = url || stored;
+  } catch (err) {
+    if (err?.status !== 404) return stored;
+    // 404 = Pages is not enabled on this repo, so whatever URL was stored no
+    // longer serves anything.
+    fresh = "";
+  }
+
+  const patch = { github_pages_url_checked_at: Date.now() };
+  if (fresh !== stored) {
+    patch.github_pages_url = fresh;
+    dbg.log(`_refreshPagesUrl(): Pages URL changed "${stored}" → "${fresh}"`);
+  }
+  await Storage.updateSettings(patch).catch(() => {});
+  return fresh;
+}
+
 async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMetaOverride = null) {
   const theme = await Storage.getTheme().catch(() => null);
   const pagesTheme = _buildPagesTheme(theme);
@@ -168,16 +269,21 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
   // rather than to a guessed `{owner}.github.io` address. That guess is a 404
   // for anyone who never enabled Pages, and cannot be anything else for a
   // private repository on a free plan, where Pages is not offered at all.
-  const pagesUrl = settings?.github_pages_url || "";
+  const pagesUrl = await _refreshPagesUrl(owner, repo, token, settings);
   const newStatsBlock = getRepoReadme(owner, repo, pagesUrl, pagesTheme, settings, indexMeta);
   let currentText = null;
   let merged = newStatsBlock;
+  let readmeReadable = true;
   try {
     const existing = await getContents(owner, repo, "README.md", token);
     currentText = existing?.content ? _decodeContent(existing.content) : null;
     if (currentText) merged = _mergeReadme(currentText, newStatsBlock);
-  } catch (_) {
-    // 404 or network error — write fresh
+  } catch (err) {
+    // Only a 404 proves there is no README to preserve. Any other failure
+    // (network drop, 5xx, 403) means the file may exist but could not be read
+    // — a "fresh" write would then destroy whatever the user wrote outside the
+    // markers. Skip the README this commit; the next one merges normally.
+    readmeReadable = err?.status === 404;
   }
 
   // ── Gamification badges ───────────────────────────────────────────────────
@@ -185,20 +291,20 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
   // block and the stats block are reconciled in a single write instead of
   // fighting over the file across two commits.
   //
-  // The badges get the Pages URL only when Pages is known to be serving them.
-  // `github_pages_url` is written once Pages has actually been enabled, so the
-  // guessed `{owner}.github.io/{repo}` above is a 404 for anyone who never
-  // turned it on — including every private repository, where the settings panel
-  // promises the self-hosted SVGs work. With no URL, `badgeMarkdown` addresses
-  // them relative to the repository, which needs no Pages site at all.
-  const badgeBase = settings?.github_pages === false ? "" : settings?.github_pages_url || "";
+  // The badges get the Pages URL only when Pages is known to be serving them —
+  // the freshly re-checked one from above, never a guess. With no URL,
+  // `badgeMarkdown` addresses them relative to the repository, which needs no
+  // Pages site at all.
+  const badgeBase = settings?.github_pages === false ? "" : pagesUrl;
   const gami = await _buildGamificationFiles(owner, repo, branch, settings, merged, badgeBase);
   if (gami) {
     items.push(...gami.items);
     if (typeof gami.readme === "string") merged = gami.readme;
   }
 
-  if (merged !== currentText) {
+  if (!readmeReadable) {
+    dbg.error("_buildDynamicFiles(): README read failed (non-404) — skipping README this commit");
+  } else if (merged !== currentText) {
     items.push({ path: "README.md", mode: "100644", type: "blob", content: merged });
     dbg.log("_buildDynamicFiles(): README updated");
   } else {
@@ -260,7 +366,11 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
  */
 async function _buildGamificationFiles(owner, repo, branch, settings, readme, pagesUrl) {
   try {
-    const problems = await Storage.getAllProblems().catch(() => []);
+    // No `.catch(() => [])` here: a transient IndexedDB failure must skip this
+    // build (the outer catch treats badges as decoration), not masquerade as an
+    // empty library — that path computed an all-zero snapshot and committed it,
+    // which is exactly the "badges suddenly show 0" report.
+    const problems = await Storage.getAllProblems();
     const { vacations } = await Storage.getGamificationState().catch(() => ({ vacations: [] }));
     const snapshot = computeSnapshot(problems, {
       config: configFromSettings(settings),
@@ -532,8 +642,17 @@ function _buildPagesTheme(theme = null) {
 async function _readIndexMeta(owner, repo, token) {
   try {
     const file = await getContents(owner, repo, "index.json", token);
-    if (!file?.content) return null;
-    const parsed = JSON.parse(decodeBase64Utf8(file.content));
+    // The contents API inlines files only up to 1 MB — above that it returns
+    // `content: ""` with `encoding: "none"`. A full index.json crosses 1 MB
+    // easily, and treating that as "no stats" is what baked zeros into the
+    // README shields. The blob endpoint serves the same object up to 100 MB.
+    let b64 = file?.content;
+    if (!b64 && file?.sha) {
+      const blob = await apiFetch(`/repos/${owner}/${repo}/git/blobs/${file.sha}`, token);
+      b64 = blob?.content;
+    }
+    if (!b64) return null;
+    const parsed = JSON.parse(decodeBase64Utf8(b64));
     return {
       stats: parsed.stats || null,
       summary: parsed.meta?.summary || null,

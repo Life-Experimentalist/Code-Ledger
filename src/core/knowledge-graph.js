@@ -5,7 +5,13 @@
 
 import { createDebugger } from "../lib/debug.js";
 import { normalizeTag } from "./topic-resolver.js";
-import { classifyTopic, KIND, masteryScore, masteryBand } from "./topic-taxonomy.js";
+import {
+  classifyTopic,
+  KIND,
+  masteryScore,
+  masteryBand,
+  effectiveLastSolved,
+} from "./topic-taxonomy.js";
 
 const dbg = createDebugger("KnowledgeGraph");
 
@@ -73,8 +79,14 @@ function blendColors(colorsArr) {
  * @param {Array<object>} problems
  * @param {object} [customMappings] `settings.topicMappings` — alias → canonical name
  * @param {object} [topicKinds] `settings.topicKinds` — canonical name → "ds"|"algo"|"domain"
+ * @param {{ halfLifeDays?: number, regainSolves?: number }} [masteryOpts] user-tuned decay knobs
  */
-export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = {}) {
+export function buildKnowledgeGraph(
+  problems,
+  customMappings = {},
+  topicKinds = {},
+  masteryOpts = {},
+) {
   dbg.log(`buildKnowledgeGraph(): building from ${(problems || []).length} problems`);
   const nodes = new Map(); // id → node
   const edges = []; // { source, target, type }
@@ -123,7 +135,10 @@ export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = 
 
     // Normalize tags
     const rawTopics = Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : [p.topic || "Untagged"];
-    const allTopics = rawTopics.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+    // Dedup after normalizing — two raw tags can fold into the same label.
+    const allTopics = [
+      ...new Set(rawTopics.map((t) => normalizeTag(t, customMappings)).filter(Boolean)),
+    ];
     if (allTopics.length === 0) allTopics.push("Untagged");
     const primaryTopic = allTopics[0];
 
@@ -168,9 +183,12 @@ export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = 
       edges.push({ source: topicId, target: id, type: "topic-problem" });
 
       let stat = topicStats.get(topic);
-      if (!stat) topicStats.set(topic, (stat = { count: 0, lastSolved: -Infinity }));
+      if (!stat) topicStats.set(topic, (stat = { count: 0, lastSolved: -Infinity, recent: [] }));
       stat.count += 1;
-      if (Number.isFinite(ts) && ts > stat.lastSolved) stat.lastSolved = ts;
+      if (Number.isFinite(ts)) {
+        if (ts > stat.lastSolved) stat.lastSolved = ts;
+        stat.recent.push(ts);
+      }
     }
 
     // Canonical grouping
@@ -334,9 +352,16 @@ export function buildKnowledgeGraph(problems, customMappings = {}, topicKinds = 
   const now = Date.now();
   for (const node of nodes.values()) {
     if (node.type !== "topic") continue;
-    const stat = topicStats.get(node.label) || { count: 0, lastSolved: -Infinity };
+    const stat = topicStats.get(node.label) || { count: 0, lastSolved: -Infinity, recent: [] };
     node.solveCount = stat.count;
-    node.mastery = masteryScore(stat, { now });
+    // Recency decays from the Nth-most-recent solve (the regain bar), so one
+    // stray solve does not paint a rusty topic fresh. daysSince keeps the true
+    // latest for display.
+    const recent = stat.recent.sort((a, b) => b - a).slice(0, 8);
+    node.mastery = masteryScore(
+      { count: stat.count, lastSolved: effectiveLastSolved(recent, masteryOpts.regainSolves) },
+      { now, halfLifeDays: masteryOpts.halfLifeDays },
+    );
     node.band = masteryBand(node.mastery);
     node.daysSince = Number.isFinite(stat.lastSolved)
       ? Math.floor((now - stat.lastSolved) / 86_400_000)

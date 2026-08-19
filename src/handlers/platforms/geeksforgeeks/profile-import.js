@@ -18,6 +18,20 @@ const dbg = createDebugger("GFGProfileImport");
 
 const DIFFICULTY_ORDER = ["school", "basic", "easy", "medium", "hard"];
 
+/**
+ * Strip the numeric IDs GFG appends to problem titles, e.g. " 1235 102404"
+ * or " 102404". Only whitespace-separated runs of 4+ digits are IDs — a
+ * shorter trailing number is part of the title ("Power of 2", "Rotate by 90").
+ *
+ * @param {string} title
+ * @returns {string}
+ */
+export function cleanGfgTitle(title) {
+  return String(title || "")
+    .replace(/(?:\s+\d{4,})+\s*$/, "")
+    .trim();
+}
+
 function findSubmissionsObject(obj) {
   if (!obj || typeof obj !== "object") return null;
 
@@ -73,8 +87,7 @@ function scrapeDomForSubmissions() {
     if (!title || title.length > 120)
       title = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-    // Clean title: remove trailing spaces and numeric IDs e.g. " 1235 102404" or " 102404"
-    const cleanTitle = title.replace(/[\s\d]+$/, "").trim();
+    const cleanTitle = cleanGfgTitle(title);
 
     // Determine difficulty from sibling/child span text
     let difficulty = "Unknown";
@@ -263,7 +276,9 @@ export function parseSubmissionDates(result) {
  */
 async function fetchSolveDates(handle, wanted, show) {
   const dates = {};
-  if (!handle) return dates;
+  // "Anonymous" is parseProfileData's placeholder when no real handle was
+  // found — posting it would walk 18 throttled empty months for nothing.
+  if (!handle || handle === "Anonymous") return dates;
 
   const now = new Date();
   let emptyRun = 0;
@@ -369,8 +384,7 @@ async function parseProfileData() {
         // Clean slug: remove double-hyphen numeric ID suffix e.g., --102404
         const cleanSlug = cleanGfgSlug(rawSlug);
 
-        // Clean title: remove trailing spaces and numeric IDs e.g. " 1235 102404" or " 102404"
-        const cleanTitle = rawTitle.replace(/[\s\d]+$/, "").trim();
+        const cleanTitle = cleanGfgTitle(rawTitle);
 
         submissions.push({
           slug: cleanSlug,
@@ -678,8 +692,12 @@ async function runProfileImport(makeProblemId, btn) {
         if (existing.code?.trim().length > 0 || !existing._importedFromProfile) {
           continue;
         }
-        // If existing is a legacy corrupt import (contains "--"), queue it for deletion and import clean one
-        if (existing.titleSlug?.includes("--")) {
+        // If existing is a legacy corrupt import, queue it for deletion and
+        // import the clean one. "Corrupt" means cleaning would change the slug
+        // — a modern canonical slug like `geeks-island--170646` contains "--"
+        // legitimately and is a fixed point of cleanGfgSlug, so a bare
+        // includes("--") check would delete a correct record here.
+        if (existing.titleSlug && cleanGfgSlug(existing.titleSlug) !== existing.titleSlug) {
           idsToDelete.push(existing.id);
           filteredProblems.push(p);
         } else {
@@ -736,7 +754,36 @@ async function runProfileImport(makeProblemId, btn) {
       }
     }
 
-    show(`Done! Imported ${totalSaved} problem(s)${skipped > 0 ? ` · ${skipped} skipped` : ""}.`);
+    // Verify every imported URL against the GFG API first (repairing slugs the
+    // profile page got wrong, marking dead ones for review in the library),
+    // then the backdated sync runs: one commit per problem, dated to the real
+    // solve time. Fire-and-forget — the sweep plus commits can take minutes,
+    // the service worker persists its progress and resumes after a browser
+    // close, and the maintenance alarm holds its date-flattening bulk commit
+    // off while the import window is active.
+    runtime.sendMessage({ type: "GFG_VERIFY_SWEEP", thenResync: true }, (res) => {
+      if (!res?.ok) {
+        // Older worker without the sweep — fall straight through to the sync.
+        runtime.sendMessage(
+          { type: "RESYNC_ALL", mode: "individual", commitType: "feat" },
+          () => {},
+        );
+      }
+    });
+
+    // Imported records carry no code until the recovery queue fetches it, and
+    // that queue is off by default — say so, or the import looks silently broken.
+    const settings = await Storage.getSettings().catch(() => ({}));
+    const recoveryOff = (settings?.codeRecoveryQueueSpeed || "disabled") === "disabled";
+    show(
+      `Done! Imported ${totalSaved} problem(s)${skipped > 0 ? ` · ${skipped} skipped` : ""}. ` +
+        `Now checking every problem link against GFG (broken ones get flagged for review in the Library), ` +
+        `then GitHub commits run in the background — one per problem, dated to the real solve time ` +
+        `(progress in Library → Settings → Git).` +
+        (recoveryOff
+          ? " Code is fetched later by Code Recovery — enable it in Settings → Advanced."
+          : ""),
+    );
     btn.textContent = `✓ Imported ${totalSaved} solves`;
     btn.style.color = "#34d399";
     btn.style.borderColor = "rgba(52,211,153,0.4)";

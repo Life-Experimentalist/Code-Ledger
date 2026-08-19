@@ -1,0 +1,6 @@
+# Files wrangler must never upload as public assets, even if present locally.
+# Windows Explorer regenerates desktop.ini in browsed folders; it is gitignored,
+# but wrangler deploys the directory as-is, so it needs its own exclusion.
+desktop.ini
+Thumbs.db
+.DS_Store

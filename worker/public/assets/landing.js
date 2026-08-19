@@ -43,7 +43,22 @@ function markInstalled(libraryUrl, version) {
   updateInstallUI(libraryUrl, version);
 }
 
+/**
+ * The library URL arrives from a CustomEvent detail, a DOM marker attribute, or
+ * sessionStorage — all forgeable by any script running on this page (another
+ * extension's content script, for instance). Only an actual extension page URL
+ * may ever reach an href; anything else (javascript:, https:, …) is dropped.
+ */
+function safeLibraryUrl(url) {
+  try {
+    const proto = new URL(url).protocol;
+    if (proto === "chrome-extension:" || proto === "moz-extension:") return url;
+  } catch (_) {}
+  return "";
+}
+
 function updateInstallUI(libraryUrl, version) {
+  libraryUrl = safeLibraryUrl(libraryUrl);
   // Without a URL from the extension there is nothing to link to, so leave the
   // page in its install state rather than pointing anywhere.
   if (!libraryUrl) return;

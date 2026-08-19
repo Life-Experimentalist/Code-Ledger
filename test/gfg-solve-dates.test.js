@@ -27,7 +27,7 @@ globalThis.localStorage = {
   removeItem: (k) => backing.delete(k),
 };
 
-const { parseSubmissionDates } =
+const { parseSubmissionDates, cleanGfgTitle } =
   await import("../src/handlers/platforms/geeksforgeeks/profile-import.js");
 
 const ms = (iso) => Date.parse(`${iso}T00:00:00.000Z`);
@@ -110,5 +110,27 @@ describe("parseSubmissionDates", () => {
     for (const input of [null, undefined, "", 0, [], "result"]) {
       assert.deepEqual(parseSubmissionDates(input), {});
     }
+  });
+});
+
+describe("cleanGfgTitle", () => {
+  test("strips the appended numeric IDs", () => {
+    assert.equal(cleanGfgTitle("Total Decoding Messages 1235"), "Total Decoding Messages");
+    assert.equal(cleanGfgTitle("Compare Two Fractions 4438 102404"), "Compare Two Fractions");
+    assert.equal(cleanGfgTitle("Kadane's Algorithm 102404  "), "Kadane's Algorithm");
+  });
+
+  test("keeps a short trailing number that is part of the title", () => {
+    // The old /[\s\d]+$/ strip turned "Power of 2" into "Power of".
+    assert.equal(cleanGfgTitle("Power of 2"), "Power of 2");
+    assert.equal(cleanGfgTitle("Rotate a Matrix by 90"), "Rotate a Matrix by 90");
+    assert.equal(cleanGfgTitle("Sum of first n terms 121"), "Sum of first n terms 121");
+  });
+
+  test("leaves ID-free titles and junk input alone", () => {
+    assert.equal(cleanGfgTitle("Two Sum"), "Two Sum");
+    assert.equal(cleanGfgTitle("  padded  "), "padded");
+    assert.equal(cleanGfgTitle(""), "");
+    assert.equal(cleanGfgTitle(null), "");
   });
 });

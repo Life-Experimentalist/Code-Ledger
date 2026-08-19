@@ -100,7 +100,6 @@ body {
   color: var(--cl-text-muted) !important;
 }
 
-
 /* Sidebar nav active / hover */
 [data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover {
   background-color: rgba(0, 0, 0, 0.05) !important;

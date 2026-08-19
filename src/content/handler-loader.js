@@ -8,79 +8,74 @@ function isHost(domain, host) {
   return host === domain || host.endsWith(`.${domain}`);
 }
 
+// This is a classic content script, so debug.js arrives via dynamic import.
+// Until it does, logging is a no-op — a visitor's console must stay clean
+// unless they opted into debug mode. Errors always reach the console.
+let dbg = { log() {}, warn() {} };
+
+async function initLogging() {
+  try {
+    const { initDebug, createDebugger } = await import(chrome.runtime.getURL("lib/debug.js"));
+    await initDebug();
+    dbg = createDebugger("HandlerLoader");
+  } catch (e) {
+    // Non-blocking: handlers still load, they just log silently.
+  }
+}
+
 async function loadHandler() {
   const hostname = window.location.hostname;
-  console.log(`[CodeLedger:HandlerLoader] loadHandler(): detected hostname=${hostname}`);
-
-  try {
-    // Read debug state from storage so createDebugger() calls work in this context.
-    console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing debug module...`);
-    const debugUrl = chrome.runtime.getURL("lib/debug.js");
-    const { initDebug } = await import(debugUrl);
-    await initDebug();
-    console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ debug initialized`);
-  } catch (e) {
-    console.warn(
-      `[CodeLedger:HandlerLoader] loadHandler(): debug init failed (non-blocking):`,
-      e?.message,
-    );
-  }
+  await initLogging();
+  dbg.log(`loadHandler(): detected hostname=${hostname}`);
 
   try {
     if (isHost("leetcode.com", hostname)) {
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): platform detected = LeetCode`);
+      dbg.log(`loadHandler(): platform detected = LeetCode`);
       const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
       const { LeetCodeHandler } = await import(url);
       const handler = new LeetCodeHandler();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing LeetCodeHandler...`);
       await handler.init();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ LeetCodeHandler initialized`);
+      dbg.log(`loadHandler(): ✓ LeetCodeHandler initialized`);
     } else if (isHost("geeksforgeeks.org", hostname)) {
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): platform detected = GeeksForGeeks`);
+      dbg.log(`loadHandler(): platform detected = GeeksForGeeks`);
       const gfgUrl = chrome.runtime.getURL("handlers/platforms/geeksforgeeks/index.js");
       const { GFGHandler } = await import(gfgUrl);
       const gfgHandler = new GFGHandler();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing GFGHandler...`);
       await gfgHandler.init();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ GFGHandler initialized`);
+      dbg.log(`loadHandler(): ✓ GFGHandler initialized`);
     } else if (isHost("codeforces.com", hostname)) {
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): platform detected = Codeforces`);
+      dbg.log(`loadHandler(): platform detected = Codeforces`);
       const cfUrl = chrome.runtime.getURL("handlers/platforms/codeforces/index.js");
       const { CodeforcesHandler } = await import(cfUrl);
       const cfHandler = new CodeforcesHandler();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing CodeforcesHandler...`);
       await cfHandler.init();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ CodeforcesHandler initialized`);
+      dbg.log(`loadHandler(): ✓ CodeforcesHandler initialized`);
     } else if (isHost("neetcode.io", hostname)) {
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): platform detected = NeetCode`);
+      dbg.log(`loadHandler(): platform detected = NeetCode`);
       const ncUrl = chrome.runtime.getURL("handlers/platforms/neetcode/index.js");
       const { NeetCodeHandler } = await import(ncUrl);
       const ncHandler = new NeetCodeHandler();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing NeetCodeHandler...`);
       await ncHandler.init();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ NeetCodeHandler initialized`);
+      dbg.log(`loadHandler(): ✓ NeetCodeHandler initialized`);
     } else if (isHost("takeuforward.org", hostname)) {
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): platform detected = takeuforward`);
+      dbg.log(`loadHandler(): platform detected = takeuforward`);
       const tufUrl = chrome.runtime.getURL("handlers/platforms/takeuforward/index.js");
       const { TakeUForwardHandler } = await import(tufUrl);
       const tufHandler = new TakeUForwardHandler();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): initializing TakeUForwardHandler...`);
       await tufHandler.init();
-      console.log(`[CodeLedger:HandlerLoader] loadHandler(): ✓ TakeUForwardHandler initialized`);
+      dbg.log(`loadHandler(): ✓ TakeUForwardHandler initialized`);
     } else {
-      console.log(
-        `[CodeLedger:HandlerLoader] loadHandler(): hostname not recognized (${hostname}) — CodeLedger not applicable`,
-      );
+      dbg.log(`loadHandler(): hostname not recognized (${hostname}) — CodeLedger not applicable`);
     }
   } catch (err) {
+    // A failed handler means solves silently stop being captured — that must
+    // stay visible even with debug mode off.
     console.error(
       `[CodeLedger:HandlerLoader] loadHandler(): ✗ handler initialization failed:`,
       err?.message || err,
     );
   }
 }
-
-console.log(`[CodeLedger:HandlerLoader] script loaded`);
 
 // Code recovery mode: opened by code-recovery-handler.js with a flag in the URL
 const _urlParams = new URLSearchParams(window.location.search);
@@ -92,12 +87,9 @@ if (
   // server-side redirects that may strip the query string.
   const _hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   const _problemId = _urlParams.get("codeledger_problemid") || _hashParams.get("cl-pid") || "";
-  console.log(`[CodeLedger:HandlerLoader] code-fetch mode detected, problemId=${_problemId}`);
   (async () => {
-    try {
-      const { initDebug } = await import(chrome.runtime.getURL("lib/debug.js"));
-      await initDebug();
-    } catch (_) {}
+    await initLogging();
+    dbg.log(`code-fetch mode detected, problemId=${_problemId}`);
     const url = chrome.runtime.getURL("handlers/platforms/leetcode/index.js");
     const { LeetCodeHandler } = await import(url);
     await new LeetCodeHandler().handleCodeFetch(_problemId);
@@ -110,6 +102,5 @@ if (
     });
   });
 } else {
-  console.log(`[CodeLedger:HandlerLoader] calling loadHandler()...`);
   loadHandler();
 }

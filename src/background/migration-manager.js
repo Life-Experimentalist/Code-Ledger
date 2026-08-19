@@ -36,11 +36,12 @@ const OLD_LAYOUT_RE = /^topics\/[^/]+\/[^/]+\//;
  *   "two-sum::py"    → "lc-two-sum"   (LeetCode bulk import style — strip ::lang suffix)
  *   null / ""        → "gfg-{titleSlug}" (GFG bug fallback — use titleSlug)
  *
- * Idempotent: records already matching /^(lc|gfg|cf)-/ are skipped.
+ * Idempotent: records already carrying a platform prefix (lc-, gfg-, cf-, nc-,
+ * tuf-, …) are skipped.
  * When multiple old records collapse to the same new id, keeps the one with the latest timestamp.
  */
 export async function migrateProblemIds() {
-  const ALREADY_MIGRATED = /^(lc|gfg|cf)-/;
+  const ALREADY_MIGRATED = CONSTANTS.platformIdRegex();
   const problems = await Storage.getAllProblems();
   const toMigrate = problems.filter((p) => !ALREADY_MIGRATED.test(p.id || ""));
   if (toMigrate.length === 0) {
@@ -66,15 +67,24 @@ export async function migrateProblemIds() {
     }
   }
 
-  // Delete old records
+  // Insert rekeyed records BEFORE deleting the old ones: a service-worker
+  // eviction between the two steps then leaves a temporary duplicate (cleaned
+  // by the next run) instead of losing the record outright.
+  const existingById = new Map(problems.map((p) => [p.id, p]));
+  for (const [newId, record] of byNewId) {
+    // A partial earlier run may have written this record already; if the copy
+    // in storage is newer (user edits since), keep it rather than regressing.
+    const current = existingById.get(newId);
+    if (current && (current.timestamp || 0) >= (record.timestamp || 0)) continue;
+    await Storage.saveProblem(record);
+  }
+  // Now delete the old records. Old ids never carry a platform prefix, so they
+  // cannot collide with the ids just written — but guard anyway.
   const oldIds = toMigrate.map((p) => p.id || p.titleSlug).filter(Boolean);
   for (const oldId of oldIds) {
+    if (byNewId.has(oldId)) continue;
     await Storage.deleteProblem(oldId).catch(() => {});
     dbg.log(`migrateProblemIds(): deleted old ${oldId}`);
-  }
-  // Insert rekeyed records
-  for (const [, record] of byNewId) {
-    await Storage.saveProblem(record);
   }
 
   // Migrate committedSlugLangs map: rekey from "slug::lang" to "newId::lang"
@@ -121,16 +131,15 @@ export async function sanitizeGfgProblemSlugs() {
         `sanitizeGfgProblemSlugs(): migrating dirty GFG problem ${p.id} (${p.titleSlug}) -> ${newId} (${cleanSlug})`,
       );
 
-      // Delete old record
-      await Storage.deleteProblem(p.id).catch(() => {});
-
-      // Save new record
+      // Save the clean record first, then remove the dirty one — interruption
+      // between the two duplicates instead of deleting.
       const updated = {
         ...p,
         id: newId,
         titleSlug: cleanSlug,
       };
       await Storage.saveProblem(updated).catch(() => {});
+      if (p.id !== newId) await Storage.deleteProblem(p.id).catch(() => {});
       updatedCount++;
     }
   }
@@ -186,7 +195,11 @@ export async function migrateRepo() {
 
   // 1. Full repo tree
   dbg.log(`migrateRepo(): fetching complete repo tree from ${owner}/${repo}...`);
-  const treeRes = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`, token);
+  const branch = CONSTANTS.REPO_BRANCH || "main";
+  const treeRes = await git.apiFetch(
+    `/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
+    token,
+  );
   const blobs = (treeRes.tree || []).filter((f) => f.type === "blob");
   dbg.log(`migrateRepo(): found ${blobs.length} total blob(s)`);
 
@@ -257,7 +270,11 @@ export async function resetRepo() {
   const { settings, git, token, owner, repo } = await _getGitContext();
 
   // 1. All existing repo blobs
-  const treeRes = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`, token);
+  const branch = CONSTANTS.REPO_BRANCH || "main";
+  const treeRes = await git.apiFetch(
+    `/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
+    token,
+  );
   const existingPaths = new Set(
     (treeRes.tree || []).filter((f) => f.type === "blob").map((f) => f.path),
   );
@@ -330,8 +347,9 @@ export async function forceRebuildRepo() {
   const { settings, git, token, owner, repo } = await _getGitContext();
 
   // Fetch existing repo tree (best-effort)
+  const branch = CONSTANTS.REPO_BRANCH || "main";
   const treeRes = await git
-    .apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`, token)
+    .apiFetch(`/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, token)
     .catch(() => ({ tree: [] }));
 
   const existingPaths = new Set(

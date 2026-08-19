@@ -15,6 +15,7 @@ import {
   parseScopes,
   canCreatePrivateRepo,
   canWriteWorkflows,
+  dropWorkflowItems,
   canPagesServePrivateRepo,
   readAccountPlan,
   describeGitHubError,
@@ -49,6 +50,37 @@ describe("canWriteWorkflows", () => {
   test("committing under .github/workflows needs the workflow scope", () => {
     assert.equal(canWriteWorkflows(parseScopes("public_repo")), false);
     assert.equal(canWriteWorkflows(parseScopes("public_repo,workflow")), true);
+  });
+});
+
+describe("dropWorkflowItems", () => {
+  const wf = { path: ".github/workflows/deploy-pages.yml", content: "x" };
+  const wfDelete = { path: ".github/workflows/update-stats.yml", sha: null };
+  const solve = { path: "problems/two-sum/leetcode/two-sum.py", content: "y" };
+
+  test("drops workflow writes and deletions, keeps everything else", () => {
+    const out = dropWorkflowItems([wf, solve, wfDelete], null, {});
+    assert.deepEqual(out.items, [solve]);
+    assert.deepEqual(out.dropped, [wf.path, wfDelete.path]);
+  });
+
+  test("resets workflowPublished to what settings already record", () => {
+    const gami = { badgesPublished: true, workflowPublished: true };
+    // Nothing recorded before → the workflow was never pushed, so still isn't.
+    const fresh = dropWorkflowItems([wf], gami, {});
+    assert.equal(fresh.gamification.workflowPublished, false);
+    assert.equal(fresh.gamification.badgesPublished, true);
+    // Previously published → the untouchable file is still in the repository.
+    const kept = dropWorkflowItems([wfDelete], gami, { workflowPublished: true });
+    assert.equal(kept.gamification.workflowPublished, true);
+  });
+
+  test("no workflow items means nothing changes, gamification included", () => {
+    const gami = { badgesPublished: false, workflowPublished: true };
+    const out = dropWorkflowItems([solve], gami, {});
+    assert.deepEqual(out.items, [solve]);
+    assert.equal(out.gamification, gami);
+    assert.deepEqual(out.dropped, []);
   });
 });
 

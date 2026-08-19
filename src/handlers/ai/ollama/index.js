@@ -72,11 +72,14 @@ export class OllamaHandler extends BaseAIHandler {
           prompt,
           stream: false,
         }),
+        // Local models generate slowly — give them longer than cloud providers.
+        signal: AbortSignal.timeout(120_000),
       });
 
       if (!res.ok) throw new Error(`Ollama API error: ${res.status}`);
 
       const data = await res.json();
+      if (!data.response) throw new Error("Empty Ollama response");
       return data.response;
     } catch (err) {
       this.dbg.error("Ollama review failed", err);

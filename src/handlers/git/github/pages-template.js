@@ -651,7 +651,10 @@ export function getPagesHtml(opts = {}) {
     }
 
     function problemUrl(p) {
-      if (p.url) return p.url;
+      // Stored URLs are repository content — anyone who lands a commit on a
+      // public repo controls them, so restrict to http(s) exactly like the
+      // commit-URL renderer below (doubled backslashes for the same reason).
+      if (p.url && /^https?:\\/\\//i.test(String(p.url))) return p.url;
       var pl = (p.platform || '').toLowerCase();
       if (pl === 'leetcode' && p.titleSlug) return 'https://leetcode.com/problems/' + p.titleSlug + '/';
       if (pl === 'geeksforgeeks' && p.titleSlug) return 'https://www.geeksforgeeks.org/problems/' + p.titleSlug + '/';
@@ -1175,6 +1178,8 @@ export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMet
   const easy = stats?.easy || 0;
   const medium = stats?.medium || 0;
   const hard = stats?.hard || 0;
+  const languages = stats?.byLang ? Object.keys(stats.byLang).length : 0;
+  const platforms = stats?.byPlatform ? Object.keys(stats.byPlatform).length : 0;
 
   const lines = [
     "<!-- CODELEDGER_AUTO_GENERATED_START -->",
@@ -1203,6 +1208,16 @@ export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMet
       "  [![Hard](https://img.shields.io/badge/Hard-" +
       hard +
       "-ef4444?style=flat-square)](" +
+      url +
+      ")" +
+      "  [![Languages](https://img.shields.io/badge/Languages-" +
+      languages +
+      "-8b5cf6?style=flat-square)](" +
+      url +
+      ")" +
+      "  [![Platforms](https://img.shields.io/badge/Platforms-" +
+      platforms +
+      "-64748b?style=flat-square)](" +
       url +
       ")",
     "",

@@ -99,6 +99,7 @@ export class GeminiHandler extends BaseAIHandler {
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
           }),
+          signal: AbortSignal.timeout(60_000),
         });
 
         this._updateRateLimits(res.headers);

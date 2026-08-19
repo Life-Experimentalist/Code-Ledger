@@ -10,6 +10,20 @@
     color-scheme: dark;
   }
 
+  /* Native select popups ignore Tailwind's translucent classes — the option
+     list is painted by the browser from the <select>'s own color-scheme. Pin
+     it to dark and give options explicit colours, or the popup renders as a
+     white-on-white OS default. */
+  select {
+    color-scheme: dark;
+  }
+
+  select option,
+  select optgroup {
+    background-color: #111118;
+    color: #cbd5e1;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: rgba(148, 163, 184, 0.35) rgba(15, 23, 42, 0.35);
@@ -26,20 +40,12 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: linear-gradient(
-      180deg,
-      rgba(6, 182, 212, 0.35),
-      rgba(148, 163, 184, 0.35)
-    );
+    background: linear-gradient(180deg, rgba(6, 182, 212, 0.35), rgba(148, 163, 184, 0.35));
     border: 2px solid rgba(15, 23, 42, 0.35);
     border-radius: 9999px;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(
-      180deg,
-      rgba(6, 182, 212, 0.55),
-      rgba(148, 163, 184, 0.5)
-    );
+    background: linear-gradient(180deg, rgba(6, 182, 212, 0.55), rgba(148, 163, 184, 0.5));
   }
 }

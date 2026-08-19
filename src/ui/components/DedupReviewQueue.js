@@ -26,11 +26,6 @@ const dbg = createDebugger("DedupReviewQueue");
 const COUNTDOWN_SECONDS = 5;
 const AI_DECIDE_TIMEOUT_MS = 10000;
 
-function getProblemCommitKey(p) {
-  if (!p?.titleSlug || !p?.lang?.slug) return null;
-  return `${p.titleSlug}::${p.lang.slug}`;
-}
-
 function fmtDate(ts) {
   if (!ts) return "unknown";
   return new Date(ts).toLocaleDateString(undefined, {

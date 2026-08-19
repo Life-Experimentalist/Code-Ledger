@@ -95,6 +95,7 @@ export class ClaudeHandler extends BaseAIHandler {
             max_tokens: 1024,
             messages: [{ role: "user", content: prompt }],
           }),
+          signal: AbortSignal.timeout(60_000),
         });
 
         this._updateRateLimits(res.headers);
@@ -105,7 +106,12 @@ export class ClaudeHandler extends BaseAIHandler {
           });
 
         const data = await res.json();
-        return data.content?.[0]?.text || "";
+        const content = data.content?.[0]?.text || "";
+        if (!content) {
+          this.dbg.warn(`review(): empty response at attempt ${attempt + 1}/${keyCount}`);
+          throw new Error("Empty Claude response");
+        }
+        return content;
       } catch (err) {
         lastErr = err;
         this.keyPool.markFailed(key, err?.status);

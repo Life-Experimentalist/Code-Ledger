@@ -35,7 +35,13 @@ async function issuedState(query = "") {
   const location = res.headers.get("location");
   const setCookie = res.headers.get("set-cookie") || "";
   const state = new URL(location).searchParams.get("state");
-  return { res, location, setCookie, state, cookie: `cl_oauth_state=${encodeURIComponent(state)}` };
+  return {
+    res,
+    location,
+    setCookie,
+    state,
+    cookie: `__Host-cl_oauth_state=${encodeURIComponent(state)}`,
+  };
 }
 
 /* ────────────────────────────────────────────────────────────────── */
@@ -170,7 +176,7 @@ describe("OAuth callback — CSRF", () => {
     // Cookie and query agree, but the HMAC was not produced with SESSION_SECRET.
     const forged = "deadbeef.9999999999999.notavalidmac";
     const res = await req(`/api/auth/github/callback?code=abc&state=${forged}`, {
-      headers: { cookie: `cl_oauth_state=${forged}` },
+      headers: { cookie: `__Host-cl_oauth_state=${forged}` },
     });
     assert.match(await res.text(), /expired|mismatch/i);
   });
@@ -178,6 +184,40 @@ describe("OAuth callback — CSRF", () => {
   test("clears the state cookie on every callback", async () => {
     const res = await req("/api/auth/github/callback?code=abc");
     assert.match(res.headers.get("set-cookie") || "", /Max-Age=0/);
+  });
+
+  test("state cookie carries the __Host- prefix requirements", async () => {
+    const { setCookie } = await issuedState();
+    assert.match(setCookie, /^__Host-/);
+    assert.match(setCookie, /Path=\//);
+    assert.match(setCookie, /Secure/);
+    assert.doesNotMatch(setCookie, /Domain=/i);
+  });
+
+  test("a malformed state cookie reads as absent, not a 500", async () => {
+    const res = await req("/api/auth/github/callback?code=abc&state=x.1.y", {
+      headers: { cookie: "__Host-cl_oauth_state=%zz" },
+    });
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /state mismatch/i);
+  });
+
+  test("an unauthenticated ?error= callback cannot bypass state verification", async () => {
+    // Before the reorder, ?error= was honoured pre-state-check, so any drive-by
+    // GET rendered attacker-chosen text in the trusted popup.
+    const res = await req("/api/auth/github/callback?error=x&error_description=Pwned+text");
+    const body = await res.text();
+    assert.doesNotMatch(body, /Pwned text/);
+    assert.match(body, /state mismatch/i);
+  });
+
+  test("a genuine denial (valid state + ?error=) still reports the error", async () => {
+    const { cookie, state } = await issuedState();
+    const res = await req(
+      `/api/auth/github/callback?error=access_denied&error_description=User+denied&state=${encodeURIComponent(state)}`,
+      { headers: { cookie } },
+    );
+    assert.match(await res.text(), /User denied/);
   });
 });
 
@@ -251,10 +291,15 @@ describe("OAuth callback — credential type", () => {
 });
 
 describe("OAuth callback — XSS (attacker-controlled error_description)", () => {
+  // State verification now runs before the error branch, so a description only
+  // renders when the redirect carries a valid state. These tests drive the full
+  // authorize → callback flow so the escaping path is actually exercised.
   test("does not emit a raw script-closing tag from error_description", async () => {
+    const { state, cookie } = await issuedState();
     const payload = "</script><img src=x onerror=alert(1)>";
     const res = await req(
-      `/api/auth/github/callback?error=access_denied&error_description=${encodeURIComponent(payload)}`,
+      `/api/auth/github/callback?error=access_denied&error_description=${encodeURIComponent(payload)}&state=${encodeURIComponent(state)}`,
+      { headers: { cookie } },
     );
     const body = await res.text();
     // The literal breakout sequence must not survive anywhere in the document.
@@ -264,9 +309,11 @@ describe("OAuth callback — XSS (attacker-controlled error_description)", () =>
   });
 
   test("escapes quotes so the data-auth attribute cannot be broken out of", async () => {
+    const { state, cookie } = await issuedState();
     const payload = '" onload="alert(1)';
     const res = await req(
-      `/api/auth/github/callback?error=x&error_description=${encodeURIComponent(payload)}`,
+      `/api/auth/github/callback?error=x&error_description=${encodeURIComponent(payload)}&state=${encodeURIComponent(state)}`,
+      { headers: { cookie } },
     );
     const body = await res.text();
     assert.ok(!body.includes('" onload="'), "attribute breakout must be neutralised");
@@ -341,7 +388,19 @@ describe("Admin canonical upload", () => {
     assert.equal(res.status, 400);
   });
 
-  test("accepts a valid JSON upload with the right token", async () => {
+  const VALID_MAP = JSON.stringify({
+    entries: [
+      {
+        canonicalId: "two-sum",
+        canonicalTitle: "Two Sum",
+        topic: "Array",
+        difficulty: "Easy",
+        aliases: [{ platform: "leetcode", slug: "two-sum" }],
+      },
+    ],
+  });
+
+  test("accepts a valid canonical map upload with the right token", async () => {
     let stored = null;
     const kv = {
       put: async (_k, v) => {
@@ -352,13 +411,68 @@ describe("Admin canonical upload", () => {
       "/api/admin/canonical",
       {
         method: "POST",
-        body: '{"ok":true}',
+        body: VALID_MAP,
         headers: { Authorization: `Bearer ${ENV.CANONICAL_UPLOAD_TOKEN}` },
       },
       { ...ENV, CANONICAL_MAP: kv },
     );
     assert.equal(res.status, 200);
-    assert.equal(stored, '{"ok":true}');
+    assert.equal(stored, VALID_MAP);
+  });
+
+  test("rejects valid JSON that is not a canonical map", async () => {
+    // This KV value is served verbatim to every install; an arbitrary blob
+    // stored here would break canonical resolution fleet-wide.
+    let stored = null;
+    const kv = {
+      put: async (_k, v) => {
+        stored = v;
+      },
+    };
+    for (const body of ['{"ok":true}', "null", "[]", '{"entries":[{"canonicalId":"x"}]}']) {
+      const res = await req(
+        "/api/admin/canonical",
+        {
+          method: "POST",
+          body,
+          headers: { Authorization: `Bearer ${ENV.CANONICAL_UPLOAD_TOKEN}` },
+        },
+        { ...ENV, CANONICAL_MAP: kv },
+      );
+      assert.equal(res.status, 400, `expected 400 for body ${body}`);
+    }
+    assert.equal(stored, null);
+  });
+
+  test("rejects an oversized body before parsing", async () => {
+    const kv = { put: async () => {} };
+    const big = `{"entries":[${'"x",'.repeat(3 * 1024 * 1024)}"x"]}`;
+    const res = await req(
+      "/api/admin/canonical",
+      {
+        method: "POST",
+        body: big,
+        headers: { Authorization: `Bearer ${ENV.CANONICAL_UPLOAD_TOKEN}` },
+      },
+      { ...ENV, CANONICAL_MAP: kv },
+    );
+    assert.equal(res.status, 413);
+  });
+
+  test("accepts the token with surrounding whitespace trimmed from the secret", async () => {
+    // `wrangler secret put` keeps a pasted trailing newline; the guard must
+    // compare against the trimmed value, not 401 forever with no diagnostic.
+    const kv = { put: async () => {} };
+    const res = await req(
+      "/api/admin/canonical",
+      {
+        method: "POST",
+        body: VALID_MAP,
+        headers: { Authorization: `Bearer ${ENV.CANONICAL_UPLOAD_TOKEN}` },
+      },
+      { ...ENV, CANONICAL_UPLOAD_TOKEN: `${ENV.CANONICAL_UPLOAD_TOKEN}\n`, CANONICAL_MAP: kv },
+    );
+    assert.equal(res.status, 200);
   });
 });
 
@@ -382,6 +496,10 @@ describe("Health", () => {
     const body = await res.json();
     assert.equal(res.status, 200);
     assert.equal(body.ok, true);
-    assert.match(body.version, /^\d+\.\d+\.\d+$/);
+    // Compare against package.json, not just a semver shape — the shape check
+    // passed for years on exactly the stale placeholder it claimed to prevent.
+    const { readFileSync } = await import("node:fs");
+    const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+    assert.equal(body.version, pkg.version);
   });
 });

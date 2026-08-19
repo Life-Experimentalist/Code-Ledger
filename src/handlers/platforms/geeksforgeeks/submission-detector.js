@@ -31,7 +31,9 @@ export function setupSubmitHook(onAccepted) {
     btn._clHooked = true;
     btn.addEventListener("click", () => {
       dbg.log("Submit button clicked — starting result poll");
-      startResultPoll(onAccepted, () => {
+      // A resubmit before the previous poll finished supersedes it.
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = startResultPoll(onAccepted, () => {
         pollTimer = null;
       });
     });
@@ -58,6 +60,7 @@ export function setupSubmitHook(onAccepted) {
  * Poll the result panel until a terminal state (accepted/failed) or timeout.
  * @param {Function} onAccepted
  * @param {Function} onDone - called regardless of outcome
+ * @returns {number} interval id, so the caller's cleanup can cancel the poll
  */
 function startResultPoll(onAccepted, onDone) {
   let attempts = 0;
@@ -103,6 +106,8 @@ function startResultPoll(onAccepted, onDone) {
       onAccepted();
     }
   }, POLL_INTERVAL_MS);
+
+  return timer;
 }
 
 function _getResultText() {

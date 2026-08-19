@@ -214,6 +214,14 @@ export async function processSubmission(handler, page, isManual) {
       submission = detailRes.data?.submissionDetails;
       if (!submission) return false;
 
+      // `latest` can fall back to subs[0] when the accepted run has not synced
+      // into the list yet — that entry may be a failed attempt. Never
+      // auto-commit anything but statusCode 10 (Accepted).
+      if (!isManual && submission.statusCode !== 10) {
+        dbg.log(`[processSubmission] latest submission ${latest.id} is not accepted — skipping`);
+        return false;
+      }
+
       if (!submission.code) {
         const monacoCode = await handler._getCodeFromMonaco();
         if (monacoCode) submission = { ...submission, code: monacoCode };
@@ -317,6 +325,10 @@ export async function processSubmission(handler, page, isManual) {
       if (handler._submitHookObserver) {
         handler._submitHookObserver.disconnect();
         handler._submitHookObserver = null;
+      }
+      if (handler._syncBtnObserver) {
+        handler._syncBtnObserver.disconnect();
+        handler._syncBtnObserver = null;
       }
     } else {
       dbg.error("Failed to process submission", err);

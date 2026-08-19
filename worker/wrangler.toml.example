@@ -31,10 +31,12 @@ id = "<CANONICAL_KV_NAMESPACE_ID>"
 directory = "./public"
 binding = "ASSETS"
 
-[env.production]
-route = "codeledger.vkrishna04.me/*"
-# zone_id is optional when using routes; fill if you want to bind explicitly
-zone_id = "<YOUR_ZONE_ID>"
+# Route at TOP LEVEL, not under [env.production]: Wrangler named environments do
+# not inherit kv_namespaces or [assets], so `deploy --env production` would ship
+# a worker with no CANONICAL_MAP and no static pages — while the actual deploy
+# path (`npm run deploy:worker` → plain `wrangler deploy`) ignored the stanza
+# entirely. One top-level config keeps a single deploy path fully bound.
+routes = [{ pattern = "codeledger.vkrishna04.me/*", zone_id = "<YOUR_ZONE_ID>" }]
 
 # Notes:
 # - Never commit private keys or secrets into git. Use `npx wrangler secret put <NAME>`

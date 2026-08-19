@@ -93,6 +93,34 @@ export function matchAcceptedRow({ rowSlug = "", pendingSlug = "", pageSlug = ""
 }
 
 /**
+ * Does an accepted row belong to the signed-in user?
+ *
+ * Contest-wide and problemset status tables list everyone's submissions, so a
+ * matching problem slug alone is not proof of ownership: within the pending
+ * TTL, somebody else's OK on the same problem would file our still-unjudged
+ * code as accepted. A row is rejected only when it provably belongs to someone
+ * else — both handles known and different. The inline box on a problem page
+ * has no party cell, and the header handle can fail to parse; an unknown on
+ * either side must not reject, because that would kill detection for every
+ * user the markup drifts for, which is worse than the rare shared-status
+ * false accept it would stop.
+ *
+ * @param {string} rowHandle handle the row's party cell links to, "" if none
+ * @param {string} ownHandle the signed-in user's handle, "" if unknown
+ * @returns {boolean}
+ */
+export function isRowOwn(rowHandle, ownHandle) {
+  const row = String(rowHandle || "")
+    .trim()
+    .toLowerCase();
+  const own = String(ownHandle || "")
+    .trim()
+    .toLowerCase();
+  if (!row || !own) return true;
+  return row === own;
+}
+
+/**
  * Reconcile what the verdict page can see with what was captured at submit.
  *
  * The capture wins on every descriptive field, because on /contest/{id}/my the

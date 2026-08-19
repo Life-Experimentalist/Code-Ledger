@@ -8,6 +8,7 @@ import { CONSTANTS } from "../core/constants.js";
 import { cleanGfgSlug } from "../core/gfg-utils.js";
 import { cfProblemUrl } from "../core/cf-utils.js";
 import { Storage } from "../core/storage.js";
+import { storage } from "../lib/browser-compat.js";
 import { fetchGFGProblemData } from "./gfg-api.js";
 
 const dbg = createDebugger("RefreshMetadataHandler");
@@ -16,6 +17,60 @@ const refreshQueueState = {
   queue: [],
   current: null,
 };
+
+// The queue lives in storage.session so a mid-queue MV3 service-worker
+// shutdown does not silently drop the remaining tabs — session scope means it
+// also does not surprise the user with tab-opening at the next browser launch.
+function persistQueueState() {
+  storage.session
+    .set({
+      [CONSTANTS.SK.REFRESH_TAB_QUEUE]: {
+        queue: refreshQueueState.queue,
+        current: refreshQueueState.current,
+      },
+    })
+    .catch(() => {});
+}
+
+/**
+ * Restore a queue interrupted by a service-worker restart. Called from the
+ * service worker's init on every wake; a no-op when nothing was persisted.
+ */
+export async function resumeRefreshQueue() {
+  let saved;
+  try {
+    const res = await storage.session.get(CONSTANTS.SK.REFRESH_TAB_QUEUE);
+    saved = res?.[CONSTANTS.SK.REFRESH_TAB_QUEUE];
+  } catch (_) {
+    return;
+  }
+  if (!saved || (!saved.queue?.length && !saved.current)) return;
+  // In-memory state wins: if this wake already started a queue, don't clobber it.
+  if (refreshQueueState.current || refreshQueueState.queue.length > 0) return;
+
+  refreshQueueState.queue = Array.isArray(saved.queue) ? saved.queue : [];
+  refreshQueueState.current = saved.current || null;
+  dbg.log(
+    `resumeRefreshQueue(): restored ${refreshQueueState.queue.length} queued, current=${!!refreshQueueState.current}`,
+  );
+
+  if (refreshQueueState.current?.tabId != null) {
+    // The tab may have closed while the worker was asleep — its onRemoved
+    // event is gone, so waiting on it would stall the queue forever.
+    chrome.tabs.get(refreshQueueState.current.tabId, (tab) => {
+      if (chrome.runtime.lastError || !tab) {
+        refreshQueueState.current = null;
+        persistQueueState();
+        openNextRefreshTab();
+      }
+    });
+  } else {
+    // Persisted mid-creation: no tab id to wait for, so re-open the URL.
+    if (refreshQueueState.current) refreshQueueState.queue.unshift(refreshQueueState.current);
+    refreshQueueState.current = null;
+    openNextRefreshTab();
+  }
+}
 
 function openNextRefreshTab() {
   if (refreshQueueState.current || refreshQueueState.queue.length === 0) {
@@ -27,17 +82,20 @@ function openNextRefreshTab() {
 
   const next = refreshQueueState.queue.shift();
   refreshQueueState.current = next;
+  persistQueueState();
   dbg.log(`openNextRefreshTab(): opening tab for ${next.url.substring(0, 60)}...`);
 
   chrome.tabs.create({ url: next.url, active: false }, (tab) => {
     if (chrome.runtime.lastError) {
       dbg.error(`openNextRefreshTab(): ✗ failed to open tab:`, chrome.runtime.lastError.message);
       refreshQueueState.current = null;
+      persistQueueState();
       setTimeout(openNextRefreshTab, 0);
       return;
     }
 
     refreshQueueState.current = { ...next, tabId: tab.id };
+    persistQueueState();
     dbg.log(`openNextRefreshTab(): ✓ opened background tab ${tab.id} for metadata refresh`);
   });
 }
@@ -59,6 +117,7 @@ export function completeRefreshMetadata(tabId) {
     `completeRefreshMetadata(): completing tab ${refreshQueueState.current.tabId || "unknown"}`,
   );
   refreshQueueState.current = null;
+  persistQueueState();
   setTimeout(openNextRefreshTab, 0);
   return { queued: refreshQueueState.queue.length, completed: true };
 }
@@ -76,6 +135,11 @@ async function refreshGFGProblemsViaAPI(gfgProblems) {
 
   for (const problem of gfgProblems) {
     try {
+      // Verified-dead URLs can only 404 — don't count them as fetch failures.
+      if (problem.urlBroken) {
+        dbg.log(`refreshGFGProblemsViaAPI(): skipping urlBroken problem=${problem.id}`);
+        continue;
+      }
       const slug = cleanGfgSlug(problem.titleSlug || problem.id?.replace(/^gfg-/, "") || "");
       if (!slug) {
         failed++;
@@ -201,6 +265,7 @@ export async function handleRefreshMetadata(problems = []) {
       dbg.log(`handleRefreshMetadata(): queueing ${tabsQueued} URL(s) for background tab refresh`);
       refreshQueueState.queue = urlsToOpen.map((url) => ({ url }));
       refreshQueueState.current = null;
+      persistQueueState();
       openNextRefreshTab();
     }
   }

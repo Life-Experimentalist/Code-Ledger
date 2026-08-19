@@ -31,7 +31,8 @@ const app = new Hono();
 
 /* ── Constants ────────────────────────────────────────────────────── */
 
-const VERSION = "1.0.0";
+// Kept in step with package.json by dev/sync-manifests.js — do not hand-edit.
+const VERSION = "1.8.0";
 
 /** Scopes the client may request. Anything else is rejected.
  *  public_repo is the default: it can create and push to public repos but
@@ -40,7 +41,10 @@ const VERSION = "1.0.0";
 const ALLOWED_SCOPES = new Set(["public_repo", "public_repo,workflow", "repo", "repo,workflow"]);
 const DEFAULT_SCOPE = "public_repo,workflow";
 
-const STATE_COOKIE = "cl_oauth_state";
+// __Host- prefix: the browser refuses this cookie unless it is Secure, has
+// Path=/ and no Domain attribute — so a sibling subdomain of the parent zone
+// cannot plant its own state via cookie-tossing (Domain=.parent).
+const STATE_COOKIE = "__Host-cl_oauth_state";
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 /* ── CORS ─────────────────────────────────────────────────────────── */
@@ -223,7 +227,15 @@ function readCookie(c, name) {
   const raw = c.req.header("cookie") || "";
   for (const part of raw.split(";")) {
     const [k, ...v] = part.trim().split("=");
-    if (k === name) return decodeURIComponent(v.join("="));
+    if (k === name) {
+      // A cookie an attacker (or a broken client) set to malformed
+      // percent-encoding must read as absent, not throw a bare 500.
+      try {
+        return decodeURIComponent(v.join("="));
+      } catch {
+        return "";
+      }
+    }
   }
   return "";
 }
@@ -304,7 +316,9 @@ app.get("/api/auth/:provider", async (c) => {
       500,
     );
   }
-  const sessionSecret = c.env?.SESSION_SECRET;
+  // Trimmed like env(): a value pasted with a trailing newline must sign and
+  // verify with the same bytes, not silently mismatch itself.
+  const sessionSecret = String(c.env?.SESSION_SECRET || "").trim();
   if (!sessionSecret) {
     return c.text("GitHub OAuth not configured — set SESSION_SECRET", 500);
   }
@@ -331,14 +345,14 @@ app.get("/api/auth/:provider", async (c) => {
     status: 302,
     headers: {
       Location: url,
-      "Set-Cookie": `${STATE_COOKIE}=${encodeURIComponent(state)}; Path=/api/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax`,
+      "Set-Cookie": `${STATE_COOKIE}=${encodeURIComponent(state)}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`,
     },
   });
 });
 
 // GitHub OAuth callback
 app.get("/api/auth/github/callback", async (c) => {
-  const clearCookie = `${STATE_COOKIE}=; Path=/api/auth; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
+  const clearCookie = `${STATE_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
   const reply = (token, error) =>
     new Response(authCallbackHtml("github", token, error), {
       status: 200,
@@ -354,11 +368,12 @@ app.get("/api/auth/github/callback", async (c) => {
   const error = c.req.query("error");
   const errorDesc = c.req.query("error_description");
 
-  if (error) return reply("", errorDesc || error);
-  if (!code) return reply("", "No code received from GitHub");
-
-  // CSRF: the state echoed by GitHub must match the one we issued in this browser.
-  const sessionSecret = c.env?.SESSION_SECRET;
+  // CSRF: the state echoed by GitHub must match the one we issued in this
+  // browser. This runs BEFORE the ?error= branch: GitHub echoes the state on
+  // error redirects too, so a genuine denial still passes, while a bare
+  // unauthenticated GET with ?error= can no longer clear a victim's pending
+  // state cookie or render attacker-chosen text in the trusted auth popup.
+  const sessionSecret = String(c.env?.SESSION_SECRET || "").trim();
   const returned = c.req.query("state");
   const stored = readCookie(c, STATE_COOKIE);
   if (!sessionSecret) return reply("", "OAuth not configured on server");
@@ -368,6 +383,9 @@ app.get("/api/auth/github/callback", async (c) => {
   if (!(await verifyState(sessionSecret, returned))) {
     return reply("", "Authorization request expired — please start the sign-in again");
   }
+
+  if (error) return reply("", errorDesc || error);
+  if (!code) return reply("", "No code received from GitHub");
 
   const clientId = env(c, "GH_CLIENT_ID");
   const clientSecret = env(c, "GH_CLIENT_SECRET");
@@ -462,9 +480,40 @@ app.get("/api/data/canonical-map.json", async (c) => {
   }
 });
 
+/** The same shape dev/build-canonical-map.js enforces before an upload: a
+ *  non-empty entries array (bare or under `entries`), every entry carrying the
+ *  four required fields plus at least one platform alias. The KV value is
+ *  served verbatim to every install, so a malformed upload here would break
+ *  canonical resolution fleet-wide for the full cache TTL. */
+function canonicalMapProblems(json) {
+  const entries = Array.isArray(json)
+    ? json
+    : json && Array.isArray(json.entries)
+      ? json.entries
+      : null;
+  if (!entries || !entries.length) return "must contain a non-empty entries array";
+  for (const e of entries) {
+    if (!e || typeof e !== "object") return "every entry must be an object";
+    if (!e.canonicalId || !e.canonicalTitle || !e.topic || !e.difficulty) {
+      return `entry ${JSON.stringify(e.canonicalId ?? null)} is missing canonicalId/canonicalTitle/topic/difficulty`;
+    }
+    const aliases = Array.isArray(e.aliases)
+      ? e.aliases.filter((a) => a && a.platform && a.slug)
+      : e.platforms && typeof e.platforms === "object"
+        ? Object.values(e.platforms).filter(Boolean)
+        : [];
+    if (!aliases.length) return `entry ${JSON.stringify(e.canonicalId)} has no platform aliases`;
+  }
+  return "";
+}
+
+// KV values cap at 25 MB; the real map is well under 5. Anything near the
+// limit is a mistake, and letting kv.put throw would surface as a bare 500.
+const CANONICAL_MAX_BYTES = 10 * 1024 * 1024;
+
 // Canonical map: admin update (protected — deliberately no CORS headers)
 app.post("/api/admin/canonical", async (c) => {
-  const expected = c.env?.CANONICAL_UPLOAD_TOKEN;
+  const expected = String(c.env?.CANONICAL_UPLOAD_TOKEN || "").trim();
   if (!expected) return c.json({ error: "Upload not configured" }, 503);
 
   const auth = c.req.header("Authorization") || "";
@@ -477,11 +526,18 @@ app.post("/api/admin/canonical", async (c) => {
   if (!kv) return c.json({ error: "KV not bound" }, 500);
 
   const body = await c.req.text();
+  if (new TextEncoder().encode(body).length > CANONICAL_MAX_BYTES) {
+    return c.json({ error: "Body exceeds the canonical map size limit" }, 413);
+  }
+  let json;
   try {
-    JSON.parse(body);
+    json = JSON.parse(body);
   } catch {
     return c.json({ error: "Body must be valid JSON" }, 400);
   }
+  const problem = canonicalMapProblems(json);
+  if (problem) return c.json({ error: `Not a canonical map: ${problem}` }, 400);
+
   await kv.put("canonical-map", body);
   return c.json({ ok: true }, 200);
 });

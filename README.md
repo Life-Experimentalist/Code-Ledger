@@ -15,7 +15,7 @@ _Zero-click commits · AI code review · Live analytics · Knowledge graph · Bu
 
 <br/>
 
-[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members) [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Version](https://img.shields.io/badge/version-1.0.0-blueviolet?style=flat-square)](docs/CHANGELOG.md)
+[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members) [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Version](https://img.shields.io/badge/version-1.8.0-blueviolet?style=flat-square)](docs/CHANGELOG.md)
 
 <br/>
 
@@ -283,7 +283,7 @@ One optional exception: **Anonymous Usage Stats**, off unless you turn it on in 
 npm install
 npm run build:css        # Tailwind → src/ui/styles/compiled.css
 npm run build            # CSS + per-target dist/
-npm run lint             # tsc --noEmit type check
+npm run lint             # dev/typecheck.js — tsc --checkJs over every file, fails on undefined names
 npm run format           # prettier over src, dev, worker
 npm test                 # node:test — extension + worker suites
 npm run validate:openapi # worker routes must match the spec

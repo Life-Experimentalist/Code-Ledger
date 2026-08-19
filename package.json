@@ -63,6 +63,7 @@
     "emoji:scan": "node dev/emoji-tools.js scan",
     "emoji:repair": "node dev/emoji-tools.js repair",
     "vendor:preact": "node dev/generate-preact-vendor.js",
+  "vendor:vis": "node dev/generate-vis-vendor.js",
     "vendor:refresh-script": "node dev/generate-refresh-script.js",
     "test": "node --test --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\"",
     "test:watch": "node --test --watch --test-reporter=spec \"test/**/*.test.js\" \"worker/test/**/*.test.js\"",
@@ -72,7 +73,9 @@
   "dependencies": {
     "chart.js": "^4.4.8",
     "htm": "^3.1.1",
-    "preact": "^10.26.4"
+    "preact": "^10.26.4",
+    "vis-data": "8.0.5",
+    "vis-network": "10.1.1"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.0.0",

@@ -64,6 +64,18 @@ function main() {
     streakFloorDay: cfg.installDay || undefined,
   });
 
+  // A recompute that scores zero solves from a non-empty index means the
+  // records carry no usable timestamps — bad data, not a bad streak. The badges
+  // currently in the repo were written by the extension from the full records;
+  // overwriting them with zeros is strictly worse than leaving them a day stale.
+  if (snapshot.totalSolves === 0 && index.problems.length > 0) {
+    console.error(
+      `computed 0 solves from ${index.problems.length} indexed problem(s) — ` +
+        "refusing to overwrite badges with zeros",
+    );
+    process.exit(0);
+  }
+
   let changed = 0;
   const files = [
     ...buildBadgeFiles(snapshot, { username: cfg.username }),
