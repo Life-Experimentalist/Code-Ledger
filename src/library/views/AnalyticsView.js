@@ -936,8 +936,6 @@ export function AnalyticsView({ problems, onNavigate }) {
         )}
       </div>
 
-      ${snapshot ? html`<${Achievements} snapshot=${snapshot} settings=${settings} />` : ""}
-
       <!-- Platform breakdown -->
       ${Object.keys(stats.platforms).length > 0
         ? html`
@@ -1003,6 +1001,11 @@ export function AnalyticsView({ problems, onNavigate }) {
 
       <!-- Heatmap: full width, so the cells autofit as large as the row allows -->
       <${HeatMap} problems=${problems} />
+
+      <!-- Achievements sit after the numbers, not before them: this page is
+           opened to read the analytics, and a wall of trophy tiles above the
+           platform breakdown pushed the actual data below the fold. -->
+      ${snapshot ? html`<${Achievements} snapshot=${snapshot} settings=${settings} />` : ""}
 
       <!-- Charts row -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">

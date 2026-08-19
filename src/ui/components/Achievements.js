@@ -48,19 +48,40 @@ export function Achievements({ snapshot, settings }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Locked tiles fold away once there is something earned to look at: a wall
+  // of grey placeholders above the earned ones read as clutter, but for a fresh
+  // ledger with nothing earned yet the locked list IS the content — it is what
+  // there is to aim at — so it starts open.
+  const earnedList = list.filter((a) => a.earned);
+  const lockedList = list.filter((a) => !a.earned);
+  const [showLocked, setShowLocked] = useState(earnedList.length === 0);
+
   if (!list.length) return "";
 
-  const earned = list.filter((a) => a.earned).length;
+  const earned = earnedList.length;
+  const shown = showLocked ? [...earnedList, ...lockedList] : earnedList;
 
   return html`
     <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-3">
-      <div class="flex items-baseline justify-between">
+      <div class="flex items-baseline justify-between gap-3">
         <span class="text-[10px] uppercase tracking-widest text-slate-500">Achievements</span>
-        <span class="text-[10px] text-slate-500 font-mono">${earned} / ${list.length}</span>
+        <div class="flex items-baseline gap-3">
+          ${lockedList.length > 0 &&
+          earnedList.length > 0 &&
+          html`
+            <button
+              onClick=${() => setShowLocked(!showLocked)}
+              class="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              ${showLocked ? "Hide locked" : `Show locked (${lockedList.length})`}
+            </button>
+          `}
+          <span class="text-[10px] text-slate-500 font-mono">${earned} / ${list.length}</span>
+        </div>
       </div>
 
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-        ${list.map(
+        ${shown.map(
           (a) => html`
             <div
               key=${a.id}

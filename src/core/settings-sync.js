@@ -82,6 +82,7 @@ export const PORTABLE_SETTINGS = [
   "gamificationBadgeStyle",
   "gamificationShieldsStyle",
   "gamificationBadgePicks",
+  "gamificationAchievementPicks",
   "gamificationActions",
   "gamificationActionsHour",
   // Party: a list of public repository references. It carries no credentials

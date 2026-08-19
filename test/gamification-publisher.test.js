@@ -24,6 +24,7 @@ import {
   workflowYaml,
   resolveBadgeStyle,
   resolveBadgePicks,
+  resolveAchievementPicks,
   readmeOptions,
 } from "../src/core/gamification-publisher.js";
 import { README_START, README_END, upsertReadmeBlock } from "../src/core/badge-svg.js";
@@ -537,5 +538,101 @@ describe("badge picks", () => {
       ["streak", "level"],
     );
     assert.equal(buildRefreshConfig({ settings: {} }).picks, null);
+  });
+});
+
+describe("achievement picks", () => {
+  // A snapshot with something earned to filter. The base SNAPSHOT deliberately
+  // has none, which is exactly the case where the README line is absent anyway.
+  const EARNED_SNAPSHOT = {
+    ...SNAPSHOT,
+    achievements: [
+      { id: "first-blood", emoji: "🩸", name: "First Blood", earned: true },
+      { id: "century", emoji: "💯", name: "Century", earned: true },
+      { id: "half-k", emoji: "🎯", name: "Half-K", earned: false },
+    ],
+  };
+
+  test("no selection means every earned achievement", () => {
+    assert.equal(resolveAchievementPicks({}), undefined);
+    assert.equal(
+      resolveAchievementPicks({ gamificationAchievementPicks: "first-blood" }),
+      undefined,
+    );
+  });
+
+  test("unknown ids are dropped", () => {
+    assert.deepEqual(
+      resolveAchievementPicks({ gamificationAchievementPicks: ["century", "wat", "first-blood"] }),
+      ["century", "first-blood"],
+    );
+  });
+
+  test("an empty selection is honoured as 'showcase nothing'", () => {
+    // The deliberate difference from resolveBadgePicks: badges have a separate
+    // README switch to remove the row, so an empty picks list there is treated
+    // as a mis-save. Achievements have only this selection — unticking them all
+    // is the one way to keep the line out of the README, so [] must survive.
+    assert.deepEqual(resolveAchievementPicks({ gamificationAchievementPicks: [] }), []);
+    assert.deepEqual(resolveAchievementPicks({ gamificationAchievementPicks: ["nope"] }), []);
+  });
+
+  test("the selection narrows the achievements line in the README", () => {
+    const plan = buildPublishPlan({
+      snapshot: EARNED_SNAPSHOT,
+      settings: { gamificationAchievementPicks: ["first-blood"] },
+      readme: "# Ledger\n",
+      pagesUrl: "https://octocat.github.io/CodeLedger",
+    });
+    const written = plan.files.find((f) => f.path === "README.md").content;
+    assert.ok(written.includes("🩸 First Blood"));
+    assert.ok(!written.includes("💯 Century"), "an unpicked achievement should not be listed");
+  });
+
+  test("no selection showcases every earned achievement, never locked ones", () => {
+    const plan = buildPublishPlan({
+      snapshot: EARNED_SNAPSHOT,
+      settings: {},
+      readme: "# Ledger\n",
+      pagesUrl: "https://octocat.github.io/CodeLedger",
+    });
+    const written = plan.files.find((f) => f.path === "README.md").content;
+    assert.ok(written.includes("🩸 First Blood"));
+    assert.ok(written.includes("💯 Century"));
+    assert.ok(!written.includes("Half-K"), "an unearned achievement never appears");
+  });
+
+  test("an empty selection removes the line entirely", () => {
+    const plan = buildPublishPlan({
+      snapshot: EARNED_SNAPSHOT,
+      settings: { gamificationAchievementPicks: [] },
+      readme: "# Ledger\n",
+      pagesUrl: "https://octocat.github.io/CodeLedger",
+    });
+    const written = plan.files.find((f) => f.path === "README.md").content;
+    assert.ok(!written.includes("First Blood"));
+    assert.ok(!written.includes("Century"));
+  });
+
+  test("readmeOptions carries the selection", () => {
+    assert.deepEqual(
+      readmeOptions({ settings: { gamificationAchievementPicks: ["century"] } }).achievementPicks,
+      ["century"],
+    );
+    assert.equal(readmeOptions({ settings: {} }).achievementPicks, undefined);
+  });
+
+  test("the selection travels to the scheduled refresh", () => {
+    assert.deepEqual(
+      buildRefreshConfig({ settings: { gamificationAchievementPicks: ["century"] } })
+        .achievementPicks,
+      ["century"],
+    );
+    // null means "all earned"; [] is an explicit "none" the Action must keep.
+    assert.equal(buildRefreshConfig({ settings: {} }).achievementPicks, null);
+    assert.deepEqual(
+      buildRefreshConfig({ settings: { gamificationAchievementPicks: [] } }).achievementPicks,
+      [],
+    );
   });
 });
