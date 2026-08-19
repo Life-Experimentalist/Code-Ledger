@@ -29,7 +29,7 @@ const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
-import { computeSnapshot, configFromSettings } from "../../core/gamification.js";
+import { computeSnapshot, configFromSettings, ACHIEVEMENTS } from "../../core/gamification.js";
 import { badgeStats } from "../../core/badge-svg.js";
 import { isGamificationActive } from "../../core/feature-flags.js";
 import {
@@ -49,6 +49,11 @@ import {
   normalizeFriends,
   summarizeIndex,
   topicGap,
+  metricLeaders,
+  headToHead,
+  catchUpDays,
+  achievementGap,
+  lastNDays,
   fetchFriendStats,
 } from "../../core/party.js";
 
@@ -88,7 +93,188 @@ function Freshness({ asOf, today }) {
   >`;
 }
 
-function Detail({ summary, mineTopics }) {
+// Achievement ids in a friend's stats.json are the same ids this build earns
+// locally, so the local catalogue supplies emoji and names. An id from a newer
+// version than this one renders as its raw id rather than being hidden.
+const ACH_META = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
+const achLabel = (id) => {
+  const meta = ACH_META[id];
+  return meta ? `${meta.emoji} ${meta.name}` : id;
+};
+
+const MEDALS = ["🥇", "🥈", "🥉"];
+const METRIC_EMOJI = {
+  totalPoints: "🏆",
+  currentStreak: "🔥",
+  longestStreak: "🏔️",
+  totalSolves: "💪",
+  level: "⭐",
+};
+
+function Podium({ rows }) {
+  const top = rows.filter((r) => r.rank).slice(0, 3);
+  if (top.length < 2) return "";
+  // Classic podium order: second on the left, winner in the middle, third on
+  // the right. The heights are the theatre; the numbers are the truth.
+  const order = top.length === 3 ? [top[1], top[0], top[2]] : [top[1], top[0]];
+  const heights = { 1: "h-24", 2: "h-16", 3: "h-12" };
+  return html`
+    <div class="flex items-end gap-2 max-w-3xl pt-2">
+      ${order.map(
+        (r) => html`
+          <div class="flex-1 flex flex-col items-center gap-1 min-w-0">
+            <span class="text-xl leading-none">${MEDALS[r.rank - 1]}</span>
+            <p class="text-xs truncate max-w-full ${r.self ? "text-cyan-300" : "text-slate-300"}">
+              ${r.label}
+            </p>
+            <p class="text-[11px] text-slate-500 tabular-nums">${r.value}</p>
+            <div
+              class="w-full rounded-t-lg border border-b-0 ${r.self
+                ? "bg-cyan-500/15 border-cyan-500/25"
+                : "bg-white/5 border-white/10"} ${heights[r.rank] || "h-12"}"
+            ></div>
+          </div>
+        `,
+      )}
+    </div>
+  `;
+}
+
+function LeadersStrip({ leaders }) {
+  const held = METRICS.filter((m) => leaders[m.id]);
+  if (held.length < 2) return "";
+  return html`
+    <div class="flex flex-wrap gap-1.5 max-w-3xl">
+      ${held.map(
+        (m) => html`
+          <span
+            title="${m.label}: ${leaders[m.id].value}"
+            class="px-2 py-1 rounded-md bg-white/[0.03] border border-white/10 text-[11px] ${leaders[
+              m.id
+            ].id === "__me"
+              ? "text-cyan-300"
+              : "text-slate-400"}"
+          >
+            ${METRIC_EMOJI[m.id] || "🏅"} ${m.label}:${" "}
+            <span class="font-medium">${leaders[m.id].label}</span>
+          </span>
+        `,
+      )}
+    </div>
+  `;
+}
+
+function Duel({ mine, theirs, theirLabel }) {
+  const duel = headToHead(mine, theirs);
+  if (!duel.length) return "";
+  const points = duel.find((r) => r.id === "totalPoints");
+  const chase = points && points.diff < 0 ? catchUpDays(-points.diff, mine.dailyTargetPoints) : 0;
+  const ach = achievementGap(mine.achievements, theirs.achievements);
+
+  return html`
+    <div class="mt-3 pt-3 border-t border-white/5 space-y-3">
+      <div>
+        <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
+          You vs ${theirLabel}
+        </p>
+        <div class="grid gap-1">
+          ${duel.map(
+            (r) => html`
+              <div class="flex items-center gap-2 text-[12px]">
+                <span
+                  class="w-16 text-right tabular-nums ${r.diff > 0
+                    ? "text-emerald-300"
+                    : "text-slate-400"}"
+                  >${r.mine}</span
+                >
+                <span class="flex-1 text-center text-slate-500">${r.label}</span>
+                <span class="w-16 tabular-nums ${r.diff < 0 ? "text-amber-300" : "text-slate-400"}"
+                  >${r.theirs}</span
+                >
+              </div>
+            `,
+          )}
+        </div>
+        ${chase
+          ? html`<p class="text-[11px] text-slate-500 mt-1.5">
+              ${-points.diff} pts behind — about ${chase} day${chase === 1 ? "" : "s"} of hitting
+              your daily target (${mine.dailyTargetPoints} pts) to close it.
+            </p>`
+          : ""}
+      </div>
+
+      ${ach.onlyTheirs.length || ach.onlyMine.length
+        ? html`
+            <div class="grid sm:grid-cols-2 gap-3">
+              <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                  They have, you don't
+                </p>
+                <div class="flex flex-wrap gap-1.5">
+                  ${ach.onlyTheirs.length
+                    ? ach.onlyTheirs.map(
+                        (id) => html`
+                          <span
+                            class="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200"
+                            >${achLabel(id)}</span
+                          >
+                        `,
+                      )
+                    : html`<span class="text-[11px] text-slate-600">Nothing — clean sweep.</span>`}
+                </div>
+              </div>
+              <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                  You have, they don't
+                </p>
+                <div class="flex flex-wrap gap-1.5">
+                  ${ach.onlyMine.length
+                    ? ach.onlyMine.map(
+                        (id) => html`
+                          <span
+                            class="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-200"
+                            >${achLabel(id)}</span
+                          >
+                        `,
+                      )
+                    : html`<span class="text-[11px] text-slate-600">Nothing yet.</span>`}
+                </div>
+              </div>
+            </div>
+          `
+        : ""}
+      ${ach.shared.length
+        ? html`<p class="text-[11px] text-slate-600">
+            ${ach.shared.length} achievement${ach.shared.length === 1 ? "" : "s"} you both hold.
+          </p>`
+        : ""}
+    </div>
+  `;
+}
+
+function ActivityStrip({ days, today }) {
+  const series = lastNDays(days, today || new Date().toISOString().slice(0, 10), 30);
+  if (!series.length) return "";
+  const max = Math.max(1, ...series.map((d) => d.count));
+  return html`
+    <div>
+      <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Their last 30 days</p>
+      <div class="flex items-end gap-[2px] h-8">
+        ${series.map(
+          (d) => html`
+            <div
+              title="${d.day}: ${d.count} solve${d.count === 1 ? "" : "s"}"
+              class="flex-1 rounded-sm ${d.count ? "bg-violet-400/60" : "bg-white/5"}"
+              style=${{ height: d.count ? `${Math.max(15, (d.count / max) * 100)}%` : "3px" }}
+            ></div>
+          `,
+        )}
+      </div>
+    </div>
+  `;
+}
+
+function Detail({ summary, mineTopics, today }) {
   const gap = topicGap(mineTopics, summary.topics);
   const cell = (label, value) => html`
     <div>
@@ -117,6 +303,8 @@ function Detail({ summary, mineTopics }) {
             ${summary.counted} entries.
           </p>`
         : ""}
+
+      <${ActivityStrip} days=${summary.days} today=${today} />
 
       <div>
         <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Their top topics</p>
@@ -314,8 +502,8 @@ export function PartyView({ problems, settings, onSettingsChange }) {
     }
   };
 
-  const rows = useMemo(() => {
-    const entries = friends.map((f) => ({
+  const entries = useMemo(() => {
+    const list = friends.map((f) => ({
       id: f.id,
       label: friendLabel(f),
       friend: f,
@@ -323,10 +511,14 @@ export function PartyView({ problems, settings, onSettingsChange }) {
       error: results[f.id]?.ok ? "" : results[f.id]?.error || "",
     }));
     if (mine?.stats) {
-      entries.unshift({ id: "__me", label: "You", stats: mine.stats, self: true });
+      list.unshift({ id: "__me", label: "You", stats: mine.stats, self: true });
     }
-    return compareRows(entries, metric);
-  }, [friends, results, mine, metric]);
+    return list;
+  }, [friends, results, mine]);
+
+  const rows = useMemo(() => compareRows(entries, metric), [entries, metric]);
+  const leaders = useMemo(() => metricLeaders(entries), [entries]);
+  const myValue = mine?.stats ? mine.stats[metric] || 0 : null;
 
   const shareUrl = useMemo(
     () => buildCompareUrl(myRef ? [myRef, ...friends] : friends),
@@ -447,6 +639,9 @@ export function PartyView({ problems, settings, onSettingsChange }) {
           `
         : ""}
 
+      <${Podium} rows=${rows} />
+      <${LeadersStrip} leaders=${leaders} />
+
       <div class="space-y-2 max-w-3xl">
         ${rows.map((row) => {
           const detail = row.friend ? details[row.friend.id] : null;
@@ -459,7 +654,7 @@ export function PartyView({ problems, settings, onSettingsChange }) {
             >
               <div class="flex items-center gap-3">
                 <span class="w-6 text-center text-xs text-slate-500"
-                  >${row.rank ? `#${row.rank}` : "—"}</span
+                  >${row.rank ? (row.rank <= 3 ? MEDALS[row.rank - 1] : `#${row.rank}`) : "—"}</span
                 >
                 <div class="flex-1 min-w-0">
                   <div class="flex items-baseline gap-2">
@@ -471,6 +666,20 @@ export function PartyView({ problems, settings, onSettingsChange }) {
                           rel="noopener noreferrer"
                           class="text-[11px] text-slate-600 hover:text-slate-400 shrink-0"
                           >${row.friend.owner}/${row.friend.repo}</a
+                        >`
+                      : ""}
+                    ${!row.self && row.value !== null && myValue !== null
+                      ? html`<span
+                          class="text-[10px] shrink-0 px-1.5 py-0.5 rounded ${row.value > myValue
+                            ? "bg-amber-500/10 text-amber-300/90"
+                            : row.value < myValue
+                              ? "bg-emerald-500/10 text-emerald-300/90"
+                              : "bg-white/5 text-slate-500"}"
+                          >${row.value > myValue
+                            ? `+${row.value - myValue} vs you`
+                            : row.value < myValue
+                              ? `−${myValue - row.value} vs you`
+                              : "tied with you"}</span
                         >`
                       : ""}
                   </div>
@@ -516,6 +725,9 @@ export function PartyView({ problems, settings, onSettingsChange }) {
                   : ""}
               </div>
 
+              ${open && mine?.stats && row.stats
+                ? html`<${Duel} mine=${mine.stats} theirs=${row.stats} theirLabel=${row.label} />`
+                : ""}
               ${open && detail?.loading
                 ? html`<p class="mt-3 pt-3 border-t border-white/5 text-[11px] text-slate-500">
                     Reading their ledger…
@@ -527,7 +739,11 @@ export function PartyView({ problems, settings, onSettingsChange }) {
                   </p>`
                 : ""}
               ${open && detail?.summary
-                ? html`<${Detail} summary=${detail.summary} mineTopics=${myTopics} />`
+                ? html`<${Detail}
+                    summary=${detail.summary}
+                    mineTopics=${myTopics}
+                    today=${mine?.today}
+                  />`
                 : ""}
             </div>
           `;
