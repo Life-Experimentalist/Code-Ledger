@@ -57,6 +57,33 @@ function safeLibraryUrl(url) {
   return "";
 }
 
+/**
+ * A web page left-clicking straight into an extension URL is refused by the
+ * browser unless the page is web-accessible, and even then a same-tab
+ * navigation loses the landing page. So a plain left click is relayed instead:
+ * CODELEDGER_OPEN_LIBRARY → presence-marker.js → background tabs.create, which
+ * is allowed everywhere. Modified clicks (middle, ctrl/cmd/shift) fall through
+ * to the href, which the extension manifest lists as web-accessible for this
+ * origin.
+ */
+function relayOpenClick(event) {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return;
+  event.preventDefault();
+  window.dispatchEvent(new CustomEvent("CODELEDGER_OPEN_LIBRARY"));
+}
+
+function makeLibraryControl(el, libraryUrl) {
+  el.href = libraryUrl;
+  // The config.json store-link override must not stomp a control that has
+  // already become the library link.
+  el.dataset.clState = "library";
+  if (!el.dataset.clRelay) {
+    el.dataset.clRelay = "1";
+    el.addEventListener("click", relayOpenClick);
+  }
+}
+
 function updateInstallUI(libraryUrl, version) {
   libraryUrl = safeLibraryUrl(libraryUrl);
   // Without a URL from the extension there is nothing to link to, so leave the
@@ -66,14 +93,14 @@ function updateInstallUI(libraryUrl, version) {
   const btn = document.getElementById("install-btn");
   if (btn) {
     btn.textContent = "📚 Open Library";
-    btn.href = libraryUrl;
+    makeLibraryControl(btn, libraryUrl);
     btn.classList.remove("btn-primary");
     btn.classList.add("btn-success");
     if (version) btn.title = `Extension v${version} detected`;
   }
 
   document.querySelectorAll("[data-cl-open]").forEach((el) => {
-    el.href = libraryUrl;
+    makeLibraryControl(el, libraryUrl);
     el.hidden = false;
   });
 
@@ -170,6 +197,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   initReveal();
   initScrollProgress();
 
+  // ── Listen for CustomEvent handshake (works for Firefox + all Chromium) ──
+  // Armed before anything awaits: presence-marker.js starts firing at
+  // document_end and only retries for ~2.5 s, so a listener attached after a
+  // slow config.json fetch could miss every event.
+  let detected = false;
+  window.addEventListener("CODELEDGER_HANDSHAKE", (e) => {
+    if (detected) return;
+    const { libraryUrl, version } = e.detail || {};
+    // A handshake without a usable URL proves nothing (Firefox delivers a null
+    // detail from extension versions that predate cloneInto) — leave
+    // `detected` unset so the DOM-marker fallback still gets its chance.
+    if (!safeLibraryUrl(libraryUrl)) return;
+    detected = true;
+    markInstalled(libraryUrl, version);
+  });
+
+  // ── Check sessionStorage cache (no flicker on refresh) ──────────────────
+  const cachedLibrary = sessionStorage.getItem(SS_KEY_LIBRARY);
+  const cachedVersion = sessionStorage.getItem(SS_KEY_VERSION);
+  if (sessionStorage.getItem(SS_KEY_INSTALLED) && safeLibraryUrl(cachedLibrary)) {
+    updateInstallUI(cachedLibrary, cachedVersion);
+    detected = true;
+  }
+
   // ── Store links ──────────────────────────────────────────────────────────
   // index.html already carries working hrefs so the page functions without
   // scripting. config.json is allowed to override them, which is how a store
@@ -182,29 +233,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const override = (id, url) => {
     const el = document.getElementById(id);
-    if (el && url) el.href = url;
+    if (el && url && el.dataset.clState !== "library") el.href = url;
   };
   override("install-btn", config.chrome_store);
   override("install-btn-chrome", config.chrome_store);
   override("install-btn-firefox", config.firefox_store);
   override("install-btn-github", config.github_releases);
-
-  // ── Check sessionStorage cache first (no flicker) ───────────────────────
-  let detected = false;
-  const cachedLibrary = sessionStorage.getItem(SS_KEY_LIBRARY);
-  const cachedVersion = sessionStorage.getItem(SS_KEY_VERSION);
-  if (sessionStorage.getItem(SS_KEY_INSTALLED) && cachedLibrary) {
-    updateInstallUI(cachedLibrary, cachedVersion);
-    detected = true;
-  }
-
-  // ── Listen for CustomEvent handshake (works for Firefox + all Chromium) ──
-  window.addEventListener("CODELEDGER_HANDSHAKE", (e) => {
-    if (detected) return;
-    detected = true;
-    const { libraryUrl, version } = e.detail || {};
-    markInstalled(libraryUrl, version);
-  });
 
   // ── Fallback: DOM marker (MutationObserver) ──────────────────────────────
   if (!detected) {

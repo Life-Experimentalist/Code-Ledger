@@ -84,7 +84,13 @@
   // ── 2. CustomEvent handshake (robust cross-browser detection) ────────────
   const detail = { version, libraryUrl, installed: true };
   const fire = () => {
-    window.dispatchEvent(new CustomEvent("CODELEDGER_HANDSHAKE", { detail }));
+    // Firefox Xray vision hides content-script objects from the page — its
+    // listener would see e.detail === null. cloneInto() (a Firefox sandbox
+    // global) exports the object into the page compartment; Chrome has no
+    // cloneInto and needs none.
+    const clone = globalThis.cloneInto;
+    const pageDetail = typeof clone === "function" ? clone(detail, window) : detail;
+    window.dispatchEvent(new CustomEvent("CODELEDGER_HANDSHAKE", { detail: pageDetail }));
   };
 
   fire(); // immediate
@@ -99,6 +105,20 @@
       dbg.log(`✓ retry loop complete (10 retries sent)`);
     }
   }, 250);
+
+  // ── 3. Open-library relay ────────────────────────────────────────────────
+  // A web page cannot reliably navigate to an extension URL itself, so a click
+  // on an "Open Library" control dispatches this event and the background opens
+  // the tab via tabs.create. The event carries no data — the worst a hostile
+  // page script on this origin can do is open the user's own library.
+  window.addEventListener("CODELEDGER_OPEN_LIBRARY", () => {
+    dbg.log(`CODELEDGER_OPEN_LIBRARY received — asking background to open the library`);
+    try {
+      Promise.resolve(_rt.sendMessage({ type: "OPEN_LIBRARY" })).catch(noop);
+    } catch (_) {
+      /* extension context torn down — nothing to open */
+    }
+  });
 
   // ── OAuth relay ───────────────────────────────────────────────────────────
   //
