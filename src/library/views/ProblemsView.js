@@ -17,7 +17,8 @@ import { getProblemCommitKey } from "../../core/lang-utils.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
 import { cfProblemUrl } from "../../core/cf-utils.js";
-import { isAIActive } from "../../core/feature-flags.js";
+import { isAIActive, isGamificationActive } from "../../core/feature-flags.js";
+import { loadSnapshot } from "../../core/gamification-state.js";
 import { classifyTopic, KIND_ORDER, KIND_LABEL_PLURAL } from "../../core/topic-taxonomy.js";
 
 const PLATFORMS = [
@@ -105,6 +106,18 @@ export function ProblemsView({
 
   const isExtension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
   const aiOn = isAIActive(settings);
+  const streaksOn = isGamificationActive(settings);
+  const [streak, setStreak] = useState(null);
+
+  // The compact strip below is the landing page's read of the same snapshot
+  // Party renders in full — it recomputes when the solve list changes so a
+  // fresh commit moves the numbers without a reload.
+  useEffect(() => {
+    if (!streaksOn) return;
+    loadSnapshot(settings)
+      .then(setStreak)
+      .catch(() => {});
+  }, [streaksOn, (problems || []).length]);
   // Reviews already written stay filterable after the last provider is switched
   // off — they are the user's own text, not a live feature.
   const hasStoredReviews = (problems || []).some((p) => p.aiReview);
@@ -551,67 +564,93 @@ export function ProblemsView({
       isExtension &&
       (queueStats?.pending > 0 || queueStats?.processing > 0 || reviewQueueMsg)
         ? html`
-            <div
-              class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs"
-            >
-              <button
-                onClick=${() => setShowQueueModal(true)}
-                class="flex items-center gap-2 text-violet-300 hover:text-violet-100 transition-colors text-left"
-              >
-                ${queueStats?.pending > 0 || queueStats?.processing > 0
-                  ? html`
-                      <span
-                        class="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"
-                      ></span>
-                      <span
-                        >AI reviews:
-                        ${queueStats?.processing > 0
-                          ? html`<span class="text-violet-200"
-                                >${queueStats.processing} running</span
-                              >
-                              · `
-                          : ""}
-                        ${queueStats?.pending || 0}
-                        queued${queueStats?.failed > 0
-                          ? html` ·
-                              <span class="text-rose-400">${queueStats.failed} failed</span>`
-                          : ""}</span
-                      >
-                    `
-                  : ""}
-                ${reviewQueueMsg
-                  ? html`<span class="text-emerald-400">${reviewQueueMsg}</span>`
-                  : ""}
-              </button>
-              <div class="flex items-center gap-2">
+            <div class="rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <button
                   onClick=${() => setShowQueueModal(true)}
-                  class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors text-[11px]"
+                  class="flex items-center gap-2.5 text-left group"
+                  title="View queue details"
                 >
-                  View queue
+                  <span class="relative flex h-2 w-2 shrink-0">
+                    <span
+                      class="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-60"
+                    ></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-violet-400"></span>
+                  </span>
+                  <span
+                    class="text-xs font-medium text-violet-200 group-hover:text-violet-100 transition-colors"
+                    >AI review queue</span
+                  >
+                  <span class="flex items-center gap-1.5 text-[11px]">
+                    ${queueStats?.processing > 0
+                      ? html`<span
+                          class="px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/30 text-violet-200"
+                          >${queueStats.processing} running</span
+                        >`
+                      : ""}
+                    ${queueStats?.pending > 0
+                      ? html`<span
+                          class="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300"
+                          >${queueStats.pending} queued</span
+                        >`
+                      : ""}
+                    ${queueStats?.done > 0
+                      ? html`<span
+                          class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
+                          >${queueStats.done} done</span
+                        >`
+                      : ""}
+                    ${queueStats?.failed > 0
+                      ? html`<span
+                          class="px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/25 text-rose-300"
+                          >${queueStats.failed} failed</span
+                        >`
+                      : ""}
+                  </span>
+                  ${reviewQueueMsg
+                    ? html`<span class="text-[11px] text-emerald-400">${reviewQueueMsg}</span>`
+                    : ""}
                 </button>
-                <button
-                  onClick=${handleRunQueueNow}
-                  disabled=${reviewQueueBusy}
-                  class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors text-[11px] disabled:opacity-40"
-                >
-                  Process now
-                </button>
-                <button
-                  onClick=${handleCancelQueue}
-                  disabled=${reviewQueueBusy}
-                  class="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-colors text-[11px] disabled:opacity-40"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick=${handleQueueAllReviews}
-                  disabled=${reviewQueueBusy}
-                  class="px-2.5 py-1 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40 text-[11px]"
-                >
-                  ${reviewQueueBusy ? "Queuing…" : "Re-queue all"}
-                </button>
+                <div class="flex items-center gap-2 text-[11px]">
+                  <button
+                    onClick=${() => setShowQueueModal(true)}
+                    class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                  >
+                    View queue
+                  </button>
+                  <button
+                    onClick=${handleRunQueueNow}
+                    disabled=${reviewQueueBusy}
+                    class="px-2.5 py-1 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40"
+                  >
+                    Process now
+                  </button>
+                  <button
+                    onClick=${handleCancelQueue}
+                    disabled=${reviewQueueBusy}
+                    class="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-40"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick=${handleQueueAllReviews}
+                    disabled=${reviewQueueBusy}
+                    class="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 transition-colors disabled:opacity-40"
+                  >
+                    ${reviewQueueBusy ? "Queuing…" : "Re-queue all"}
+                  </button>
+                </div>
               </div>
+              ${queueStats?.total > 0
+                ? html`
+                    <div class="mt-2.5 h-1 rounded-full bg-black/40 overflow-hidden">
+                      <div
+                        class="h-full bg-violet-400 transition-[width]"
+                        style=${`width:${Math.round(((queueStats.done + queueStats.failed) / queueStats.total) * 100)}%`}
+                      ></div>
+                    </div>
+                  `
+                : ""}
             </div>
           `
         : aiOn &&
@@ -649,6 +688,64 @@ export function ProblemsView({
               </div>
             `
           : ""}
+
+      <!-- Streak strip — the landing-page glance at what Party shows in full -->
+      ${streaksOn && streak
+        ? html`
+            <button
+              onClick=${() => onNavigate?.("party")}
+              title="Open the Party tab"
+              class="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] transition-colors text-left"
+            >
+              <span class="flex items-baseline gap-1.5">
+                <span class="text-base leading-none">🔥</span>
+                <span
+                  class="text-lg font-bold ${streak.currentStreak > 0
+                    ? "text-amber-300"
+                    : "text-slate-600"}"
+                  >${streak.currentStreak}</span
+                >
+                <span class="text-[10px] uppercase tracking-widest text-slate-500"
+                  >${streak.currentStreak === 1 ? "day" : "days"}</span
+                >
+              </span>
+              <span class="flex items-center gap-2 flex-1 min-w-[140px]">
+                <span class="flex-1 h-1.5 rounded-full bg-black/40 overflow-hidden">
+                  <span
+                    class="block h-full transition-[width] ${streak.todayDone ||
+                    streak.vacationActive
+                      ? "bg-emerald-400"
+                      : "bg-cyan-400"}"
+                    style=${`width:${
+                      streak.todayDone || streak.vacationActive
+                        ? 100
+                        : Math.round(
+                            Math.min(
+                              1,
+                              (streak.todayPoints || 0) / Math.max(1, streak.effectiveTarget || 1),
+                            ) * 100,
+                          )
+                    }%`}
+                  ></span>
+                </span>
+                <span class="text-[11px] text-slate-400 whitespace-nowrap">
+                  ${streak.vacationActive
+                    ? "Vacation — streak safe"
+                    : streak.todayDone
+                      ? "Today's target met"
+                      : `${streak.todayPoints || 0} / ${Math.max(1, streak.effectiveTarget || 1)} pts today`}
+                </span>
+              </span>
+              <span class="flex items-baseline gap-3 text-[11px] text-slate-500">
+                ${streak.freezes > 0
+                  ? html`<span title="Streak freezes banked">❄ ${streak.freezes}</span>`
+                  : ""}
+                <span title=${streak.level?.name || ""}>Lv ${streak.level?.level ?? 1}</span>
+                <span class="text-slate-600">→</span>
+              </span>
+            </button>
+          `
+        : ""}
 
       <!-- Platform hub -->
       <div class="grid grid-cols-3 gap-4">

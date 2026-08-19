@@ -8,7 +8,6 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
-import { isAIActive } from "../../core/feature-flags.js";
 
 import { PanelGeneral } from "../settings-panels/PanelGeneral.js";
 import { PanelAI } from "../settings-panels/PanelAI.js";
@@ -17,7 +16,6 @@ import { PanelPlatforms } from "../settings-panels/PanelPlatforms.js";
 import { PanelGamification } from "../settings-panels/PanelGamification.js";
 import { PanelPrivacy } from "../settings-panels/PanelPrivacy.js";
 import { PanelBackups } from "../settings-panels/PanelBackups.js";
-import { PanelBehaviorBank } from "../settings-panels/PanelBehaviorBank.js";
 import { PanelAdvanced } from "../settings-panels/PanelAdvanced.js";
 
 const NAV_ITEMS = [
@@ -28,7 +26,6 @@ const NAV_ITEMS = [
   { id: "streaks", emoji: "🔥", label: "Streaks" },
   { id: "privacy", emoji: "🔒", label: "Privacy" },
   { id: "backups", emoji: "💾", label: "Backups" },
-  { id: "bank", emoji: "🧠", label: "Behaviour Bank" },
   { id: "advanced", emoji: "⚙️", label: "Advanced" },
 ];
 
@@ -41,7 +38,6 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
     "streaks",
     "privacy",
     "backups",
-    "bank",
     "advanced",
   ]);
   const initPanel = getQueryParam("settingsTab", "general");
@@ -56,12 +52,8 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
     updateQueryParams({ settingsTab: id });
   }
 
-  // The bank holds nothing but AI-written insights and the skills they draw on,
-  // so it follows the AI switch. The AI panel itself always stays — it is where
-  // the switch is turned back on.
-  const aiOn = isAIActive(settings);
-  const navItems = NAV_ITEMS.filter((item) => item.id !== "bank" || aiOn);
-  const shownPanel = activePanel === "bank" && !aiOn ? "general" : activePanel;
+  const navItems = NAV_ITEMS;
+  const shownPanel = activePanel;
 
   function renderPanel() {
     const props = { settings, onSettingsChange, onSetupRepo, onConnect };
@@ -80,8 +72,6 @@ export function SettingsPageView({ settings, onSettingsChange, onSetupRepo, onCo
         return html`<${PanelPrivacy} ...${props} onGoToPanel=${goToPanel} />`;
       case "backups":
         return html`<${PanelBackups} ...${props} />`;
-      case "bank":
-        return html`<${PanelBehaviorBank} ...${props} />`;
       case "advanced":
         return html`<${PanelAdvanced} ...${props} />`;
       default:

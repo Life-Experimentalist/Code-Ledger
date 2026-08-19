@@ -29,6 +29,60 @@ const SS_KEY_LIBRARY = "cl_ext_library_url";
 const SS_KEY_VERSION = "cl_ext_version";
 
 /**
+ * PWA install, gated on the extension.
+ *
+ * The installed app is nothing but this page in its own window — its whole
+ * value is the "Open Library" relay into the extension. So the install button
+ * appears only when both halves exist: the browser handed us a
+ * beforeinstallprompt event AND the extension handshake succeeded. Either one
+ * alone keeps it hidden (already-installed app windows never get the event,
+ * which also stops us re-offering inside the app itself).
+ */
+let deferredInstallPrompt = null;
+let extensionDetected = false;
+
+function maybeShowPwaInstall() {
+  const btn = document.getElementById("pwa-install-btn");
+  if (!btn) return;
+  btn.hidden = !(deferredInstallPrompt && extensionDetected);
+}
+
+function initPwa() {
+  if ("serviceWorker" in navigator) {
+    // Registration failing (http, private mode) only costs offline support.
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    maybeShowPwaInstall();
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    maybeShowPwaInstall();
+  });
+
+  const btn = document.getElementById("pwa-install-btn");
+  if (btn) {
+    btn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (!deferredInstallPrompt) return;
+      const prompt = deferredInstallPrompt;
+      // A prompt event is single-use; drop it either way and let a future
+      // beforeinstallprompt re-arm the button if the user dismissed.
+      deferredInstallPrompt = null;
+      maybeShowPwaInstall();
+      try {
+        prompt.prompt();
+        await prompt.userChoice;
+      } catch (_) {}
+    });
+  }
+}
+
+/**
  * The library is a page inside the extension. There is no hosted copy, so
  * without the extension there is nothing to open — every library control stays
  * hidden until the handshake proves it is installed. Linking these to /library
@@ -106,6 +160,9 @@ function updateInstallUI(libraryUrl, version) {
 
   const badge = document.getElementById("ext-detected-badge");
   if (badge) badge.hidden = false;
+
+  extensionDetected = true;
+  maybeShowPwaInstall();
 }
 
 function waitForDomMarker(timeoutMs = 3000) {
@@ -196,6 +253,7 @@ function initScrollProgress() {
 document.addEventListener("DOMContentLoaded", async () => {
   initReveal();
   initScrollProgress();
+  initPwa();
 
   // ── Listen for CustomEvent handshake (works for Firefox + all Chromium) ──
   // Armed before anything awaits: presence-marker.js starts firing at

@@ -17,7 +17,12 @@ const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
 import { createDebugger } from "../../lib/debug.js";
-import { computeSnapshot, configFromSettings, DEFAULT_CONFIG } from "../../core/gamification.js";
+import {
+  computeSnapshot,
+  configFromSettings,
+  DEFAULT_CONFIG,
+  dayKey,
+} from "../../core/gamification.js";
 import { badge, badgeSpecs, BADGE_NAMES, BADGE_ALT, DEFAULT_PICKS } from "../../core/badge-svg.js";
 import { SHIELDS_STYLES } from "../../core/badge-shields.js";
 import { isGamificationActive, visibleAchievements } from "../../core/feature-flags.js";
@@ -105,6 +110,12 @@ function Row({ on, onClick, disabled, title, children }) {
 
 export function PanelGamification({ settings, onSettingsChange }) {
   const [snapshot, setSnapshot] = useState(null);
+  const [vacations, setVacations] = useState([]);
+  // Bumped after every vacation edit so the preview effect re-reads state.
+  const [vacationsVersion, setVacationsVersion] = useState(0);
+  const [vacStart, setVacStart] = useState("");
+  const [vacEnd, setVacEnd] = useState("");
+  const [vacNote, setVacNote] = useState("");
 
   const s = settings || {};
   const active = isGamificationActive(s);
@@ -129,7 +140,10 @@ export function PanelGamification({ settings, onSettingsChange }) {
           vacations: state?.vacations || [],
           streakFloorDay: s.installDay || undefined,
         });
-        if (live) setSnapshot(next);
+        if (live) {
+          setSnapshot(next);
+          setVacations(state?.vacations || []);
+        }
       } catch (e) {
         dbg.warn("preview snapshot failed:", e?.message || e);
       }
@@ -143,6 +157,7 @@ export function PanelGamification({ settings, onSettingsChange }) {
     s.maxFreezes,
     s.penaltyMultiplier,
     s.installDay,
+    vacationsVersion,
   ]);
 
   const specs = snapshot ? badgeSpecs(snapshot) : null;
@@ -182,6 +197,36 @@ export function PanelGamification({ settings, onSettingsChange }) {
     const value = raw === "" ? undefined : Number(raw);
     if (value !== undefined && !Number.isFinite(value)) return;
     onSettingsChange?.(key, value);
+  };
+
+  // The numbers the tunables actually produce, clamped the same way
+  // computeStreak clamps them — so the sentence below never promises a
+  // behaviour the engine refuses to run (a 0 target, a sub-1× penalty).
+  const cfg = configFromSettings(s);
+  const targetPts = Math.max(1, Math.round(cfg.dailyTargetPoints));
+  const freezePts = Math.round(targetPts * Math.max(1, cfg.freezeEarnMultiplier));
+  const buyBackPts = Math.ceil(Math.max(1, cfg.penaltyMultiplier) * targetPts);
+
+  const todayKey = dayKey(Date.now(), cfg.utcOffsetMinutes);
+  const openVacation = vacations.find((v) => v && !v.end);
+
+  const addVacation = async () => {
+    const start = vacStart || todayKey;
+    await Storage.addVacation(start, vacEnd || null, vacNote.trim());
+    setVacStart("");
+    setVacEnd("");
+    setVacNote("");
+    setVacationsVersion((v) => v + 1);
+  };
+
+  const endVacationToday = async () => {
+    await Storage.endVacation(todayKey);
+    setVacationsVersion((v) => v + 1);
+  };
+
+  const removeVacation = async (start) => {
+    await Storage.deleteVacation(start);
+    setVacationsVersion((v) => v + 1);
   };
 
   return html`
@@ -402,6 +447,11 @@ export function PanelGamification({ settings, onSettingsChange }) {
           <p class="text-[11px] text-slate-500 leading-snug">
             Easy is worth 10, Medium 25, Hard 50. Leave a field blank to use the default.
           </p>
+          <p class="text-[11px] text-cyan-300/80 leading-snug">
+            With your numbers: a day closes at <b>${targetPts}</b> pts, a freeze is banked at
+            <b> ${freezePts}</b> pts in one day, and buying back a missed day costs
+            <b> ${buyBackPts}</b> pts.
+          </p>
           ${TUNABLES.map(
             ({ key, label, unit, hint, min, max, step }) => html`
               <div key=${key} class="flex items-start gap-3">
@@ -424,6 +474,106 @@ export function PanelGamification({ settings, onSettingsChange }) {
               </div>
             `,
           )}
+        </div>
+
+        <!-- Vacations -->
+        <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
+          <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Vacations</h3>
+          <p class="text-[11px] text-slate-500 leading-snug">
+            A vacation day is neutral — it neither extends nor breaks the streak, and no points are
+            expected. Declare one before you leave or backdate it after; leave the end date blank
+            for an open-ended break. For ${cfg.iceBreakerDays || DEFAULT_CONFIG.iceBreakerDays}
+            day${(cfg.iceBreakerDays || DEFAULT_CONFIG.iceBreakerDays) !== 1 ? "s" : ""} after a
+            vacation ends, the daily target is reduced while you warm back up.
+          </p>
+
+          ${openVacation
+            ? html`
+                <div
+                  class="flex items-center justify-between gap-3 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/25"
+                >
+                  <p class="text-xs text-cyan-200">
+                    On vacation since <b>${openVacation.start}</b> — the streak is paused.
+                  </p>
+                  <button
+                    onClick=${endVacationToday}
+                    class="shrink-0 px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-medium hover:bg-cyan-500/30 transition-colors"
+                  >
+                    End today
+                  </button>
+                </div>
+              `
+            : ""}
+          ${vacations.length > 0
+            ? html`
+                <div class="space-y-2">
+                  ${vacations.map(
+                    (v) => html`
+                      <div
+                        key=${v.start}
+                        class="flex items-center gap-3 p-2 rounded-lg bg-white/5 border border-white/10"
+                      >
+                        <span class="text-base leading-none">🏖️</span>
+                        <div class="flex-1 min-w-0">
+                          <p class="text-xs text-slate-300">
+                            ${v.start} → ${v.end || "ongoing"}
+                          </p>
+                          ${v.note
+                            ? html`<p class="text-[11px] text-slate-500 truncate">${v.note}</p>`
+                            : ""}
+                        </div>
+                        <button
+                          onClick=${() => removeVacation(v.start)}
+                          title="Delete this vacation"
+                          class="shrink-0 px-2 py-1 rounded text-rose-400/70 hover:text-rose-300 hover:bg-rose-500/10 text-xs transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    `,
+                  )}
+                </div>
+              `
+            : html`<p class="text-[11px] text-slate-600 italic">No vacations declared.</p>`}
+
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
+            <label class="block">
+              <span class="block text-xs font-medium text-slate-400 mb-1.5">Start</span>
+              <input
+                type="date"
+                value=${vacStart}
+                onChange=${(e) => setVacStart(e.target.value)}
+                style="color-scheme:dark"
+                class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500/40"
+              />
+            </label>
+            <label class="block">
+              <span class="block text-xs font-medium text-slate-400 mb-1.5">End — optional</span>
+              <input
+                type="date"
+                value=${vacEnd}
+                onChange=${(e) => setVacEnd(e.target.value)}
+                style="color-scheme:dark"
+                class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500/40"
+              />
+            </label>
+            <label class="block">
+              <span class="block text-xs font-medium text-slate-400 mb-1.5">Note — optional</span>
+              <input
+                type="text"
+                placeholder="Exams, travel…"
+                value=${vacNote}
+                onChange=${(e) => setVacNote(e.target.value)}
+                class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500/40"
+              />
+            </label>
+            <button
+              onClick=${addVacation}
+              class="px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-widest hover:bg-cyan-500/20 transition-colors"
+            >
+              ${vacStart ? "Add vacation" : "Start today"}
+            </button>
+          </div>
         </div>
 
         <!-- Scheduled refresh -->

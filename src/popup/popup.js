@@ -14,6 +14,7 @@ import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.
 import { isAIActive, isGamificationActive } from "../core/feature-flags.js";
 import { loadSnapshot } from "../core/gamification-state.js";
 import { countByDifficulty, loadUserDifficultyMap } from "../core/difficulty-map.js";
+import { pendingCommitStatus, formatRetryEta } from "../core/pending-commits.js";
 
 const dbg = createDebugger("PopupApp");
 
@@ -59,7 +60,7 @@ function StreakStrip({ snapshot }) {
           ${snapshot.freezes > 0
             ? html`<span title="Streak freezes earned">❄ ${snapshot.freezes}</span>`
             : ""}
-          <span>Lv ${snapshot.level}</span>
+          <span title=${snapshot.level?.name || ""}>Lv ${snapshot.level?.level ?? 1}</span>
         </div>
       </div>
       <div class="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden">
@@ -91,6 +92,7 @@ function PopupApp() {
   const [pendingConflicts, setPendingConflicts] = useState(0);
   const [settings, setSettings] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
+  const [pending, setPending] = useState({ total: 0, stale: 0, nextRetryAt: null });
 
   useEffect(() => {
     Promise.all([Storage.getAllProblems(), loadUserDifficultyMap()]).then(([problems, diffMap]) => {
@@ -117,6 +119,12 @@ function PopupApp() {
         }
       })
       .catch(() => {});
+    // The popup stays open long enough for a retry to land, so keep the count
+    // honest with a light poll instead of a one-shot read.
+    const readPending = () => pendingCommitStatus().then(setPending).catch(() => {});
+    readPending();
+    const timer = setInterval(readPending, 15 * 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const openLibrary = (tab = "solutions", settingsTab = null) => {
@@ -223,6 +231,27 @@ function PopupApp() {
             `}
       </div>
 
+      ${pending.stale > 0
+        ? html`
+            <button
+              onClick=${() => openLibrary("solutions")}
+              class="w-full mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-left hover:bg-amber-500/20 transition-colors"
+            >
+              <span class="text-amber-400 text-base leading-none">⏳</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-[11px] font-medium text-amber-300">
+                  ${pending.stale} solve${pending.stale !== 1 ? "s" : ""} waiting to reach GitHub
+                </p>
+                <p class="text-[10px] text-amber-500/80 truncate">
+                  ${formatRetryEta(pending.nextRetryAt)
+                    ? `Next retry ${formatRetryEta(pending.nextRetryAt)}`
+                    : "Saved locally — retried automatically"}
+                </p>
+              </div>
+              <span class="text-amber-500 text-xs shrink-0">→</span>
+            </button>
+          `
+        : ""}
       ${pendingConflicts > 0
         ? html`
             <button

@@ -413,6 +413,16 @@
           <a href="#" id="hero-library-btn" class="btn btn-secondary" data-cl-open hidden
             >📚 Open Library</a
           >
+          <!--
+            Desktop-app install. Stays hidden unless BOTH are true: the browser
+            fired beforeinstallprompt AND the extension handshake proved an
+            install — the app window is only useful as a launcher for the
+            extension's library, so offering it to visitors without the
+            extension would install a dead shell. landing.js owns the gating.
+          -->
+          <a href="#" id="pwa-install-btn" class="btn btn-secondary" hidden
+            >🖥 Install desktop app</a
+          >
           <a
             href="https://github.com/Life-Experimentalist/Code-Ledger"
             target="_blank"
