@@ -903,9 +903,7 @@ export function AnalyticsView({ problems, onNavigate }) {
         punchCard: stats.hourMatrix,
       },
       monthlyDifficulty: stats.monthsDiff,
-      platforms: Object.fromEntries(
-        Object.entries(stats.platforms).map(([k, v]) => [k, v.total]),
-      ),
+      platforms: Object.fromEntries(Object.entries(stats.platforms).map(([k, v]) => [k, v.total])),
       languages: stats.langs,
       topTopics: Object.entries(stats.topics)
         .sort((a, b) => b[1].total - a[1].total)
@@ -1362,7 +1360,12 @@ export function AnalyticsView({ problems, onNavigate }) {
                 plugins: {
                   legend: {
                     position: "bottom",
-                    labels: { color: "#94a3b8", usePointStyle: true, boxWidth: 8, font: { size: 10 } },
+                    labels: {
+                      color: "#94a3b8",
+                      usePointStyle: true,
+                      boxWidth: 8,
+                      font: { size: 10 },
+                    },
                   },
                 },
               }}
@@ -1389,7 +1392,8 @@ export function AnalyticsView({ problems, onNavigate }) {
                         </div>
                       `;
                     const m = Math.floor(secs / 60);
-                    const val = m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m ${secs % 60}s`;
+                    const val =
+                      m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m ${secs % 60}s`;
                     return html`
                       <div key=${diff} class="flex items-center justify-between">
                         <span class="text-sm font-medium" style=${{ color }}>${diff}</span>
@@ -1481,9 +1485,9 @@ export function AnalyticsView({ problems, onNavigate }) {
               AI-Ready Insights Export
             </h3>
             <p class="mt-1 text-xs text-slate-500 leading-snug">
-              Everything above as one JSON object — totals, streaks, punch card, monthly
-              difficulty mix, topics, solve times. Paste it into any AI chat and ask what to
-              practice next. No problem titles or code included.
+              Everything above as one JSON object — totals, streaks, punch card, monthly difficulty
+              mix, topics, solve times. Paste it into any AI chat and ask what to practice next. No
+              problem titles or code included.
             </p>
           </div>
           <button
