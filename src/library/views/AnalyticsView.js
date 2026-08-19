@@ -12,6 +12,8 @@ import { createDebugger } from "../../lib/debug.js";
 
 const dbg = createDebugger("AnalyticsView");
 
+const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 import { ProblemModal } from "../components/ProblemModal.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { CONSTANTS } from "../../core/constants.js";
@@ -434,6 +436,14 @@ export function AnalyticsView({ problems, onNavigate }) {
       weeks: {},
       months: {},
       dayOfWeek: [0, 0, 0, 0, 0, 0, 0],
+      // 7×24 solve counts (day-of-week × hour-of-day) — the punch card, and the
+      // most AI-inferenceable shape here: "when does this person actually solve".
+      hourMatrix: Array.from({ length: 7 }, () => new Array(24).fill(0)),
+      peakHour: null,
+      // Per-month difficulty mix, parallel to `months` — shows progression from
+      // Easy-heavy to Medium/Hard-heavy over the year.
+      monthsDiff: {},
+      solveTimeByDiff: {},
       bestDay: { name: "—", count: 0 },
       currentStreak: 0,
       longestStreak: 0,
@@ -444,8 +454,6 @@ export function AnalyticsView({ problems, onNavigate }) {
       uniqueProblems: 0, // Count of unique problems solved
       multiLangCount: 0, // Count of problems solved in 2+ languages
     };
-
-    const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     // Pre-build last 12 weeks slots
     const dNow = new Date();
@@ -460,6 +468,7 @@ export function AnalyticsView({ problems, onNavigate }) {
       const d = new Date(dNow.getFullYear(), dNow.getMonth() - i, 1);
       const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       s.months[mStr] = 0;
+      s.monthsDiff[mStr] = { easy: 0, medium: 0, hard: 0 };
     }
 
     // Build day map for streak calculation
@@ -514,9 +523,16 @@ export function AnalyticsView({ problems, onNavigate }) {
       // Monthly activity
       const mStr = `${solvedDate.getFullYear()}-${String(solvedDate.getMonth() + 1).padStart(2, "0")}`;
       if (s.months[mStr] !== undefined) s.months[mStr]++;
+      const mdiff = s.monthsDiff[mStr];
+      if (mdiff) {
+        if (cat === "Easy") mdiff.easy++;
+        else if (cat === "Medium") mdiff.medium++;
+        else if (cat === "Hard") mdiff.hard++;
+      }
 
       // Day of week activity
       s.dayOfWeek[solvedDate.getDay()]++;
+      s.hourMatrix[solvedDate.getDay()][solvedDate.getHours()]++;
 
       const ds = dateStr(solvedDate);
       dayMap[ds] = (dayMap[ds] || 0) + 1;
@@ -560,12 +576,28 @@ export function AnalyticsView({ problems, onNavigate }) {
       s.bestDay = { name: DOW_NAMES[maxDow], count: s.dayOfWeek[maxDow] };
     }
 
+    // Peak solving hour across the whole matrix
+    if (s.total > 0) {
+      const hourTotals = new Array(24).fill(0);
+      s.hourMatrix.forEach((row) => row.forEach((n, h) => (hourTotals[h] += n)));
+      const maxH = hourTotals.reduce((best, n, h) => (n > hourTotals[best] ? h : best), 0);
+      if (hourTotals[maxH] > 0) s.peakHour = maxH;
+    }
+
     // Average solve time (only problems that have elapsedSeconds)
     const timed = problems.filter((p) => p.elapsedSeconds > 0);
     if (timed.length > 0) {
       s.avgSolveSeconds = Math.round(
         timed.reduce((acc, p) => acc + p.elapsedSeconds, 0) / timed.length,
       );
+      // Median per difficulty — medians because one left-open tab would wreck a mean
+      ["Easy", "Medium", "Hard"].forEach((diff) => {
+        const secs = timed
+          .filter((p) => mapDifficulty(p.difficulty, userMap) === diff)
+          .map((p) => p.elapsedSeconds)
+          .sort((a, b) => a - b);
+        if (secs.length > 0) s.solveTimeByDiff[diff] = secs[Math.floor(secs.length / 2)];
+      });
     }
 
     return s;
@@ -801,6 +833,33 @@ export function AnalyticsView({ problems, onNavigate }) {
           },
         ],
       },
+      difficultyTrendBar: {
+        labels: Object.keys(stats.monthsDiff).map((m) => {
+          const [yr, mo] = m.split("-");
+          const d = new Date(parseInt(yr), parseInt(mo) - 1, 1);
+          return d.toLocaleString("default", { month: "short" }) + " '" + yr.slice(2);
+        }),
+        datasets: [
+          {
+            label: "Easy",
+            data: Object.values(stats.monthsDiff).map((m) => m.easy),
+            backgroundColor: "#10b981",
+            borderRadius: 3,
+          },
+          {
+            label: "Medium",
+            data: Object.values(stats.monthsDiff).map((m) => m.medium),
+            backgroundColor: "#f59e0b",
+            borderRadius: 3,
+          },
+          {
+            label: "Hard",
+            data: Object.values(stats.monthsDiff).map((m) => m.hard),
+            backgroundColor: "#ef4444",
+            borderRadius: 3,
+          },
+        ],
+      },
       dayOfWeekBar: {
         labels: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
         datasets: [
@@ -816,6 +875,59 @@ export function AnalyticsView({ problems, onNavigate }) {
       },
     };
   }, [stats, topicsByType, activeTopicTab]);
+
+  // One JSON object that any AI can consume without seeing the raw solves —
+  // the same shape the Pages report embeds, so a prompt written against one
+  // works against the other.
+  const [copiedInsights, setCopiedInsights] = useState(false);
+  const insights = useMemo(
+    () => ({
+      generatedAt: new Date().toISOString(),
+      totals: {
+        solved: stats.total,
+        easy: stats.easy,
+        medium: stats.medium,
+        hard: stats.hard,
+        unknown: stats.unknown,
+      },
+      streak: {
+        current: snapshot ? snapshot.currentStreak : stats.currentStreak,
+        longest: snapshot ? snapshot.longestStreak : stats.longestStreak,
+      },
+      activity: {
+        last7Days: stats.last7Days,
+        last30Days: stats.last30Days,
+        bestDayOfWeek: stats.bestDay.count > 0 ? stats.bestDay.name : null,
+        peakHour: stats.peakHour,
+        byDayOfWeek: stats.dayOfWeek,
+        punchCard: stats.hourMatrix,
+      },
+      monthlyDifficulty: stats.monthsDiff,
+      platforms: Object.fromEntries(
+        Object.entries(stats.platforms).map(([k, v]) => [k, v.total]),
+      ),
+      languages: stats.langs,
+      topTopics: Object.entries(stats.topics)
+        .sort((a, b) => b[1].total - a[1].total)
+        .slice(0, 15)
+        .map(([topic, c]) => ({ topic, count: c.total })),
+      solveTime: {
+        avgSeconds: stats.avgSolveSeconds,
+        medianSecondsByDifficulty: stats.solveTimeByDiff,
+      },
+    }),
+    [stats, snapshot],
+  );
+
+  const copyInsights = useCallback(() => {
+    navigator.clipboard
+      .writeText(JSON.stringify(insights, null, 2))
+      .then(() => {
+        setCopiedInsights(true);
+        setTimeout(() => setCopiedInsights(false), 2000);
+      })
+      .catch((e) => dbg.warn("clipboard write failed", e));
+  }, [insights]);
 
   const activeTopics = activeTopicTab === "ds" ? topicsByType.ds : topicsByType.algo;
   const topTopics = activeTopics.slice(0, 8);
@@ -1218,6 +1330,170 @@ export function AnalyticsView({ problems, onNavigate }) {
               }}
             />
           </div>
+        </div>
+      </div>
+
+      <!-- Difficulty progression + solve-time medians -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div
+          class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col lg:col-span-2 h-72"
+        >
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+            Difficulty Progression (12 Months)
+          </h3>
+          <div class="flex-1 min-h-0">
+            <${ChartWrapper}
+              type="bar"
+              data=${chartData.difficultyTrendBar}
+              options=${{
+                scales: {
+                  y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: { color: "rgba(255,255,255,0.05)" },
+                    ticks: { color: "#64748b", precision: 0 },
+                  },
+                  x: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: { color: "#64748b" },
+                  },
+                },
+                plugins: {
+                  legend: {
+                    position: "bottom",
+                    labels: { color: "#94a3b8", usePointStyle: true, boxWidth: 8, font: { size: 10 } },
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+
+        <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col h-72">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+            Solve Time by Difficulty
+          </h3>
+          ${Object.keys(stats.solveTimeByDiff).length > 0
+            ? html`
+                <div class="flex-1 flex flex-col justify-center gap-4">
+                  ${["Easy", "Medium", "Hard"].map((diff) => {
+                    const secs = stats.solveTimeByDiff[diff];
+                    const color =
+                      diff === "Easy" ? "#10b981" : diff === "Medium" ? "#f59e0b" : "#ef4444";
+                    if (!secs)
+                      return html`
+                        <div key=${diff} class="flex items-center justify-between">
+                          <span class="text-sm" style=${{ color }}>${diff}</span>
+                          <span class="text-xs text-slate-600">no timed solves</span>
+                        </div>
+                      `;
+                    const m = Math.floor(secs / 60);
+                    const val = m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m ${secs % 60}s`;
+                    return html`
+                      <div key=${diff} class="flex items-center justify-between">
+                        <span class="text-sm font-medium" style=${{ color }}>${diff}</span>
+                        <span class="text-lg font-bold text-white">${val}</span>
+                      </div>
+                    `;
+                  })}
+                  <p class="text-[10px] text-slate-600 leading-snug">
+                    Median of timed solves — start the floating timer on a problem page to feed
+                    this.
+                  </p>
+                </div>
+              `
+            : html`
+                <div class="flex-1 flex items-center justify-center">
+                  <p class="text-xs text-slate-600 text-center leading-relaxed px-4">
+                    No timed solves yet.<br />Use the floating timer on a problem page and this
+                    fills in.
+                  </p>
+                </div>
+              `}
+        </div>
+      </div>
+
+      <!-- Punch card: day-of-week × hour-of-day -->
+      <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
+            Solving Punch Card
+          </h3>
+          ${stats.peakHour !== null
+            ? html`<span class="text-[10px] text-cyan-400"
+                >Peak hour: ${String(stats.peakHour).padStart(2, "0")}:00</span
+              >`
+            : ""}
+        </div>
+        <div class="overflow-x-auto">
+          <div class="min-w-[560px]">
+            ${stats.hourMatrix.map((row, d) => {
+              const max = Math.max(1, ...stats.hourMatrix.flat());
+              return html`
+                <div
+                  key=${d}
+                  class="grid items-center gap-[3px] mb-[3px]"
+                  style=${{ gridTemplateColumns: "2.5rem repeat(24, minmax(0, 1fr))" }}
+                >
+                  <span class="text-[10px] text-slate-500 pr-1">${DOW_NAMES[d].slice(0, 3)}</span>
+                  ${row.map(
+                    (n, hr) => html`
+                      <div
+                        key=${hr}
+                        class="aspect-square rounded-[3px]"
+                        style=${{
+                          backgroundColor:
+                            n === 0
+                              ? "rgba(6,182,212,0.05)"
+                              : `rgba(6,182,212,${(0.2 + 0.8 * (n / max)).toFixed(2)})`,
+                        }}
+                        title=${`${DOW_NAMES[d]} ${String(hr).padStart(2, "0")}:00 — ${n} solve${n === 1 ? "" : "s"}`}
+                      ></div>
+                    `,
+                  )}
+                </div>
+              `;
+            })}
+            <div
+              class="grid gap-[3px] mt-1"
+              style=${{ gridTemplateColumns: "2.5rem repeat(24, minmax(0, 1fr))" }}
+            >
+              <span></span>
+              ${Array.from(
+                { length: 24 },
+                (_, hr) => html`
+                  <span key=${hr} class="text-[8px] text-slate-600 text-center"
+                    >${hr % 6 === 0 ? String(hr).padStart(2, "0") : ""}</span
+                  >
+                `,
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI-ready export -->
+      <div class="p-5 bg-[#0a0a0f] border border-white/5 rounded-2xl">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              AI-Ready Insights Export
+            </h3>
+            <p class="mt-1 text-xs text-slate-500 leading-snug">
+              Everything above as one JSON object — totals, streaks, punch card, monthly
+              difficulty mix, topics, solve times. Paste it into any AI chat and ask what to
+              practice next. No problem titles or code included.
+            </p>
+          </div>
+          <button
+            onClick=${copyInsights}
+            class="shrink-0 rounded-lg border px-4 py-2 text-sm font-medium transition-all ${copiedInsights
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+              : "border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"}"
+          >
+            ${copiedInsights ? "✓ Copied" : "Copy insights JSON"}
+          </button>
         </div>
       </div>
 

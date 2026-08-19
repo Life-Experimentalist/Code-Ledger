@@ -119,7 +119,7 @@ function Podium({ rows }) {
   const order = top.length === 3 ? [top[1], top[0], top[2]] : [top[1], top[0]];
   const heights = { 1: "h-24", 2: "h-16", 3: "h-12" };
   return html`
-    <div class="flex items-end gap-2 max-w-3xl pt-2">
+    <div class="flex items-end gap-2 max-w-3xl mx-auto w-full pt-2">
       ${order.map(
         (r) => html`
           <div class="flex-1 flex flex-col items-center gap-1 min-w-0">
@@ -144,7 +144,7 @@ function LeadersStrip({ leaders }) {
   const held = METRICS.filter((m) => leaders[m.id]);
   if (held.length < 2) return "";
   return html`
-    <div class="flex flex-wrap gap-1.5 max-w-3xl">
+    <div class="flex flex-wrap gap-1.5 justify-center">
       ${held.map(
         (m) => html`
           <span
@@ -551,7 +551,7 @@ export function PartyView({ problems, settings, onSettingsChange }) {
 
   return html`
     <div class="p-6 space-y-5 overflow-y-auto">
-      <header class="max-w-3xl">
+      <header>
         <h2 class="text-lg font-semibold text-slate-200">Party</h2>
         <p class="text-sm text-slate-400 mt-1">
           Put your ledger next to other people's by writing down their repository. Numbers come from
@@ -560,11 +560,11 @@ export function PartyView({ problems, settings, onSettingsChange }) {
         </p>
       </header>
 
-      <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 max-w-3xl">
+      <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold mb-2">
           What this does and does not do
         </p>
-        <ul class="text-[12px] text-slate-400 space-y-1 leading-relaxed">
+        <ul class="text-[12px] text-slate-400 leading-relaxed grid gap-x-8 gap-y-1 lg:grid-cols-3">
           <li>
             <span class="text-slate-300">It is one-sided.</span> Adding somebody does not add you to
             their list, and they can add you without you knowing either.
@@ -581,7 +581,7 @@ export function PartyView({ problems, settings, onSettingsChange }) {
         </ul>
       </div>
 
-      <form onSubmit=${onAdd} class="flex flex-wrap gap-2 items-start max-w-3xl">
+      <form onSubmit=${onAdd} class="flex flex-wrap gap-2 items-start">
         <input
           value=${input}
           onInput=${(e) => {
@@ -613,9 +613,9 @@ export function PartyView({ problems, settings, onSettingsChange }) {
           ${loading ? "Refreshing…" : "Refresh"}
         </button>
       </form>
-      ${addError ? html`<p class="text-[12px] text-rose-300 max-w-3xl">${addError}</p>` : ""}
+      ${addError ? html`<p class="text-[12px] text-rose-300">${addError}</p>` : ""}
 
-      <div class="flex flex-wrap gap-1.5 max-w-3xl">
+      <div class="flex flex-wrap gap-1.5">
         ${METRICS.map(
           (m) => html`
             <button
@@ -632,7 +632,7 @@ export function PartyView({ problems, settings, onSettingsChange }) {
 
       ${!friends.length
         ? html`
-            <p class="text-sm text-slate-500 max-w-3xl">
+            <p class="text-sm text-slate-500">
               Nobody added yet. Anyone using CodeLedger with a public ledger repository will work —
               paste the repository they publish their badges from.
             </p>
@@ -642,7 +642,7 @@ export function PartyView({ problems, settings, onSettingsChange }) {
       <${Podium} rows=${rows} />
       <${LeadersStrip} leaders=${leaders} />
 
-      <div class="space-y-2 max-w-3xl">
+      <div class="space-y-2">
         ${rows.map((row) => {
           const detail = row.friend ? details[row.friend.id] : null;
           const open = row.friend && expanded === row.friend.id;
@@ -752,7 +752,7 @@ export function PartyView({ problems, settings, onSettingsChange }) {
 
       ${friends.length
         ? html`
-            <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 max-w-3xl space-y-2">
+            <div class="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2">
               <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">
                 Share this comparison
               </p>

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { h, useState, useEffect } from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -759,6 +759,138 @@ function GitHubBackups({ settings, onSettingsChange }) {
   `;
 }
 
+// ── Behaviour bank data ────────────────────────────────────────────────────
+// Export/import/clear for the AI behaviour bank. Lives here with the other
+// data-management flows; the bank's stats and insights are the library's
+// Behaviour Bank tab.
+
+function BehaviorBankData() {
+  const [entryCount, setEntryCount] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const fileInputRef = useRef(null);
+
+  const countEntries = (bank) =>
+    Object.keys(bank || {}).filter((k) => !k.startsWith("__")).length;
+
+  const refresh = async () => {
+    const bank = await Storage.getBehaviorBank().catch(() => ({}));
+    setEntryCount(countEntries(bank));
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const flash = (text) => {
+    setMsg(text);
+    setTimeout(() => setMsg(""), 4000);
+  };
+
+  const handleExport = async () => {
+    try {
+      setBusy(true);
+      const data = (await Storage.getBehaviorBank()) || {};
+      await downloadJSON(data, "behavior-bank");
+      flash("✓ Behaviour bank exported");
+    } catch (e) {
+      flash("Failed: " + (e?.message || String(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setBusy(true);
+      const imported = JSON.parse(await file.text());
+      if (typeof imported !== "object" || imported === null || Array.isArray(imported)) {
+        throw new Error("Invalid behaviour bank format: must be a JSON object");
+      }
+      const shouldMerge = confirm(
+        "Merge with existing behaviour bank data?\n\nOK = Merge (combine both)\nCancel = Replace (use imported data only)",
+      );
+      let finalData = imported;
+      if (shouldMerge) {
+        const existing = (await Storage.getBehaviorBank()) || {};
+        finalData = { ...existing, ...imported };
+      }
+      await Storage.setBehaviorBank(finalData);
+      await refresh();
+      flash(`✓ Imported ${countEntries(imported)} entries`);
+    } catch (e) {
+      flash("Failed: " + (e?.message || String(e)));
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleClear = async () => {
+    if (!confirm("Clear all behaviour bank data? This cannot be undone.")) return;
+    try {
+      setBusy(true);
+      await Storage.setBehaviorBank({});
+      await refresh();
+      flash("✓ Behaviour bank cleared");
+    } catch (e) {
+      flash("Failed: " + (e?.message || String(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return html`
+    <div class="space-y-4">
+      <p class="text-xs text-slate-500 leading-snug">
+        The behaviour bank is what the AI knows about how you solve — per-problem timings, revisit
+        counts, and its own written insights. Its stats live in the library's Behaviour Bank tab;
+        this is where the data itself is exported, imported or wiped.
+      </p>
+      <p class="text-xs text-slate-400">
+        <b class="text-slate-200">${entryCount}</b> problem entr${entryCount === 1 ? "y" : "ies"}
+        stored on this device.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <button
+          onClick=${handleExport}
+          disabled=${busy || entryCount === 0}
+          class="px-4 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >
+          ${busy ? "Working…" : "Export as JSON"}
+        </button>
+        <button
+          onClick=${() => fileInputRef.current?.click()}
+          disabled=${busy}
+          class="px-4 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-200 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >
+          ${busy ? "Working…" : "Import from JSON"}
+        </button>
+        <button
+          onClick=${handleClear}
+          disabled=${busy || entryCount === 0}
+          class="px-4 py-1.5 bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 text-rose-300 text-xs rounded-lg transition-colors disabled:opacity-50"
+        >
+          ${busy ? "Working…" : "Clear data"}
+        </button>
+      </div>
+      ${msg &&
+      html`<p class="text-xs ${msg.includes("Failed") ? "text-rose-400" : "text-emerald-400"}">
+        ${msg}
+      </p>`}
+      <input
+        ref=${fileInputRef}
+        type="file"
+        accept=".json"
+        style="display: none"
+        onChange=${handleImportFile}
+      />
+    </div>
+  `;
+}
+
 // ── Main panel ─────────────────────────────────────────────────────────────
 
 const BACKUP_TABS = [
@@ -766,6 +898,7 @@ const BACKUP_TABS = [
   { id: "scheduled", label: "Scheduled", emoji: "🔁" },
   { id: "rolling", label: "Rolling", emoji: "⚡" },
   { id: "github", label: "GitHub", emoji: "☁️" },
+  { id: "bank", label: "Bank", emoji: "🧠" },
 ];
 
 export function PanelBackups({ settings, onSettingsChange }) {
@@ -774,10 +907,10 @@ export function PanelBackups({ settings, onSettingsChange }) {
   return html`
     <div class="space-y-5 w-full">
       <div>
-        <h2 class="text-base font-semibold text-white mb-1">Backups</h2>
+        <h2 class="text-base font-semibold text-white mb-1">Backups & data</h2>
         <p class="text-xs text-slate-500 mb-1">
           Four layers of protection for your solve history — three on this device, one in your
-          repository.
+          repository — plus the behaviour bank's own export and import.
         </p>
       </div>
 
@@ -808,6 +941,7 @@ export function PanelBackups({ settings, onSettingsChange }) {
       ${activeTab === "rolling" && html`<${RollingBackup} />`}
       ${activeTab === "github" &&
       html`<${GitHubBackups} settings=${settings} onSettingsChange=${onSettingsChange} />`}
+      ${activeTab === "bank" && html`<${BehaviorBankData} />`}
     </div>
   `;
 }

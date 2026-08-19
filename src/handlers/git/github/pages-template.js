@@ -277,6 +277,17 @@ export function getPagesHtml(opts = {}) {
 
     <div class="g2">
       <div class="card">
+        <div class="card-label">Difficulty Progression (12 Months)</div>
+        <div class="vc-box"><canvas id="dp"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Solving Punch Card</div>
+        <div id="pc" style="overflow-x:auto"></div>
+      </div>
+    </div>
+
+    <div class="g2">
+      <div class="card">
         <div class="card-label">Languages</div>
         <div class="chart-box"><canvas id="lc"></canvas></div>
       </div>
@@ -470,6 +481,97 @@ export function getPagesHtml(opts = {}) {
             labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 10, padding: 8 } } }
         }
       });
+    }
+
+    // Stacked per-month difficulty mix over the last 12 months. Returns the
+    // month map so main() can fold it into the AI insights JSON.
+    function buildDifficultyTrend(problems) {
+      var now = new Date();
+      var keys = [], labels = [], byMonth = {};
+      for (var i = 11; i >= 0; i--) {
+        var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        var k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        keys.push(k);
+        labels.push(MONTH_NAMES[d.getMonth()] + " '" + String(d.getFullYear()).slice(2));
+        byMonth[k] = { easy: 0, medium: 0, hard: 0 };
+      }
+      for (var j = 0; j < problems.length; j++) {
+        var p = problems[j];
+        if (!p.timestamp) continue;
+        var ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
+        var pd = new Date(ts);
+        var mk = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
+        var slot = byMonth[mk];
+        if (!slot) continue;
+        var diff = normDiff(p.difficulty);
+        if (diff === 'Easy') slot.easy++;
+        else if (diff === 'Medium') slot.medium++;
+        else if (diff === 'Hard') slot.hard++;
+      }
+      var canvas = document.getElementById('dp');
+      if (canvas && typeof Chart !== 'undefined') {
+        new Chart(canvas.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Easy', data: keys.map(function(k2) { return byMonth[k2].easy; }), backgroundColor: '#34d399' },
+              { label: 'Medium', data: keys.map(function(k2) { return byMonth[k2].medium; }), backgroundColor: '#fbbf24' },
+              { label: 'Hard', data: keys.map(function(k2) { return byMonth[k2].hard; }), backgroundColor: '#f87171' }
+            ]
+          },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 10, padding: 8 } } },
+            scales: {
+              x: { stacked: true, grid: { display: false }, ticks: { color: '#64748b', maxTicksLimit: 12 } },
+              y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#64748b', precision: 0 } }
+            }
+          }
+        });
+      }
+      return byMonth;
+    }
+
+    // Day-of-week x hour-of-day punch card. Renders into #pc and returns the
+    // 7x24 matrix for the insights JSON.
+    function buildPunchCard(problems) {
+      var matrix = [];
+      for (var d = 0; d < 7; d++) {
+        var row = [];
+        for (var h = 0; h < 24; h++) row.push(0);
+        matrix.push(row);
+      }
+      var max = 0;
+      for (var i = 0; i < problems.length; i++) {
+        var p = problems[i];
+        if (!p.timestamp) continue;
+        var ts = p.timestamp > 1e12 ? p.timestamp : p.timestamp * 1000;
+        var pd = new Date(ts);
+        var n = ++matrix[pd.getDay()][pd.getHours()];
+        if (n > max) max = n;
+      }
+      var box = document.getElementById('pc');
+      if (box) {
+        var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        var htmlStr = '<div style="min-width:520px">';
+        for (var r = 0; r < 7; r++) {
+          htmlStr += '<div style="display:grid;grid-template-columns:2.2rem repeat(24,minmax(0,1fr));gap:2px;margin-bottom:2px;align-items:center">';
+          htmlStr += '<span style="font-size:.6rem;color:var(--muted)">' + days[r] + '</span>';
+          for (var c = 0; c < 24; c++) {
+            var v = matrix[r][c];
+            var alpha = v === 0 ? 0.05 : (0.2 + 0.8 * (v / (max || 1)));
+            htmlStr += '<div title="' + days[r] + ' ' + String(c).padStart(2, '0') + ':00 — ' + v + '" style="aspect-ratio:1;border-radius:2px;background:rgba(6,182,212,' + alpha.toFixed(2) + ')"></div>';
+          }
+          htmlStr += '</div>';
+        }
+        htmlStr += '<div style="display:grid;grid-template-columns:2.2rem repeat(24,minmax(0,1fr));gap:2px"><span></span>';
+        for (var hh = 0; hh < 24; hh++) {
+          htmlStr += '<span style="font-size:.5rem;color:var(--muted);text-align:center">' + (hh % 6 === 0 ? String(hh).padStart(2, '0') : '') + '</span>';
+        }
+        htmlStr += '</div></div>';
+        box.innerHTML = htmlStr;
+      }
+      return matrix;
     }
 
     function dayKey(d) {
@@ -909,6 +1011,8 @@ export function getPagesHtml(opts = {}) {
         // Velocity + difficulty charts
         buildVelocityChart(problems);
         buildDifficultyDonut(sEasy, sMed, sHard);
+        var monthlyDiff = buildDifficultyTrend(problems);
+        var punchCard = buildPunchCard(problems);
 
         // Language donut
         var langMap = countBy(problems, function(p) {
@@ -951,6 +1055,43 @@ export function getPagesHtml(opts = {}) {
         var topicEntries = sortedEntries(topicMap).slice(0, 10);
         renderBars('tb', topicEntries, topicEntries.length ? topicEntries[0][1] : 1, function() { return '#06b6d4'; });
 
+        // AI-ready insights: the same shape the library's Analytics tab copies
+        // to the clipboard, assembled from aggregates only — no titles, no
+        // code. Exposed as window.CL_INSIGHTS and in #cl-insights so a person
+        // (or a bot) can lift one JSON object from the report.
+        var dowTotals = [0, 0, 0, 0, 0, 0, 0];
+        var hourTotals = [];
+        for (var ht = 0; ht < 24; ht++) hourTotals.push(0);
+        for (var pr = 0; pr < 7; pr++) {
+          for (var pcH = 0; pcH < 24; pcH++) {
+            dowTotals[pr] += punchCard[pr][pcH];
+            hourTotals[pcH] += punchCard[pr][pcH];
+          }
+        }
+        var peakHour = null, peakN = 0;
+        for (var ph = 0; ph < 24; ph++) { if (hourTotals[ph] > peakN) { peakN = hourTotals[ph]; peakHour = ph; } }
+        var dowNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        var bestDow = 0;
+        for (var bd = 1; bd < 7; bd++) { if (dowTotals[bd] > dowTotals[bestDow]) bestDow = bd; }
+        var insights = {
+          generatedAt: new Date().toISOString(),
+          totals: { solved: sTotal, easy: sEasy, medium: sMed, hard: sHard },
+          streak: { current: streakData.current, longest: streakData.max },
+          activity: {
+            bestDayOfWeek: sTotal > 0 ? dowNames[bestDow] : null,
+            peakHour: peakHour,
+            byDayOfWeek: dowTotals,
+            punchCard: punchCard
+          },
+          monthlyDifficulty: monthlyDiff,
+          platforms: countBy(problems, function(p) { return p.platform || 'Unknown'; }),
+          languages: langMap,
+          topTopics: sortedEntries(topicMap).slice(0, 15).map(function(e) { return { topic: e[0], count: e[1] }; })
+        };
+        window.CL_INSIGHTS = insights;
+        var insEl = document.getElementById('cl-insights');
+        if (insEl) insEl.textContent = JSON.stringify(insights);
+
         // Recent solves
         var recent = problems.slice().sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); }).slice(0, 10);
         var rows = '';
@@ -991,6 +1132,9 @@ export function getPagesHtml(opts = {}) {
 
     main();
   </script>
+  <!-- Filled by main() with the CL_INSIGHTS aggregate JSON — inert to the
+       browser, liftable by anything that reads the rendered DOM. -->
+  <script type="application/json" id="cl-insights"></script>
   <script>
     // Inject server-provided commit list for client-side rendering.
     // "<" is escaped so a commit message carrying a closing script tag cannot end

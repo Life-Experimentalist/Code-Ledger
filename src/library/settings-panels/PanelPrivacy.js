@@ -133,7 +133,7 @@ export function PanelPrivacy({ settings, onGoToPanel }) {
   const freeOnes = costs.filter((c) => c.free);
 
   return html`
-    <div class="space-y-6 max-w-3xl">
+    <div class="space-y-6 w-full">
       <!-- Where this configuration currently stands -->
       <div class="rounded-xl border px-4 py-4 ${style.ring}">
         <div class="flex items-center gap-2">

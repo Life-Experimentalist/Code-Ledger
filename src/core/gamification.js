@@ -325,8 +325,12 @@ export function isVacationDay(key, vacations) {
 export function computeStreak(days, config, vacations, todayKey, floorDay) {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const target = Math.max(1, Math.round(cfg.dailyTargetPoints));
-  const freezeAt = target * cfg.freezeEarnMultiplier;
-  const penaltyCost = Math.ceil(cfg.penaltyMultiplier * target);
+  // Both multipliers are clamped to 1, not just hinted at in the UI. A freeze
+  // multiplier below 1 would hand out a freeze on every completed day, and a
+  // penalty multiplier below 1 makes a missed day cheaper than the day itself
+  // — with 0, every miss auto-restores and the streak can never break.
+  const freezeAt = target * Math.max(1, cfg.freezeEarnMultiplier);
+  const penaltyCost = Math.ceil(Math.max(1, cfg.penaltyMultiplier) * target);
 
   const keys = [...days.keys()].sort();
   if (!keys.length) {

@@ -36,6 +36,7 @@ import {
 } from "./components/DuplicateDetectionModal.js";
 import { BrokenImportsModal } from "./components/BrokenImportsModal.js";
 import { markSettingsPendingCommit } from "/core/settings-auto-commit.js";
+import { pendingCommitStatus, formatRetryEta } from "/core/pending-commits.js";
 
 initializeHandlers();
 initDebug().catch(() => {});
@@ -68,6 +69,7 @@ function LibraryApp() {
   const [tokenExpired, setTokenExpired] = useState(false);
   const [reauthBusy, setReauthBusy] = useState(false);
   const [pendingCommitCount, setPendingCommitCount] = useState(0);
+  const [nextRetryAt, setNextRetryAt] = useState(null);
   const [retryBusy, setRetryBusy] = useState(false);
   const [importReport, setImportReport] = useState(null);
   const [showBrokenImports, setShowBrokenImports] = useState(false);
@@ -112,18 +114,21 @@ function LibraryApp() {
   // keys are commits in flight or ones the 10-minute maintenance alarm has not
   // reached yet, so they don't warrant a banner.
   const refreshPendingCommits = useCallback(() => {
-    Storage.getPendingProblemKeys()
-      .then((map) => {
-        const staleBefore = Date.now() - CONSTANTS.PENDING_COMMIT_STALE_MS;
-        setPendingCommitCount(
-          Object.values(map || {}).filter((t) => Number(t) < staleBefore).length,
-        );
+    pendingCommitStatus()
+      .then((status) => {
+        setPendingCommitCount(status.stale);
+        setNextRetryAt(status.nextRetryAt);
       })
       .catch(() => {});
   }, []);
 
+  // Re-read on a timer, not just on mount: the maintenance alarm clears these
+  // keys from the service worker, which has no way to tell this page. Without
+  // the poll the banner survived the very retry it promised.
   useEffect(() => {
     refreshPendingCommits();
+    const timer = setInterval(refreshPendingCommits, 15 * 1000);
+    return () => clearInterval(timer);
   }, [refreshPendingCommits]);
 
   const retryPendingCommits = useCallback(() => {
@@ -1148,7 +1153,10 @@ function LibraryApp() {
                         yet
                       </p>
                       <p class="text-[11px] text-amber-400/80 mt-0.5">
-                        They're saved locally and retried automatically every 10 minutes.
+                        They're saved locally and retried automatically.
+                        ${formatRetryEta(nextRetryAt)
+                          ? ` Next retry ${formatRetryEta(nextRetryAt)}.`
+                          : ""}
                       </p>
                     </div>
                   </div>

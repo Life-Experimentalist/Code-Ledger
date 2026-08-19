@@ -1218,7 +1218,7 @@ export function BehaviourBankView({ problems = [], onNavigate }) {
   const [tab, setTab] = useState("behaviour");
 
   return html`
-    <div class="flex flex-col gap-6 w-full max-w-3xl mx-auto">
+    <div class="flex flex-col gap-6 w-full">
       <!-- Header -->
       <div>
         <h1 class="text-2xl font-light text-white mb-1">Behaviour Bank</h1>
