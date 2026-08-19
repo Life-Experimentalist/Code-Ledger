@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { initDebug, coreDebug, setDebug, createDebugger } from "../lib/debug.js";
+import { initDebug, setDebug, createDebugger } from "../lib/debug.js";
 import { decodeBase64Utf8 } from "../lib/base64.js";
 import { storage as browserStorage } from "../lib/browser-compat.js";
 import { registry } from "../core/handler-registry.js";
@@ -93,13 +93,12 @@ import {
   RATE_LIMIT_DELAY_MS_EXPORT as REVIEW_RATE_LIMIT_MS,
 } from "../core/ai-review-queue.js";
 import {
-  needsSettingsCommit,
   getConfigFileForCommit,
   clearSettingsCommitFlag,
   forceCommitSettingsNow,
 } from "../core/settings-auto-commit.js";
-import { initMCPConfig, shouldUseToolsForAI } from "../core/mcp-config.js";
-import { buildSkillsSystemPrompt, getAutoToolIds } from "../core/ai/skills-registry.js";
+import { initMCPConfig } from "../core/mcp-config.js";
+import { buildSkillsSystemPrompt } from "../core/ai/skills-registry.js";
 import { buildKnowledgeContext } from "../core/memory/knowledge-bank.js";
 import { synthesizeInsights } from "../core/memory/insight-synthesis.js";
 import {
@@ -128,7 +127,6 @@ import { getRoadmapContext } from "../core/roadmap-progress.js";
 import { applyInferredMetadata } from "../core/ai-review-metadata.js";
 
 let _syncAlarmBound = false;
-let _reviewQueueAlarmBound = false;
 let _resyncInProgress = false;
 let _activeSyncPort = null;
 
@@ -1945,7 +1943,7 @@ function _pathSetsMatch(oldPaths, newPaths) {
 
 async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
   dbg.log(`handleResyncAll(): starting - mode=${mode}, commitType=${commitType}`);
-  const { settings, git, token, owner, repoName } = await _resolveGitHubContext();
+  const { settings, git, owner, repoName } = await _resolveGitHubContext();
 
   // Pre-load canonical map so resolve() is available synchronously for path building
   await canonicalMapper

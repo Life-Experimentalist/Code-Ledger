@@ -121,7 +121,8 @@
         },
         {
             "resources": [
-                "content/presence-marker.js"
+                "content/presence-marker.js",
+                "library/library.html"
             ],
             "matches": [
                 "*://codeledger.vkrishna04.me/*"
