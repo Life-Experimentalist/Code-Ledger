@@ -30,7 +30,7 @@
 import { BasePlatformHandler } from "../../_base/BasePlatformHandler.js";
 import { SELECTORS } from "./dom-selectors.js";
 import { detectPage, PAGE_TYPES } from "./page-detector.js";
-import { TAP_PATHS, readProblemMeta } from "./api.js";
+import { TAP_PATHS, TIER_KEY, readProblemMeta, readSubscriptionTier } from "./api.js";
 import { resolveLang } from "./lang-utils.js";
 import { watchSubmissions } from "./submission-detector.js";
 import { watchSheet } from "./sheet.js";
@@ -59,6 +59,8 @@ export class TakeUForwardHandler extends BasePlatformHandler {
     this._aiPanelSlug = null;
     /** @type {Map<string, ReturnType<typeof readProblemMeta>>} */
     this._metaCache = new Map();
+    /** @type {"plus"|"free"|null} last tier written, to skip repeat writes */
+    this._tier = null;
     registerPlatformPrompt("takeuforward", this.getDefaultPrompt());
   }
 
@@ -227,10 +229,33 @@ Be concise. Max 200 words.`;
    */
   _cacheMetadata(payload) {
     if (payload.status && payload.status !== 200) return;
-    const meta = readProblemMeta(parseJsonSafe(payload.responseBody));
+    const body = parseJsonSafe(payload.responseBody);
+    this._recordTier(readSubscriptionTier(body));
+    const meta = readProblemMeta(body);
     if (!meta) return;
     this._metaCache.set(meta.slug, meta);
     dbg.log(`Cached metadata for ${meta.slug}${meta.difficulty ? "" : " (difficulty redacted)"}`);
+  }
+
+  /**
+   * Remember which side of the paywall this browser is on, so the settings
+   * panel can say why submit tracking is quiet instead of leaving the user to
+   * guess. Written only when it changes — this runs on every problem page.
+   *
+   * @param {"plus"|"free"|null} tier
+   */
+  async _recordTier(tier) {
+    if (!tier || tier === this._tier) return;
+    this._tier = tier;
+    try {
+      const settings = await Storage.getSettings();
+      if (settings[TIER_KEY] === tier) return;
+      await Storage.updateSettings({ [TIER_KEY]: tier });
+      dbg.log(`takeuforward tier detected: ${tier}`);
+    } catch (e) {
+      // A tier we could not persist is cosmetic — never let it break metadata.
+      dbg.error("Failed to save takeuforward tier:", e);
+    }
   }
 
   /** @param {string} slug */

@@ -256,6 +256,42 @@ export function readProblemMeta(body) {
   };
 }
 
+/** What `readSubscriptionTier` can conclude. */
+export const TIER = { PLUS: "plus", FREE: "free" };
+
+/** Settings key the detected tier is remembered under. Derived, never typed. */
+export const TIER_KEY = "takeuforward_tier";
+
+/**
+ * Which side of takeuforward's paywall the person reading this page is on.
+ *
+ * There is no endpoint that answers "is this account TUF+", and the GitHub
+ * account CodeLedger signs in with says nothing about it — they are unrelated
+ * identities. But `/v2/plus/problem/{slug}` answers 200 to anyone and redacts
+ * the subscriber-only fields to the literal string "Subscribe to TUF+", so the
+ * response the page already fetched carries the answer for free: see the
+ * sentinel and the reader is on the free tier, see a real difficulty and they
+ * are not.
+ *
+ * A field that is simply absent proves nothing, and is reported as unknown
+ * rather than guessed either way.
+ *
+ * @param {any} body the raw parsed `/v2/plus/problem/{slug}` response
+ * @returns {"plus"|"free"|null} null when the response cannot say
+ */
+export function readSubscriptionTier(body) {
+  const d = unwrap(body);
+  if (!d || typeof d !== "object" || !d.problem_slug) return null;
+
+  const isSentinel = (v) =>
+    (typeof v === "string" && v.trim() === REDACTED) ||
+    (Array.isArray(v) && v.some((x) => String(x).trim() === REDACTED));
+
+  if (isSentinel(d.difficulty) || isSentinel(d.topic_tags)) return TIER.FREE;
+  if (typeof d.difficulty === "string" && d.difficulty.trim()) return TIER.PLUS;
+  return null;
+}
+
 /**
  * @param {any} raw
  * @returns {string|null}
