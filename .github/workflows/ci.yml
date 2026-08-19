@@ -21,6 +21,10 @@ jobs:
     name: Lint, format, test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The auto-heal step pushes a formatting fix back to the branch on push
+    # events; fork PRs are downgraded to read automatically.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -46,7 +50,28 @@ jobs:
       - name: Type check
         run: npm run lint
 
+      # Formatting drift is mechanically fixable, so it must not block the
+      # pipeline. On a push, run Prettier itself and push the fix back as a
+      # bot commit, then carry on gating the healed tree. A GITHUB_TOKEN push
+      # does not trigger another workflow run, and Prettier is idempotent, so
+      # this cannot loop. Pull requests keep the blocking check — a fork's
+      # token cannot push back.
+      - name: Format (auto-heal on push)
+        if: github.event_name == 'push'
+        run: |
+          npm run format
+          if git diff --quiet; then
+            echo "formatting clean — nothing to heal"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "style: auto-heal formatting drift"
+          git push origin "HEAD:${{ github.ref_name }}" ||
+            echo "::warning::branch moved before the formatting fix could land — the next push heals it"
+
       - name: Format check
+        if: github.event_name != 'push'
         run: npm run format:check
 
       - name: Unit and worker tests
