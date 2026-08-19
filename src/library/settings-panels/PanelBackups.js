@@ -770,8 +770,7 @@ function BehaviorBankData() {
   const [msg, setMsg] = useState("");
   const fileInputRef = useRef(null);
 
-  const countEntries = (bank) =>
-    Object.keys(bank || {}).filter((k) => !k.startsWith("__")).length;
+  const countEntries = (bank) => Object.keys(bank || {}).filter((k) => !k.startsWith("__")).length;
 
   const refresh = async () => {
     const bank = await Storage.getBehaviorBank().catch(() => ({}));

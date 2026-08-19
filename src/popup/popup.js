@@ -121,7 +121,10 @@ function PopupApp() {
       .catch(() => {});
     // The popup stays open long enough for a retry to land, so keep the count
     // honest with a light poll instead of a one-shot read.
-    const readPending = () => pendingCommitStatus().then(setPending).catch(() => {});
+    const readPending = () =>
+      pendingCommitStatus()
+        .then(setPending)
+        .catch(() => {});
     readPending();
     const timer = setInterval(readPending, 15 * 1000);
     return () => clearInterval(timer);

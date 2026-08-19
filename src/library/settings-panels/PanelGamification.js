@@ -515,9 +515,7 @@ export function PanelGamification({ settings, onSettingsChange }) {
                       >
                         <span class="text-base leading-none">🏖️</span>
                         <div class="flex-1 min-w-0">
-                          <p class="text-xs text-slate-300">
-                            ${v.start} → ${v.end || "ongoing"}
-                          </p>
+                          <p class="text-xs text-slate-300">${v.start} → ${v.end || "ongoing"}</p>
                           ${v.note
                             ? html`<p class="text-[11px] text-slate-500 truncate">${v.note}</p>`
                             : ""}
