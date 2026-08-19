@@ -11,10 +11,6 @@ import { useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("MirrorsPanel");
-
 import { Storage } from "../../core/storage.js";
 
 // GitHub only. The GitLab and Bitbucket handlers were stubs whose write paths

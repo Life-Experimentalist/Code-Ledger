@@ -11,7 +11,7 @@ import { Storage } from "../../core/storage.js";
 import { getProblemCommitKey } from "../../core/lang-utils.js";
 import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("ProblemModal");
-import { cleanCode, highlightCode, highlightCodeWithLines } from "../../lib/syntax-highlight.js";
+import { cleanCode, highlightCodeWithLines } from "../../lib/syntax-highlight.js";
 import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
 import { AIReviewPanel } from "../../ui/components/AIReviewPanel.js";
@@ -52,58 +52,6 @@ function aiAwareTabs(problem, settings) {
   const tabs = modalTabRegistry.getTabs(problem?.platform || "leetcode", problem);
   if (isAIActive(settings)) return tabs;
   return tabs.filter((t) => !AI_TAB_IDS.has(t.id) || (t.id === "review" && !!problem?.aiReview));
-}
-
-function renderMarkdown(md) {
-  if (!md) return "";
-  let html = String(md)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    // fenced code blocks
-    .replace(
-      /```[\w]*\n?([\s\S]*?)```/g,
-      (_, code) =>
-        `<pre class="my-3 p-3 bg-black/60 rounded-lg border border-white/10 overflow-x-auto text-xs font-mono text-slate-200 leading-relaxed">${code.trimEnd()}</pre>`,
-    )
-    // inline code
-    .replace(
-      /`([^`\n]+)`/g,
-      '<code class="px-1 py-0.5 rounded bg-white/10 text-cyan-300 text-[0.85em] font-mono">$1</code>',
-    )
-    // bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-    // italic
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    // headings
-    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-white mt-4 mb-1">$1</h3>')
-    .replace(
-      /^## (.+)$/gm,
-      '<h2 class="text-sm font-bold text-slate-100 mt-4 mb-1 uppercase tracking-wide">$1</h2>',
-    )
-    .replace(/^# (.+)$/gm, '<h1 class="text-base font-bold text-white mt-4 mb-2">$1</h1>')
-    // unordered lists: accumulate items into <ul>
-    .replace(/((?:^[*\-] .+\n?)+)/gm, (block) => {
-      const items = block
-        .trim()
-        .split("\n")
-        .map((l) => `<li class="ml-4 list-disc">${l.replace(/^[*\-] /, "").trim()}</li>`)
-        .join("");
-      return `<ul class="my-2 space-y-0.5 text-slate-300">${items}</ul>`;
-    })
-    .replace(/((?:^\d+\. .+\n?)+)/gm, (block) => {
-      const items = block
-        .trim()
-        .split("\n")
-        .map((l) => `<li class="ml-4 list-decimal">${l.replace(/^\d+\. /, "").trim()}</li>`)
-        .join("");
-      return `<ol class="my-2 space-y-0.5 text-slate-300">${items}</ol>`;
-    })
-    // horizontal rule
-    .replace(/^---+$/gm, '<hr class="my-3 border-white/10"/>')
-    // paragraphs: wrap consecutive non-empty lines not already in a block tag
-    .replace(/^(?!<[houpl]|<hr|<pre)(.+)$/gm, '<p class="mb-1">$1</p>');
-  return html;
 }
 
 export const PLATFORM_META = {
@@ -154,8 +102,6 @@ const DIFF_CLASS = {
   Medium: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   Hard: "bg-rose-500/15 text-rose-400 border-rose-500/30",
 };
-
-const CHAT_KEY = (slug) => `cl-chat-${slug}`;
 
 // Session-level memory of the last active tab — survives problem navigation but not page reload.
 let _lastModalTab = "overview";
@@ -2047,113 +1993,6 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
               Delete problem
             </button>
           `}
-    </div>
-  </div>`;
-}
-
-function MethodCard({ method, methodIndex, problem, onUpdate }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [localReview, setLocalReview] = useState(method.aiReview || "");
-
-  const handleGenerateReview = async () => {
-    if (busy || !method.code) return;
-    if (typeof chrome === "undefined" || !chrome.runtime?.id) {
-      setError("Extension not available.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    let keepAlivePort = null;
-    let keepAliveTimer = null;
-    try {
-      keepAlivePort = chrome.runtime.connect({ name: "ai-review-keepalive" });
-      keepAliveTimer = setInterval(() => {
-        try {
-          keepAlivePort?.postMessage({ type: "ping" });
-        } catch (_) {}
-      }, 20000);
-    } catch (_) {}
-    const release = () => {
-      clearInterval(keepAliveTimer);
-      try {
-        keepAlivePort?.disconnect();
-      } catch (_) {}
-    };
-    try {
-      const result = await new Promise((resolve, reject) => {
-        let settled = false;
-        const timer = setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          release();
-          reject(new Error("AI review timed out"));
-        }, 90000);
-        chrome.runtime.sendMessage(
-          {
-            type: "REGENERATE_AI_REVIEW",
-            problem: {
-              ...problem,
-              code: method.code,
-              lang: { name: method.language || problem.lang?.name },
-              _methodIndex: methodIndex,
-            },
-          },
-          (resp) => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            release();
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp);
-            else reject(new Error(resp?.error || "AI review failed"));
-          },
-        );
-      });
-      const methodReview = result.problem?.methods?.[methodIndex]?.aiReview || result.review || "";
-      setLocalReview(methodReview);
-      if (result.problem) onUpdate?.(result.problem);
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return html`<div class="border border-white/10 rounded-xl overflow-hidden">
-    <div class="px-4 py-2.5 bg-white/[0.02] border-b border-white/5 flex items-center gap-3">
-      <span class="text-xs font-medium text-slate-300">
-        ${method.title || `Approach ${methodIndex + 1}`}
-      </span>
-      ${method.language
-        ? html`<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500">
-            ${method.language}
-          </span>`
-        : ""}
-      ${method.description
-        ? html`<span class="text-[10px] text-slate-600 ml-auto truncate max-w-xs">
-            ${method.description}
-          </span>`
-        : ""}
-    </div>
-    <pre
-      class="text-xs leading-relaxed overflow-x-auto bg-black/50 py-3 whitespace-pre font-mono m-0 max-h-96"
-      dangerouslySetInnerHTML=${{
-        __html: highlightCodeWithLines(
-          method.code || "// (no code)",
-          (method.language || "").toLowerCase(),
-        ),
-      }}
-    ></pre>
-    <div class="border-t border-white/10 p-3">
-      <${AIReviewPanel}
-        review=${localReview}
-        onGenerate=${handleGenerateReview}
-        loading=${busy}
-        error=${error}
-        providerId=${method._aiProvider}
-        modelId=${method._aiModel}
-      />
     </div>
   </div>`;
 }

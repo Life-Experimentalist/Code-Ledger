@@ -16,9 +16,6 @@ import {
 import { buildAIChatContext } from "../lib/ai-chat-context.js";
 import { parseMarkdown } from "./components/AIMarkdownRenderer.js";
 import { Storage } from "../core/storage.js";
-import { createDebugger } from "../lib/debug.js";
-
-const dbg = createDebugger("FloatingAI");
 
 import { expandChatVariables, getUsedCommands, CHAT_COMMANDS } from "../lib/chat-variables.js";
 const DEFAULT_PLATFORM = {
@@ -177,7 +174,6 @@ export function createFloatingAI(slug = "", opts = {}) {
     modeBtnEl.style.borderColor =
       chatMode === "guided" ? "rgba(6,182,212,0.35)" : "rgba(255,255,255,0.12)";
   }
-  let copyPrompt = null;
   let copyPromptTimer = null;
 
   function openAIChatsPage() {
@@ -808,7 +804,6 @@ export function createFloatingAI(slug = "", opts = {}) {
   }
 
   function hideCopyPrompt() {
-    copyPrompt = null;
     copyPromptEl.style.display = "none";
     copyPromptEl.innerHTML = "";
     if (copyPromptTimer) {
@@ -819,7 +814,6 @@ export function createFloatingAI(slug = "", opts = {}) {
 
   function showCopyPrompt(text, x, y) {
     if (!copyableEnabled) return;
-    copyPrompt = { text, x, y };
     copyPromptEl.style.left = `${Math.max(8, x)}px`;
     copyPromptEl.style.top = `${Math.max(8, y)}px`;
     copyPromptEl.innerHTML = `

@@ -8,7 +8,6 @@
  */
 
 import { Storage } from "./storage.js";
-import { canonicalMapper } from "./canonical-mapper.js";
 import { createDebugger } from "../lib/debug.js";
 import {
   saveInsight,

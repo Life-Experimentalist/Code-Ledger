@@ -11,10 +11,8 @@
  */
 
 import { execSync } from "child_process";
-import { createReadStream, createWriteStream, mkdirSync, readFileSync } from "fs";
-import { resolve, relative, join } from "path";
-import { createGzip } from "zlib";
-import { pipeline } from "stream/promises";
+import { mkdirSync, readFileSync } from "fs";
+import { resolve, join } from "path";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const manifest = JSON.parse(readFileSync(join("src", "manifest-chromium.json"), "utf8"));

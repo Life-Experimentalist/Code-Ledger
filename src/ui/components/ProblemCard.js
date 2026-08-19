@@ -7,13 +7,10 @@ import { h } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
 import { cfProblemUrl } from "../../core/cf-utils.js";
 import { classifyTopic, KIND, KIND_ORDER, KIND_LABEL } from "../../core/topic-taxonomy.js";
-
-const dbg = createDebugger("ProblemCard");
 
 const PLATFORM_META = {
   leetcode: {

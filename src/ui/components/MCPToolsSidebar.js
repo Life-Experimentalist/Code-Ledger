@@ -6,7 +6,7 @@
  * Modal-agnostic component that can be embedded in any context.
  */
 
-import { h, useState, useEffect } from "../../vendor/preact-bundle.js";
+import { h, useState } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 

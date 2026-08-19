@@ -7,10 +7,6 @@ import { h, useState, useEffect, useMemo, useCallback } from "../../vendor/preac
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("AIChatsView");
-
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { ModelStatusBar } from "../../ui/components/ModelStatusBar.js";
@@ -96,13 +92,12 @@ export function AIChatsView({
   const [prefillHandled, setPrefillHandled] = useState(false);
   const [prefillChatSlug, setPrefillChatSlug] = useState("");
   const [showMCPTools, setShowMCPTools] = useState(false);
-  const [mcpToolResult, setMCPToolResult] = useState(null);
+  const [, setMCPToolResult] = useState(null);
 
   const handleMCPToolResult = (result) => {
     setMCPToolResult(result);
     if (result?.result?.ok) {
       // Optionally prepend tool result to current reply
-      const toolInfo = `\n\n[Tool: ${result.toolId}]\n`;
       // Could auto-attach result if useful, for now just store it
     }
   };
@@ -509,16 +504,6 @@ export function AIChatsView({
     } finally {
       setReplyPending(false);
     }
-  };
-
-  const groupByDate = (list) => {
-    const byDate = {};
-    list.forEach((chat) => {
-      const dateKey = new Date(chat.createdAt || Date.now()).toLocaleDateString();
-      if (!byDate[dateKey]) byDate[dateKey] = [];
-      byDate[dateKey].push(chat);
-    });
-    return byDate;
   };
 
   if (loading) {

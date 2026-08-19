@@ -6,13 +6,6 @@
  * Usage: node dev/test-sync-flows.js [--verbose] [--dry-run]
  */
 
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.dirname(__dirname);
-
 const VERBOSE = process.argv.includes("--verbose");
 const DRY_RUN = process.argv.includes("--dry-run");
 

@@ -28,11 +28,7 @@ const html = htm.bind(h);
 import { createDebugger } from "../../lib/debug.js";
 
 const dbg = createDebugger("GraphView");
-import {
-  buildKnowledgeGraph,
-  DIFFICULTY_COLOR,
-  PLATFORM_COLOR,
-} from "../../core/knowledge-graph.js";
+import { buildKnowledgeGraph, PLATFORM_COLOR } from "../../core/knowledge-graph.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import {
   KIND,

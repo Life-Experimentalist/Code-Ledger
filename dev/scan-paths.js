@@ -55,7 +55,6 @@ function* walkDir(dir) {
 
 function scanFile(filePath) {
   const content = fs.readFileSync(filePath, "utf-8");
-  const relPath = path.relative(srcDir, filePath);
   const issues = [];
 
   for (const [name, { regex, safe }] of Object.entries(PATTERNS)) {

@@ -7,10 +7,7 @@
  */
 
 import { CONSTANTS } from "../../../core/constants.js";
-import { createDebugger } from "../../../lib/debug.js";
 import { solutionPath, readmePath, hintsPath } from "../../../core/path-builder.js";
-
-const dbg = createDebugger("LeetCodeFileBuilder");
 
 /**
  * Execute a LeetCode GraphQL query.

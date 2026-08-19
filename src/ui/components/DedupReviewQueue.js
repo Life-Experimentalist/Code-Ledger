@@ -26,31 +26,6 @@ const dbg = createDebugger("DedupReviewQueue");
 const COUNTDOWN_SECONDS = 5;
 const AI_DECIDE_TIMEOUT_MS = 10000;
 
-function fmtDate(ts) {
-  if (!ts) return "unknown";
-  return new Date(ts).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function CodeBlock({ code, label, meta }) {
-  return html`
-    <div class="flex-1 min-w-0">
-      <div class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1">
-        ${label}
-      </div>
-      ${meta && html`<div class="text-[10px] text-slate-500 mb-1">${meta}</div>`}
-      <pre
-        class="bg-black/30 border border-white/5 rounded-lg p-3 text-[11px] text-slate-300 overflow-auto max-h-48 whitespace-pre-wrap break-all"
-      >
-${code || "(no code)"}</pre
-      >
-    </div>
-  `;
-}
-
 function ConflictItem({ item, candidate, onResolved, globalFrozen, onShowAIDecision, aiOn }) {
   const [seconds, setSeconds] = useState(COUNTDOWN_SECONDS);
   const [resolving, setResolving] = useState(false);
@@ -519,7 +494,7 @@ export function DedupReviewQueue({ onClose = () => {} }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [globalFrozen, setGlobalFrozen] = useState(false);
-  const [aiDecisionItem, setAiDecisionItem] = useState(null);
+  const [, setAiDecisionItem] = useState(null);
   const [aiOn, setAiOn] = useState(false);
 
   useEffect(() => {

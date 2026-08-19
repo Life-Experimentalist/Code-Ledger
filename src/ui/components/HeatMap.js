@@ -4,20 +4,9 @@
  */
 
 import { h } from "../../vendor/preact-bundle.js";
-import {
-  htm,
-  useState,
-  useMemo,
-  useEffect,
-  useRef,
-  useCallback,
-} from "../../vendor/preact-bundle.js";
+import { htm, useState, useMemo, useEffect, useRef } from "../../vendor/preact-bundle.js";
 import { mapDifficulty, loadUserDifficultyMap } from "../../core/difficulty-map.js";
 const html = htm.bind(h);
-
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("HeatMap");
 
 function fmtDateLabel(dateStr) {
   try {

@@ -15,9 +15,6 @@
  */
 
 import { CONSTANTS } from "./constants.js";
-import { createDebugger } from "../lib/debug.js";
-
-const dbg = createDebugger("PathBuilder");
 
 /** Increment when the directory layout changes. Stored in index.json. */
 export const LAYOUT_VERSION = 3;

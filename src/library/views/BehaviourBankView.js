@@ -6,7 +6,7 @@
  * roadmap, and knowledge bank entries. Replaces the panel stub in Settings.
  */
 
-import { h, useState, useEffect, useRef } from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 

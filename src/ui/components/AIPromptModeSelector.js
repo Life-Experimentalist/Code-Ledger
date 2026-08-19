@@ -14,10 +14,6 @@ import { h } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("AIPromptModeSelector");
-
 export const PROMPT_MODES = [
   {
     id: "tutor",

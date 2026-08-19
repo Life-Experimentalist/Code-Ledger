@@ -3,10 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createDebugger } from "./debug.js";
-
-const dbg = createDebugger("ChatVariables");
-
 /**
  * Expand variables in AI chat input
  * /mycode → user's code from problem

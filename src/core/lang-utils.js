@@ -3,10 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createDebugger } from "../lib/debug.js";
 import { CONSTANTS } from "./constants.js";
-
-const dbg = createDebugger("LangUtils");
 
 /**
  * Normalize language from various formats to a consistent lowercase string.

@@ -11,10 +11,6 @@ import { useState, useEffect } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("DifficultyMapPanel");
-
 import { BUILT_IN_MAP, CANONICAL } from "../../core/difficulty-map.js";
 
 const DIFF_COLOR = {

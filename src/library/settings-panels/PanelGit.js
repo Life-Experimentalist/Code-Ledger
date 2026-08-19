@@ -7,10 +7,6 @@ import { h, useState, useEffect, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("PanelGit");
-
 import { Storage } from "../../core/storage.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { registry } from "../../core/handler-registry.js";
@@ -30,7 +26,7 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
   const [refreshInfraBusy, setRefreshInfraBusy] = useState(false);
   const syncPortRef = useRef(null);
   const [syncCount, setSyncCount] = useState(null);
-  const [syncNeedsPush, setSyncNeedsPush] = useState(false);
+  const [, setSyncNeedsPush] = useState(false);
   const [importData, setImportData] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");

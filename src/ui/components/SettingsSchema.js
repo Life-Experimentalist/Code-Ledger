@@ -8,10 +8,7 @@ import { useEffect, useCallback, useState, useRef } from "../../vendor/preact-bu
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { createDebugger } from "../../lib/debug.js";
 import { trustedAuthOrigins, isTrustedAuthMessage } from "../../lib/oauth-message.js";
-
-const dbg = createDebugger("SettingsSchema");
 
 import { testAIKey, testProviderEndpoint, fetchModelsForProvider } from "../../core/model-fetch.js";
 import { Storage } from "../../core/storage.js";
@@ -1530,7 +1527,6 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
           const endpoint = values[endpointField] || p.endpoint || "";
           const providerEnabled =
             typeof values[enabledField] === "undefined" ? true : !!values[enabledField];
-          const isPinned = values?.aiProvider === pid || values?.aiSecondary === pid;
 
           return html`
             <div
@@ -1980,8 +1976,6 @@ export function SettingsSchema({ schema, values, onChange, onSetupRepo }) {
               remoteOnly=${syncConflictData.remoteOnly}
               providerName=${syncConflictData.provider || "GitHub"}
               onCancel=${async (resolvedSoFar, remaining) => {
-                const provider = syncConflictData.provider;
-                const mode = syncConflictData.mode || "bulk";
                 // Persist any choices the user made before closing
                 if (resolvedSoFar?.length > 0) {
                   try {

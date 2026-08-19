@@ -127,7 +127,7 @@ export function stripReadmeBlock(readme) {
  * @returns {{ files: Array<{path: string, content: string}>, deletes: string[], badgesPublished: boolean, intent: string }}
  */
 export function buildPublishPlan(opts = {}) {
-  const { snapshot, settings = {}, readme, pagesUrl, username, repoPrivate = false } = opts;
+  const { snapshot, settings = {}, readme, username, repoPrivate = false } = opts;
   const intent = resolvePublishIntent(settings);
 
   if (intent === "idle") {

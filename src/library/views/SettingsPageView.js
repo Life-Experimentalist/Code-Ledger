@@ -6,9 +6,6 @@
 import { h, useState } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
-import { createDebugger } from "../../lib/debug.js";
-
-const dbg = createDebugger("SettingsPageView");
 
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
 import { isAIActive } from "../../core/feature-flags.js";

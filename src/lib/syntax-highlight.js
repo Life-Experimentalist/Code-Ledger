@@ -7,10 +7,6 @@
  * Colors use inline styles (no CSS class dependencies).
  */
 
-import { createDebugger } from "./debug.js";
-
-const dbg = createDebugger("SyntaxHighlight");
-
 function escHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -607,7 +603,6 @@ const C_STRING = "color:#86efac"; // green-300
 const C_COMMENT = "color:#6b7280;font-style:italic"; // gray-500
 const C_NUMBER = "color:#fbbf24"; // amber-400
 const C_TYPE = "color:#c084fc"; // purple-400
-const C_BUILTIN = "color:#67e8f9"; // cyan-300
 
 /**
  * Strip invisible whitespace visualization characters that some code editors

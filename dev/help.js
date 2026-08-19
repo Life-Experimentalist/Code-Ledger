@@ -90,10 +90,6 @@ const CATEGORIES = [
   },
 ];
 
-function pad(str, len) {
-  return str + " ".repeat(Math.max(0, len - str.length));
-}
-
 const COL_WIDTH = 42;
 
 console.log();
@@ -105,7 +101,6 @@ for (const { label, color, scripts } of CATEGORIES) {
   console.log(`${BOLD}${color}${label}${RESET}`);
   for (const [name, desc] of scripts) {
     const nameStr = `${color}npm run ${name}${RESET}`;
-    const paddedName = pad(`npm run ${name}`, COL_WIDTH);
     const displayName = nameStr + " ".repeat(Math.max(0, COL_WIDTH - `npm run ${name}`.length));
     console.log(`  ${displayName}  ${DIM}${desc}${RESET}`);
   }

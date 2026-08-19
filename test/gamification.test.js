@@ -39,7 +39,6 @@ import {
 } from "../src/core/gamification.js";
 
 const UTC = { utcOffsetMinutes: 0 };
-const DAY = 86_400_000;
 
 /** Epoch ms for midday on a given `YYYY-MM-DD`, so no test sits on a boundary. */
 function at(key, hour = 12) {

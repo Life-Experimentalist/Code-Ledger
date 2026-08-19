@@ -7,13 +7,11 @@
  * Respects rate limits with exponential backoff.
  */
 
-import { Storage } from "./storage.js";
 import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("AIReviewQueue");
 
 const QUEUE_STORE = "ai-review-queue";
-const QUEUE_STATE_KEY = "review_queue_state";
 const RETRY_BASE_DELAY_MS = 5000; // Start with 5s backoff
 const RETRY_MAX_DELAY_MS = 300000; // Cap at 5 minutes
 const MAX_RETRIES = 5;

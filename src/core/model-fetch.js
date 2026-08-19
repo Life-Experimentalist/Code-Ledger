@@ -241,7 +241,6 @@ export async function testAIKey(providerId, key, endpointOverride = "") {
       providerId === "ollama" ? "tags" : "models"
     }`;
   };
-  const me = provider.modelsEndpoint;
 
   try {
     if (providerId === "openai") {

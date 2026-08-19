@@ -311,7 +311,7 @@ Return ONLY a JSON array of objects representing suggestions where the current m
     try {
       if (typeof chrome === "undefined" || !chrome.runtime?.id)
         throw new Error("Extension not available");
-      const res = await new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({ type: "SYNC_SETTINGS_TO_GITHUB" }, (resp) => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp);
@@ -334,7 +334,7 @@ Return ONLY a JSON array of objects representing suggestions where the current m
     try {
       if (typeof chrome === "undefined" || !chrome.runtime?.id)
         throw new Error("Extension not available");
-      const res = await new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({ type: "SYNC_SETTINGS_FROM_GITHUB" }, (resp) => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (resp?.ok) resolve(resp);
@@ -576,7 +576,7 @@ Return ONLY a JSON array of objects representing suggestions where the current m
               try {
                 if (typeof chrome === "undefined" || !chrome.runtime?.id)
                   throw new Error("Extension not available");
-                const res = await new Promise((resolve, reject) => {
+                await new Promise((resolve, reject) => {
                   chrome.runtime.sendMessage({ type: "FORCE_COMMIT_SETTINGS" }, (resp) => {
                     if (chrome.runtime.lastError)
                       reject(new Error(chrome.runtime.lastError.message));
