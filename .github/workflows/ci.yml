@@ -50,25 +50,32 @@ jobs:
       - name: Type check
         run: npm run lint
 
-      # Formatting drift is mechanically fixable, so it must not block the
-      # pipeline. On a push, run Prettier itself and push the fix back as a
-      # bot commit, then carry on gating the healed tree. A GITHUB_TOKEN push
-      # does not trigger another workflow run, and Prettier is idempotent, so
-      # this cannot loop. Pull requests keep the blocking check — a fork's
-      # token cannot push back.
-      - name: Format (auto-heal on push)
+      # Drift that a script can fix must not block the pipeline. Three of the
+      # gates below reject exactly that kind of drift: Prettier formatting,
+      # the version copied from package.json into the manifests and landing
+      # page, and the host_permissions generated from the handlers' DOMAINS
+      # exports. On a push, run the fixers themselves and push the result
+      # back as a bot commit, then carry on gating the healed tree. A
+      # GITHUB_TOKEN push does not trigger another workflow run, and every
+      # fixer is idempotent, so this cannot loop. Pull requests keep the
+      # blocking checks — a fork's token cannot push back. The generators
+      # run first so anything they write gets formatted; a sync-manifests
+      # failure (landing-page pattern gone) is real breakage and still fails.
+      - name: Auto-heal formatting and generated files (push)
         if: github.event_name == 'push'
         run: |
+          node dev/sync-manifests.js
+          node dev/generate-manifest-domains.js
           npm run format
           if git diff --quiet; then
-            echo "formatting clean — nothing to heal"
+            echo "no drift — nothing to heal"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "style: auto-heal formatting drift"
+          git commit -am "chore: auto-heal formatting and generated-file drift"
           git push origin "HEAD:${{ github.ref_name }}" ||
-            echo "::warning::branch moved before the formatting fix could land — the next push heals it"
+            echo "::warning::branch moved before the heal commit could land — the next push heals it"
 
       - name: Format check
         if: github.event_name != 'push'
