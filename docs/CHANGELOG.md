@@ -6,6 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- The GitHub Pages report has a Knowledge Graph section, the same picture the library's Graph tab draws: topic hubs coloured by mastery (solve volume × recency, 90-day half-life, decay clocked from the second-most-recent solve so one stray solve does not repaint a rusty topic), problem dots coloured by difficulty, and the unsolved similar problems LeetCode attaches to your solves shown as hollow ghost suggestions. Drag to pan, scroll to zoom, hover for details, click a problem to open it on its platform. Rendered on a plain canvas from the same `index.json` the rest of the report reads — no library, no network call, and it respects the report's light/dark toggle. Existing repos pick it up through the usual report-update flow in Settings → Git.
+
+---
+
 ## [1.8.1] — 2026-08-19
 
 ### Added
