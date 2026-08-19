@@ -94,6 +94,7 @@ function main() {
       pagesUrl: cfg.pagesUrl,
       username: cfg.username,
       picks: Array.isArray(cfg.picks) ? cfg.picks : undefined,
+      achievementPicks: Array.isArray(cfg.achievementPicks) ? cfg.achievementPicks : undefined,
       urlFor: useShields
         ? (name) => shieldsUrl(cfg.rawBase, name, snapshot, { style: cfg.shieldsStyle })
         : undefined,

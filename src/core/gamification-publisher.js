@@ -28,7 +28,7 @@ import {
   SHIELDS_PATHS,
   SHIELDS_STYLES,
 } from "./badge-shields.js";
-import { configFromSettings } from "./gamification.js";
+import { configFromSettings, ACHIEVEMENTS } from "./gamification.js";
 import { isGamificationActive } from "./feature-flags.js";
 
 /** Every path the feature writes. Nothing outside this list is ever deleted. */
@@ -211,6 +211,25 @@ export function resolveBadgePicks(settings = {}) {
 }
 
 /**
+ * Which achievements the README's showcase line may list.
+ *
+ * Unlike `resolveBadgePicks`, an empty array is honoured as "none": badges have
+ * a dedicated README switch for removing the row, but the achievements line has
+ * only this selection, so unchecking everything must actually clear it. No
+ * stored value means every earned achievement shows, which also lets a fresh
+ * achievement appear without the user having to opt it in.
+ *
+ * @param {Record<string, any>} settings
+ * @returns {string[]|undefined} undefined when every earned achievement shows
+ */
+export function resolveAchievementPicks(settings = {}) {
+  const picks = settings.gamificationAchievementPicks;
+  if (!Array.isArray(picks)) return undefined;
+  const known = new Set(ACHIEVEMENTS.map((a) => a.id));
+  return picks.filter((id) => known.has(id));
+}
+
+/**
  * Everything `upsertReadmeBlock` needs to render the block in the chosen style.
  *
  * @param {object} opts same shape as `buildPublishPlan`
@@ -219,7 +238,12 @@ export function resolveBadgePicks(settings = {}) {
 export function readmeOptions(opts = {}) {
   const { settings = {}, snapshot, pagesUrl, username, repo, branch, repoPrivate } = opts;
   const rawBase = rawBaseUrl(username, repo, branch);
-  const base = { pagesUrl, username, picks: resolveBadgePicks(settings) };
+  const base = {
+    pagesUrl,
+    username,
+    picks: resolveBadgePicks(settings),
+    achievementPicks: resolveAchievementPicks(settings),
+  };
 
   if (resolveBadgeStyle(settings, { repoPrivate, rawBase }) !== "shields") return base;
 
@@ -271,6 +295,9 @@ export function buildRefreshConfig(opts = {}) {
       : "flat",
     rawBase,
     picks: resolveBadgePicks(settings) || null,
+    // null means "all earned"; an array — empty included — is an explicit
+    // selection the nightly refresh must reproduce exactly.
+    achievementPicks: resolveAchievementPicks(settings) ?? null,
   };
 }
 

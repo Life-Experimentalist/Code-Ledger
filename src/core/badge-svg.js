@@ -507,7 +507,8 @@ export const DEFAULT_PICKS = Object.freeze(["streak", "points", "level", "diffic
  *
  * @param {object} snapshot
  * @param {{ pagesUrl?: string, username?: string, showCard?: boolean,
- *          picks?: string[], urlFor?: (name: string) => string }} [opts]
+ *          picks?: string[], achievementPicks?: string[],
+ *          urlFor?: (name: string) => string }} [opts]
  * @returns {string}
  */
 export function badgeMarkdown(snapshot, opts = {}) {
@@ -537,7 +538,14 @@ export function badgeMarkdown(snapshot, opts = {}) {
     lines.push(picks.map((n) => `![${BADGE_ALT[n]}](${url(n)})`).join(" "));
   }
 
-  const earned = (snapshot.achievements || []).filter((a) => a.earned);
+  // `achievementPicks` is an explicit selection: an array narrows the line to
+  // exactly those ids, and an empty array removes the line entirely. That is a
+  // deliberate difference from `picks` above — badges have a separate README
+  // switch to remove the row, achievements have only this.
+  const showcase = Array.isArray(opts.achievementPicks) ? new Set(opts.achievementPicks) : null;
+  const earned = (snapshot.achievements || []).filter(
+    (a) => a.earned && (!showcase || showcase.has(a.id)),
+  );
   if (earned.length) {
     lines.push("", earned.map((a) => `${a.emoji} ${a.name}`).join(" · "));
   }

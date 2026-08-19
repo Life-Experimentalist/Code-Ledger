@@ -80,6 +80,46 @@ const EDGE_STYLE = {
  * holds still. randomSeed pins the initial scatter, which makes the final
  * layout reproducible run to run.
  */
+// The zoom range the view's own +/- buttons enforce. The wheel must obey the
+// same bounds: vis-network's built-in wheel zoom runs all the way to scale
+// 1e-5, where the whole graph is a sub-pixel dot that reads as "disappeared".
+const SCALE_MIN = 0.05;
+const SCALE_MAX = 5;
+
+/**
+ * Pointer-anchored wheel zoom, proportional to how far the wheel actually
+ * turned. vis-network's own handler steps a fixed 10% per wheel *event*
+ * whatever the delta says — a smooth-scrolling mouse or touchpad fires dozens
+ * of small-delta events per flick, so one flick multiplied the scale several
+ * times over and hurled the camera toward its 1e-5–10 limits, far past the
+ * range the zoom buttons allow. Pure so the arithmetic is testable.
+ *
+ * @param {number} scale                Current camera scale
+ * @param {{x:number,y:number}} anchor  Canvas-space point under the pointer
+ * @param {{x:number,y:number}} center  Canvas-space viewport centre
+ * @param {number} deltaY               WheelEvent.deltaY
+ * @param {number} deltaMode            WheelEvent.deltaMode (0 px, 1 lines, 2 pages)
+ * @returns {{scale:number, position:{x:number,y:number}}|null} null = no-op
+ */
+export function computeWheelZoom(scale, anchor, center, deltaY, deltaMode) {
+  const unit = deltaMode === 1 ? 16 : deltaMode === 2 ? 120 : 1;
+  // One notch of a classic wheel is ~100px → ~14% per notch, close to the old
+  // per-notch feel. Capped so a free-spinning wheel's burst of huge deltas is
+  // a fast zoom rather than a teleport.
+  const px = Math.max(-360, Math.min(360, deltaY * unit));
+  if (!px) return null;
+  const next = Math.min(Math.max(scale * Math.exp(-px * 0.0015), SCALE_MIN), SCALE_MAX);
+  if (next === scale) return null;
+  // Keep the canvas point under the pointer stationary on screen: its DOM
+  // offset from the viewport centre is (center − anchor) · scale, which must
+  // come out unchanged at the new scale.
+  const k = scale / next;
+  return {
+    scale: next,
+    position: { x: anchor.x + (center.x - anchor.x) * k, y: anchor.y + (center.y - anchor.y) * k },
+  };
+}
+
 const VIS_OPTIONS = {
   autoResize: false,
   layout: { randomSeed: 7 },
@@ -487,6 +527,7 @@ export function GraphView({
   /* ── Create the network once, lazily loading the vendored bundle ── */
   useEffect(() => {
     let cancelled = false;
+    let removeWheel = null;
     (async () => {
       const vis = await import("../../vendor/vis-network-bundle.js");
       if (cancelled || !containerRef.current) return;
@@ -556,12 +597,38 @@ export function GraphView({
         containerRef.current.style.cursor = "default";
       });
 
+      // Wheel zoom is ours, not vis-network's — see computeWheelZoom. The
+      // capture-phase listener runs before the canvas's own, and stopping
+      // propagation keeps vis blind to the wheel while leaving its touch
+      // pinch handling alive. preventDefault stops the page scrolling
+      // underneath the graph at the same time.
+      const container = containerRef.current;
+      const onWheel = (e) => {
+        const net = networkRef.current;
+        if (!net) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = container.getBoundingClientRect();
+        const pointer = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const move = computeWheelZoom(
+          net.getScale(),
+          net.DOMtoCanvas(pointer),
+          net.getViewPosition(),
+          e.deltaY,
+          e.deltaMode,
+        );
+        if (move) net.moveTo(move);
+      };
+      container.addEventListener("wheel", onWheel, { capture: true, passive: false });
+      removeWheel = () => container.removeEventListener("wheel", onWheel, { capture: true });
+
       visReadyRef.current = true;
       setGraphEpoch((e) => e + 1); // trigger the data-load effect below
     })().catch((err) => dbg.error("Failed to load graph engine:", err));
 
     return () => {
       cancelled = true;
+      removeWheel?.();
       visReadyRef.current = false;
       networkRef.current?.destroy();
       networkRef.current = null;
@@ -868,7 +935,7 @@ export function GraphView({
     const network = networkRef.current;
     if (!network) return;
     network.moveTo({
-      scale: Math.min(Math.max(network.getScale() * factor, 0.05), 5),
+      scale: Math.min(Math.max(network.getScale() * factor, SCALE_MIN), SCALE_MAX),
       animation: { duration: 200, easingFunction: "easeInOutQuad" },
     });
   }, []);

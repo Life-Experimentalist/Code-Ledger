@@ -20,7 +20,7 @@ import { createDebugger } from "../../lib/debug.js";
 import { computeSnapshot, configFromSettings, DEFAULT_CONFIG } from "../../core/gamification.js";
 import { badge, badgeSpecs, BADGE_NAMES, BADGE_ALT, DEFAULT_PICKS } from "../../core/badge-svg.js";
 import { SHIELDS_STYLES } from "../../core/badge-shields.js";
-import { isGamificationActive } from "../../core/feature-flags.js";
+import { isGamificationActive, visibleAchievements } from "../../core/feature-flags.js";
 
 const dbg = createDebugger("PanelGamification");
 
@@ -146,6 +146,26 @@ export function PanelGamification({ settings, onSettingsChange }) {
   ]);
 
   const specs = snapshot ? badgeSpecs(snapshot) : null;
+
+  // Achievements to showcase in the README. No stored value means "all earned,
+  // future ones included"; an array — empty included — is an explicit
+  // selection, which is how unchecking everything actually clears the line.
+  const achievements = snapshot ? visibleAchievements(snapshot, s) : [];
+  const achievementStored = Array.isArray(s.gamificationAchievementPicks)
+    ? s.gamificationAchievementPicks
+    : null;
+  const showcased = (id) => !achievementStored || achievementStored.includes(id);
+  const toggleShowcase = (id) => {
+    const next = achievements
+      .map((a) => a.id)
+      .filter((x) => (x === id ? !showcased(x) : showcased(x)));
+    // Everything ticked goes back to the default, so achievements earned later
+    // showcase themselves instead of waiting for a visit to this panel.
+    onSettingsChange?.(
+      "gamificationAchievementPicks",
+      next.length === achievements.length ? undefined : next,
+    );
+  };
 
   const togglePick = (name) => {
     const on = picks.includes(name);
@@ -329,6 +349,52 @@ export function PanelGamification({ settings, onSettingsChange }) {
             })}
           </div>
         </div>
+
+        <!-- Which achievements -->
+        ${achievements.length > 0 &&
+        html`
+          <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
+            <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">
+              Achievements to showcase
+            </h3>
+            <p class="text-[11px] text-slate-500 leading-snug">
+              Earned achievements are listed under the badge row in your README. Untick any you
+              would rather keep to yourself — a locked one only appears once you earn it, so leaving
+              it ticked just means it shows up on its own that day.
+            </p>
+
+            <div class="grid gap-2 sm:grid-cols-2">
+              ${achievements.map((a) => {
+                const on = showcased(a.id);
+                return html`
+                  <label
+                    key=${a.id}
+                    title=${a.hint}
+                    class="flex items-center gap-3 p-2 rounded-lg border transition-colors cursor-pointer
+                      ${on ? "bg-white/5 border-white/10" : "border-transparent hover:bg-white/5"}"
+                  >
+                    <input
+                      type="checkbox"
+                      checked=${on}
+                      onChange=${() => toggleShowcase(a.id)}
+                      class="accent-cyan-500"
+                    />
+                    <span class="text-base leading-none ${a.earned ? "" : "grayscale opacity-40"}"
+                      >${a.emoji}</span
+                    >
+                    <span class="text-sm truncate ${a.earned ? "text-slate-200" : "text-slate-500"}"
+                      >${a.name}</span
+                    >
+                    ${!a.earned &&
+                    html`<span class="ml-auto text-[10px] uppercase tracking-wider text-slate-600"
+                      >locked</span
+                    >`}
+                  </label>
+                `;
+              })}
+            </div>
+          </div>
+        `}
 
         <!-- Scoring -->
         <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
