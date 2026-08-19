@@ -408,6 +408,26 @@ Return ONLY a JSON array of objects representing suggestions where the current m
           desc="Sends an anonymous solve-count ping to counter.vkrishna04.me. No personal data or code is included. Off by default."
           defaultOn=${false}
         />
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-sm text-slate-300">Incognito mode</p>
+            <p class="text-[11px] text-slate-500 leading-snug mt-0.5 max-w-[280px]">
+              While active, solves are discarded instead of recorded or committed. A banner shows at
+              the top of the library until it expires or you turn it off.
+            </p>
+          </div>
+          <select
+            value=${settings?.incognitoMode || "off"}
+            onChange=${(e) => onSettingsChange("incognitoMode", e.target.value)}
+            class="bg-[#1e1e1e] text-xs text-slate-300 border border-white/10 rounded px-2 py-1 outline-none focus:border-cyan-500/50"
+          >
+            <option value="off">Off</option>
+            <option value="1h">1 hour</option>
+            <option value="4h">4 hours</option>
+            <option value="24h">24 hours</option>
+            <option value="forever">Until turned off</option>
+          </select>
+        </div>
       </div>
 
       <!-- Background Operations -->

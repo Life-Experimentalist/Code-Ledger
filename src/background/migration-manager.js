@@ -385,7 +385,7 @@ export async function forceRebuildRepo() {
       files.push({ path: "index.json", content: indexContent });
       return {
         files,
-        message: buildCommitMessage(COMMIT_TYPES.SOLVED, p),
+        message: buildCommitMessage(COMMIT_TYPES.SOLVED, p, settings?.commitMessageTemplate),
         date: p.timestamp || Date.now(),
         repoName: repo,
       };

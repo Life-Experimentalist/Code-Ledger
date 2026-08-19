@@ -22,11 +22,35 @@ export function resolveCommitType(str) {
 }
 
 /**
+ * Fill a user commit-message template with a solve's data.
+ * Supported variables: {topic} {title} {difficulty} {language} {platform} —
+ * the exact list the settings UI advertises. Unknown braces pass through.
+ *
+ * @param {string} template
+ * @param {object} data — { title, titleSlug, lang, topic, difficulty, platform }
+ */
+export function applyCommitTemplate(template, data = {}) {
+  const vars = {
+    topic: data.topic || "Untagged",
+    title: data.title || data.titleSlug || "Unknown",
+    difficulty: data.difficulty || "?",
+    language: data.lang?.name || data.lang?.slug || "Unknown",
+    platform: data.platform || "unknown",
+  };
+  return template.replace(/\{(topic|title|difficulty|language|platform)\}/g, (_, k) => vars[k]);
+}
+
+/**
  * Build a commit message for the given type and data.
  * @param {string} type   — one of COMMIT_TYPES values
  * @param {object} data   — { title, titleSlug, lang, topic, count, platform, detail }
+ * @param {string} [template] — user's commitMessageTemplate setting; applies to
+ *   solve commits only (the other types have no per-problem variables to fill)
  */
-export function buildCommitMessage(type, data = {}) {
+export function buildCommitMessage(type, data = {}, template = "") {
+  if (type === COMMIT_TYPES.SOLVED && typeof template === "string" && template.trim()) {
+    return applyCommitTemplate(template, data);
+  }
   switch (type) {
     case COMMIT_TYPES.SOLVED: {
       const lang = data.lang?.name || data.lang?.slug || "Unknown";

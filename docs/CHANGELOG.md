@@ -6,6 +6,48 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.8.1] — 2026-08-19
+
+### Added
+
+- The Solutions tab now answers "what should I solve next", not just "what have I solved". An **Up next** bar suggests up to three problems, ranked from data the library already holds and computed without any network call or AI: the unsolved similar problems LeetCode attaches to your most recent solves (a candidate named by several recent solves outranks a one-off, and each card says which solve it follows and when), problems serving your active roadmap milestone, which outrank the merely recent, and — when the similars run dry — your least-practised topic as a "revisit" nudge. Solved problems can never be suggested, matched by slug and by canonical id so a problem solved on GeeksForGeeks is not re-suggested from LeetCode's list; paid-only problems are excluded outright. A reroll button pages through the rest when more than three qualify.
+
+- Solving on vacation now counts. A vacation day was strictly neutral — the streak survived, but a day you chose to solve anyway earned nothing, which made ending a break early strictly worse than sitting it out. A vacation day that reaches the daily target now extends the streak and banks freezes exactly like any other day, so coming back early always pays; a partial vacation day stays neutral rather than turning into a miss. Two achievements land with it: **Back In Action** (hit the target while on vacation) and **Weekend Warrior** (solve on ten weekend days).
+
+- Breaks are detected after the fact, not just declared in advance. Life happens without a vacation being declared first, and until now the only repair for a week away was rebuilding the streak from zero. When three or more consecutive zero-point days end yesterday — today is still in progress, and declared vacations don't count into the run — the Solutions tab offers to mark the run as a break with one click, which makes those days neutral and lets the streak pick up where it left off. The threshold is deliberately not configurable: below three days, freezes and the penalty buy-back are the intended tools, and a tunable threshold would let every single missed day be auto-forgiven. Someone with no solve history is never offered a break — you cannot be away from nothing.
+
+- The extension's welcome page now mentions the desktop app. The landing page has been installable as a PWA since 1.8.0, but the only way to learn that was to visit the site and notice the button; the onboarding checklist now has a card pointing there, and says honestly that the install control lives in the site's corner once it detects the extension — the welcome page cannot install it for you.
+
+- The AI review prompts are now editable. Settings → AI gained a prompt editor: each template CodeLedger sends — review, chat system prompt, merge — can be read, edited and reset to the shipped default, so what the model is asked is no longer something you have to take on faith or read source to learn.
+
+- A master switch for AI, offered only once it means something. Settings → AI now has an "AI features" toggle that hides every AI surface — reviews, chats, prompts — without deleting the provider keys underneath. It appears only after at least one provider is configured, because with nothing configured there is nothing to switch off and a dead toggle reads as a broken feature.
+
+- Incognito mode has a control. The engine has honoured an incognito flag since it shipped — solves discarded instead of recorded or committed, with a banner while it lasts — but nothing in the UI could set it. Settings → Advanced now offers it with 1-hour, 4-hour, 24-hour and until-turned-off durations.
+
+- The popup's recent solves are links now. Each one opens the library with that problem's dialog already open, instead of leaving you to find it again in the list.
+
+### Fixed
+
+- Navigating between problems with the dialog's arrow keys no longer strands the new problem in the old one's loading state. "Refresh problem data", "Generate AI review" and the code-recovery button each set a busy flag that only their own completion cleared — arrive at a different problem mid-flight and it inherited the spinner, and worse, the stale completion then wrote the *old* problem's update over the dialog, snapping it back to the problem you had just left. Every async completion now checks it still belongs to the problem on screen before touching anything, and switching problems resets all transient state.
+
+- The commit message template is honoured. Settings has offered a `commitMessageTemplate` with `{topic}`, `{title}`, `{difficulty}`, `{language}` and `{platform}` variables for as long as the setting has existed, and nothing ever read it — every solve commit used the built-in format regardless of what was typed. Solve commits now fill the template when one is set; the other commit types (imports, index updates) keep the built-in messages, since they have no per-problem variables to fill.
+
+- Per-platform difficulty aliases now count. The Platforms panel lets each platform declare what it calls Easy, Medium and Hard — GeeksForGeeks' "School" and "Basic", for instance — but only the global mapping was ever consulted, so aliased solves fell through to a guess in stats and badges. The per-platform maps are now folded into normalization, with the explicit global mapping still winning on conflict.
+
+- Problems from Codeforces, NeetCode and takeuforward no longer open the dialog onto "No content." The dialog hardcoded an "overview" first tab that only LeetCode and GeeksForGeeks problems actually have; it now opens on the first tab the problem really offers.
+
+- The import report's "View conflicts" button lands on the panel that has the conflicts. It switched to Settings but not to the Git panel inside it, so it opened General and left you to find the dedup queue yourself.
+
+- The privacy panel no longer offers a jump button that goes nowhere. The mermaid disclosure's "review setting" button pointed at a settings panel with no mermaid control on it — per-diagram rendering is decided on the diagram. The button is gone; the disclosure text remains.
+
+### Removed
+
+- The dead settings stack. The library's hand-written settings panels replaced the schema-driven settings renderer some releases ago, but the old machinery stayed in the tree, unreachable but still shipping: `SettingsView.js`, the 2,000-line `SettingsSchema.js`, `DifficultyMapPanel.js`, `MirrorsPanel.js`, the registry's `getAllSettingsSchemas()` that only they called, and `src/sidebar/sidebar.html`, which no manifest has pointed at since the sidebar became the library page. Handlers still register their settings schemas — kept as the machine-readable description of what a handler accepts — but nothing renders them.
+
+- The "coming soon" mirror-provider chips. The 1.7.0 cleanup removed the GitLab and Bitbucket handlers because every method on them threw, with the rule that no provider appears in the UI before its `commit()` works; the disabled chips advertising them in the mirrors picker were the last violation of it.
+
+---
+
 ## [1.8.0] — 2026-08-19
 
 ### Added

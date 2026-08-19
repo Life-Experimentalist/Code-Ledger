@@ -122,7 +122,7 @@ manifest-chromium.json / manifest-firefox.json   — the build emits one manifes
 │   ├── sanitize-html.js              — the allow-list sanitiser every rendered HTML string goes through
 │   └── debug.js                      — createDebugger() with console.bind() trick
 ├── ui/
-│   ├── components/SettingsSchema.js  — schema-driven settings renderer (Preact + htm)
+│   ├── components/                   — shared Preact components (ModelSelector, panels, modals)
 │   ├── components/GitHubOnboardingModal.js — first-time repo setup wizard (Trees API)
 │   └── floating-timer.js             — draggable solve-time stopwatch (content-script safe, no framework)
 └── welcome/
@@ -299,12 +299,12 @@ All handlers live in `src/handlers/` and follow a strict structure:
 
 - **Reusable components**: `src/ui/components/{PascalCase}.js`
   - One component per file; file name matches exported class/function name
-  - Examples: `SettingsSchema.js`, `GitHubOnboardingModal.js`, `DedupReviewQueue.js`, `AIReviewPanel.js`
+  - Examples: `GitHubOnboardingModal.js`, `DedupReviewQueue.js`, `AIReviewPanel.js`
   - These are shared between extension sidebar and web app
 
 - **Library views**: `src/library/views/{PascalCase}View.js`
   - Always end with `View` suffix to distinguish from generic components
-  - Examples: `ProblemsView.js`, `AnalyticsView.js`, `SettingsView.js`, `AIChatsView.js`, `GraphView.js`
+  - Examples: `ProblemsView.js`, `AnalyticsView.js`, `SettingsPageView.js`, `AIChatsView.js`, `GraphView.js`
 
 ### Core Utilities & Modules
 
@@ -322,8 +322,8 @@ All handlers live in `src/handlers/` and follow a strict structure:
 | Handler directories | kebab-case        | `leetcode`, `gemini`, `github`                               | All handlers indexed by name               |
 | Handler files       | `index.js`        | `index.js`                                                   | Standard entry point                       |
 | Support files       | kebab-case        | `dom-selectors.js`, `page-detector.js`, `graphql-queries.js` | Clear purpose from name                    |
-| Components          | PascalCase        | `SettingsSchema.js`, `ModelSelector.js`                      | React/Preact convention                    |
-| Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                         | Distinguish from generic components        |
+| Components          | PascalCase        | `GitHubOnboardingModal.js`, `ModelSelector.js`               | React/Preact convention                    |
+| Views               | PascalCase + View | `ProblemsView.js`, `SettingsPageView.js`                     | Distinguish from generic components        |
 | Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                   | Lowercase for utility modules              |
 | Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.TELEMETRY_OPT_IN`                              | Via `CONSTANTS.SK.*` where it has an entry |
 | CSS files           | kebab-case        | `theme-variables.css`                                        | Tailwind input files or compiled           |
@@ -491,7 +491,7 @@ The `GitHubOnboardingModal` (`src/ui/components/GitHubOnboardingModal.js`) handl
 - **Create new repo**: Uses `auto_init: false`, then writes the first commit itself. `initializeRepository()` detects the empty repo (the `git/ref/heads/{branch}` lookup fails), omits `base_tree` and `parents` to build a **root commit**, and then creates `refs/heads/main` explicitly. This keeps the repo free of a GitHub-generated README. Note `api-client.js` `createRepo()` still passes `auto_init: true` for the non-onboarding path — both work, but the two paths differ.
 - **Repo init**: Uses the **Trees API** (`POST /git/trees` → `POST /git/commits` → `PATCH /git/refs/heads/main`) for atomic multi-file creation. Never use the Contents API (`PUT /contents/`) — it creates one commit per file and requires `btoa()` which breaks on non-ASCII (emoji).
 - **Token flow**: OAuth token is already saved to `auth.tokens` by the time the modal opens (saved by `library.js` handleOAuthMessage). The modal should NOT re-save the token to settings.
-- **Trigger**: Only `library.js` shows the modal (via `showGitHubOnboarding` state). `SettingsSchema.js` does NOT trigger onboarding — it only stores the token and fetches the username.
+- **Trigger**: Only `library.js` shows the modal (via `showGitHubOnboarding` state). The Git settings panel does NOT trigger onboarding — it only stores the token and fetches the username.
 
 ## Problem Solve Data Shape
 

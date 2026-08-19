@@ -497,7 +497,10 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
     setShowAddMirror(false);
   };
 
-  const MIRROR_PROVIDERS = [{ id: "github", label: "GitHub", ready: true }];
+  // Only providers whose commit() works may appear here — a "coming soon" chip
+  // is exactly what the 1.7.0 provider cleanup removed. Add an entry only
+  // alongside a working handler (see docs/guides/setup/git-integration-setup.md).
+  const MIRROR_PROVIDERS = [{ id: "github", label: "GitHub" }];
 
   const repoUrl = repoOwner && repoName ? `https://github.com/${repoOwner}/${repoName}` : "";
 
@@ -805,22 +808,17 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
                       <button
                         key=${p.id}
                         onClick=${() => {
-                          if (p.ready) {
-                            setMirrorProvider(p.id);
-                            setMirrorCheckState(null);
-                            checkMirrorRepo(mirrorOwner, mirrorRepo, p.id);
-                          }
+                          setMirrorProvider(p.id);
+                          setMirrorCheckState(null);
+                          checkMirrorRepo(mirrorOwner, mirrorRepo, p.id);
                         }}
-                        disabled=${!p.ready}
-                        title=${p.ready ? p.label : `${p.label} — coming soon`}
+                        title=${p.label}
                         class="flex-1 py-1 rounded text-[11px] font-medium border transition-colors ${mirrorProvider ===
                         p.id
                           ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-200"
-                          : "bg-white/5 border-white/10 text-slate-500"} disabled:opacity-40 disabled:cursor-not-allowed"
+                          : "bg-white/5 border-white/10 text-slate-500"}"
                       >
-                        ${p.label}${!p.ready
-                          ? html`<span class="ml-1 text-[8px] opacity-60">soon</span>`
-                          : ""}
+                        ${p.label}
                       </button>
                     `,
                   )}

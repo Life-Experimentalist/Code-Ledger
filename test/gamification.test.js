@@ -28,6 +28,7 @@ import {
   scoreEvents,
   buildDailyPoints,
   isVacationDay,
+  detectAwayGap,
   computeStreak,
   levelFor,
   computeSnapshot,
@@ -857,5 +858,126 @@ describe("describeStreak", () => {
       vacations: [{ start: "2026-03-01", end: "2026-03-10" }],
     });
     assert.match(describeStreak(s), /vacation/);
+  });
+
+  test("acknowledges a vacation day where the target was met anyway", () => {
+    const s = computeSnapshot(pointsOn("2026-03-03", 25), {
+      ...base,
+      now: at("2026-03-03"),
+      vacations: [{ start: "2026-03-01", end: "2026-03-10" }],
+    });
+    assert.match(describeStreak(s), /counts anyway/);
+  });
+});
+
+describe("solving on vacation", () => {
+  const base = { config: { ...UTC, dailyTargetPoints: 25 } };
+  const vac = [{ start: "2026-03-02", end: "2026-03-05" }];
+
+  test("a vacation day that hits the target extends the streak", () => {
+    const problems = [
+      ...pointsOn("2026-03-01", 25),
+      ...pointsOn("2026-03-03", 25), // mid-vacation solve
+      ...pointsOn("2026-03-06", 25),
+    ];
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-06"), vacations: vac });
+    // 01 complete, 02 neutral, 03 complete, 04–05 neutral, 06 complete = 3.
+    assert.equal(s.currentStreak, 3);
+    const day = s.timeline.find((t) => t.day === "2026-03-03");
+    assert.equal(day.status, "complete");
+    assert.equal(day.vacation, true);
+  });
+
+  test("a partial vacation day stays neutral, not missed", () => {
+    const problems = [...pointsOn("2026-03-01", 25), ...pointsOn("2026-03-03", 10)];
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-06"), vacations: vac });
+    assert.equal(s.timeline.find((t) => t.day === "2026-03-03").status, "vacation");
+  });
+
+  test("a big vacation day still banks a freeze", () => {
+    const problems = [...pointsOn("2026-03-01", 25), ...pointsOn("2026-03-03", 50)];
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-04"), vacations: vac });
+    assert.equal(s.freezes, 1);
+    assert.equal(s.timeline.find((t) => t.day === "2026-03-03").status, "earned-freeze");
+  });
+
+  test("Back In Action is earned by a vacation-day solve", () => {
+    const problems = [...pointsOn("2026-03-01", 25), ...pointsOn("2026-03-03", 25)];
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-04"), vacations: vac });
+    assert.ok(s.achievements.find((a) => a.id === "back-in-action").earned);
+    const without = computeSnapshot(pointsOn("2026-03-01", 25), {
+      ...base,
+      now: at("2026-03-01"),
+    });
+    assert.ok(!without.achievements.find((a) => a.id === "back-in-action").earned);
+  });
+});
+
+describe("away-gap detection", () => {
+  const base = { config: { ...UTC, dailyTargetPoints: 25 } };
+
+  test("a three-day silent run ending yesterday is offered as a break", () => {
+    const problems = pointsOn("2026-03-01", 25);
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-05") });
+    assert.deepEqual(s.awayGap, { start: "2026-03-02", end: "2026-03-04", days: 3 });
+  });
+
+  test("a one- or two-day miss is left to freezes and the penalty", () => {
+    const problems = pointsOn("2026-03-01", 25);
+    const s = computeSnapshot(problems, { ...base, now: at("2026-03-04") });
+    assert.equal(s.awayGap, null);
+  });
+
+  test("today in progress does not count toward the gap", () => {
+    // Solved 03-01; 02, 03, 04 silent; now it is midday on the 4th — only two
+    // finished days are silent, today is still live.
+    const problems = pointsOn("2026-03-01", 25);
+    const gap = detectAwayGap(buildDailyPoints(problems, UTC), [], "2026-03-04");
+    assert.equal(gap, null);
+  });
+
+  test("declared vacations end the gap instead of counting into it", () => {
+    const problems = pointsOn("2026-03-01", 25);
+    const s = computeSnapshot(problems, {
+      ...base,
+      now: at("2026-03-08"),
+      vacations: [{ start: "2026-03-02", end: "2026-03-04" }],
+    });
+    // Only 05, 06, 07 are undeclared — the gap starts after the vacation.
+    assert.deepEqual(s.awayGap, { start: "2026-03-05", end: "2026-03-07", days: 3 });
+  });
+
+  test("no activity ever means no gap — you cannot be away from nothing", () => {
+    const s = computeSnapshot([], { ...base, now: at("2026-03-08") });
+    assert.equal(s.awayGap, null);
+  });
+
+  test("the gap never reaches past the install-day floor", () => {
+    const problems = pointsOn("2026-02-01", 25);
+    const s = computeSnapshot(problems, {
+      ...base,
+      now: at("2026-03-06"),
+      streakFloorDay: "2026-03-04",
+    });
+    // Only 03-04 and 03-05 are inside the floor — too short to be a break.
+    assert.equal(s.awayGap, null);
+  });
+
+  test("declaring the gap as a vacation restores the streak", () => {
+    const problems = [
+      ...pointsOn("2026-03-01", 25),
+      ...pointsOn("2026-03-02", 25),
+      ...pointsOn("2026-03-06", 25),
+    ];
+    const broken = computeSnapshot(problems, { ...base, now: at("2026-03-06") });
+    assert.equal(broken.currentStreak, 1, "the gap broke the streak");
+    const gap = broken.awayGap;
+    assert.ok(gap);
+    const rescued = computeSnapshot(problems, {
+      ...base,
+      now: at("2026-03-06"),
+      vacations: [{ start: gap.start, end: gap.end }],
+    });
+    assert.equal(rescued.currentStreak, 3, "the break made the gap neutral");
   });
 });

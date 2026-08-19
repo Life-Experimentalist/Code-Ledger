@@ -480,9 +480,10 @@ export function PanelGamification({ settings, onSettingsChange }) {
         <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-4">
           <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Vacations</h3>
           <p class="text-[11px] text-slate-500 leading-snug">
-            A vacation day is neutral — it neither extends nor breaks the streak, and no points are
-            expected. Declare one before you leave or backdate it after; leave the end date blank
-            for an open-ended break. For ${cfg.iceBreakerDays || DEFAULT_CONFIG.iceBreakerDays}
+            A vacation day never breaks the streak, and no points are expected — but a vacation day
+            where you hit the target still counts in full, so coming back early always pays. Declare
+            one before you leave or backdate it after; leave the end date blank for an open-ended
+            break. For ${cfg.iceBreakerDays || DEFAULT_CONFIG.iceBreakerDays}
             day${(cfg.iceBreakerDays || DEFAULT_CONFIG.iceBreakerDays) !== 1 ? "s" : ""} after a
             vacation ends, the daily target is reduced while you warm back up.
           </p>

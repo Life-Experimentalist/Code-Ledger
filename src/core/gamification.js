@@ -292,6 +292,58 @@ export function isVacationDay(key, vacations) {
   return false;
 }
 
+/**
+ * A gap this long (or longer) of consecutive zero-point days reads as "life
+ * happened" rather than "skipped a day". Below it, freezes and the penalty
+ * buy-back are the intended tools; at or above it the UI may offer to declare
+ * the gap a break retroactively. Not configurable: a tunable threshold here
+ * would let a user auto-forgive every single missed day.
+ */
+export const AWAY_GAP_MIN_DAYS = 3;
+
+/**
+ * Detect a trailing run of missed days that looks like an undeclared break:
+ * consecutive non-vacation days with zero points, ending yesterday, with real
+ * activity somewhere before the run. The UI offers to convert the run into a
+ * retroactive vacation, which makes the days neutral and restores the streak.
+ *
+ * Today is excluded — it is still in progress, not yet "away".
+ *
+ * @param {Map<string, {points:number}>} days from buildDailyPoints
+ * @param {Array<{start:string,end?:string|null}>} vacations
+ * @param {string} todayKey
+ * @param {string} [floorDay] install day — gaps do not predate it
+ * @returns {{ start: string, end: string, days: number }|null}
+ */
+export function detectAwayGap(days, vacations, todayKey, floorDay) {
+  const yesterday = addDays(todayKey, -1);
+  let key = yesterday;
+  let start = null;
+  let length = 0;
+  // 120-day cap: past that the streak story is long dead and a "mark as break"
+  // banner would be noise, not a rescue.
+  while (length < 120) {
+    if (floorDay && key < floorDay) break;
+    if (isVacationDay(key, vacations)) break;
+    if ((days.get(key)?.points || 0) > 0) break;
+    start = key;
+    length += 1;
+    key = addDays(key, -1);
+  }
+  if (!start || length < AWAY_GAP_MIN_DAYS) return null;
+  // A break has a "before" — someone who never solved anything is not away,
+  // they just have not started.
+  let hadActivityBefore = false;
+  for (const [k, d] of days) {
+    if (k < start && (d?.points || 0) > 0) {
+      hadActivityBefore = true;
+      break;
+    }
+  }
+  if (!hadActivityBefore) return null;
+  return { start, end: yesterday, days: length };
+}
+
 /* ------------------------------------------------------------------ */
 /* Streak                                                              */
 /* ------------------------------------------------------------------ */
@@ -301,7 +353,10 @@ export function isVacationDay(key, vacations) {
  *
  * The rules, in the order they are applied to each day:
  *
- *   1. A vacation day is neutral. It neither extends nor breaks the streak.
+ *   1. A vacation day never breaks the streak — but a vacation day that
+ *      reaches the target still counts fully, freeze earning included. Coming
+ *      back early costs nothing and pays the same as any other day, so there
+ *      is never a reason to sit a break out to its end.
  *   2. A day that reaches the target extends the streak. Reaching
  *      `freezeEarnMultiplier` × target also banks a freeze (one per day, capped
  *      at `maxFreezes`).
@@ -371,7 +426,7 @@ export function computeStreak(days, config, vacations, todayKey, floorDay) {
     const vacation = isVacationDay(key, vacations);
     let status;
 
-    if (vacation) {
+    if (vacation && points < target) {
       status = "vacation";
     } else if (points >= target) {
       current += 1;
@@ -558,6 +613,24 @@ export const ACHIEVEMENTS = Object.freeze([
     test: (s) => s.penaltyDays.length >= 1,
   },
   {
+    id: "back-in-action",
+    emoji: "🏃",
+    name: "Back In Action",
+    hint: "Hit the daily target while on vacation",
+    test: (s) => s.timeline.some((t) => t.vacation && t.status !== "vacation"),
+  },
+  {
+    id: "weekend-warrior",
+    emoji: "🛡️",
+    name: "Weekend Warrior",
+    hint: "Solve on 10 weekend days",
+    // getUTCDay is safe here: day keys are calendar days already shifted into
+    // the user's timezone, so midnight UTC of the key IS that local day.
+    test: (s) =>
+      s.timeline.filter((t) => t.points > 0 && [0, 6].includes(new Date(t.day).getUTCDay()))
+        .length >= 10,
+  },
+  {
     id: "level-five",
     emoji: "⭐",
     name: "Engineer",
@@ -706,6 +779,12 @@ export function computeSnapshot(problems, options = {}) {
     iceBreaker,
 
     /**
+     * A trailing run of missed days that looks like an undeclared break, or
+     * null. Surfaces as a one-click "mark those days as a break" offer.
+     */
+    awayGap: detectAwayGap(days, vacations, today, options.streakFloorDay),
+
+    /**
      * What it would cost to save the streak right now: null when nothing is at
      * risk, otherwise the points needed today and how they would be paid.
      */
@@ -827,7 +906,11 @@ export function recallCandidates(problems, opts = {}) {
 export function describeStreak(snapshot) {
   if (!snapshot || !snapshot.enabled) return "";
   const s = snapshot.currentStreak;
-  if (snapshot.vacationActive) return "On vacation — streak is paused";
+  if (snapshot.vacationActive) {
+    return snapshot.todayDone
+      ? "Solved on vacation — today counts anyway"
+      : "On vacation — streak is paused";
+  }
   if (s === 0) return "No streak yet — solve one problem to start";
   const done = snapshot.todayDone
     ? "today is done"

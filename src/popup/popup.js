@@ -153,6 +153,20 @@ function PopupApp() {
     }
   };
 
+  // Deep-link one solve into the library — ProblemsView restores ?problem= on
+  // mount and opens the modal for it.
+  const openProblem = (p) => {
+    const id = p?.id || p?.titleSlug || "";
+    const url = runtime.getURL(
+      `library/library.html?tab=solutions${id ? `&problem=${encodeURIComponent(id)}` : ""}`,
+    );
+    try {
+      tabs.create({ url });
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
   return html`
     <div class="flex flex-col h-full bg-[#050508] p-4 text-white">
       <div class="flex items-center gap-3 mb-6">
@@ -210,8 +224,10 @@ function PopupApp() {
               <div class="flex flex-col gap-2">
                 ${recent.map(
                   (p) => html`
-                    <div
-                      class="p-2 bg-white/5 border border-white/5 rounded flex justify-between items-center group cursor-default"
+                    <button
+                      onClick=${() => openProblem(p)}
+                      title="Open in library"
+                      class="p-2 bg-white/5 border border-white/5 rounded flex justify-between items-center group cursor-pointer text-left w-full hover:bg-white/10 transition-colors"
                     >
                       <div class="truncate max-w-[200px]">
                         <p
@@ -227,7 +243,7 @@ function PopupApp() {
                         class="text-[10px] font-mono text-slate-500 border border-white/10 px-1 rounded"
                         >${p.lang?.ext || "js"}</span
                       >
-                    </div>
+                    </button>
                   `,
                 )}
               </div>

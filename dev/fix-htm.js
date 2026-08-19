@@ -20,5 +20,4 @@ function fixHtmImports(dir) {
 fixHtmImports("./src/ui");
 fixHtmImports("./src/library");
 fixHtmImports("./src/popup");
-fixHtmImports("./src/sidebar");
 console.log("Fixed htm imports");

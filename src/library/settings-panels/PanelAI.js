@@ -18,6 +18,8 @@ import {
   setMCPToolEnabled,
   getEnabledMCPTools,
 } from "../../core/mcp-config.js";
+import { getDefaultAIPrompts, normalizeAIPrompts } from "../../core/ai-prompts.js";
+import { canToggleAI } from "../../core/feature-flags.js";
 
 const PROVIDERS = Object.values(CONSTANTS.AI_PROVIDERS);
 
@@ -137,6 +139,24 @@ export function PanelAI({ settings, onSettingsChange }) {
   const [queueBusy, setQueueBusy] = useState(false);
   const [queueMsg, setQueueMsg] = useState("");
   const [showQueueModal, setShowQueueModal] = useState(false);
+  // Review-prompt overrides. buildReviewPrompt() has always preferred the
+  // stored override over the registered template; the only editor for it died
+  // with SettingsSchema, so the setting was write-only. Loaded lazily on open.
+  const [promptsOpen, setPromptsOpen] = useState(false);
+  const [promptDraft, setPromptDraft] = useState(null);
+  const [promptSaving, setPromptSaving] = useState(false);
+  const [promptMsg, setPromptMsg] = useState("");
+
+  useEffect(() => {
+    if (!promptsOpen || promptDraft !== null) return;
+    let mounted = true;
+    Storage.getAIPrompts()
+      .then((raw) => mounted && setPromptDraft(normalizeAIPrompts(raw)))
+      .catch(() => mounted && setPromptDraft(getDefaultAIPrompts()));
+    return () => {
+      mounted = false;
+    };
+  }, [promptsOpen]);
 
   useEffect(() => {
     Storage.getAIKeys()
@@ -401,6 +421,37 @@ export function PanelAI({ settings, onSettingsChange }) {
           you add a key.
         </p>
       </div>
+
+      <!-- Master AI switch — offered only once a provider is configured, so a
+           fresh install never sees a toggle that can do nothing. The stored key
+           records an explicit "no": providers stay configured, all AI UI hides. -->
+      ${canToggleAI(settings) &&
+      html`
+        <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-2">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-slate-300">AI features</p>
+              <p class="text-[11px] text-slate-500">
+                Turn off to hide every AI surface — reviews, chats, prompts — without removing your
+                provider keys.
+              </p>
+            </div>
+            <button
+              onClick=${() => onSettingsChange("aiEnabled", settings.aiEnabled === false)}
+              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors
+                ${settings.aiEnabled !== false
+                ? "bg-cyan-500/30 border-cyan-500/40"
+                : "bg-white/5 border-white/10"}"
+            >
+              <span
+                class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
+                ${settings.aiEnabled !== false ? "translate-x-4" : "translate-x-0.5"}"
+              >
+              </span>
+            </button>
+          </div>
+        </div>
+      `}
 
       <!-- Auto-review toggle -->
       <div class="p-4 rounded-xl border border-white/8 bg-white/2 space-y-2">
@@ -899,6 +950,100 @@ export function PanelAI({ settings, onSettingsChange }) {
             `
           : mcpOpen
             ? html`<p class="mt-3 text-xs text-slate-500">Loading MCP config…</p>`
+            : ""}
+      </div>
+
+      <!-- Review prompt templates (collapsed by default) -->
+      <div class="p-4 rounded-xl border border-white/8 bg-white/2">
+        <button
+          onClick=${() => setPromptsOpen((v) => !v)}
+          class="flex items-center justify-between w-full text-left"
+        >
+          <div>
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-widest">
+              Review Prompts
+            </p>
+            <p class="text-[11px] text-slate-600 mt-0.5">
+              The instructions the AI review starts from, per platform. Variables:
+              <code class="text-slate-500">{title}</code>
+              <code class="text-slate-500">{difficulty}</code>
+              <code class="text-slate-500">{language}</code>
+              <code class="text-slate-500">{platform}</code>
+            </p>
+          </div>
+          <span class="text-slate-500 text-xs">${promptsOpen ? "▲" : "▼"}</span>
+        </button>
+
+        ${promptsOpen && promptDraft
+          ? html`
+              <div class="mt-4 flex flex-col gap-4">
+                ${Object.keys(promptDraft).map((key) => {
+                  const label =
+                    key === "default"
+                      ? "Default (all platforms)"
+                      : CONSTANTS.PLATFORMS?.[key]?.name || key;
+                  const defaults = getDefaultAIPrompts();
+                  return html`
+                    <div key=${key}>
+                      <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] text-slate-500">${label}</label>
+                        ${promptDraft[key] !== defaults[key] &&
+                        html`
+                          <button
+                            onClick=${() => setPromptDraft((d) => ({ ...d, [key]: defaults[key] }))}
+                            class="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                          >
+                            Reset to default
+                          </button>
+                        `}
+                      </div>
+                      <textarea
+                        value=${promptDraft[key] || ""}
+                        onInput=${(e) => {
+                          const v = e.target.value;
+                          setPromptDraft((d) => ({ ...d, [key]: v }));
+                        }}
+                        rows="6"
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono placeholder-slate-600 resize-y focus:outline-none focus:border-cyan-500/40"
+                      />
+                    </div>
+                  `;
+                })}
+                <div class="flex items-center gap-3">
+                  <button
+                    onClick=${async () => {
+                      setPromptSaving(true);
+                      setPromptMsg("");
+                      try {
+                        await Storage.setAIPrompts(promptDraft);
+                        setPromptMsg("Saved");
+                      } catch (e) {
+                        setPromptMsg("Save failed: " + (e?.message || e));
+                      } finally {
+                        setPromptSaving(false);
+                        setTimeout(() => setPromptMsg(""), 4000);
+                      }
+                    }}
+                    disabled=${promptSaving}
+                    class="px-4 py-2 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/30 text-cyan-300 text-xs rounded-lg transition-colors disabled:opacity-40"
+                  >
+                    ${promptSaving ? "Saving…" : "Save Prompts"}
+                  </button>
+                  ${promptMsg &&
+                  html`
+                    <p
+                      class="text-[11px] ${promptMsg === "Saved"
+                        ? "text-emerald-400"
+                        : "text-rose-400"}"
+                    >
+                      ${promptMsg}
+                    </p>
+                  `}
+                </div>
+              </div>
+            `
+          : promptsOpen
+            ? html`<p class="mt-3 text-xs text-slate-500">Loading prompts…</p>`
             : ""}
       </div>
     </div>

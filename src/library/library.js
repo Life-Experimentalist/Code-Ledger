@@ -262,7 +262,7 @@ function LibraryApp() {
               if (mounted) setSetupIncomplete(true);
               return;
             }
-            // Inject into local settings state so SettingsSchema "Connected" indicator works.
+            // Inject into local settings state so the Git panel "Connected" indicator works.
             // This is display-only — never persisted to chrome.storage.
             if (mounted) {
               setSettings((prev) => ({ ...prev, github_token: oauthToken }));
@@ -545,7 +545,7 @@ function LibraryApp() {
     }
   }, [duplicateGroups]);
 
-  // Called from SettingsSchema "Set up repository" / "Change repo" button
+  // Called from the Git panel "Set up repository" / "Change repo" button
   const handleSetupRepo = useCallback(
     async (token, _owner) => {
       const t = token || (await Storage.getAuthToken("github").catch(() => null));
@@ -706,7 +706,7 @@ function LibraryApp() {
     if ("git_active_primary" in patch) delete next.git_active_primary;
 
     // GitHub OAuth tokens should NOT be stored in settings — they belong in auth.tokens.
-    // Only update state locally for OAuth fields; actual token was saved by handleOAuth in SettingsSchema.
+    // Only update state locally for OAuth fields; the actual token is saved by handleOAuthMessage.
     const isOAuthField = ["github_token", "gitlab_token", "bitbucket_token"].includes(key);
 
     setSettings(next);
@@ -948,6 +948,9 @@ function LibraryApp() {
             html`
               <button
                 onClick=${() => {
+                  // The dedup review queue lives on the Git panel; the settings
+                  // view reads settingsTab once at mount, so set it first.
+                  updateQueryParams({ settingsTab: "git" });
                   setActiveTab("settings");
                   setImportReport(null);
                 }}

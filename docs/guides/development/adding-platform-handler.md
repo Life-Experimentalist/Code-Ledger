@@ -99,8 +99,9 @@ Once your module is created, register it so the extension loads it.
 
 `handler-registry.js` holds the registry itself; `init.js` is what fills it.
 Import the class and add an instance to the `platforms` array —
-`initializeHandlers()` registers it and picks up its `getSettingsSchema()` if it
-defines one.
+`initializeHandlers()` registers it and records its `getSettingsSchema()` if it
+defines one (the schema is descriptive only; the settings UI is the hand-written
+panels under `src/library/settings-panels/`).
 
 ```javascript
 // At the top of init.js, alongside the other platform imports
