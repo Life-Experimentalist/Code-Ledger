@@ -273,6 +273,12 @@ export const CONSTANTS = Object.freeze({
 
   KEY_POOL_RETRY_AFTER_MS: 60_000,
 
+  // A pending commit key younger than this is either a commit still in flight
+  // or one the 10-minute MAINTENANCE_COMMIT alarm has not yet had a chance to
+  // retry. Only older keys count as "stuck" for the icon badge and the
+  // library's uncommitted-solves banner.
+  PENDING_COMMIT_STALE_MS: 15 * 60 * 1000,
+
   DEFAULT_REPO_NAME: "CodeLedger-Sync",
   REPO_BRANCH: "main",
   COMMIT_MESSAGE_TEMPLATE: "[{topic}] {title} — {difficulty} | {language}",
@@ -307,7 +313,9 @@ export const CONSTANTS = Object.freeze({
     DISABLED_PLATFORMS: "platforms.disabled",
     CANONICAL_MAP_CACHE: "canonical.map.cache",
     CANONICAL_MAP_ETAG: "canonical.map.etag",
+    CANONICAL_MAP_FETCHED_AT: "canonical.map.fetchedAt",
     CANONICAL_LOCAL_ENTRIES: "canonical.local.entries",
+    REFRESH_TAB_QUEUE: "refresh.tabQueue",
     AI_PROMPTS: "ai.prompts",
     SYNC_STATE: "sync.state",
     THEME: "ui.theme",
@@ -360,6 +368,14 @@ export const CONSTANTS = Object.freeze({
   makeProblemId(platform, titleSlug) {
     const code = this.PLATFORM_CODE[platform] || platform.slice(0, 3).toLowerCase();
     return `${code}-${titleSlug}`;
+  },
+
+  /**
+   * Regex matching ids that already carry a platform prefix ("lc-", "tuf-", …),
+   * derived from PLATFORM_CODE so a new platform can never be left out of it.
+   */
+  platformIdRegex() {
+    return new RegExp(`^(${Object.values(this.PLATFORM_CODE).join("|")})-`);
   },
 
   /**

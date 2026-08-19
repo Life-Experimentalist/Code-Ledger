@@ -124,28 +124,25 @@ Be concise. Max 200 words.`;
 
   /**
    * Angular routes without a page load, so `popstate` alone misses every
-   * in-app link. Patching the two history methods that Angular actually calls
-   * is the only way to hear about them.
+   * in-app link. Patching `history.pushState` here would only patch the
+   * content script's isolated-world copy — the page's router calls the
+   * MAIN-world one, so the patch never fires. Polling the URL is the only
+   * signal an isolated world reliably gets.
    */
   _watchNavigation() {
     const fire = () => this._scheduleDebounce(() => this._onNavigate(), 300);
-    const { pushState, replaceState } = window.history;
 
-    window.history.pushState = function (...args) {
-      const out = pushState.apply(this, args);
-      fire();
-      return out;
-    };
-    window.history.replaceState = function (...args) {
-      const out = replaceState.apply(this, args);
-      fire();
-      return out;
-    };
+    let lastHref = window.location.href;
+    const poll = setInterval(() => {
+      if (window.location.href !== lastHref) {
+        lastHref = window.location.href;
+        fire();
+      }
+    }, 1000);
     window.addEventListener("popstate", fire);
 
     this._navWatcher = () => {
-      window.history.pushState = pushState;
-      window.history.replaceState = replaceState;
+      clearInterval(poll);
       window.removeEventListener("popstate", fire);
     };
   }
@@ -180,7 +177,7 @@ Be concise. Max 200 words.`;
    * @param {{problemId: string, code: string, lang: string, verdict: object}} solve
    */
   async _handleAccepted(solve) {
-    if (this._processingLock) return;
+    if (this._deferWhileLocked(this._handleAccepted, [solve])) return;
     this._processingLock = true;
     try {
       const settings = await Storage.getSettings();
@@ -235,6 +232,7 @@ Be concise. Max 200 words.`;
       dbg.error("Failed to process NeetCode submission", err);
     } finally {
       this._processingLock = false;
+      this._drainDeferredEvents();
     }
   }
 

@@ -5,6 +5,7 @@
 
 import { createDebugger } from "../lib/debug.js";
 import { Storage } from "../core/storage.js";
+import { getProblemCommitKey } from "../core/lang-utils.js";
 import { tabs, runtime } from "../lib/browser-compat.js";
 import { CONSTANTS } from "../core/constants.js";
 
@@ -129,10 +130,7 @@ export async function triggerCodeRecovery(problem) {
             }
             return Storage.saveProblem(updated).then(async () => {
               // Mark for GitHub commit — problem now has code it lacked before
-              const slug = String(updated.titleSlug || updated.id || "").trim();
-              const langRaw = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
-              const normLang = String(langRaw).toLowerCase().replace(/\s+/g, "");
-              const key = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+              const key = getProblemCommitKey(updated);
               if (key) await Storage.markPendingProblemKey(key).catch(() => {});
               // Tell any open library page. Recovery outlives the modal that
               // asked for it, so the modal has to be told when it lands rather

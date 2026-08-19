@@ -58,7 +58,11 @@ export function createDebugger(namespace) {
       return _debugEnabled ? console.warn.bind(console, prefix) : noop;
     },
     get error() {
-      return _debugEnabled ? console.error.bind(console, prefix) : noop;
+      // Errors are never gated: a failed commit or auth error must be visible
+      // with debug off, or the user's only symptom is "nothing happened".
+      // Bound from the preserved original so DevTools shows the caller's
+      // file:line, not the console hook below.
+      return _origConsole.error.bind(null, prefix);
     },
     get info() {
       return _debugEnabled ? console.info.bind(console, prefix) : noop;
@@ -109,8 +113,9 @@ function _updateConsoleHooks() {
   console.warn = function (...args) {
     if (_debugEnabled) _origConsole.warn(...args);
   };
+  // console.error always forwards — the gate silences chatter, not failures.
   console.error = function (...args) {
-    if (_debugEnabled) _origConsole.error(...args);
+    _origConsole.error(...args);
   };
   console.info = function (...args) {
     if (_debugEnabled) _origConsole.info(...args);

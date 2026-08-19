@@ -6,6 +6,14 @@
  * No I/O, no side effects — just data transformation.
  */
 
+/** A commit file that could never form a valid tree entry. */
+export class InvalidCommitFileError extends Error {
+  constructor(detail) {
+    super(`Invalid commit file: ${detail}`);
+    this.name = "InvalidCommitFileError";
+  }
+}
+
 /**
  * Convert a files array + optional deletes list into GitHub tree items.
  * Deletions are represented by sha:null as required by the Trees API.
@@ -16,9 +24,16 @@
  */
 export function buildTreeItems(files, deletes = []) {
   const items = (files || []).map((f) => {
+    // A tree entry with neither `sha` nor a string `content` is rejected by
+    // GitHub with a bare 422, surfacing far from the real cause — usually a
+    // handler whose code extraction came back undefined. Fail here, by name.
+    if (typeof f?.path !== "string" || !f.path) {
+      throw new InvalidCommitFileError(`file path is ${JSON.stringify(f?.path ?? null)}`);
+    }
     const item = { path: f.path, mode: "100644", type: "blob" };
     if (f.sha) item.sha = f.sha;
-    else item.content = f.content;
+    else if (typeof f.content === "string") item.content = f.content;
+    else throw new InvalidCommitFileError(`"${f.path}" has ${typeof f.content} content`);
     return item;
   });
 

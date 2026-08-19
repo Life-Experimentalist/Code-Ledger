@@ -462,8 +462,19 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
         );
       });
 
+      // Only a 404 proves the repository is empty. Swallowing every error here
+      // let a rate-limit or network blip read as "empty", after which
+      // initializeRepository committed on top of an arbitrary non-empty repo.
       const contents = await ghFetch(`/repos/${selectedOwner}/${repoToLink}/contents`).catch(
-        () => [],
+        (e) => {
+          if (e?.status === 404) return [];
+          throw new Error(
+            describeGitHubError(e, {
+              action: "read that repository's contents",
+              owner: selectedOwner,
+            }),
+          );
+        },
       );
       if (
         Array.isArray(contents) &&
@@ -1131,7 +1142,9 @@ async function initializeRepository(owner, repo, token) {
     });
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub API ${res.status}`);
+      throw Object.assign(new Error(e.message || `GitHub API ${res.status}`), {
+        status: res.status,
+      });
     }
     return res.json();
   };
@@ -1149,7 +1162,11 @@ async function initializeRepository(owner, repo, token) {
     const commit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
     baseTreeSha = commit.tree.sha;
   } catch (e) {
-    // If we get an error (e.g. 409 Conflict for empty repo), it's likely an empty repository
+    // An empty repository answers the ref lookup with 409 ("Git Repository is
+    // empty") or 404. Anything else — rate limit, 5xx, network — proves
+    // nothing about the repo, and attempting a root commit against a repo
+    // that has commits only produces a confusing "Reference already exists".
+    if (e?.status !== 404 && e?.status !== 409) throw e;
     isRootCommit = true;
   }
 
@@ -1175,7 +1192,9 @@ async function initializeRepository(owner, repo, token) {
         path: "index.html",
         mode: "100644",
         type: "blob",
-        content: getPagesHtml(),
+        // Owner and repo are embedded so the dashboard resolves its API URLs
+        // even when served from a custom domain, where hostname-derivation fails.
+        content: getPagesHtml({ owner, repo }),
       },
       {
         path: ".gitignore",
@@ -1276,12 +1295,16 @@ async function enableGitHubPages(owner, repo, token) {
     "X-GitHub-Api-Version": "2022-11-28",
   };
 
-  // Enable Pages (may already be enabled — ignore errors)
+  // Enable Pages (may already be enabled — ignore errors).
+  // build_type:"workflow" must match api-client.enablePages(): infra-builder
+  // commits a deploy-pages.yml into every repo, and against a legacy branch
+  // build that workflow fails on every solve — red X and failure email each
+  // commit, even though the legacy builder still deploys the site.
   try {
     await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ source: { branch: "main", path: "/" } }),
+      body: JSON.stringify({ build_type: "workflow" }),
     });
   } catch (_) {}
 

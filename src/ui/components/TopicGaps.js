@@ -85,12 +85,13 @@ function Column({ title, subtitle, topics, onTopic, empty }) {
  * @param {object} props
  * @param {Array<object>} props.problems the ledger
  * @param {Record<string,string>} [props.topicKinds] `settings.topicKinds` overrides
+ * @param {{ halfLifeDays?: number, regainSolves?: number }} [props.masteryOpts] user-tuned decay knobs
  * @param {(topic: object) => void} [props.onTopic] open the solves behind a topic
  */
-export function TopicGaps({ problems, topicKinds, onTopic }) {
+export function TopicGaps({ problems, topicKinds, masteryOpts, onTopic }) {
   const gaps = useMemo(
-    () => topicGaps(problems || [], { overrides: topicKinds || {} }),
-    [problems, topicKinds],
+    () => topicGaps(problems || [], { overrides: topicKinds || {}, ...(masteryOpts || {}) }),
+    [problems, topicKinds, masteryOpts],
   );
 
   const { ds, algo, untouched, summary } = gaps;

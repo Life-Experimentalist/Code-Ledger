@@ -125,9 +125,12 @@ export function getCommit(owner, repo, sha, token) {
 
 /** POST /git/trees → { sha } */
 export function createTree(owner, repo, treeItems, baseTreeSha, token) {
+  // A root commit has no base tree, and GitHub rejects an explicit null —
+  // the field must be absent entirely.
+  const body = baseTreeSha ? { base_tree: baseTreeSha, tree: treeItems } : { tree: treeItems };
   return apiFetch(`/repos/${owner}/${repo}/git/trees`, token, {
     method: "POST",
-    body: JSON.stringify({ base_tree: baseTreeSha, tree: treeItems }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -144,6 +147,15 @@ export function updateRef(owner, repo, branch, sha, token) {
   return apiFetch(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, token, {
     method: "PATCH",
     body: JSON.stringify({ sha }),
+  });
+}
+
+/** POST /git/refs — create a branch that does not exist yet (root commit path).
+ *  PATCH 404s on an empty repository because there is no ref to move. */
+export function createRef(owner, repo, branch, sha, token) {
+  return apiFetch(`/repos/${owner}/${repo}/git/refs`, token, {
+    method: "POST",
+    body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
   });
 }
 

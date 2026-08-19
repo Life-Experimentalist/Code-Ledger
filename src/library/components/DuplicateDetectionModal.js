@@ -14,6 +14,7 @@ import { htm } from "../../vendor/preact-bundle.js";
 import { highlightCode } from "../../lib/syntax-highlight.js";
 import { normalizeCode } from "../../core/ai-deduplication.js";
 import { Storage } from "../../core/storage.js";
+import { getProblemCommitKey } from "../../core/lang-utils.js";
 import { createDebugger } from "../../lib/debug.js";
 import { CONSTANTS } from "../../core/constants.js";
 
@@ -81,10 +82,9 @@ function fmtDate(ts) {
 // ── Action executor ───────────────────────────────────────────────────────────
 
 export function buildPendingKey(problem) {
-  const slug = String(problem.titleSlug || problem.id || "").trim();
-  const lang = problem.lang?.name || problem.lang?.slug || problem.lang?.ext || "";
-  const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
-  return slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+  // Must match the key the service worker's commit sweep builds, or the
+  // re-commit mark is never picked up.
+  return getProblemCommitKey(problem);
 }
 
 /**

@@ -42,6 +42,7 @@ import {
   matchAcceptedRow,
   mergeCapturedMetadata,
   isPendingFresh,
+  isRowOwn,
   PENDING_TTL_MS,
 } from "../src/handlers/platforms/codeforces/verdict-match.js";
 import { CONSTANTS } from "../src/core/constants.js";
@@ -515,6 +516,33 @@ describe("matchAcceptedRow", () => {
       "gym100500B",
     );
     assert.equal(matchAcceptedRow({ rowSlug: "gym100500B", pendingSlug: "100500B" }), null);
+  });
+});
+
+describe("isRowOwn", () => {
+  test("a row linked to the signed-in handle is ours", () => {
+    assert.equal(isRowOwn("tourist", "tourist"), true);
+  });
+
+  test("handles compare case-insensitively and ignore whitespace", () => {
+    // CF handles are case-preserving but case-insensitive; the header link and
+    // the party cell can disagree on casing for the same account.
+    assert.equal(isRowOwn("Tourist", "tourist"), true);
+    assert.equal(isRowOwn("  tourist ", "TOURIST"), true);
+  });
+
+  test("a row provably belonging to another handle is rejected", () => {
+    assert.equal(isRowOwn("petr", "tourist"), false);
+  });
+
+  test("an unknown on either side fails open", () => {
+    // The inline box on a problem page has no party cell, and the header
+    // handle can fail to parse — rejecting on unknown would kill detection
+    // entirely whenever the markup drifts.
+    assert.equal(isRowOwn("", "tourist"), true);
+    assert.equal(isRowOwn("petr", ""), true);
+    assert.equal(isRowOwn("", ""), true);
+    assert.equal(isRowOwn(null, undefined), true);
   });
 });
 

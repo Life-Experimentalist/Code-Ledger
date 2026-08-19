@@ -8,6 +8,7 @@ import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
 import { Storage } from "../../core/storage.js";
+import { getProblemCommitKey } from "../../core/lang-utils.js";
 import { createDebugger } from "../../lib/debug.js";
 const dbg = createDebugger("ProblemModal");
 import { cleanCode, highlightCode, highlightCodeWithLines } from "../../lib/syntax-highlight.js";
@@ -23,11 +24,19 @@ import { expandChatVariables } from "../../lib/chat-variables.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
 import { cfProblemUrl } from "../../core/cf-utils.js";
+import { classifyTopic, KIND, KIND_ORDER, KIND_LABEL } from "../../core/topic-taxonomy.js";
 // Side-effect: registers LeetCode tabs into modalTabRegistry
 import "../../handlers/platforms/leetcode/modal-tabs.js";
 
 /** Tabs that exist only to talk to a model, keyed by registry id. */
 const AI_TAB_IDS = new Set(["review", "chat"]);
+
+/**
+ * Stored URLs come from imported/synced problem data, which the extension does
+ * not control end to end. Only http(s) may reach an href — anything else
+ * (javascript:, data:, …) is dropped rather than bound.
+ */
+const httpUrl = (u) => (/^https?:\/\//i.test(String(u || "")) ? u : "");
 
 /**
  * The registry's tabs, minus the AI ones when there is no provider to reach.
@@ -116,6 +125,18 @@ export const PLATFORM_META = {
     color: CONSTANTS.PLATFORMS.codeforces.color,
     url: (slug) => cfProblemUrl(slug) || CONSTANTS.PLATFORMS.codeforces.problemsetUrl,
   },
+  neetcode: {
+    favicon: "https://neetcode.io/favicon.ico",
+    label: "NeetCode",
+    color: CONSTANTS.PLATFORMS.neetcode.color,
+    url: (slug) => CONSTANTS.PLATFORMS.neetcode.problemsBase + slug,
+  },
+  takeuforward: {
+    favicon: "https://takeuforward.org/favicon.ico",
+    label: "takeuforward",
+    color: CONSTANTS.PLATFORMS.takeuforward.color,
+    url: (slug) => CONSTANTS.PLATFORMS.takeuforward.problemsBase + slug,
+  },
 };
 
 function _fmtElapsed(secs) {
@@ -149,6 +170,7 @@ export function ProblemModal({
   onOpenGraphProblem,
   onNavigate,
   hideCloseButton = false,
+  topicKinds = {},
 }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [copied, setCopied] = useState(false);
@@ -333,36 +355,33 @@ export function ProblemModal({
   };
   const problemUrl = meta.url(problem.titleSlug || problem.id || "");
 
-  // Sort tags by importance: first by tag type (algorithms before data structures, etc),
-  // then alphabetically within each type. Priority: algorithms, data-structures, concepts, misc
-  const _tagPriority = {
-    algorithms: 0,
-    sorting: 1,
-    searching: 1,
-    "dynamic-programming": 2,
-    greedy: 2,
-    backtracking: 2,
-    graph: 3,
-    tree: 3,
-    "linked-list": 4,
-    array: 4,
-    "hash-table": 4,
-    string: 5,
-    math: 6,
-    "bit-manipulation": 7,
+  // One chip per canonical topic, algorithms before structures. The axis a tag
+  // belongs to comes from the shared taxonomy, so this list agrees with
+  // Analytics and the graph about what "Binary Search" is — and merging
+  // through the canonical name collapses "hash map" and "Hash Table" into one
+  // chip instead of two.
+  const kindRank = (k) => {
+    const i = KIND_ORDER.indexOf(k);
+    return i === -1 ? KIND_ORDER.length : i;
   };
-  const topics = (
-    Array.isArray(problem.tags) && problem.tags.length > 0
-      ? problem.tags.sort((a, b) => {
-          const aPri = _tagPriority[String(a).toLowerCase()] ?? 999;
-          const bPri = _tagPriority[String(b).toLowerCase()] ?? 999;
-          if (aPri !== bPri) return aPri - bPri;
-          return String(a).localeCompare(String(b));
-        })
-      : problem.topic
-        ? [problem.topic]
-        : []
-  ).filter((t) => t && t !== "Untagged");
+  const topics = (() => {
+    const raw =
+      Array.isArray(problem.tags) && problem.tags.length
+        ? problem.tags
+        : problem.topic
+          ? [problem.topic]
+          : [];
+    const seen = new Map();
+    for (const t of raw) {
+      if (!t) continue;
+      const { topic, kind } = classifyTopic(t, topicKinds);
+      if (!topic || topic === "Untagged" || seen.has(topic)) continue;
+      seen.set(topic, kind);
+    }
+    return [...seen.entries()]
+      .sort((a, b) => kindRank(a[1]) - kindRank(b[1]) || a[0].localeCompare(b[0]))
+      .map(([topic, kind]) => ({ topic, kind }));
+  })();
   const diffClass = DIFF_CLASS[problem.difficulty] || "bg-white/5 text-slate-400 border-white/10";
   const langName = problem.lang?.name || problem.language || null;
 
@@ -823,10 +842,11 @@ export function ProblemModal({
                     </button>
                   `
                 : ""}
-            ${problem.submissionsUrl || (problem.platform === "leetcode" && problem.titleSlug)
+            ${httpUrl(problem.submissionsUrl) ||
+            (problem.platform === "leetcode" && problem.titleSlug)
               ? html`
                   <a
-                    href=${problem.submissionsUrl ||
+                    href=${httpUrl(problem.submissionsUrl) ||
                     CONSTANTS.PLATFORMS.leetcode.problemsBase + problem.titleSlug + "/submissions/"}
                     target="_blank"
                     rel="noopener"
@@ -878,8 +898,15 @@ export function ProblemModal({
                 ${topics.map(
                   (t) => html`
                     <span
-                      class="px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-slate-400"
-                      >${t}</span
+                      class=${`px-2 py-0.5 rounded-full text-[10px] border ${
+                        t.kind === KIND.ALGO
+                          ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-300"
+                          : t.kind === KIND.DS
+                            ? "bg-amber-500/10 border-amber-500/20 text-amber-300/90"
+                            : "bg-white/5 border-white/10 text-slate-400"
+                      }`}
+                      title=${KIND_LABEL[t.kind] || ""}
+                      >${t.topic}</span
                     >
                   `,
                 )}
@@ -1433,47 +1460,114 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
 
 // ── EditTab sub-component — manages its own edit/delete state ───────────────
 
+/** Problem timestamps are stored in seconds by some handlers and ms by others. */
+function _tsToMs(t) {
+  return t && t < 1e12 ? t * 1000 : t || 0;
+}
+
+/** Local-time value for a datetime-local input ("" when no timestamp). */
+function _tsToLocalInput(t) {
+  const ms = _tsToMs(t);
+  if (!ms) return "";
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Ask the service worker a question; resolves null outside the extension. */
+function _sendMessage(msg) {
+  return new Promise((resolve) => {
+    if (!window.chrome?.runtime?.sendMessage) return resolve(null);
+    try {
+      chrome.runtime.sendMessage(msg, (res) => resolve(res || null));
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
+/** Slug from a pasted problem URL, or the input unchanged when it isn't one. */
+function _slugFromPaste(value) {
+  if (!/:\/\//.test(value)) return value;
+  const m = value.match(/\/problems\/([^/?#]+)/i);
+  if (m) {
+    try {
+      return decodeURIComponent(m[1]);
+    } catch (_) {
+      return m[1];
+    }
+  }
+  return value;
+}
+
 function EditTab({ problem, onUpdate, onDelete, onClose }) {
-  const initialTags = (() => {
-    const fromProblem = Array.isArray(problem.tags) ? problem.tags : [];
-    const fallbackTopic = problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
+  const tagsOf = (p) => {
+    const fromProblem = Array.isArray(p.tags) ? p.tags : [];
+    const fallbackTopic = p.topic && p.topic !== "Untagged" ? [p.topic] : [];
     return [
       ...new Set(
         [...fromProblem, ...fallbackTopic].map((t) => String(t || "").trim()).filter(Boolean),
       ),
     ];
-  })();
+  };
 
   const [title, setTitle] = useState(problem.title || "");
   const [difficulty, setDifficulty] = useState(problem.difficulty || "Unknown");
-  const [tagList, setTagList] = useState(initialTags);
+  const [tagList, setTagList] = useState(tagsOf(problem));
   const [tagDraft, setTagDraft] = useState("");
+  const [slug, setSlug] = useState(problem.titleSlug || "");
+  const [solvedAt, setSolvedAt] = useState(_tsToLocalInput(problem.timestamp));
+  const [elapsed, setElapsed] = useState(
+    problem.elapsedSeconds > 0 ? String(problem.elapsedSeconds) : "",
+  );
+  const [langName, setLangName] = useState(problem.lang?.name || "");
+  const [langExt, setLangExt] = useState(problem.lang?.ext || "");
+  const [runtime, setRuntime] = useState(problem.runtime || "");
+  const [memory, setMemory] = useState(problem.memory || "");
+  const [runtimePct, setRuntimePct] = useState(
+    Number.isFinite(problem.runtimePct) ? String(problem.runtimePct) : "",
+  );
+  const [memoryPct, setMemoryPct] = useState(
+    Number.isFinite(problem.memoryPct) ? String(problem.memoryPct) : "",
+  );
+  const [acRate, setAcRate] = useState(
+    problem.acRate != null && problem.acRate !== "" ? String(problem.acRate) : "",
+  );
+  const [code, setCode] = useState(problem.code || "");
+  const [statement, setStatement] = useState(problem.problemStatement || "");
   const [notes, setNotes] = useState(problem.notes || "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [linkChecking, setLinkChecking] = useState(false);
+  const [linkCheck, setLinkCheck] = useState(null);
 
   useEffect(() => {
-    const nextTags = (() => {
-      const fromProblem = Array.isArray(problem.tags) ? problem.tags : [];
-      const fallbackTopic = problem.topic && problem.topic !== "Untagged" ? [problem.topic] : [];
-      return [
-        ...new Set(
-          [...fromProblem, ...fallbackTopic].map((t) => String(t || "").trim()).filter(Boolean),
-        ),
-      ];
-    })();
     setTitle(problem.title || "");
     setDifficulty(problem.difficulty || "Unknown");
-    setTagList(nextTags);
+    setTagList(tagsOf(problem));
     setTagDraft("");
+    setSlug(problem.titleSlug || "");
+    setSolvedAt(_tsToLocalInput(problem.timestamp));
+    setElapsed(problem.elapsedSeconds > 0 ? String(problem.elapsedSeconds) : "");
+    setLangName(problem.lang?.name || "");
+    setLangExt(problem.lang?.ext || "");
+    setRuntime(problem.runtime || "");
+    setMemory(problem.memory || "");
+    setRuntimePct(Number.isFinite(problem.runtimePct) ? String(problem.runtimePct) : "");
+    setMemoryPct(Number.isFinite(problem.memoryPct) ? String(problem.memoryPct) : "");
+    setAcRate(problem.acRate != null && problem.acRate !== "" ? String(problem.acRate) : "");
+    setCode(problem.code || "");
+    setStatement(problem.problemStatement || "");
     setNotes(problem.notes || "");
     setError("");
     setSaved(false);
     setConfirmDelete(false);
     setDeleting(false);
+    setLinkChecking(false);
+    setLinkCheck(null);
   }, [problem?.id, problem?.titleSlug]);
 
   const addTagsFromDraft = () => {
@@ -1513,13 +1607,60 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
         tags: newTags,
         topic: newTags[0] || problem.topic || "Untagged",
         notes: notes.trim(),
+        code,
+        problemStatement: statement,
         manuallyEdited: true,
       };
+
+      const newSlug = slug.trim();
+      if (newSlug && newSlug !== problem.titleSlug) {
+        updated.titleSlug = newSlug;
+        // A hand-edited link supersedes any earlier verification verdict.
+        delete updated.urlBroken;
+        delete updated.urlBrokenAt;
+        delete updated.urlVerifiedAt;
+      }
+
+      if (solvedAt) {
+        const ms = new Date(solvedAt).getTime();
+        if (Number.isFinite(ms)) {
+          // Preserve the record's storage unit — some handlers store seconds.
+          updated.timestamp =
+            problem.timestamp && problem.timestamp < 1e12 ? Math.round(ms / 1000) : ms;
+        }
+      }
+
+      const elapsedNum = parseInt(elapsed, 10);
+      updated.elapsedSeconds = Number.isFinite(elapsedNum) && elapsedNum > 0 ? elapsedNum : 0;
+
+      const newLangName = langName.trim();
+      const newLangExt = langExt.trim().replace(/^\./, "");
+      if (newLangName || newLangExt) {
+        updated.lang = {
+          ...(problem.lang || {}),
+          name: newLangName || problem.lang?.name || "",
+          ext: newLangExt || problem.lang?.ext || "",
+        };
+      }
+
+      const setOrDrop = (key, value) => {
+        const v = String(value).trim();
+        if (v) updated[key] = v;
+        else delete updated[key];
+      };
+      setOrDrop("runtime", runtime);
+      setOrDrop("memory", memory);
+      const numOrDrop = (key, value) => {
+        const v = parseFloat(value);
+        if (Number.isFinite(v)) updated[key] = v;
+        else delete updated[key];
+      };
+      numOrDrop("runtimePct", runtimePct);
+      numOrDrop("memoryPct", memoryPct);
+      numOrDrop("acRate", acRate);
+
       await Storage.saveProblem(updated);
-      const slug = String(updated.titleSlug || updated.id || "").trim();
-      const lang = updated.lang?.name || updated.lang?.slug || updated.lang?.ext || "";
-      const normLang = String(lang).toLowerCase().replace(/\s+/g, "");
-      const pendingKey = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+      const pendingKey = getProblemCommitKey(updated);
       if (pendingKey) await Storage.markPendingProblemKey(pendingKey).catch(() => {});
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1544,9 +1685,45 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
     }
   };
 
+  const platformMeta = PLATFORM_META[problem.platform];
+  let previewUrl = "";
+  try {
+    previewUrl = platformMeta && slug.trim() ? platformMeta.url(slug.trim()) : "";
+  } catch (_) {
+    previewUrl = "";
+  }
+
+  const runLinkCheck = async () => {
+    const input = slug.trim();
+    if (!input || linkChecking) return;
+    setLinkChecking(true);
+    setLinkCheck(null);
+    const res = await _sendMessage({
+      type: "LINK_CHECK",
+      platform: problem.platform,
+      url: input,
+    });
+    setLinkChecking(false);
+    setLinkCheck(res?.ok ? res.status : "error");
+  };
+
+  const platformName = platformMeta?.label || problem.platform || "the platform";
+  const linkCheckLabel = {
+    ok: html`<span class="text-emerald-400">✓ verified on ${platformName}</span>`,
+    notfound: html`<span class="text-rose-400/90">not found on ${platformName}</span>`,
+    invalid: html`<span class="text-rose-400/90"
+      >that doesn't look like a ${platformName} problem link</span
+    >`,
+    error: html`<span class="text-slate-400">couldn't check — try again</span>`,
+    unverified: html`<span class="text-amber-400/90"
+      >${platformName} can't be auto-checked — open the link to confirm</span
+    >`,
+  }[linkCheck];
+
   return html` <div class="flex flex-col gap-5">
     <p class="text-[11px] text-slate-500">
-      Update metadata for this problem. Changes are saved locally to your browser database.
+      Every field of this record is editable — metadata, link, code and statement. Changes save to
+      your local database, and the record is queued for your next GitHub sync.
     </p>
 
     <div class="flex flex-col gap-1.5">
@@ -1620,41 +1797,198 @@ function EditTab({ problem, onUpdate, onDelete, onClose }) {
       </p>
     </div>
 
-    <!-- Platform metadata (read-only) -->
-    <div class="flex flex-col gap-1">
-      <span class="text-[10px] uppercase tracking-wider text-slate-500">Metadata</span>
-      <div class="grid grid-cols-3 gap-2 text-xs">
-        ${[
-          ["Platform", problem.platform],
-          ["Language", problem.lang?.name],
-          ["Runtime", problem.runtime],
-          ["Memory", problem.memory],
-          [
-            "Accept Rate",
-            problem.acRate
-              ? (typeof problem.acRate === "number" ? problem.acRate.toFixed(1) : problem.acRate) +
-                "%"
-              : null,
-          ],
-          [
-            "Solved",
-            problem.timestamp
-              ? new Date(
-                  problem.timestamp < 1e12 ? problem.timestamp * 1000 : problem.timestamp,
-                ).toLocaleDateString()
-              : null,
-          ],
-        ].map(([label, val]) =>
-          val
-            ? html`
-                <div class="bg-white/3 rounded p-2">
-                  <span class="text-slate-500 text-[10px]">${label}</span>
-                  <p class="text-slate-300 mt-0.5">${val}</p>
-                </div>
-              `
-            : "",
-        )}
+    <!-- Problem link -->
+    <div class="flex flex-col gap-1.5">
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Problem link (slug)</label>
+      <div class="flex items-center gap-2">
+        <input
+          type="text"
+          value=${slug}
+          onInput=${(e) => {
+            setSlug(_slugFromPaste(e.target.value));
+            setLinkCheck(null);
+          }}
+          placeholder="problem-slug — or paste the full problem URL"
+          class="flex-1 min-w-0 px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 font-mono"
+        />
+        <button
+          onClick=${runLinkCheck}
+          disabled=${!slug.trim() || linkChecking}
+          class="shrink-0 px-3 py-2 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 disabled:opacity-50 rounded-lg transition-colors"
+        >
+          ${linkChecking ? "Checking…" : "Check link"}
+        </button>
       </div>
+      ${linkCheckLabel ? html`<p class="text-[11px]">${linkCheckLabel}</p>` : ""}
+      ${previewUrl
+        ? html`<p class="text-[10px] text-slate-600 break-all">
+            Opens as:${" "}
+            <a
+              href=${previewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-cyan-500/80 hover:text-cyan-400"
+              >${previewUrl}</a
+            >
+          </p>`
+        : ""}
+      <p class="text-[10px] text-slate-600">
+        Pasting a full URL extracts the slug automatically. Changing it clears any earlier
+        link-verification result for this record.
+      </p>
+    </div>
+
+    <!-- Solve details -->
+    <div class="flex flex-col gap-1.5">
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Solve details</label>
+      <div class="grid grid-cols-2 gap-2 text-xs mb-1">
+        <div class="bg-white/3 rounded p-2">
+          <span class="text-slate-500 text-[10px]">Platform</span>
+          <p class="text-slate-300 mt-0.5">${problem.platform || "—"}</p>
+        </div>
+        <div class="bg-white/3 rounded p-2 min-w-0">
+          <span class="text-slate-500 text-[10px]">Record ID (fixed — keys the repo path)</span>
+          <p class="text-slate-300 mt-0.5 font-mono truncate" title=${problem.id}>
+            ${problem.id || "—"}
+          </p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Solved at</span>
+          <input
+            type="datetime-local"
+            value=${solvedAt}
+            onInput=${(e) => setSolvedAt(e.target.value)}
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Time spent (seconds)</span>
+          <input
+            type="number"
+            min="0"
+            value=${elapsed}
+            onInput=${(e) => setElapsed(e.target.value)}
+            placeholder="0"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Language</span>
+          <input
+            type="text"
+            value=${langName}
+            onInput=${(e) => setLangName(e.target.value)}
+            placeholder="Python"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">File extension</span>
+          <input
+            type="text"
+            value=${langExt}
+            onInput=${(e) => setLangExt(e.target.value)}
+            placeholder="py"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 font-mono"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Runtime</span>
+          <input
+            type="text"
+            value=${runtime}
+            onInput=${(e) => setRuntime(e.target.value)}
+            placeholder="52 ms"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Memory</span>
+          <input
+            type="text"
+            value=${memory}
+            onInput=${(e) => setMemory(e.target.value)}
+            placeholder="16.4 MB"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Runtime beats (%)</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value=${runtimePct}
+            onInput=${(e) => setRuntimePct(e.target.value)}
+            placeholder="—"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Memory beats (%)</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value=${memoryPct}
+            onInput=${(e) => setMemoryPct(e.target.value)}
+            placeholder="—"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-slate-500">Acceptance rate (%)</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value=${acRate}
+            onInput=${(e) => setAcRate(e.target.value)}
+            placeholder="—"
+            class="px-3 py-2 bg-black border border-white/10 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </div>
+      </div>
+      <p class="text-[10px] text-slate-600">
+        The file extension names the committed file — change it only if the language is wrong. Blank
+        runtime/memory/percent fields are removed from the record.
+      </p>
+    </div>
+
+    <!-- Code -->
+    <div class="flex flex-col gap-1.5">
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Solution code</label>
+      <textarea
+        value=${code}
+        onInput=${(e) => setCode(e.target.value)}
+        rows="12"
+        spellcheck="false"
+        placeholder="// paste or edit the committed solution"
+        class="px-3 py-2 bg-black border border-white/10 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-y font-mono whitespace-pre"
+      ></textarea>
+      ${Array.isArray(problem.methods) && problem.methods.length > 1
+        ? html`<p class="text-[10px] text-slate-600">
+            This record has ${problem.methods.length} solution methods — this edits the primary code
+            committed to GitHub; the Code tab shows every method.
+          </p>`
+        : ""}
+    </div>
+
+    <!-- Problem statement -->
+    <div class="flex flex-col gap-1.5">
+      <label class="text-[11px] uppercase tracking-wider text-slate-500">Problem statement</label>
+      <textarea
+        value=${statement}
+        onInput=${(e) => setStatement(e.target.value)}
+        rows="8"
+        placeholder="The problem description shown on the Problem tab and in the committed README. HTML from the platform is kept and sanitised on display."
+        class="px-3 py-2 bg-black border border-white/10 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-y font-mono"
+      ></textarea>
     </div>
 
     <div class="flex flex-col gap-1.5">

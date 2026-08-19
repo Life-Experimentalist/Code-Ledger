@@ -44,11 +44,27 @@ function streakText(streak) {
  * A missing snapshot is treated the same as the feature being off: an empty
  * badge and the plain title. Guessing would be worse than saying nothing.
  *
+ * Stuck commits outrank everything, including the gamification gate: a solve
+ * that is saved locally but has repeatedly failed to reach GitHub is the one
+ * thing the user cannot find out any other way without opening the library.
+ *
  * @param {object|null} snapshot  from computeSnapshot()
  * @param {Record<string, any>} [settings]
+ * @param {number} [pendingCommits]  solves stuck uncommitted past the retry window
  * @returns {{ text: string, color: string, title: string }}
  */
-export function iconBadge(snapshot, settings) {
+export function iconBadge(snapshot, settings, pendingCommits = 0) {
+  const pending = Math.max(0, Math.floor(Number(pendingCommits) || 0));
+  if (pending > 0) {
+    return {
+      text: "!",
+      color: AT_RISK,
+      title:
+        `${DEFAULT_TITLE} — ${pending} solve${pending === 1 ? "" : "s"} saved locally ` +
+        `but not on GitHub yet — retried automatically every 10 minutes`,
+    };
+  }
+
   if (!isGamificationActive(settings) || !snapshot || typeof snapshot !== "object") {
     return { text: "", color: DONE, title: DEFAULT_TITLE };
   }

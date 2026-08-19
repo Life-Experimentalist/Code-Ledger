@@ -504,7 +504,12 @@ export const Storage = {
             const settings = await this.getSettings();
             const customMappings = settings?.topicMappings || {};
             if (p.tags && Array.isArray(p.tags)) {
-              p.tags = p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+              // Dedup AFTER normalizing: the canonical union above compares raw
+              // strings, so "array" (canonical slug) and "Array" (stored tag)
+              // both survive it and normalize into the same label.
+              p.tags = [
+                ...new Set(p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean)),
+              ];
             }
             if (p.topic) {
               p.topic = normalizeTag(p.topic, customMappings);
@@ -552,7 +557,12 @@ export const Storage = {
               }
             }
             if (p.tags && Array.isArray(p.tags)) {
-              p.tags = p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean);
+              // Dedup AFTER normalizing: the canonical union above compares raw
+              // strings, so "array" (canonical slug) and "Array" (stored tag)
+              // both survive it and normalize into the same label.
+              p.tags = [
+                ...new Set(p.tags.map((t) => normalizeTag(t, customMappings)).filter(Boolean)),
+              ];
             }
             if (p.topic) {
               p.topic = normalizeTag(p.topic, customMappings);
@@ -635,9 +645,14 @@ export const Storage = {
 
   async markSlugLangCommitted(titleSlug, langName) {
     const key = "cl.committed.sluglangs";
-    const map = await this.getCommittedSlugLangs();
-    map[`${titleSlug}::${String(langName || "").toLowerCase()}`] = Date.now();
-    await browserStorage.local.set({ [key]: map });
+    // Locked like updateSettings: these maps are read-modify-write from the
+    // service worker, the library tab and the popup at once, and an unlocked
+    // interleave silently drops one side's marks.
+    return withLock(key, async () => {
+      const map = await this.getCommittedSlugLangs();
+      map[`${titleSlug}::${String(langName || "").toLowerCase()}`] = Date.now();
+      await browserStorage.local.set({ [key]: map });
+    });
   },
 
   async isSlugLangCommitted(titleSlug, langName) {
@@ -653,9 +668,11 @@ export const Storage = {
 
   async markSubmissionCommitted(commitKey) {
     const key = "cl.committed.submissions";
-    const map = await this.getCommittedSubmissions();
-    map[String(commitKey || "")] = Date.now();
-    await browserStorage.local.set({ [key]: map });
+    return withLock(key, async () => {
+      const map = await this.getCommittedSubmissions();
+      map[String(commitKey || "")] = Date.now();
+      await browserStorage.local.set({ [key]: map });
+    });
   },
 
   async isSubmissionCommitted(commitKey) {
@@ -671,44 +688,50 @@ export const Storage = {
 
   async markPendingProblemKey(problemCommitKey) {
     const key = "cl.pending.problemkeys";
-    const map = await this.getPendingProblemKeys();
     const commitKey = String(problemCommitKey || "").trim();
     if (!commitKey) {
       dbg.warn(`markPendingProblemKey(): empty commitKey, skipped`);
       return;
     }
-    map[commitKey] = Date.now();
-    dbg.log(
-      `markPendingProblemKey(): marked ${commitKey} (now ${Object.keys(map).length} pending)`,
-    );
-    await browserStorage.local.set({ [key]: map });
+    return withLock(key, async () => {
+      const map = await this.getPendingProblemKeys();
+      map[commitKey] = Date.now();
+      dbg.log(
+        `markPendingProblemKey(): marked ${commitKey} (now ${Object.keys(map).length} pending)`,
+      );
+      await browserStorage.local.set({ [key]: map });
+    });
   },
 
   async markPendingProblemKeys(problemCommitKeys = []) {
     const key = "cl.pending.problemkeys";
-    const map = await this.getPendingProblemKeys();
-    const now = Date.now();
-    for (const raw of problemCommitKeys) {
-      const commitKey = String(raw || "").trim();
-      if (commitKey) map[commitKey] = now;
-    }
-    await browserStorage.local.set({ [key]: map });
+    return withLock(key, async () => {
+      const map = await this.getPendingProblemKeys();
+      const now = Date.now();
+      for (const raw of problemCommitKeys) {
+        const commitKey = String(raw || "").trim();
+        if (commitKey) map[commitKey] = now;
+      }
+      await browserStorage.local.set({ [key]: map });
+    });
   },
 
   async clearPendingProblemKeys(problemCommitKeys = []) {
     const key = "cl.pending.problemkeys";
-    const map = await this.getPendingProblemKeys();
-    const before = Object.keys(map).length;
-    for (const raw of problemCommitKeys || []) {
-      const commitKey = String(raw || "").trim();
-      if (!commitKey) continue;
-      delete map[commitKey];
-    }
-    const after = Object.keys(map).length;
-    dbg.log(
-      `clearPendingProblemKeys(): removed ${problemCommitKeys.length} key(s) (${before} → ${after} pending)`,
-    );
-    await browserStorage.local.set({ [key]: map });
+    return withLock(key, async () => {
+      const map = await this.getPendingProblemKeys();
+      const before = Object.keys(map).length;
+      for (const raw of problemCommitKeys || []) {
+        const commitKey = String(raw || "").trim();
+        if (!commitKey) continue;
+        delete map[commitKey];
+      }
+      const after = Object.keys(map).length;
+      dbg.log(
+        `clearPendingProblemKeys(): removed ${problemCommitKeys.length} key(s) (${before} → ${after} pending)`,
+      );
+      await browserStorage.local.set({ [key]: map });
+    });
   },
 
   async markRenameNeeded(id, { oldBase, newBase }) {

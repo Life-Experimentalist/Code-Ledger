@@ -118,6 +118,13 @@ export const CHAT_COMMANDS = [
     usage: "/solution",
     kind: "tutor",
   },
+  {
+    id: "graph",
+    label: "Knowledge Graph",
+    description: "Insert your knowledge-graph digest — topics, mastery, weak spots, gaps.",
+    usage: "/graph",
+    kind: "context",
+  },
 ];
 
 export const AI_MENTION_OPTIONS = [
@@ -221,7 +228,8 @@ export function getUsedCommands(text) {
 }
 
 export async function expandChatVariables(text, context = {}) {
-  const { problem, userCode, errors, submission, hints, similar, constraints } = context;
+  const { problem, userCode, errors, submission, hints, similar, constraints, graphDigest } =
+    context;
 
   let expanded = text;
 
@@ -341,6 +349,14 @@ ${submission.feedback ? `- Feedback: ${submission.feedback}` : ""}`
     );
   }
 
+  // /graph → knowledge-graph digest (built lazily by the caller, only when used)
+  if (expanded.includes("/graph")) {
+    const graphText = graphDigest
+      ? `**Knowledge graph:**\n${graphDigest}`
+      : "(knowledge-graph digest not available here)";
+    expanded = expanded.replace(/\/graph/g, graphText);
+  }
+
   return expanded;
 }
 
@@ -369,6 +385,7 @@ export function getUsedVariables(text) {
         "diagram",
         "formula",
         "solution",
+        "graph",
       ].includes(varName)
     ) {
       if (!vars.includes(varName)) vars.push(varName);

@@ -15,6 +15,7 @@ const dbg = createDebugger("SettingsSchema");
 
 import { testAIKey, testProviderEndpoint, fetchModelsForProvider } from "../../core/model-fetch.js";
 import { Storage } from "../../core/storage.js";
+import { getProblemCommitKey } from "../../core/lang-utils.js";
 import { ModelSelector } from "./ModelSelector.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { getQueryParam, updateQueryParams } from "../../core/url-state.js";
@@ -278,10 +279,14 @@ function LeetCodeImportPanel({ username }) {
       let imported = 0;
       for (const sub of submissions) {
         const slug = (sub.lang || "").toLowerCase().replace(/\s+/g, "");
-        const problemId = `${sub.titleSlug}::${slug || "unknown"}`;
+        // Platform-scoped id, same as every other write path. The old
+        // `titleSlug::lang` id was the exact legacy format migrateProblemIds
+        // rekeys away, so the getProblem dedupe check below never matched a
+        // migrated record and every run re-imported the whole list.
+        const problemId = CONSTANTS.makeProblemId("leetcode", sub.titleSlug);
         const existing = await Storage.getProblem?.(problemId).catch(() => null);
         if (existing) continue;
-        await Storage.saveProblem({
+        const record = {
           id: problemId,
           title: sub.title,
           titleSlug: sub.titleSlug,
@@ -292,10 +297,9 @@ function LeetCodeImportPanel({ username }) {
           timestamp: Number(sub.timestamp) * 1000,
           code: "",
           url: CONSTANTS.PLATFORMS.leetcode.problemsBase + sub.titleSlug + "/",
-        });
-        await Storage.markPendingProblemKey(`${sub.titleSlug}::${slug || "unknown"}`).catch(
-          () => {},
-        );
+        };
+        await Storage.saveProblem(record);
+        await Storage.markPendingProblemKey(getProblemCommitKey(record)).catch(() => {});
         imported++;
       }
       setStatus(

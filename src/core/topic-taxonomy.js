@@ -46,6 +46,21 @@ export const KIND_LABEL = Object.freeze({
   domain: "Other",
 });
 
+/** Group headers, wherever topics of one axis are listed together. */
+export const KIND_LABEL_PLURAL = Object.freeze({
+  ds: "Data structures",
+  algo: "Algorithms",
+  domain: "Other",
+});
+
+/**
+ * Display order wherever the axes appear side by side: the algorithm first
+ * (what you had to think of), then the structure (what held the data), then
+ * the rest. Every grouped list in the UI follows this so the same tag always
+ * appears in the same place.
+ */
+export const KIND_ORDER = Object.freeze([KIND.ALGO, KIND.DS, KIND.DOMAIN]);
+
 /**
  * Canonical topic → axis. Keys are the canonical names `normalizeTag` emits.
  *
@@ -274,10 +289,51 @@ export function masteryBand(score) {
 }
 
 /**
+ * The moment mastery decays from, with a regain bar: one stray solve does not
+ * refresh a rusty topic. The clock only rewinds as far as the Nth most recent
+ * solve, so it takes `regainSolves` recent problems before the topic counts
+ * as back in touch. A topic with fewer solves than the bar uses its oldest —
+ * a brand-new topic is not penalised for being new.
+ *
+ * @param {number[]} timestampsDesc solve times, newest first
+ * @param {number} [regainSolves]
+ * @returns {number} epoch ms, or -Infinity with no usable solves
+ */
+export function effectiveLastSolved(timestampsDesc, regainSolves = 2) {
+  const list = Array.isArray(timestampsDesc) ? timestampsDesc : [];
+  if (!list.length) return -Infinity;
+  const n = Math.max(1, Math.min(Math.floor(regainSolves) || 1, list.length));
+  return list[n - 1];
+}
+
+/**
+ * The user-configurable mastery knobs, read off the settings map with clamps
+ * and defaults. Single authority — the graph, the gap report, and the settings
+ * panel all go through this so they can never disagree on the defaults.
+ *
+ * @param {object|null} settings
+ * @returns {{ halfLifeDays: number, regainSolves: number }}
+ */
+export function masteryOptsFromSettings(settings) {
+  const num = (v, lo, hi, dflt) => {
+    // Number(null) and Number("") are 0, which would silently clamp an unset
+    // knob to the floor instead of falling back to the default.
+    if (v === null || v === undefined || v === "") return dflt;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
+  };
+  return {
+    halfLifeDays: num(settings?.mastery_half_life_days, 7, 3650, 90),
+    regainSolves: num(settings?.mastery_regain_solves, 1, 8, 2),
+  };
+}
+
+/**
  * Per-topic mastery across the whole ledger.
  *
  * @param {Array<object>} problems
- * @param {{ now?: number, overrides?: Record<string,string>, halfLifeDays?: number }} [opts]
+ * @param {{ now?: number, overrides?: Record<string,string>, halfLifeDays?: number,
+ *   regainSolves?: number }} [opts]
  * @returns {Array<{ topic:string, kind:string, count:number, platforms:string[],
  *   byDifficulty:Record<string,number>, lastSolved:number, daysSince:number,
  *   mastery:number, band:string }>}
@@ -314,6 +370,7 @@ export function topicMastery(problems, opts = {}) {
           platforms: new Set(),
           byDifficulty: {},
           lastSolved: -Infinity,
+          recent: [],
         };
         acc.set(topic, e);
       }
@@ -321,13 +378,22 @@ export function topicMastery(problems, opts = {}) {
       if (p.platform) e.platforms.add(p.platform);
       const d = p.difficulty || "Unknown";
       e.byDifficulty[d] = (e.byDifficulty[d] || 0) + 1;
-      if (Number.isFinite(ts) && ts > e.lastSolved) e.lastSolved = ts;
+      if (Number.isFinite(ts)) {
+        if (ts > e.lastSolved) e.lastSolved = ts;
+        e.recent.push(ts);
+      }
     }
   }
 
   return [...acc.values()]
     .map((e) => {
-      const mastery = masteryScore(e, { now, halfLifeDays: opts.halfLifeDays });
+      // Recency decays from the Nth-most-recent solve, not the very last one —
+      // the regain bar. Display fields keep the true latest.
+      const recent = e.recent.sort((a, b) => b - a).slice(0, 8);
+      const mastery = masteryScore(
+        { count: e.count, lastSolved: effectiveLastSolved(recent, opts.regainSolves) },
+        { now, halfLifeDays: opts.halfLifeDays },
+      );
       return {
         topic: e.topic,
         kind: e.kind,
@@ -354,7 +420,8 @@ export function topicMastery(problems, opts = {}) {
  * one leaderboard lets Array drown out both.
  *
  * @param {Array<object>} problems
- * @param {{ now?: number, overrides?: Record<string,string>, limit?: number, minCount?: number }} [opts]
+ * @param {{ now?: number, overrides?: Record<string,string>, limit?: number, minCount?: number,
+ *   halfLifeDays?: number, regainSolves?: number }} [opts]
  * @returns {{ ds: object[], algo: object[], domain: object[], untouched: object[], summary: object }}
  */
 export function topicGaps(problems, opts = {}) {

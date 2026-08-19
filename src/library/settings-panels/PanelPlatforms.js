@@ -18,7 +18,12 @@ import {
   getKnownTopics,
   normalizeTag,
 } from "../../core/topic-resolver.js";
-import { classifyTopic, KIND, KIND_LABEL } from "../../core/topic-taxonomy.js";
+import {
+  classifyTopic,
+  KIND,
+  KIND_LABEL,
+  masteryOptsFromSettings,
+} from "../../core/topic-taxonomy.js";
 import { TIER, TIER_KEY } from "../../handlers/platforms/takeuforward/api.js";
 
 const PLATFORMS = Object.values(CONSTANTS.PLATFORMS);
@@ -91,6 +96,15 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
 
   /** The user's own calls on which axis a topic sits, keyed on canonical name. */
   const topicKinds = settings?.topicKinds || {};
+
+  /** Current decay knobs, already clamped to their valid ranges. */
+  const masteryOpts = masteryOptsFromSettings(settings);
+
+  const setMasteryNumber = (key, raw, lo, hi) => {
+    const n = Math.round(Number(raw));
+    if (!Number.isFinite(n)) return;
+    onSettingsChange(key, Math.min(hi, Math.max(lo, n)));
+  };
 
   /**
    * Cycle a topic through the three axes and back to the built-in call.
@@ -658,6 +672,53 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
             </div>
           </div>
         </details>
+      </div>
+
+      <!-- Topic Proficiency Decay -->
+      <div class="pt-6 border-t border-white/10 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-white mb-1">Topic Proficiency Decay</h3>
+          <p class="text-xs text-slate-500">
+            Topic mastery in the graph and the gap report fades when a topic goes untouched. The
+            half-life sets how fast: after that many days without solving, the recency part of the
+            score is halved. Regaining takes more than one solve — a topic counts as touched again
+            only from its Nth most recent solve, so a single stray problem does not mark a rusty
+            topic as fresh.
+          </p>
+        </div>
+
+        <div class="bg-white/2 border border-white/5 rounded-xl p-4 flex items-end gap-6 flex-wrap">
+          <div class="space-y-1">
+            <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold"
+              >Half-life (days)</label
+            >
+            <input
+              type="number"
+              min="7"
+              max="3650"
+              step="1"
+              value=${masteryOpts.halfLifeDays}
+              onChange=${(e) => setMasteryNumber("mastery_half_life_days", e.target.value, 7, 3650)}
+              class="w-28 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/40"
+            />
+            <p class="text-[10px] text-slate-600">7–3650 · default 90</p>
+          </div>
+          <div class="space-y-1">
+            <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold"
+              >Solves to regain</label
+            >
+            <input
+              type="number"
+              min="1"
+              max="8"
+              step="1"
+              value=${masteryOpts.regainSolves}
+              onChange=${(e) => setMasteryNumber("mastery_regain_solves", e.target.value, 1, 8)}
+              class="w-28 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/40"
+            />
+            <p class="text-[10px] text-slate-600">1–8 · default 2</p>
+          </div>
+        </div>
       </div>
     </div>
   `;

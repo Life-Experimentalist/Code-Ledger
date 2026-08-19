@@ -5,8 +5,9 @@
  * Usage: node dev/generate-manifest-domains.js  (or: npm run domains:update)
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const root = resolve(import.meta.dirname, "..");
 
@@ -18,14 +19,26 @@ function writeJson(rel, obj) {
   writeFileSync(resolve(root, rel), JSON.stringify(obj, null, 4) + "\n", "utf8");
 }
 
-// Platform domains — add new platforms here when adding a handler
-const PLATFORM_DOMAINS = [
-  "*://*.leetcode.com/*",
-  "*://*.geeksforgeeks.org/*",
-  "*://*.codeforces.com/*",
-  "*://*.neetcode.io/*",
-  "*://*.takeuforward.org/*",
-];
+// Platform domains come from each handler's `DOMAINS` export in
+// src/handlers/platforms/{name}/dom-selectors.js — the single place a new
+// platform declares its hostnames. A subdomain entry (www., practice., …) is
+// folded into its parent, since the manifest pattern `*://*.{domain}/*`
+// already covers every subdomain.
+const platformsDir = resolve(root, "src/handlers/platforms");
+const PLATFORM_DOMAINS = [];
+for (const name of readdirSync(platformsDir).sort()) {
+  if (name.startsWith("_")) continue;
+  const file = resolve(platformsDir, name, "dom-selectors.js");
+  const { DOMAINS } = await import(pathToFileURL(file).href);
+  if (!Array.isArray(DOMAINS) || !DOMAINS.length) {
+    console.error(`${name}/dom-selectors.js exports no DOMAINS — every platform must declare one.`);
+    process.exit(1);
+  }
+  for (const d of DOMAINS) {
+    if (DOMAINS.some((other) => other !== d && d.endsWith(`.${other}`))) continue;
+    PLATFORM_DOMAINS.push(`*://*.${d}/*`);
+  }
+}
 
 // Where content/net-tap.js runs. It executes in the page's own world, so it is
 // deliberately scoped to the two sites whose judges cannot be observed any

@@ -14,6 +14,12 @@
           application/json:
             schema:
               $ref: "#/components/schemas/HealthResponse"
+  options:
+    tags: [health]
+    summary: CORS preflight
+    responses:
+      "204":
+        description: Permissive CORS headers, empty body
 
 /api/auth/{provider}:
   get:
@@ -44,7 +50,7 @@
         description: Requested OAuth scope. Unrecognised values silently become the default.
         schema:
           type: string
-          enum: [public_repo, workflow, repo, workflow]
+          enum: [public_repo, "public_repo,workflow", repo, "repo,workflow"]
           default: public_repo,workflow
     responses:
       "302":
@@ -81,13 +87,19 @@
     tags: [auth]
     summary: OAuth callback receiver
     description: |
-      Verifies the signed `state` cookie in constant time before exchanging the code,
-      clears the cookie, then returns an HTML page that posts
-      `{ type: "CODELEDGER_AUTH", provider, token, error }` to the opener window.
+      Verifies the signed `state` cookie in constant time before anything else —
+      including before honouring `error`/`error_description`, so an attacker cannot
+      render arbitrary text on the page by linking to the callback directly. GitHub
+      echoes `state` on error redirects, so genuine denials still verify. On success
+      the cookie is cleared and the code exchanged.
 
-      Always answers `200` with HTML — failures are reported inside the posted message
-      so the extension's listener sees them, rather than as an HTTP status the popup
-      cannot read.
+      Always answers `200` with an HTML page carrying
+      `{ type: "CODELEDGER_AUTH", provider, token, error }` — failures travel inside
+      that payload so the extension sees them, rather than as an HTTP status the
+      popup cannot read. The payload is delivered as the `data-auth` attribute of
+      `#codeledger-auth-result`, read by the extension's content script at
+      document_end; an origin-locked same-window `postMessage` is the fallback for
+      timing races. Nothing is posted to an opener window.
 
       If GitHub returns an App-shaped token response (`expires_in` or `refresh_token`
       present, `scope` absent), the worker refuses it and reports the misconfiguration.
@@ -173,6 +185,12 @@
           application/json:
             schema:
               $ref: "#/components/schemas/ErrorResponse"
+  options:
+    tags: [data]
+    summary: CORS preflight (covers /api/data/*)
+    responses:
+      "204":
+        description: Permissive CORS headers, empty body
 
 /api/admin/canonical:
   post:
@@ -180,8 +198,11 @@
     summary: "Admin: replace the canonical map"
     description: |
       Requires a bearer token matching `CANONICAL_UPLOAD_TOKEN`, compared in constant
-      time. The body must parse as JSON before anything is written. Deliberately sends
-      no CORS headers, so a browser on another origin cannot call it.
+      time. The body must parse as JSON **and** validate as a canonical map before
+      anything is written: entries may be a bare array or live under `.entries`, and
+      every entry needs `canonicalId`, `canonicalTitle`, `topic`, `difficulty` and at
+      least one platform alias. Bodies over 10 MiB are rejected before parsing.
+      Deliberately sends no CORS headers, so a browser on another origin cannot call it.
     security:
       - canonical_token: []
     requestBody:
@@ -196,13 +217,19 @@
             schema:
               $ref: "#/components/schemas/OKResponse"
       "400":
-        description: Body is not valid JSON
+        description: Body is not valid JSON, or does not validate as a canonical map
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ErrorResponse"
       "401":
         description: Missing or wrong bearer token
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      "413":
+        description: Body exceeds the 10 MiB limit
         content:
           application/json:
             schema:

@@ -348,7 +348,9 @@ async function runProfileImport(handler, pageUsername, btn) {
             runtime.sendMessage(
               {
                 type: "RESYNC_ALL",
-                mode: "bulk",
+                // Individual mode: one commit per problem, backdated to the
+                // real submission time — bulk would flatten every date to now.
+                mode: "individual",
                 commitType: "comprehensive-update",
               },
               (res) => resolve(res || {}),

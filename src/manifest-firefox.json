@@ -22,9 +22,9 @@
     ],
     "host_permissions": [
         "*://codeledger.vkrishna04.me/*",
-        "*://*.leetcode.com/*",
-        "*://*.geeksforgeeks.org/*",
         "*://*.codeforces.com/*",
+        "*://*.geeksforgeeks.org/*",
+        "*://*.leetcode.com/*",
         "*://*.neetcode.io/*",
         "*://*.takeuforward.org/*",
         "https://api.github.com/*",
@@ -44,9 +44,9 @@
     "content_scripts": [
         {
             "matches": [
-                "*://*.leetcode.com/*",
-                "*://*.geeksforgeeks.org/*",
                 "*://*.codeforces.com/*",
+                "*://*.geeksforgeeks.org/*",
+                "*://*.leetcode.com/*",
                 "*://*.neetcode.io/*",
                 "*://*.takeuforward.org/*"
             ],
@@ -118,9 +118,9 @@
                 "ui/components/AIMarkdownRenderer.js"
             ],
             "matches": [
-                "*://*.leetcode.com/*",
-                "*://*.geeksforgeeks.org/*",
                 "*://*.codeforces.com/*",
+                "*://*.geeksforgeeks.org/*",
+                "*://*.leetcode.com/*",
                 "*://*.neetcode.io/*",
                 "*://*.takeuforward.org/*"
             ]

@@ -11,6 +11,7 @@ import { createDebugger } from "../../lib/debug.js";
 import { CONSTANTS } from "../../core/constants.js";
 import { cleanGfgSlug } from "../../core/gfg-utils.js";
 import { cfProblemUrl } from "../../core/cf-utils.js";
+import { classifyTopic, KIND, KIND_ORDER, KIND_LABEL } from "../../core/topic-taxonomy.js";
 
 const dbg = createDebugger("ProblemCard");
 
@@ -65,12 +66,31 @@ export function ProblemCard({
     favicon: null,
   };
   const problemUrl = meta.url(problem.titleSlug || problem.id || "");
-  const topics =
-    Array.isArray(problem.tags) && problem.tags.length > 0
-      ? problem.tags
-      : problem.topic
-        ? [problem.topic]
-        : ["General"];
+  // Canonical topics, algorithms first — the interesting chip ("Binary
+  // Search") leads and the container chip ("Array") trails, on every card.
+  const topics = (() => {
+    const raw =
+      Array.isArray(problem.tags) && problem.tags.length
+        ? problem.tags
+        : problem.topic
+          ? [problem.topic]
+          : [];
+    const seen = new Map();
+    for (const t of raw) {
+      if (!t) continue;
+      const { topic, kind } = classifyTopic(t);
+      if (!topic || seen.has(topic)) continue;
+      seen.set(topic, kind);
+    }
+    const rank = (k) => {
+      const i = KIND_ORDER.indexOf(k);
+      return i === -1 ? KIND_ORDER.length : i;
+    };
+    const out = [...seen.entries()]
+      .sort((a, b) => rank(a[1]) - rank(b[1]) || a[0].localeCompare(b[0]))
+      .map(([topic, kind]) => ({ topic, kind }));
+    return out.length ? out : [{ topic: "General", kind: null }];
+  })();
   const langName = problem.lang?.name || problem.language || null;
 
   const handleClick = onSelect
@@ -150,8 +170,13 @@ export function ProblemCard({
           .map(
             (t) => html`
               <span
-                class="px-1.5 py-0.5 rounded text-[9px] bg-white/5 border border-white/10 text-slate-400"
-                >${t}</span
+                class="px-1.5 py-0.5 rounded text-[9px] border ${t.kind === KIND.ALGO
+                  ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-300"
+                  : t.kind === KIND.DS
+                    ? "bg-amber-500/10 border-amber-500/20 text-amber-300/90"
+                    : "bg-white/5 border-white/10 text-slate-400"}"
+                title=${KIND_LABEL[t.kind] || ""}
+                >${t.topic}</span
               >
             `,
           )}

@@ -8,7 +8,7 @@ import { CONSTANTS } from "../core/constants.js";
 import { registry } from "../core/handler-registry.js";
 import { createDebugger } from "../lib/debug.js";
 import { decodeBase64Utf8 } from "../lib/base64.js";
-import { normalizeLang } from "../core/lang-utils.js";
+import { getProblemCommitKey } from "../core/lang-utils.js";
 import { flushPendingChatSync, importChatsFromRepo } from "../core/chat-sync.js";
 import { importChatsLocal } from "../core/ai-chat-storage.js";
 
@@ -27,15 +27,12 @@ const COMPARE_FIELDS = [
   "duplicateOf",
 ];
 
-function _syncCommitKey(problem = {}) {
-  const id = String(
-    problem.id ||
-      CONSTANTS.makeProblemId(problem.platform || "unknown", problem.titleSlug || "unknown"),
-  );
-  const lang = normalizeLang(problem);
-  if (!id || !lang) return "";
-  return `${id}::${lang}`;
-}
+// Matching uses the same shared commit key the service worker commits by
+// (getProblemCommitKey), so a record the SW would treat as one problem+lang is
+// never split into a phantom remote-only copy here. A langless record now keys
+// as its bare id instead of "" — two langless copies of the same problem on two
+// devices match instead of re-importing forever.
+const _syncCommitKey = getProblemCommitKey;
 
 /**
  * Reduce one comparable field to a string, with every way of saying "nothing"
@@ -94,7 +91,8 @@ export async function importFromRepo(owner, repo, git) {
     // Fallback: try raw.githubusercontent URL (public repos)
     try {
       dbg.log(`importFromRepo(): trying raw.githubusercontent fallback...`);
-      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/index.json`;
+      const branch = CONSTANTS.REPO_BRANCH || "main";
+      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/index.json`;
       const r = await fetch(rawUrl);
       if (r.ok) raw = await r.text();
       dbg.log(`importFromRepo(): ✓ loaded index.json from raw.githubusercontent`);
@@ -128,8 +126,9 @@ export async function importFromRepo(owner, repo, git) {
   }
 
   // Ensure all remote problems have platform-scoped ids
+  const platformIdRe = CONSTANTS.platformIdRegex();
   const remoteProblems = rawRemote.map((p) => {
-    if (!p.id || !/^(lc|gfg|cf)-/.test(p.id)) {
+    if (!p.id || !platformIdRe.test(p.id)) {
       return {
         ...p,
         id: CONSTANTS.makeProblemId(p.platform || "unknown", p.titleSlug || "unknown"),
@@ -158,7 +157,16 @@ export async function importFromRepo(owner, repo, git) {
       // _conflictResolvedAt is set by applyImport() when called from conflict resolution.
       // Once RESYNC_ALL pushes the local version, remote will match local and this branch
       // won't fire anymore.
-      if (local._conflictResolvedAt && local._conflictResolvedAt > (remote.timestamp || 0)) {
+      // remote.timestamp may be Unix seconds (Codeforces) while
+      // _conflictResolvedAt is always ms — compare in one unit, or a
+      // seconds-side remote loses every comparison and its conflicts are
+      // suppressed forever after a single resolution.
+      const remoteTs = remote.timestamp
+        ? remote.timestamp > 1e10
+          ? remote.timestamp
+          : remote.timestamp * 1000
+        : 0;
+      if (local._conflictResolvedAt && local._conflictResolvedAt > remoteTs) {
         dbg.log(
           `importFromRepo(): skipping re-detection for ${local.id} — resolved locally, push pending`,
         );
@@ -277,15 +285,22 @@ export const SyncEngine = {
         `performSync(): import complete — ${remoteOnly.length} new, ${conflicts.length} conflicts`,
       );
 
+      // Import the non-conflicted records first: a single conflicted problem
+      // must not hold every other device's new solves hostage until the user
+      // opens the conflict modal.
+      if (remoteOnly.length > 0) {
+        await applyImport(remoteOnly);
+      }
+
       if (conflicts.length > 0) {
         await Storage.updateSettings({ _pendingConflicts: conflicts.length });
         dbg.warn(
-          `performSync(): ✗ ${conflicts.length} conflict(s) detected — user action required in Git settings`,
+          `performSync(): ${conflicts.length} conflict(s) need user action — ` +
+            `imported ${remoteOnly.length} non-conflicted problem(s) anyway`,
         );
         return;
       }
 
-      await applyImport(remoteOnly);
       // Clear any stale conflict flag
       if (settings._pendingConflicts) {
         await Storage.updateSettings({ _pendingConflicts: 0 });

@@ -9,6 +9,8 @@ import { storage as browserStorage } from "../lib/browser-compat.js";
 import { registry } from "../core/handler-registry.js";
 import { eventBus } from "../core/event-bus.js";
 import { Storage } from "../core/storage.js";
+import { withLock } from "../core/async-lock.js";
+import { getProblemCommitKey } from "../core/lang-utils.js";
 import { Telemetry } from "../core/telemetry.js";
 import { initializeHandlers } from "../handlers/init.js";
 import { CONSTANTS } from "../core/constants.js";
@@ -19,11 +21,19 @@ import {
   parseWeakAreas,
 } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
-import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metadata-handler.js";
+import { buildGraphDigest, isGraphQuestion } from "../core/graph-insights.js";
+import {
+  handleRefreshMetadata,
+  completeRefreshMetadata,
+  resumeRefreshQueue,
+} from "./refresh-metadata-handler.js";
 import { triggerCodeRecovery } from "./code-recovery-handler.js";
-import { fetchGFGProblemData } from "./gfg-api.js";
-import { fetchLeetCodeProblemData } from "./leetcode-api.js";
-import { fetchCFProblemData } from "./codeforces-api.js";
+import { fetchGFGProblemData, fetchGFGProblemOutcome } from "./gfg-api.js";
+import { verifyGfgProblem, runGfgVerifySweep, applyManualSlug } from "./gfg-verify.js";
+import { checkLink, applyManualLink, verifyProblemLink } from "./link-verify.js";
+import { fetchLeetCodeProblemData, fetchLeetCodeProblemOutcome } from "./leetcode-api.js";
+import { fetchCFProblemData, fetchCFProblemOutcome } from "./codeforces-api.js";
+import { fetchNeetCodeProblemOutcome } from "./neetcode-api.js";
 import {
   HEAL_STATE_KEY,
   healProblem,
@@ -371,6 +381,10 @@ async function init() {
     completeRefreshMetadata(tabId);
   });
 
+  // A metadata-refresh tab queue interrupted by a service-worker shutdown is
+  // persisted in storage.session — pick it back up on this wake.
+  resumeRefreshQueue().catch(() => {});
+
   // (onConnect listener registered at top level — see below init())
 
   if (!_syncAlarmBound) {
@@ -405,17 +419,28 @@ async function init() {
           (async () => {
             const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
             if (Object.keys(pendingMap || {}).length > 0) {
-              dbg.log(
-                `MAINTENANCE_COMMIT: ${Object.keys(pendingMap).length} pending key(s), running bulk commit`,
-              );
-              await handleResyncAll("bulk", "chore").catch((e) =>
-                dbg.warn("maintenance batch commit failed:", e.message),
-              );
+              if (await _isImportActive()) {
+                // A profile import is still feeding batches in; its own
+                // individual sync (or the next tick after the flag lapses)
+                // will commit these with real solve dates. A bulk commit now
+                // would flatten them all to today.
+                dbg.log("MAINTENANCE_COMMIT: import in flight — deferring batch commit");
+              } else {
+                dbg.log(
+                  `MAINTENANCE_COMMIT: ${Object.keys(pendingMap).length} pending key(s), running bulk commit`,
+                );
+                await handleResyncAll("bulk", "chore").catch((e) =>
+                  dbg.warn("maintenance batch commit failed:", e.message),
+                );
+              }
             }
             // The re-arm pass. A library tab that queued a review or flagged a
             // problem for recovery wrote storage directly and could not create
             // an alarm from a page context; this is where the worker notices.
             await refreshQueueAlarms();
+            // The retry either drained the pending map or left it stuck; the
+            // icon badge should say which without waiting for the hourly tick.
+            await refreshIconBadge().catch(() => {});
           })().catch(() => {});
         } else if (alarm?.name === BADGE_ALARM) {
           refreshIconBadge().catch(() => {});
@@ -521,23 +546,8 @@ async function applyFirstRunDefaults() {
   }
 }
 
-function getProblemCommitKey(problem = {}) {
-  // Align with sync-engine._syncCommitKey: use platform-scoped ID to match remote index.json
-  const id = String(
-    problem.id ||
-      CONSTANTS.makeProblemId(
-        problem.platform || "unknown",
-        problem.titleSlug || problem.slug || "unknown",
-      ),
-  ).trim();
-  if (!id) return "";
-
-  const lang =
-    problem.lang?.name || problem.lang?.slug || problem.lang?.ext || problem.language || "";
-  const normLang = String(lang).toLowerCase().trim();
-
-  return normLang ? `${id}::${normLang}` : id;
-}
+// getProblemCommitKey moved to core/lang-utils.js so every writer of the
+// pendingProblemKeys map builds the same key this file's commit sweep matches.
 
 function getProblemFiles(problem = {}, settings = {}) {
   // Enrich with canonical if missing (map must be pre-loaded via canonicalMapper.loadMap())
@@ -1069,6 +1079,14 @@ async function _commitWithFailover(files, message, repoName, commitOpts, setting
     return { handler: git, target: null, newSha };
   }
 
+  // Statuses that mean the target itself is broken (repo gone, payload
+  // rejected) rather than the moment being bad. Only these justify promoting a
+  // later target to active primary: a 5xx, a rate-limit or a network error is
+  // transient, and promoting on it silently abandons the real primary — every
+  // future commit then lands on the mirror while the primary falls behind
+  // forever. (401 never reaches here; it throws above the ladder.)
+  const PERMANENT_STATUSES = new Set([400, 404, 410, 422]);
+  let priorFailuresPermanent = true;
   let lastErr = null;
   for (const target of targets) {
     const handler = registry.getGitProvider(target.provider || "github");
@@ -1086,7 +1104,7 @@ async function _commitWithFailover(files, message, repoName, commitOpts, setting
       const active = settings.git_active_primary;
       const currentKey = active ? _targetKey(_normalizeGitTarget(active) || {}) : "";
       const wonKey = _targetKey(target);
-      if (currentKey !== wonKey) {
+      if (currentKey !== wonKey && priorFailuresPermanent) {
         await Storage.updateSettings({ git_active_primary: target }).catch(() => {});
       }
       dbg.log(
@@ -1095,6 +1113,7 @@ async function _commitWithFailover(files, message, repoName, commitOpts, setting
       return { handler, target, newSha };
     } catch (e) {
       lastErr = e;
+      if (!PERMANENT_STATUSES.has(e.status)) priorFailuresPermanent = false;
       dbg.warn(
         `_commitWithFailover(): ✗ target ${target.provider}/${target.owner ? target.owner + "/" : ""}${target.repo} failed:`,
         e.message,
@@ -1186,9 +1205,14 @@ async function handleSolved(data) {
 
   const titleSlug = data.titleSlug || "";
   const langName = data.lang?.name || data.lang?.slug || data.lang?.ext || "";
+  // The fallback key must be stable across deliveries of the same event: with
+  // Date.now() in it, a duplicate solve event (MutationObserver double-fire,
+  // handler retry) got a fresh key every time and the dedup check never hit.
+  // Every handler sets timestamp; "no-ts" only appears for malformed events,
+  // and forceCommit still overrides the dedup for genuine re-commits.
   const submissionCommitKey = data.submissionId
     ? `submission:${data.platform || "unknown"}:${data.submissionId}`
-    : `submission:${data.platform || "unknown"}:${titleSlug}:${langName}:${data.timestamp || data.id || Date.now()}`;
+    : `submission:${data.platform || "unknown"}:${titleSlug}:${langName}:${data.timestamp || data.id || "no-ts"}`;
   const alreadyCommitted = await Storage.isSubmissionCommitted(submissionCommitKey).catch(
     () => false,
   );
@@ -1231,7 +1255,26 @@ async function handleSolved(data) {
     });
   } catch (_) {}
 
-  // 3. AI Review (if enabled)
+  // 3. Duplicate Detection — check if code matches existing solutions.
+  // Runs for every solve, before the AI review copies `data`: this used to
+  // live inside the AI-review catch, so it only ever ran when a review was
+  // requested AND threw — never with auto-review off, never on success.
+  try {
+    const allProblems = await Storage.getAllProblems().catch(() => []);
+    const dupResult = detectDuplicate(data, allProblems);
+    if (dupResult.isDuplicate) {
+      data.isDuplicate = true;
+      data.duplicateOf = dupResult.duplicateOf;
+      dbg.log(
+        `handleSolved(): duplicate detected: ${data.titleSlug} matches ${dupResult.duplicateOf}`,
+      );
+      await Storage.saveProblem(data);
+    }
+  } catch (dupErr) {
+    dbg.error(`handleSolved(): duplicate detection failed:`, dupErr?.message || dupErr);
+  }
+
+  // 3a. AI Review (if enabled)
   // Note: settings is loaded here so rename detection below can use it too
   const settings = await Storage.getSettings();
 
@@ -1267,21 +1310,7 @@ async function handleSolved(data) {
       await Storage.saveProblem(updatedData);
       dbg.log(`handleSolved(): ✓ AI review success via ${providerId} (${modelId})`);
     } catch (err) {
-      // 3b. Duplicate Detection — check if code matches existing solutions
-      try {
-        const allProblems = await Storage.getAllProblems().catch(() => []);
-        const dupResult = detectDuplicate(data, allProblems);
-        if (dupResult.isDuplicate) {
-          data.isDuplicate = true;
-          data.duplicateOf = dupResult.duplicateOf;
-          dbg.log(
-            `handleSolved(): duplicate detected: ${data.titleSlug} matches ${dupResult.duplicateOf}`,
-          );
-          await Storage.saveProblem(data);
-        }
-      } catch (dupErr) {
-        dbg.error(`handleSolved(): duplicate detection failed:`, dupErr?.message || dupErr);
-      }
+      dbg.warn(`handleSolved(): AI review failed (non-blocking):`, err?.message || err);
     }
   }
 
@@ -1333,182 +1362,200 @@ async function handleSolved(data) {
     );
   }
   if (gitEnabled && (forceCommit || !alreadyCommitted)) {
-    dbg.log(`handleSolved(): starting auto-commit - type=${forceCommit ? "UPDATE" : "SOLVED"}`);
-    try {
-      const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
-      const pendingKeys = new Set(Object.keys(pendingMap || {}));
-      const allProblems = await Storage.getAllProblems().catch(() => []);
-      const pendingProblems = allProblems.filter((p) => {
-        const key = getProblemCommitKey(p);
-        return key && pendingKeys.has(key);
-      });
+    // Serialized per submission key, with the dedup re-checked inside the
+    // lock: two deliveries of the same event otherwise both read
+    // already_committed=false above (the mark only lands after the first
+    // commit finishes) and both commit.
+    await withLock(`cl.commit.${submissionCommitKey}`, async () => {
+      if (
+        !forceCommit &&
+        (await Storage.isSubmissionCommitted(submissionCommitKey).catch(() => false))
+      ) {
+        dbg.log(`handleSolved(): duplicate suppressed inside commit lock - ${submissionCommitKey}`);
+        return;
+      }
+      dbg.log(`handleSolved(): starting auto-commit - type=${forceCommit ? "UPDATE" : "SOLVED"}`);
+      try {
+        const pendingMap = await Storage.getPendingProblemKeys().catch(() => ({}));
+        const pendingKeys = new Set(Object.keys(pendingMap || {}));
+        const allProblems = await Storage.getAllProblems().catch(() => []);
+        const pendingProblems = allProblems.filter((p) => {
+          const key = getProblemCommitKey(p);
+          return key && pendingKeys.has(key);
+        });
 
-      const filesToCommit = [];
-      const seenPaths = new Set();
-      for (const p of pendingProblems) {
-        for (const f of getProblemFiles(p, settings)) {
-          if (!f?.path || seenPaths.has(f.path)) continue;
-          seenPaths.add(f.path);
-          filesToCommit.push(f);
-        }
-        // Include user notes as a markdown file when present
-        try {
-          if (p.notes && typeof p.notes === "string" && p.notes.trim()) {
-            const base = problemBase(p.id || p.titleSlug, p.canonical, settings, p.platform);
-            const notesPath = `${base}/notes.md`;
-            if (!seenPaths.has(notesPath)) {
-              seenPaths.add(notesPath);
-              filesToCommit.push({
-                path: notesPath,
-                content: p.notes,
-              });
-            }
+        const filesToCommit = [];
+        const seenPaths = new Set();
+        for (const p of pendingProblems) {
+          for (const f of getProblemFiles(p, settings)) {
+            if (!f?.path || seenPaths.has(f.path)) continue;
+            seenPaths.add(f.path);
+            filesToCommit.push(f);
           }
-        } catch (e) {
-          /* ignore */
-        }
-        // Include AI chats related to this problem
-        try {
-          const slug = p.titleSlug || p.id || "";
-          if (slug) {
-            const chats = await getChatsByProblem(slug).catch(() => []);
-            const base = problemBase(p.id || p.titleSlug, p.canonical, settings, p.platform);
-            if (Array.isArray(chats) && chats.length) {
-              for (const chat of chats) {
-                const chatPath = `${base}/ai-chats/chat-${chat.id}.json`;
-                if (seenPaths.has(chatPath)) continue;
-                seenPaths.add(chatPath);
+          // Include user notes as a markdown file when present
+          try {
+            if (p.notes && typeof p.notes === "string" && p.notes.trim()) {
+              const base = problemBase(p.id || p.titleSlug, p.canonical, settings, p.platform);
+              const notesPath = `${base}/notes.md`;
+              if (!seenPaths.has(notesPath)) {
+                seenPaths.add(notesPath);
                 filesToCommit.push({
-                  path: chatPath,
-                  content: JSON.stringify(chat, null, 2),
+                  path: notesPath,
+                  content: p.notes,
                 });
               }
             }
+          } catch (e) {
+            /* ignore */
           }
-        } catch (e) {
-          /* ignore */
+          // Include AI chats related to this problem
+          try {
+            const slug = p.titleSlug || p.id || "";
+            if (slug) {
+              const chats = await getChatsByProblem(slug).catch(() => []);
+              const base = problemBase(p.id || p.titleSlug, p.canonical, settings, p.platform);
+              if (Array.isArray(chats) && chats.length) {
+                for (const chat of chats) {
+                  const chatPath = `${base}/ai-chats/chat-${chat.id}.json`;
+                  if (seenPaths.has(chatPath)) continue;
+                  seenPaths.add(chatPath);
+                  filesToCommit.push({
+                    path: chatPath,
+                    content: JSON.stringify(chat, null, 2),
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            /* ignore */
+          }
         }
-      }
 
-      filesToCommit.push({
-        path: "index.json",
-        content: await buildIndexJson(),
-      });
-
-      // Bundle .codeledger/* so settings/bank/roadmaps stay in sync with every solve
-      try {
         filesToCommit.push({
-          path: ".codeledger/sync.json",
-          content: await buildSyncPayload(),
+          path: "index.json",
+          content: await buildIndexJson(),
         });
-      } catch (_) {}
-      try {
-        const bank = await Storage.getBehaviorBank();
-        filesToCommit.push({
-          path: ".codeledger/behaviour-bank.json",
-          content: JSON.stringify(bank || {}, null, 2),
-        });
-      } catch (_) {}
-      try {
-        const roadmaps = await Storage.getRoadmaps();
-        filesToCommit.push({
-          path: ".codeledger/roadmaps.json",
-          content: JSON.stringify(roadmaps || [], null, 2),
-        });
-      } catch (_) {}
 
-      // Auto-commit settings if they've changed
-      const configFile = await getConfigFileForCommit();
-      if (configFile) {
-        filesToCommit.push(configFile);
-        dbg.log(`handleSolved(): including config file in commit`);
-      }
-
-      const pendingCount = pendingProblems.length || 1;
-      const commitType = forceCommit ? COMMIT_TYPES.UPDATE : COMMIT_TYPES.SOLVED;
-      const commitMsg =
-        pendingCount > 1
-          ? buildCommitMessage(COMMIT_TYPES.CHORE, {
-              count: pendingCount,
-            })
-          : buildCommitMessage(commitType, data);
-      dbg.log(
-        `handleSolved(): commit prep - pending=${pendingCount}, type=${commitType}, files=${filesToCommit.length}`,
-      );
-      const commitOpts = data.timestamp ? { date: new Date(data.timestamp) } : {};
-      const primaryResult = await _commitWithFailover(
-        filesToCommit,
-        commitMsg,
-        settings.github_repo || settings.gitRepo,
-        commitOpts,
-        settings,
-      );
-      await Storage.markSubmissionCommitted(submissionCommitKey).catch(() => {});
-      await Storage.markSlugLangCommitted(data.id || titleSlug, langName).catch(() => {});
-      const clearedKeys = pendingProblems.map((p) => getProblemCommitKey(p)).filter(Boolean);
-      await Storage.clearPendingProblemKeys(clearedKeys).catch(() => {});
-
-      // Record committed paths per-problem so future resyncs can detect
-      // structural drift (path renames, layout changes) and compute deletions.
-      for (const p of pendingProblems) {
-        const paths = getProblemFiles(p, settings).map((f) => f.path);
-        if (paths.length > 0) {
-          await Storage.saveProblem({ ...p, _committedPaths: paths }).catch(() => {});
-        }
-      }
-
-      // Clear settings commit flag after successful commit
-      await clearSettingsCommitFlag().catch(() => {});
-
-      dbg.log(
-        `handleSolved(): ✓ git commit successful - slug=${titleSlug}, cleared_keys=${clearedKeys.length}`,
-      );
-
-      if (settings.notifications !== false) {
+        // Bundle .codeledger/* so settings/bank/roadmaps stay in sync with every solve
         try {
-          chrome.notifications.create({
-            type: "basic",
-            iconUrl: chrome.runtime.getURL("assets/icons/icon48.png"),
-            title: "CodeLedger: Committed!",
-            message: `${data.title || titleSlug} saved to GitHub.`,
+          filesToCommit.push({
+            path: ".codeledger/sync.json",
+            content: await buildSyncPayload(),
           });
         } catch (_) {}
-      }
-
-      // On-device snapshots — one build feeds the rolling copy and, if it is
-      // switched on, the scheduled one.
-      saveLocalSnapshots({
-        scheduled: settings.schedBackupOnSolve !== false,
-        trigger: "on-solve",
-      });
-
-      // GitHub rolling backup (if enabled)
-      const _git = registry.getGitProvider(settings.gitProvider || "github");
-      if (_git) {
-        const _owner = settings.github_owner || settings.github_username || "";
-        const _repo = settings.github_repo || settings.gitRepo || "";
-        if (_owner && _repo) {
-          maybeCommitRollingBackup(_owner, _repo, _git).catch((err) => {
-            dbg.warn("maybeCommitRollingBackup failed inside handleSolved:", err);
+        try {
+          const bank = await Storage.getBehaviorBank();
+          filesToCommit.push({
+            path: ".codeledger/behaviour-bank.json",
+            content: JSON.stringify(bank || {}, null, 2),
           });
+        } catch (_) {}
+        try {
+          const roadmaps = await Storage.getRoadmaps();
+          filesToCommit.push({
+            path: ".codeledger/roadmaps.json",
+            content: JSON.stringify(roadmaps || [], null, 2),
+          });
+        } catch (_) {}
+
+        // Auto-commit settings if they've changed
+        const configFile = await getConfigFileForCommit();
+        if (configFile) {
+          filesToCommit.push(configFile);
+          dbg.log(`handleSolved(): including config file in commit`);
         }
+
+        const pendingCount = pendingProblems.length || 1;
+        const commitType = forceCommit ? COMMIT_TYPES.UPDATE : COMMIT_TYPES.SOLVED;
+        const commitMsg =
+          pendingCount > 1
+            ? buildCommitMessage(COMMIT_TYPES.CHORE, {
+                count: pendingCount,
+              })
+            : buildCommitMessage(commitType, data);
+        dbg.log(
+          `handleSolved(): commit prep - pending=${pendingCount}, type=${commitType}, files=${filesToCommit.length}`,
+        );
+        // Codeforces (and any REST-sourced solve) reports Unix seconds; the rest
+        // report ms. Same guard as commitUpdatedProblem/handleResyncAll — without
+        // it the commit is authored in January 1970.
+        const commitOpts = data.timestamp
+          ? { date: new Date(data.timestamp > 1e10 ? data.timestamp : data.timestamp * 1000) }
+          : {};
+        const primaryResult = await _commitWithFailover(
+          filesToCommit,
+          commitMsg,
+          settings.github_repo || settings.gitRepo,
+          commitOpts,
+          settings,
+        );
+        await Storage.markSubmissionCommitted(submissionCommitKey).catch(() => {});
+        await Storage.markSlugLangCommitted(data.id || titleSlug, langName).catch(() => {});
+        const clearedKeys = pendingProblems.map((p) => getProblemCommitKey(p)).filter(Boolean);
+        await Storage.clearPendingProblemKeys(clearedKeys).catch(() => {});
+
+        // Record committed paths per-problem so future resyncs can detect
+        // structural drift (path renames, layout changes) and compute deletions.
+        for (const p of pendingProblems) {
+          const paths = getProblemFiles(p, settings).map((f) => f.path);
+          if (paths.length > 0) {
+            await Storage.saveProblem({ ...p, _committedPaths: paths }).catch(() => {});
+          }
+        }
+
+        // Clear settings commit flag after successful commit
+        await clearSettingsCommitFlag().catch(() => {});
+
+        dbg.log(
+          `handleSolved(): ✓ git commit successful - slug=${titleSlug}, cleared_keys=${clearedKeys.length}`,
+        );
+
+        if (settings.notifications !== false) {
+          try {
+            chrome.notifications.create({
+              type: "basic",
+              iconUrl: chrome.runtime.getURL("assets/icons/icon48.png"),
+              title: "CodeLedger: Committed!",
+              message: `${data.title || titleSlug} saved to GitHub.`,
+            });
+          } catch (_) {}
+        }
+
+        // On-device snapshots — one build feeds the rolling copy and, if it is
+        // switched on, the scheduled one.
+        saveLocalSnapshots({
+          scheduled: settings.schedBackupOnSolve !== false,
+          trigger: "on-solve",
+        });
+
+        // GitHub rolling backup (if enabled)
+        const _git = registry.getGitProvider(settings.gitProvider || "github");
+        if (_git) {
+          const _owner = settings.github_owner || settings.github_username || "";
+          const _repo = settings.github_repo || settings.gitRepo || "";
+          if (_owner && _repo) {
+            maybeCommitRollingBackup(_owner, _repo, _git).catch((err) => {
+              dbg.warn("maybeCommitRollingBackup failed inside handleSolved:", err);
+            });
+          }
+        }
+
+        // Fire-and-forget: rename files to canonical paths if needed
+        performPendingRenames().catch(() => {});
+
+        // Push to any configured mirrors (fire-and-forget; failures are non-fatal)
+        await pushToMirrors(
+          filesToCommit,
+          commitMsg,
+          commitOpts,
+          settings,
+          primaryResult.target ? _targetKey(primaryResult.target) : "",
+        );
+      } catch (err) {
+        dbg.error(`handleSolved(): ✗ git commit failed for ${titleSlug}:`, err?.message || err);
+        dbg.error(`handleSolved(): error details:`, err);
       }
-
-      // Fire-and-forget: rename files to canonical paths if needed
-      performPendingRenames().catch(() => {});
-
-      // Push to any configured mirrors (fire-and-forget; failures are non-fatal)
-      await pushToMirrors(
-        filesToCommit,
-        commitMsg,
-        commitOpts,
-        settings,
-        primaryResult.target ? _targetKey(primaryResult.target) : "",
-      );
-    } catch (err) {
-      dbg.error(`handleSolved(): ✗ git commit failed for ${titleSlug}:`, err?.message || err);
-      dbg.error(`handleSolved(): error details:`, err);
-    }
+    });
   }
 
   // The solve is in IndexedDB by now whether or not the commit went through,
@@ -1574,7 +1621,8 @@ async function performPendingRenames() {
 
   for (const r of renames) {
     try {
-      const tree = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`);
+      const branch = CONSTANTS.REPO_BRANCH || "main";
+      const tree = await git.apiFetch(`/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`);
       const relevant = (tree.tree || []).filter(
         (f) => f.type === "blob" && f.path.startsWith(r.oldBase + "/"),
       );
@@ -1810,10 +1858,29 @@ async function handleResyncCount() {
  */
 const _BULK_IMPORT_KEY = "cl-bulk-import-pending";
 
+// While a profile import is feeding batches in, a bulk resync would flatten
+// every record's real solve date into one now-dated commit. handleBulkImport
+// stamps this key (a wall-clock expiry, so a crashed import can never suppress
+// maintenance forever) and the maintenance alarm + any bulk resync request
+// defer to the backdated individual mode until it lapses or the import's own
+// individual sync clears it.
+const _IMPORT_ACTIVE_KEY = "cl.import.activeUntil";
+
+async function _isImportActive() {
+  const res = await browserStorage.local.get(_IMPORT_ACTIVE_KEY).catch(() => ({}));
+  return Number(res?.[_IMPORT_ACTIVE_KEY] || 0) > Date.now();
+}
+
 async function handleResyncAll(mode = "bulk", commitType = "chore") {
   if (_resyncInProgress) {
     dbg.warn("handleResyncAll(): already in progress — skipping duplicate call");
     return { committed: 0, skipped: true };
+  }
+  if (mode === "bulk" && (await _isImportActive())) {
+    dbg.log(
+      "handleResyncAll(): import in flight — upgrading bulk to individual to keep solve dates",
+    );
+    mode = "individual";
   }
   _resyncInProgress = true;
   // Persist intent for individual-mode syncs so a browser close can resume
@@ -1831,6 +1898,9 @@ async function handleResyncAll(mode = "bulk", commitType = "chore") {
     if (mode === "individual") {
       await browserStorage.local.remove(_BULK_IMPORT_KEY).catch(() => {});
     }
+    // A completed sync of any mode means the import's records are committed
+    // (or failed and will be retried by maintenance) — stop suppressing.
+    await browserStorage.local.remove(_IMPORT_ACTIVE_KEY).catch(() => {});
     try {
       _activeSyncPort?.postMessage({ type: "sync-done" });
     } catch (_) {}
@@ -1888,22 +1958,37 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
   // Fetch existing index.json to find already-committed slugs/langs
   const remoteByCommitKey = new Map();
   let headSha = null;
+  let indexRes = null;
   try {
-    const indexRes = await git.getContents(owner, repoName, "index.json");
-    const raw = decodeBase64Utf8(indexRes.content);
-    const index = JSON.parse(raw);
-    (index.problems || []).forEach((p) => {
-      const key = getProblemCommitKey(p);
-      if (key) remoteByCommitKey.set(key, p);
-    });
-    dbg.log(`handleResyncAll(): fetched ${remoteByCommitKey.size} existing remote problem(s)`);
+    indexRes = await git.getContents(owner, repoName, "index.json");
   } catch (e) {
-    dbg.warn(`handleResyncAll(): repo doesn't exist or no index.json yet:`, e?.message);
+    // Only a 404 proves the repo has no index yet. A network drop, 401 or 5xx
+    // means the index exists but could not be read — proceeding would classify
+    // every local problem as "never committed" and re-push the whole library.
+    if (e?.status !== 404) {
+      throw new Error(`Resync aborted — could not read remote index.json: ${e?.message || e}`);
+    }
+    dbg.log("handleResyncAll(): no index.json yet — remote is empty");
+  }
+  if (indexRes) {
+    try {
+      const index = JSON.parse(decodeBase64Utf8(indexRes.content));
+      (index.problems || []).forEach((p) => {
+        const key = getProblemCommitKey(p);
+        if (key) remoteByCommitKey.set(key, p);
+      });
+      dbg.log(`handleResyncAll(): fetched ${remoteByCommitKey.size} existing remote problem(s)`);
+    } catch (e) {
+      // The file exists but cannot be decoded. Rebuilding it from local data is
+      // the only recovery, so continue with an empty remote map.
+      dbg.warn(`handleResyncAll(): index.json unreadable — rebuilding it:`, e?.message);
+    }
   }
 
   // Fetch HEAD SHA so we can load the full recursive file tree (for inferring old paths)
   try {
-    const ref = await git.apiFetch(`/repos/${owner}/${repoName}/git/ref/heads/main`);
+    const branch = CONSTANTS.REPO_BRANCH || "main";
+    const ref = await git.apiFetch(`/repos/${owner}/${repoName}/git/ref/heads/${branch}`);
     headSha = ref?.object?.sha || null;
   } catch (_) {
     try {
@@ -1984,6 +2069,23 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
         }
       }
     }
+  }
+
+  // Garbage-collect orphaned pending keys. The commit key embeds the language
+  // (`id::lang`), so a record whose language gets filled in later — self-heal,
+  // code recovery, a metadata refresh — generates a new key, and the one marked
+  // at import time matches no problem ever again. Deleted problems orphan their
+  // keys the same way. Nothing can ever commit-and-clear such a key, so it sits
+  // in the map inflating the "solves haven't reached GitHub" banner and the
+  // toolbar `!` count forever. Only keys past the stale window are collected,
+  // so a solve that marked its key moments before saving its record is safe.
+  const _gcBefore = Date.now() - CONSTANTS.PENDING_COMMIT_STALE_MS;
+  const orphanedPending = Object.entries(pendingMap || {})
+    .filter(([k, t]) => !localProblemKeys.has(k) && Number(t) < _gcBefore)
+    .map(([k]) => k);
+  if (orphanedPending.length > 0) {
+    dbg.log(`handleResyncAll(): clearing ${orphanedPending.length} orphaned pending key(s)`);
+    await Storage.clearPendingProblemKeys(orphanedPending).catch(() => {});
   }
 
   dbg.log(
@@ -2303,8 +2405,9 @@ async function _handleResyncAllInner(mode = "bulk", commitType = "chore") {
   // ── Post-commit bookkeeping ───────────────────────────────────────────────
   const allChanged = [...newProblems, ...maintenanceItems.map((m) => m.problem)];
   for (const p of allChanged) {
+    // id-first, matching the handleSolved mark and the migrated key format.
     await Storage.markSlugLangCommitted(
-      p.titleSlug,
+      p.id || p.titleSlug,
       p.lang?.name || p.lang?.slug || p.lang?.ext || "",
     ).catch(() => {});
   }
@@ -2345,6 +2448,14 @@ async function handleBulkImport(problems = []) {
       missingDifficulty: 0,
     };
 
+  // Every batch re-stamps the suppression window, so however long the import
+  // runs, the maintenance alarm's date-flattening bulk commit stays deferred
+  // until 15 minutes after the LAST batch — by which time the importer's own
+  // backdated individual sync has run (or the window lapses harmlessly).
+  await browserStorage.local
+    .set({ [_IMPORT_ACTIVE_KEY]: Date.now() + 15 * 60_000 })
+    .catch(() => {});
+
   const pendingKeys = [];
   let autoMerged = 0;
   let conflicts = 0;
@@ -2369,7 +2480,11 @@ async function handleBulkImport(problems = []) {
       if (langGroup.length === 1) {
         const existing = await Storage.getProblem(langGroup[0].id).catch(() => null);
         if (existing?.manuallyEdited) continue;
-        await Storage.saveProblem(langGroup[0]).catch(() => {});
+        await Storage.saveProblem(langGroup[0])
+          .then(() => {
+            actualSaved++;
+          })
+          .catch(() => {});
         // Only commit if code actually changed — avoid re-committing unchanged data on repeated imports
         const isNew =
           !existing || normalizeCode(existing.code) !== normalizeCode(langGroup[0].code);
@@ -2394,7 +2509,11 @@ async function handleBulkImport(problems = []) {
       if (allSame) {
         // Auto-merge: keep oldest, discard rest.
         // Same code as already in repo — no GitHub commit needed.
-        await Storage.saveProblem(primary).catch(() => {});
+        await Storage.saveProblem(primary)
+          .then(() => {
+            actualSaved++;
+          })
+          .catch(() => {});
         autoMerged += rest.length;
         dbg.log(
           `handleBulkImport(): auto-merged ${rest.length} duplicate(s) for ${primary.titleSlug} (no commit — same code)`,
@@ -2416,7 +2535,11 @@ async function handleBulkImport(problems = []) {
           ...primary,
           conflictPending: true,
           conflictCandidates: candidates,
-        }).catch(() => {});
+        })
+          .then(() => {
+            actualSaved++;
+          })
+          .catch(() => {});
         const key = getProblemCommitKey(primary);
         if (key) pendingKeys.push(key);
         // Mark duplicates so library filters them out
@@ -2472,9 +2595,11 @@ async function handleBulkImport(problems = []) {
   // Kick review queue immediately if there are problems without code needing recovery
   if (missingCode > 0) processAIReviewQueue().catch(() => {});
 
-  // Broadcast import report to any open library tabs
+  // Broadcast import report to any open library tabs.
+  // `saved` counts records actually written to storage; the commit queue
+  // (pendingKeys) is smaller whenever a re-import found unchanged code.
   const report = {
-    saved: pendingKeys.length,
+    saved: actualSaved,
     autoMerged,
     conflicts,
     missingCode,
@@ -2562,10 +2687,33 @@ async function handleAIChat(messages, context = {}) {
   const chatRoadmap = await getRoadmapContext().catch(() => "");
   if (chatRoadmap) contextParts.push(chatRoadmap);
 
-  dbg.log(`handleAIChat(): prepared ${contextParts.length} context part(s)`);
-
   const lastUserMsg =
     (messages || []).filter((m) => m?.role === "user").slice(-1)[0]?.content || "";
+
+  // The knowledge-graph digest rides in two ways. An explicit /graph anywhere
+  // in the conversation: the expansion loop below consumes context.graphDigest,
+  // and without one here the surfaces that don't pre-expand (floating chat,
+  // problem modal) expand /graph to "not available here". And automatically,
+  // when the question is the kind the graph answers — progress, weak spots,
+  // what to practice next — where it lands as context instead of rewriting the
+  // user's own message. A message that already carries an expanded digest
+  // (the library chat expands /graph before sending) attaches nothing twice.
+  const wantsGraphCommand = (messages || []).some(
+    (m) => m?.role === "user" && String(m.content || "").includes("/graph"),
+  );
+  const asksGraphQuestion =
+    isGraphQuestion(lastUserMsg) && !lastUserMsg.includes("**Knowledge graph:**");
+  if (wantsGraphCommand || asksGraphQuestion) {
+    const digest = buildGraphDigest(await Storage.getAllProblems().catch(() => []), settings);
+    if (wantsGraphCommand) context.graphDigest = digest;
+    if (asksGraphQuestion && !wantsGraphCommand) {
+      contextParts.push(
+        `Knowledge-graph digest (attached automatically — the question is about topics, progress or what to practice next):\n${digest}`,
+      );
+    }
+  }
+
+  dbg.log(`handleAIChat(): prepared ${contextParts.length} context part(s)`);
   const skillsCtx = {
     text: lastUserMsg,
     justSolved: !!context.justSolved,
@@ -2874,10 +3022,7 @@ async function _saveHealState(state) {
  * every ten minutes as a single commit.
  */
 function _afterHeal(problem, fields) {
-  const slug = String(problem.titleSlug || problem.id || "").trim();
-  const langRaw = problem.lang?.name || problem.lang?.slug || problem.lang?.ext || "";
-  const normLang = String(langRaw).toLowerCase().replace(/\s+/g, "");
-  const key = slug ? (normLang ? `${slug}::${normLang}` : slug) : "";
+  const key = getProblemCommitKey(problem);
   if (key) Storage.markPendingProblemKey(key).catch(() => {});
   try {
     chrome.runtime.sendMessage({
@@ -2905,6 +3050,70 @@ const _healDeps = {
     codeforces: fetchCFProblemData,
   },
 };
+
+// ============================================================================
+// GFG URL Verification — repair wrong import slugs, mark dead ones
+// ============================================================================
+
+const _gfgVerifyDeps = {
+  fetchOutcome: fetchGFGProblemOutcome,
+  saveProblem: (p) => Storage.saveProblem(p),
+  markPending: (p) => {
+    const key = getProblemCommitKey(p);
+    return key ? Storage.markPendingProblemKey(key) : Promise.resolve();
+  },
+  getAllProblems: () => Storage.getAllProblems(),
+};
+
+// Platform-generic link verification (LINK_CHECK / LINK_APPLY /
+// LINK_VERIFY_ONE). takeuforward has no probe on purpose: its backend rejects
+// requests whose Origin is not on its allowlist, and a chrome-extension://
+// origin is not — link-verify saves TUF fixes clearly unverified instead.
+const _linkVerifyDeps = {
+  probes: {
+    leetcode: fetchLeetCodeProblemOutcome,
+    geeksforgeeks: fetchGFGProblemOutcome,
+    codeforces: fetchCFProblemOutcome,
+    neetcode: fetchNeetCodeProblemOutcome,
+  },
+  saveProblem: (p) => Storage.saveProblem(p),
+  markPending: (p) => {
+    const key = getProblemCommitKey(p);
+    return key ? Storage.markPendingProblemKey(key) : Promise.resolve();
+  },
+};
+
+let _gfgSweepInProgress = false;
+
+/**
+ * Run the verification sweep, broadcast the summary to any open library page,
+ * and optionally follow with an individual resync so repaired/verified
+ * problems reach GitHub with their real solve dates.
+ */
+async function runGfgSweepAndCommit({ thenResync = false, onlyUnverified = true } = {}) {
+  if (_gfgSweepInProgress) return null;
+  _gfgSweepInProgress = true;
+  let summary = null;
+  try {
+    summary = await runGfgVerifySweep(_gfgVerifyDeps, { onlyUnverified });
+    try {
+      chrome.runtime.sendMessage({ type: "GFG_VERIFY_DONE", ...summary });
+    } catch (_) {
+      // No page listening — counts are derivable from storage anyway.
+    }
+  } catch (e) {
+    dbg.warn(`runGfgSweepAndCommit(): sweep failed: ${e?.message}`);
+  } finally {
+    _gfgSweepInProgress = false;
+  }
+  if (thenResync) {
+    // Even a failed sweep must not strand the import: the commits still run.
+    await handleResyncAll("individual", "feat").catch((e) =>
+      dbg.warn(`runGfgSweepAndCommit(): resync failed: ${e?.message}`),
+    );
+  }
+  return summary;
+}
 
 let _selfHealBusy = false;
 
@@ -3003,13 +3212,16 @@ async function processCodeRecoveryQueue() {
     _codeRecoveryBusy = true;
     const all = await Storage.getAllProblems();
 
-    // Eligible problems: missing code or explicit flag
+    // Eligible problems: missing code or explicit flag. Records marked
+    // urlBroken are skipped — opening a tab on a dead URL burns the full 30s
+    // timeout and can never return code.
     const eligible = all.filter(
       (p) =>
-        p._needsCodeFetch ||
-        (p.platform === "geeksforgeeks" &&
-          p._importedFromProfile &&
-          (!p.code || p.code.trim() === "")),
+        !p.urlBroken &&
+        (p._needsCodeFetch ||
+          (p.platform === "geeksforgeeks" &&
+            p._importedFromProfile &&
+            (!p.code || p.code.trim() === ""))),
     );
     if (eligible.length === 0) return;
 
@@ -4085,6 +4297,74 @@ try {
           sendResponse({ ok: true, problems: (problems || []).filter((p) => ids.has(p.id)) }),
         )
         .catch((e) => sendResponse({ ok: false, problems: [], error: e.message }));
+      return true;
+    }
+
+    if (msg && msg.type === "GFG_VERIFY_SWEEP") {
+      dbg.log(`onMessage(GFG_VERIFY_SWEEP): thenResync=${!!msg.thenResync}`);
+      if (_gfgSweepInProgress) {
+        sendResponse({ ok: true, started: false, alreadyRunning: true });
+        return true;
+      }
+      // Respond immediately — the sweep can take minutes for a large import
+      // and the caller only needs to know it was accepted. Completion is
+      // broadcast as GFG_VERIFY_DONE.
+      sendResponse({ ok: true, started: true });
+      runGfgSweepAndCommit({
+        thenResync: !!msg.thenResync,
+        onlyUnverified: msg.onlyUnverified !== false,
+      }).catch((e) => dbg.error(`onMessage(GFG_VERIFY_SWEEP): failed:`, e?.message));
+      return true;
+    }
+
+    if (msg && msg.type === "LINK_VERIFY_ONE") {
+      dbg.log(`onMessage(LINK_VERIFY_ONE): id=${msg.id}`);
+      (async () => {
+        const problem = await Storage.getProblem(msg.id).catch(() => null);
+        if (!problem) return { ok: false, error: `Problem not found: ${msg.id}` };
+        // GFG keeps its richer path — the candidate walk can repair a slug
+        // across the site's three slug generations, not just verify it.
+        const result =
+          problem.platform === "geeksforgeeks"
+            ? await verifyGfgProblem(problem, _gfgVerifyDeps)
+            : await verifyProblemLink(problem, _linkVerifyDeps);
+        // The API metadata blob is for internal use — the page only needs
+        // the verdict and the (possibly repaired) slug.
+        return {
+          ok: true,
+          status: result.status,
+          slug: result.slug || null,
+          repaired: !!result.repaired,
+        };
+      })()
+        .then(sendResponse)
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
+      return true;
+    }
+
+    if (msg && msg.type === "LINK_APPLY") {
+      dbg.log(`onMessage(LINK_APPLY): id=${msg.id}`);
+      (async () => {
+        const problem = await Storage.getProblem(msg.id).catch(() => null);
+        if (!problem) return { ok: false, error: `Problem not found: ${msg.id}` };
+        const result =
+          problem.platform === "geeksforgeeks"
+            ? await applyManualSlug(problem, msg.url, _gfgVerifyDeps)
+            : await applyManualLink(problem, msg.url, _linkVerifyDeps);
+        return { ok: true, status: result.status, slug: result.slug || null };
+      })()
+        .then(sendResponse)
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
+      return true;
+    }
+
+    if (msg && msg.type === "LINK_CHECK") {
+      dbg.log(`onMessage(LINK_CHECK): platform=${msg.platform}`);
+      checkLink(msg.platform, msg.url, _linkVerifyDeps)
+        .then((result) =>
+          sendResponse({ ok: true, status: result.status, slug: result.slug || null }),
+        )
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
       return true;
     }
 

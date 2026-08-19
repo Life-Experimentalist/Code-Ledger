@@ -108,6 +108,38 @@ export class BasePlatformHandler {
   }
 
   /**
+   * Queue-instead-of-drop companion to the per-handler `_processingLock`.
+   *
+   * Event-driven handlers (Codeforces rows, NeetCode/takeuforward network
+   * taps) receive each accepted submission exactly once — a second event
+   * arriving while one is mid-commit used to be dropped forever. Poll-driven
+   * detectors do not need this: their next tick re-detects.
+   *
+   * Usage, at the top of the processing method:
+   *   if (this._deferWhileLocked(this._handleAccepted, [solve])) return;
+   * and in its `finally`, after releasing the lock:
+   *   this._drainDeferredEvents();
+   *
+   * Replays go through the handler's own dedup keys, so a duplicate event
+   * queued here is skipped downstream, not double-committed.
+   */
+  _deferWhileLocked(fn, args) {
+    if (!this._processingLock) return false;
+    this._deferredEvents ||= [];
+    // Five distinct solves landing during one in-flight commit is already
+    // implausible; beyond that it is observer noise, not signal.
+    if (this._deferredEvents.length < 5) this._deferredEvents.push([fn, args]);
+    return true;
+  }
+
+  _drainDeferredEvents() {
+    const next = this._deferredEvents?.shift();
+    if (!next) return;
+    const [fn, args] = next;
+    queueMicrotask(() => fn.apply(this, args));
+  }
+
+  /**
    * Debounced call — cancels any pending invocation and schedules a new one.
    * Uses `this._debounceTimer` so each handler instance has its own timer.
    *

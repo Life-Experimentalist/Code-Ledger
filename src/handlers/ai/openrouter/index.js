@@ -98,6 +98,7 @@ export class OpenRouterHandler extends BaseAIHandler {
             model,
             messages: [{ role: "user", content: prompt }],
           }),
+          signal: AbortSignal.timeout(60_000),
         });
 
         this._updateRateLimits(res.headers);
@@ -108,7 +109,12 @@ export class OpenRouterHandler extends BaseAIHandler {
           });
 
         const data = await res.json();
-        return data.choices?.[0]?.message?.content || "";
+        const content = data.choices?.[0]?.message?.content || "";
+        if (!content) {
+          this.dbg.warn(`review(): empty response at attempt ${attempt + 1}/${keyCount}`);
+          throw new Error("Empty OpenRouter response");
+        }
+        return content;
       } catch (err) {
         lastErr = err;
         this.keyPool.markFailed(key, err?.status);

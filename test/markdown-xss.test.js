@@ -128,6 +128,21 @@ describe("parseMarkdown — code blocks", () => {
     const out = parseMarkdown('```js"><script>alert(1)</script>\ncode\n```');
     assertInert(out, "language tag");
   });
+
+  // The stash-restore step must not interpret $-patterns in the fragment: a
+  // string replacement turns `$&` into the matched placeholder and `$'` into
+  // the rest of the document, silently corrupting any code sample using them.
+  test("code containing $-replacement patterns survives verbatim", () => {
+    const out = parseMarkdown("```sh\nsed 's/x/$& $` $' \"$1\"/'\n```");
+    assert.ok(out.includes("$&amp; $` $"), "the $-patterns must render literally");
+    assert.ok(!out.includes("@@S0@@"), "no stash placeholder may leak into the output");
+  });
+
+  test("inline code with $' does not duplicate the rest of the document", () => {
+    const out = parseMarkdown("use `$'` here\n\ntrailing paragraph");
+    const matches = out.match(/trailing paragraph/g) || [];
+    assert.equal(matches.length, 1, "the tail of the document must appear exactly once");
+  });
 });
 
 describe("parseMarkdown — well-formed input still renders", () => {

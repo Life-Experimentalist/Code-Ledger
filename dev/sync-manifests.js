@@ -62,6 +62,18 @@ const SITE_VERSIONS = [
     replace: `$1${targetVersion}`,
     what: "hero badge",
   },
+  {
+    file: "worker/src/index.js",
+    find: /(const VERSION = ")\d+\.\d+\.\d+(")/,
+    replace: `$1${targetVersion}$2`,
+    what: "worker /api/health version",
+  },
+  {
+    file: "README.md",
+    find: /(badge\/version-)\d+\.\d+\.\d+(-blueviolet)/,
+    replace: `$1${targetVersion}$2`,
+    what: "README version badge",
+  },
 ];
 
 for (const { file, find, replace, what } of SITE_VERSIONS) {

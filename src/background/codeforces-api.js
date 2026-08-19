@@ -24,7 +24,7 @@
  * problem and a live one render identically.
  */
 
-import { cfProblemUrl } from "../core/cf-utils.js";
+import { cfProblemUrl, splitCFSlug } from "../core/cf-utils.js";
 import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("CFApi");
@@ -134,4 +134,93 @@ export async function fetchCFProblemData(slug) {
     `fetchCFProblemData(): ✓ ${slug} — ${problemStatement.length} chars, ${tags.length} tag(s)`,
   );
   return { tags, problemStatement };
+}
+
+// ── Link verification ───────────────────────────────────────────────────────
+//
+// Codeforces has no per-problem JSON endpoint, and the problem page answers a
+// wrong URL with a redirect to the problemset — useless as a yes/no. What it
+// does publish is `problemset.problems`: the complete list of every regular
+// problemset problem (~11k entries, ~2MB). Membership in a successfully
+// fetched list is a definitive answer for non-gym slugs. Gym problems are
+// absent from that list by design, so a gym slug can never be condemned —
+// only its shape can be validated.
+
+const PROBLEMSET_URL = "https://codeforces.com/api/problemset.problems";
+/** The problemset changes a few times a week; a stale set only delays a verdict. */
+const PROBLEMSET_TTL_MS = 6 * 60 * 60 * 1000;
+
+let _problemsetSlugs = null;
+let _problemsetFetchedAt = 0;
+
+/**
+ * The set of `{contestId}{index}` keys in a problemset.problems payload, or
+ * null when the payload is not a successful listing. Exported for tests.
+ *
+ * @param {object} payload  parsed problemset.problems response
+ * @returns {Set<string>|null}
+ */
+export function slugSetFromProblemset(payload) {
+  if (payload?.status !== "OK" || !Array.isArray(payload?.result?.problems)) return null;
+  const set = new Set();
+  for (const p of payload.result.problems) {
+    if (p?.contestId != null && p?.index) set.add(`${p.contestId}${p.index}`);
+  }
+  return set.size ? set : null;
+}
+
+/**
+ * The verdict a slug set gives for one slug. Pure — exported for tests.
+ *
+ * @param {Set<string>} slugSet  from slugSetFromProblemset
+ * @param {string} slug  e.g. "4A", "gym100500B"
+ * @returns {{data: object|null, miss: boolean, unverifiable?: boolean}}
+ *   miss is true only when the answer is definitive: a slug no URL can be
+ *   built from, or a non-gym slug absent from the full listing. Gym slugs
+ *   come back `unverifiable` — the listing cannot see them.
+ */
+export function cfOutcomeFromSlugSet(slugSet, slug) {
+  const parts = splitCFSlug(slug);
+  // No URL can ever be built from this slug — that is broken by construction,
+  // no network answer required.
+  if (!parts) return { data: null, miss: true };
+  if (parts.isGym) return { data: null, miss: false, unverifiable: true };
+  return slugSet.has(`${parts.contestId}${parts.index}`)
+    ? { data: { slug }, miss: false }
+    : { data: null, miss: true };
+}
+
+/**
+ * Definitive-where-possible existence check for a Codeforces problem slug.
+ *
+ * @param {string} slug
+ * @returns {Promise<{data: object|null, miss: boolean, unverifiable?: boolean}>}
+ */
+export async function fetchCFProblemOutcome(slug) {
+  const parts = splitCFSlug(slug);
+  if (!parts) return { data: null, miss: true };
+  if (parts.isGym) return { data: null, miss: false, unverifiable: true };
+
+  if (!_problemsetSlugs || Date.now() - _problemsetFetchedAt > PROBLEMSET_TTL_MS) {
+    try {
+      const res = await fetch(PROBLEMSET_URL, { headers: { Accept: "application/json" } });
+      if (!res.ok) {
+        dbg.warn(`fetchCFProblemOutcome(): HTTP ${res.status} from problemset.problems`);
+        return { data: null, miss: false };
+      }
+      const set = slugSetFromProblemset(await res.json());
+      if (!set) {
+        dbg.warn(`fetchCFProblemOutcome(): problemset.problems answered without a listing`);
+        return { data: null, miss: false };
+      }
+      _problemsetSlugs = set;
+      _problemsetFetchedAt = Date.now();
+      dbg.log(`fetchCFProblemOutcome(): cached ${set.size} problemset slugs`);
+    } catch (e) {
+      dbg.warn(`fetchCFProblemOutcome(): ✗ ${e?.message}`);
+      return { data: null, miss: false };
+    }
+  }
+
+  return cfOutcomeFromSlugSet(_problemsetSlugs, slug);
 }

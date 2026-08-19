@@ -20,6 +20,8 @@ import {
   splitTags,
   masteryScore,
   masteryBand,
+  effectiveLastSolved,
+  masteryOptsFromSettings,
   topicMastery,
   topicGaps,
   buildTopicGraph,
@@ -254,6 +256,61 @@ test("mastery bands cover the whole range", () => {
   assert.equal(masteryBand(0.4), "working");
   assert.equal(masteryBand(0.7), "strong");
   assert.equal(masteryBand(1), "strong");
+});
+
+/* ------------------------------------------------------------------ */
+/* effectiveLastSolved — the regain bar                                */
+/* ------------------------------------------------------------------ */
+
+test("one stray solve does not refresh a rusty topic", () => {
+  // 40 solves a year ago, then a single problem yesterday. With the default
+  // regain bar of 2, recency is measured from the 2nd-most-recent solve —
+  // which is still a year old — so the topic stays rusty.
+  const recent = [NOW - DAY, ...Array.from({ length: 5 }, (_, i) => NOW - (365 + i) * DAY)];
+  assert.equal(effectiveLastSolved(recent, 2), NOW - 365 * DAY);
+
+  // A second recent solve clears the bar and the topic reads fresh again.
+  const regained = [NOW - DAY, NOW - 2 * DAY, NOW - 365 * DAY];
+  assert.equal(effectiveLastSolved(regained, 2), NOW - 2 * DAY);
+});
+
+test("effectiveLastSolved clamps the bar to what exists", () => {
+  assert.equal(effectiveLastSolved([], 2), -Infinity);
+  assert.equal(effectiveLastSolved([NOW], 3), NOW); // only one solve → use it
+  assert.equal(effectiveLastSolved([NOW, NOW - DAY], 0), NOW); // bar floors at 1
+  assert.equal(effectiveLastSolved([NOW, NOW - DAY], NaN), NOW);
+});
+
+test("masteryOptsFromSettings clamps to sane ranges with defaults", () => {
+  assert.deepEqual(masteryOptsFromSettings(undefined), { halfLifeDays: 90, regainSolves: 2 });
+  assert.deepEqual(masteryOptsFromSettings({}), { halfLifeDays: 90, regainSolves: 2 });
+  assert.deepEqual(
+    masteryOptsFromSettings({ mastery_half_life_days: 30, mastery_regain_solves: 3 }),
+    { halfLifeDays: 30, regainSolves: 3 },
+  );
+  assert.deepEqual(
+    masteryOptsFromSettings({ mastery_half_life_days: 1, mastery_regain_solves: 99 }),
+    { halfLifeDays: 7, regainSolves: 8 },
+  );
+  assert.deepEqual(
+    masteryOptsFromSettings({ mastery_half_life_days: "not a number", mastery_regain_solves: null }),
+    { halfLifeDays: 90, regainSolves: 2 },
+  );
+});
+
+test("topicMastery honours the regain bar end to end", () => {
+  const history = [
+    ...Array.from({ length: 10 }, (_, i) => solve({ tags: ["Graph"], daysAgo: 300 + i })),
+    solve({ tags: ["Graph"], daysAgo: 1 }),
+  ];
+  const strict = topicMastery(history, { now: NOW, regainSolves: 2 });
+  const lax = topicMastery(history, { now: NOW, regainSolves: 1 });
+  assert.ok(
+    strict[0].mastery < lax[0].mastery,
+    "one fresh solve should not lift mastery when the bar is 2",
+  );
+  // The displayed staleness still reports the true latest solve.
+  assert.equal(strict[0].daysSince, 1);
 });
 
 /* ------------------------------------------------------------------ */

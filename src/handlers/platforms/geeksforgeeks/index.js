@@ -57,6 +57,7 @@ export class GFGHandler extends BasePlatformHandler {
     this._cleanupSubmitHook = null;
     this._aiPanel = null;
     this._aiPanelSlug = null;
+    this._addLibChecking = false;
     registerPlatformPrompt("geeksforgeeks", this.getDefaultPrompt());
   }
 
@@ -149,6 +150,8 @@ Be concise. Max 200 words.`;
           if (page.slug) this._startAIPanel(page.slug);
         })
         .catch(() => {});
+      // Header hydrates late; the MutationObserver debounce re-tries after this.
+      setTimeout(() => this._maybeInjectAddToLibraryBtn(), 2500);
     }
 
     if (page.type === PAGE_TYPES.PROFILE) {
@@ -346,7 +349,7 @@ Be concise. Max 200 words.`;
                       this._closeSubmissionModal(modal);
 
                       if (extractedCode && extractedCode.trim()) {
-                        const langText = langCell ? langCell.textContent.trim() : "C++";
+                        const langText = langCell ? langCell.textContent.trim() : "";
                         const timeText = timeCell ? timeCell.textContent.trim() : "";
                         const langObj = this._resolveLanguageFromText(langText);
 
@@ -515,6 +518,7 @@ Be concise. Max 200 words.`;
           this._injectSyncBtn();
         }
         this._checkSubmissionsTable();
+        this._maybeInjectAddToLibraryBtn();
       }, 1500);
     });
     this.mutationObserver.observe(document.body, {
@@ -555,6 +559,9 @@ Be concise. Max 200 words.`;
       this._stopAIPanel();
       this._timer.stopFloating();
     }
+    // The old problem's button is stale either way; the observer re-injects
+    // for the new problem once its header (and solved badge) render.
+    document.getElementById("cl-gfg-add-lib-btn")?.remove();
 
     if (page.type === PAGE_TYPES.PROFILE) {
       injectProfileImportBtn((slug) => this.makeProblemId(slug)).catch(() => {});
@@ -641,6 +648,144 @@ Be concise. Max 200 words.`;
     dbg.log("Injected Sync to Ledger button next to success indicator");
   }
 
+  /* ── "Add to Library" for already-solved problems ─────────────────── */
+
+  _findSolvedBadge() {
+    // GFG marks an already-solved problem with a "Solved" chip in the problem
+    // header. Class names are CSS-module hashed, so match by substring first,
+    // then fall back to an exact-text scan limited to the header.
+    const header = document.querySelector(
+      '[class*="problems_header"], .problems-header, .problem-statement-container',
+    );
+    if (!header) return null;
+
+    const byClass = header.querySelector('[class*="solved"], [class*="Solved"]');
+    if (byClass) return byClass;
+
+    return (
+      [...header.querySelectorAll("span, div, p")].find((el) => {
+        const t = (el.textContent || "").trim().toLowerCase();
+        return t === "solved" || t === "problem solved";
+      }) || null
+    );
+  }
+
+  async _maybeInjectAddToLibraryBtn() {
+    const page = detectPage(window.location.pathname);
+    if (page.type !== PAGE_TYPES.PROBLEM || !page.slug) {
+      document.getElementById("cl-gfg-add-lib-btn")?.remove();
+      return;
+    }
+
+    const existingBtn = document.getElementById("cl-gfg-add-lib-btn");
+    if (existingBtn) {
+      // SPA navigation to a different problem invalidates the old button.
+      if (existingBtn.dataset.slug === page.slug) return;
+      existingBtn.remove();
+    }
+
+    if (this._addLibChecking) return;
+    this._addLibChecking = true;
+    try {
+      const badge = this._findSolvedBadge();
+      if (!badge) return;
+
+      const problemId = this.makeProblemId(page.slug);
+      const existing = await Storage.getProblem(problemId).catch(() => null);
+      if (existing) return;
+
+      // A fresh accepted submission already shows "Sync to Ledger" — don't
+      // stack a second button doing the same thing.
+      if (document.getElementById("cl-gfg-sync-btn")) return;
+
+      this._injectAddToLibraryBtn(badge, page.slug);
+    } finally {
+      this._addLibChecking = false;
+    }
+  }
+
+  _injectAddToLibraryBtn(badge, slug) {
+    if (document.getElementById("cl-gfg-add-lib-btn")) return;
+
+    const btn = document.createElement("button");
+    btn.id = "cl-gfg-add-lib-btn";
+    btn.dataset.slug = slug;
+    btn.title = "This solved problem isn't in your CodeLedger library yet — add it";
+
+    btn.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      color: #22d3ee;
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      vertical-align: middle;
+      margin-left: 12px;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      outline: none;
+      white-space: nowrap;
+    `;
+
+    btn.onmouseenter = () => {
+      btn.style.background = "rgba(6, 182, 212, 0.18)";
+      btn.style.borderColor = "rgba(6, 182, 212, 0.55)";
+    };
+    btn.onmouseleave = () => {
+      btn.style.background = "rgba(6, 182, 212, 0.08)";
+      btn.style.borderColor = "rgba(6, 182, 212, 0.35)";
+    };
+
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;"><path d="M12 4a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H5a1 1 0 110-2h6V5a1 1 0 011-1z"/></svg> Add to Library`;
+
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const originalHTML = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.textContent = "⏳ Adding…";
+
+        const page = detectPage(window.location.pathname);
+        const processed = await this._processSubmission(page, true);
+
+        if (processed) {
+          btn.textContent = "✓ Added";
+          setTimeout(() => btn.remove(), 2500);
+        } else {
+          // The editor holds no code (already-solved pages can load empty).
+          // The Submissions tab's per-row Sync buttons recover the real code.
+          btn.textContent = "✗ No code in editor — use Submissions tab";
+          setTimeout(() => {
+            if (btn.parentNode) {
+              btn.innerHTML = originalHTML;
+              btn.disabled = false;
+            }
+          }, 4000);
+        }
+      } catch (err) {
+        dbg.error("Add to Library failed", err);
+        btn.textContent = "✗ Failed";
+        setTimeout(() => {
+          if (btn.parentNode) {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+          }
+        }, 3000);
+      }
+    });
+
+    badge.insertAdjacentElement("afterend", btn);
+    dbg.log("Injected Add to Library button next to solved badge", { slug });
+  }
+
   /* ── Submission detection ─────────────────────────────────────────── */
   async _checkSubmission() {
     if (this._processingLock) return;
@@ -691,9 +836,9 @@ Be concise. Max 200 words.`;
         return false;
       }
 
-      // Module-level dedup
+      // Module-level dedup — marked only after a successful emit below, so a
+      // failed code extraction leaves the retry path open.
       if (!isManual && slug === this.lastDetectedId) return false;
-      this.lastDetectedId = slug;
 
       // Extract problem data from DOM
       const meta = this._extractMetadata(slug);
@@ -703,10 +848,8 @@ Be concise. Max 200 words.`;
 
       if (!code || !code.trim()) {
         dbg.warn("Code extraction failed, skipping commit");
-        return;
+        return false;
       }
-
-      sessionStorage.setItem(dedupKey, "1");
 
       const canonical = await this.resolveCanonical(slug);
 
@@ -742,6 +885,10 @@ Be concise. Max 200 words.`;
         _requestAIReview: true,
       });
 
+      // Both dedup marks land only after the emit — a failure anywhere above
+      // must leave this solve detectable again.
+      sessionStorage.setItem(dedupKey, "1");
+      this.lastDetectedId = slug;
       dbg.log("Solve emitted", { slug, lang: lang.name });
       return true;
     } catch (err) {
@@ -994,10 +1141,10 @@ Be concise. Max 200 words.`;
       "[class*='language'] [class*='selected']",
       "select[name='language'] option:checked",
     ]);
-    const raw = langEl ? langEl.textContent.trim().split("(")[0].trim() : "C++";
-    const name = raw || "C++";
-    const ext = langExt(name);
-    return { name, ext };
+    const raw = langEl ? langEl.textContent.trim().split("(")[0].trim() : "";
+    // No guessed default: an unreadable language yields "unknown"/.txt — a
+    // .txt file is honest, a fabricated "C++" is not.
+    return this._resolveLanguageFromText(raw);
   }
 
   _readTestFailures() {
@@ -1218,7 +1365,7 @@ Be concise. Max 200 words.`;
 
             this._closeSubmissionModal(modal);
 
-            const langText = row.children[langIdx]?.textContent || "C++";
+            const langText = row.children[langIdx]?.textContent || "";
             const lang = this._resolveLanguageFromText(langText);
             const timeText = row.children[timeIdx]?.textContent;
 
@@ -1403,10 +1550,11 @@ Be concise. Max 200 words.`;
   }
 
   _resolveLanguageFromText(langText) {
-    const raw = langText.trim();
-    const name = raw || "C++";
-    const ext = langExt(name);
-    const langSlug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-    return { name, ext, slug: langSlug };
+    const raw = (langText || "").trim();
+    // Same fallback shape as codeforces/lang-utils.js — never guess a language.
+    if (!raw) return { name: "unknown", ext: "txt", slug: "txt" };
+    const ext = langExt(raw);
+    const langSlug = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return { name: raw, ext, slug: langSlug };
   }
 }

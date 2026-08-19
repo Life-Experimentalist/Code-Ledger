@@ -437,12 +437,14 @@ problems/lc-two-sum/README.md
 # A second approach to the same problem gets a suffix, not a second directory
 problems/lc-two-sum/lc-two-sum-greedy.py
 
-index.json                                    ← always the last file in the commit
+index.json                                    ← included in every commit
 ```
 
 `index.json` at the repo root is what the sync engine reads on another device.
-The service worker appends it to every commit, so the index can never lag the
-files it describes — they land in the same atomic tree.
+The service worker includes it in every solve commit, so the index lands in the
+same atomic tree as the files it describes. A maintenance commit that omits it
+(e.g. a file rename) leaves the index one commit stale, which the next solve
+commit corrects.
 
 #### Commit Message Types
 

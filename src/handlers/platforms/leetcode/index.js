@@ -170,11 +170,12 @@ Be concise. Max 200 words.`;
     setTimeout(() => this._syncButtonsForCurrentPage(), 2000);
 
     // Watch for mutations and re-evaluate button state; also recover QoL buttons
-    const observer = new MutationObserver(() => {
+    if (this._syncBtnObserver) this._syncBtnObserver.disconnect();
+    this._syncBtnObserver = new MutationObserver(() => {
       this._syncButtonsForCurrentPage();
       this._maybeReinjectQoL();
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    this._syncBtnObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   /** Re-inject QoL copy/paste buttons if React removed them from the toolbar. */

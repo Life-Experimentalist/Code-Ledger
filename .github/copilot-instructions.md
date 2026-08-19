@@ -246,7 +246,7 @@ All handlers live in `src/handlers/` and follow a strict structure:
 | Views               | PascalCase + View | `ProblemsView.js`, `SettingsView.js`                       | Distinguish from generic components |
 | Core/lib modules    | kebab-case        | `ai-deduplication.js`, `browser-compat.js`                 | Lowercase for utility modules       |
 | Storage keys        | CONSTANT_CASE     | `CONSTANTS.SK.GITHUB_REPO`                                 | Via `CONSTANTS.SK.*` export only    |
-| CSS files           | kebab-case        | `floating-timer.css`                                       | Tailwind input files or compiled    |
+| CSS files           | kebab-case        | `theme-variables.css`                                      | Tailwind input files or compiled    |
 | Data files          | kebab-case        | `canonical-map.json`, `metadata.json`                      | In `src/data/`                      |
 
 ### Storage Key Conventions

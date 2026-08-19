@@ -178,6 +178,42 @@ describe("commit pipeline — repository auto-creation", () => {
     assert.equal(gh.state.createdRepo.private, true);
   });
 
+  test("bootstraps an externally created empty repository with a root commit", async () => {
+    // The repo exists on github.com but has no commits: the ref lookup 404s
+    // and createRepository 422s "name already exists". Before the root-commit
+    // path existed this combination failed every commit forever.
+    const gh = install({
+      "POST /user/repos": (_c, _s, json) =>
+        json({ message: "name already exists on this account" }, 422),
+    });
+    gh.state.repoExists = false;
+
+    const sha = await new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", {
+      skipInfra: true,
+    });
+    assert.equal(sha, "c".repeat(40));
+
+    const commitCall = gh.calls.find((c) => c.method === "POST" && c.path.endsWith("/git/commits"));
+    assert.deepEqual(commitCall.body.parents, [], "a root commit has no parents");
+    const treeCall = gh.calls.find((c) => c.method === "POST" && c.path.endsWith("/git/trees"));
+    assert.ok(!("base_tree" in treeCall.body), "a root tree carries no base_tree");
+    assert.ok(
+      gh.calls.some((c) => c.method === "POST" && c.path.endsWith("/git/refs")),
+      "the branch must be created, not patched",
+    );
+  });
+
+  test("a non-422 repository-creation failure still propagates", async () => {
+    const gh = install({
+      "POST /user/repos": (_c, _s, json) => json({ message: "Forbidden" }, 403),
+    });
+    gh.state.repoExists = false;
+    await assert.rejects(
+      () => new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", { skipInfra: true }),
+      /403/,
+    );
+  });
+
   test("a failure to apply cosmetic repo settings does not lose the commit", async () => {
     const gh = fakeGitHub({
       "PATCH /CodeLedger-Sync": () =>
@@ -211,6 +247,17 @@ describe("commit pipeline — failures surface, they do not vanish", () => {
       () => new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", { skipInfra: true }),
       /Not authenticated/,
     );
+  });
+
+  test("falls back to the settings PAT when no OAuth token is stored", async () => {
+    // The documented contract: OAuth first, then settings.github_token.
+    Storage.getAuthToken = async () => "";
+    useSettings({ github_repo: "CodeLedger-Sync", github_token: "ghp_manualpat" });
+    install();
+    const sha = await new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", {
+      skipInfra: true,
+    });
+    assert.equal(sha, "c".repeat(40));
   });
 
   test("retries a non-fast-forward ref update instead of dropping the commit", async () => {
@@ -274,5 +321,13 @@ describe("commit payload assembly", () => {
     const items = buildTreeItems([{ path: "a.py", content: "x", sha: "b".repeat(40) }]);
     assert.equal(items[0].sha, "b".repeat(40));
     assert.equal(items[0].content, undefined);
+  });
+
+  test("rejects a file with no usable content instead of building a doomed tree", () => {
+    // undefined content produced a tree entry with neither `content` nor `sha`,
+    // which GitHub rejects with a bare 422 far from the real cause.
+    assert.throws(() => buildTreeItems([{ path: "a.py" }]), /Invalid commit file: "a\.py"/);
+    assert.throws(() => buildTreeItems([{ content: "x" }]), /Invalid commit file/);
+    assert.throws(() => buildTreeItems([{ path: "", content: "x" }]), /Invalid commit file/);
   });
 });

@@ -22,11 +22,17 @@ const dbg = createDebugger("LeetCodeApi");
 const GRAPHQL_URL = "https://leetcode.com/graphql";
 
 /**
+ * Like `fetchLeetCodeProblemData`, but distinguishes "that slug does not
+ * exist" from "the request failed". LeetCode answers a nonexistent slug with
+ * HTTP 200 and `data.question: null` — that is a definitive miss. Anything
+ * else that yields no question (HTTP error, network failure, malformed body)
+ * is indefinite and must never condemn a record.
+ *
  * @param {string} slug  problem titleSlug, e.g. "two-sum"
- * @returns {Promise<{title: string, difficulty: string, tags: string[], problemStatement: string|null} | null>}
+ * @returns {Promise<{data: object|null, miss: boolean}>}
  */
-export async function fetchLeetCodeProblemData(slug) {
-  if (!slug) return null;
+export async function fetchLeetCodeProblemOutcome(slug) {
+  if (!slug) return { data: null, miss: true };
   try {
     const res = await fetch(GRAPHQL_URL, {
       method: "POST",
@@ -38,26 +44,42 @@ export async function fetchLeetCodeProblemData(slug) {
       }),
     });
     if (!res.ok) {
-      dbg.warn(`fetchLeetCodeProblemData(): HTTP ${res.status} for slug=${slug}`);
-      return null;
+      dbg.warn(`fetchLeetCodeProblemOutcome(): HTTP ${res.status} for slug=${slug}`);
+      return { data: null, miss: false };
     }
     const json = await res.json();
+    if (json?.data && json.data.question === null) {
+      dbg.warn(`fetchLeetCodeProblemOutcome(): no such problem: slug=${slug}`);
+      return { data: null, miss: true };
+    }
     const q = json?.data?.question;
     if (!q) {
-      dbg.warn(`fetchLeetCodeProblemData(): no question in response for slug=${slug}`);
-      return null;
+      dbg.warn(`fetchLeetCodeProblemOutcome(): malformed response for slug=${slug}`);
+      return { data: null, miss: false };
     }
     return {
-      title: q.title || slug,
-      difficulty: q.difficulty || "",
-      tags: (q.topicTags || []).map((t) => t?.name).filter(Boolean),
-      // A premium problem answers with an empty body rather than an error. That
-      // is not a statement we failed to fetch, it is one we are not allowed to
-      // have — reporting null keeps the caller from storing "".
-      problemStatement: q.content || null,
+      data: {
+        title: q.title || slug,
+        difficulty: q.difficulty || "",
+        tags: (q.topicTags || []).map((t) => t?.name).filter(Boolean),
+        // A premium problem answers with an empty body rather than an error. That
+        // is not a statement we failed to fetch, it is one we are not allowed to
+        // have — reporting null keeps the caller from storing "".
+        problemStatement: q.content || null,
+      },
+      miss: false,
     };
   } catch (e) {
-    dbg.warn(`fetchLeetCodeProblemData(): ✗ ${e?.message}`);
-    return null;
+    dbg.warn(`fetchLeetCodeProblemOutcome(): ✗ ${e?.message}`);
+    return { data: null, miss: false };
   }
+}
+
+/**
+ * @param {string} slug  problem titleSlug, e.g. "two-sum"
+ * @returns {Promise<{title: string, difficulty: string, tags: string[], problemStatement: string|null} | null>}
+ */
+export async function fetchLeetCodeProblemData(slug) {
+  const { data } = await fetchLeetCodeProblemOutcome(slug);
+  return data;
 }
