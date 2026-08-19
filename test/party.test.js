@@ -27,6 +27,11 @@ import {
   normalizeFriends,
   summarizeIndex,
   topicGap,
+  metricLeaders,
+  headToHead,
+  catchUpDays,
+  achievementGap,
+  lastNDays,
   fetchFriendStats,
   ERROR_TEXT,
 } from "../src/core/party.js";
@@ -496,6 +501,127 @@ describe("fetchFriendStats", () => {
       assert.equal(typeof ERROR_TEXT[key], "string");
       assert.ok(ERROR_TEXT[key].length > 20, `${key} needs a real sentence`);
     }
+  });
+});
+
+describe("metricLeaders", () => {
+  const entry = (id, over = {}) => ({ id, label: id, stats: { ...STATS, ...over } });
+
+  test("crowns the top value per metric independently", () => {
+    const leaders = metricLeaders([
+      entry("a", { totalPoints: 100, currentStreak: 3 }),
+      entry("b", { totalPoints: 50, currentStreak: 9 }),
+    ]);
+    assert.equal(leaders.totalPoints.id, "a");
+    assert.equal(leaders.currentStreak.id, "b");
+    assert.equal(leaders.currentStreak.value, 9);
+  });
+
+  test("a metric nobody scored on gets no crown", () => {
+    const leaders = metricLeaders([
+      entry("a", { currentStreak: 0 }),
+      entry("b", { currentStreak: 0 }),
+    ]);
+    assert.equal(leaders.currentStreak, undefined);
+  });
+
+  test("ties break the way the leaderboard does — more solves first", () => {
+    const leaders = metricLeaders([
+      entry("few", { totalPoints: 100, totalSolves: 10 }),
+      entry("many", { totalPoints: 100, totalSolves: 20 }),
+    ]);
+    assert.equal(leaders.totalPoints.id, "many");
+  });
+
+  test("entries without stats are ignored, not crashed on", () => {
+    assert.deepEqual(metricLeaders([{ id: "x", label: "x", stats: null }]), {});
+    assert.deepEqual(metricLeaders(null), {});
+  });
+});
+
+describe("headToHead", () => {
+  test("covers every leaderboard metric with the signed gap", () => {
+    const rows = headToHead({ ...STATS, totalPoints: 100 }, { ...STATS, totalPoints: 150 });
+    assert.equal(rows.length, METRICS.length);
+    const points = rows.find((r) => r.id === "totalPoints");
+    assert.equal(points.mine, 100);
+    assert.equal(points.theirs, 150);
+    assert.equal(points.diff, -50);
+  });
+
+  test("either side missing means no duel rather than a duel against zeros", () => {
+    assert.deepEqual(headToHead(null, STATS), []);
+    assert.deepEqual(headToHead(STATS, null), []);
+  });
+});
+
+describe("catchUpDays", () => {
+  test("rounds the days up — a partial day of solving is still a day", () => {
+    assert.equal(catchUpDays(50, 25), 2);
+    assert.equal(catchUpDays(51, 25), 3);
+  });
+
+  test("no gap is zero days, not an estimate", () => {
+    assert.equal(catchUpDays(0, 25), 0);
+    assert.equal(catchUpDays(-10, 25), 0);
+  });
+
+  test("no target means no estimate — dividing by zero is not motivation", () => {
+    assert.equal(catchUpDays(50, 0), null);
+    assert.equal(catchUpDays(50, undefined), null);
+  });
+});
+
+describe("achievementGap", () => {
+  test("splits into shared and one-sided, sorted", () => {
+    const gap = achievementGap(["century", "first-blood"], ["first-blood", "week-streak"]);
+    assert.deepEqual(gap.shared, ["first-blood"]);
+    assert.deepEqual(gap.onlyTheirs, ["week-streak"]);
+    assert.deepEqual(gap.onlyMine, ["century"]);
+  });
+
+  test("ids this build has never heard of survive the comparison", () => {
+    // A newer version publishing a new achievement must not make the newer
+    // ledger look poorer to an older reader.
+    const gap = achievementGap([], ["from-the-future"]);
+    assert.deepEqual(gap.onlyTheirs, ["from-the-future"]);
+  });
+
+  test("junk entries are dropped, not compared", () => {
+    const gap = achievementGap([null, 42, "century"], "not-an-array");
+    assert.deepEqual(gap.onlyMine, ["century"]);
+    assert.deepEqual(gap.shared, []);
+  });
+});
+
+describe("lastNDays", () => {
+  test("zero-fills the gaps — the gaps are the story", () => {
+    const series = lastNDays([{ day: "2026-08-09", count: 3 }], "2026-08-10", 3);
+    assert.deepEqual(series, [
+      { day: "2026-08-08", count: 0 },
+      { day: "2026-08-09", count: 3 },
+      { day: "2026-08-10", count: 0 },
+    ]);
+  });
+
+  test("days outside the window are excluded", () => {
+    const series = lastNDays(
+      [
+        { day: "2026-01-01", count: 9 },
+        { day: "2026-08-10", count: 1 },
+      ],
+      "2026-08-10",
+      2,
+    );
+    assert.deepEqual(
+      series.map((d) => d.count),
+      [0, 1],
+    );
+  });
+
+  test("an unreadable today yields nothing rather than a series ending nowhere", () => {
+    assert.deepEqual(lastNDays([], "not-a-day"), []);
+    assert.deepEqual(lastNDays([], ""), []);
   });
 });
 

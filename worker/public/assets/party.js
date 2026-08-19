@@ -489,6 +489,133 @@ export function topicGap(mine, theirs) {
 }
 
 /**
+ * Who leads each metric, for the crowns.
+ *
+ * The tiebreak matches `compareRows` — same value, more solves, then name — so
+ * the crown always sits on the row the leaderboard would rank first. A metric
+ * nobody has scored on gets no leader: crowning somebody for zero points is the
+ * kind of gamification that teaches people the crowns mean nothing.
+ *
+ * @param {Array<{id: string, label: string, stats: object|null}>} entries
+ * @returns {Object<string, {id: string, label: string, value: number}>}
+ */
+export function metricLeaders(entries) {
+  const list = (Array.isArray(entries) ? entries : []).filter((e) => e && e.stats);
+  const out = {};
+  for (const m of METRICS) {
+    let best = null;
+    for (const e of list) {
+      const value = e.stats[m.id] || 0;
+      if (value <= 0) continue;
+      if (
+        !best ||
+        value > best.value ||
+        (value === best.value && (e.stats.totalSolves || 0) > best.solves) ||
+        (value === best.value &&
+          (e.stats.totalSolves || 0) === best.solves &&
+          String(e.label).localeCompare(String(best.label)) < 0)
+      ) {
+        best = { id: e.id, label: e.label, value, solves: e.stats.totalSolves || 0 };
+      }
+    }
+    if (best) out[m.id] = { id: best.id, label: best.label, value: best.value };
+  }
+  return out;
+}
+
+/**
+ * Your numbers against one other ledger's, metric by metric.
+ *
+ * Nothing here that `compareRows` does not already know — but a leaderboard
+ * answers "who is ahead overall" and a duel answers "where exactly", which is
+ * the question that tells somebody what to do about it.
+ *
+ * @param {object|null} mine parsed stats
+ * @param {object|null} theirs parsed stats
+ * @returns {Array<{id: string, label: string, short: string, mine: number, theirs: number, diff: number}>}
+ */
+export function headToHead(mine, theirs) {
+  if (!mine || !theirs) return [];
+  return METRICS.map((m) => {
+    const a = mine[m.id] || 0;
+    const b = theirs[m.id] || 0;
+    return { id: m.id, label: m.label, short: m.short, mine: a, theirs: b, diff: a - b };
+  });
+}
+
+/**
+ * How many days of hitting your own daily target closes a points gap.
+ *
+ * Deliberately framed on the *your effort* side — it uses your target, not a
+ * guess at their pace, because their pace is not something a stats file states
+ * and inventing it would put a made-up number in the most motivating spot on
+ * the page. Returns 0 when there is no gap and null when there is no target to
+ * divide by.
+ *
+ * @param {number} gap points behind (positive)
+ * @param {number} dailyTarget the user's own daily target
+ * @returns {number|null}
+ */
+export function catchUpDays(gap, dailyTarget) {
+  const g = Number(gap);
+  if (!Number.isFinite(g) || g <= 0) return 0;
+  const t = Number(dailyTarget);
+  if (!Number.isFinite(t) || t <= 0) return null;
+  return Math.ceil(g / t);
+}
+
+/**
+ * Achievements split into shared, only-theirs and only-yours.
+ *
+ * Ids as published in `stats.json` — opaque strings, compared exactly. Unknown
+ * ids survive: a file written by a newer version than the one reading it names
+ * achievements this build has never heard of, and dropping them would make the
+ * newer ledger look poorer for being newer.
+ *
+ * @param {Array<string>} mine earned achievement ids
+ * @param {Array<string>} theirs earned achievement ids
+ */
+export function achievementGap(mine, theirs) {
+  const a = new Set((Array.isArray(mine) ? mine : []).filter((x) => typeof x === "string" && x));
+  const b = new Set(
+    (Array.isArray(theirs) ? theirs : []).filter((x) => typeof x === "string" && x),
+  );
+  return {
+    shared: [...a].filter((x) => b.has(x)).sort(),
+    onlyTheirs: [...b].filter((x) => !a.has(x)).sort(),
+    onlyMine: [...a].filter((x) => !b.has(x)).sort(),
+  };
+}
+
+/**
+ * A dense daily series ending on `todayKey`, for the activity strip.
+ *
+ * `summarizeIndex` reports only the days that had solves; a sparkline drawn
+ * from that flatters everybody, because the gaps are the story. Zero-filled
+ * here, in UTC like the rest of a foreign ledger's dates.
+ *
+ * @param {Array<{day: string, count: number}>} days
+ * @param {string} todayKey `YYYY-MM-DD`
+ * @param {number} [n]
+ * @returns {Array<{day: string, count: number}>}
+ */
+export function lastNDays(days, todayKey, n = 30) {
+  if (!DAY_RE.test(String(todayKey || ""))) return [];
+  const len = Math.max(1, Math.min(Math.floor(Number(n) || 0) || 30, 366));
+  const counts = new Map();
+  for (const d of Array.isArray(days) ? days : []) {
+    if (d && DAY_RE.test(String(d.day || ""))) counts.set(d.day, num(d.count, 1000));
+  }
+  const end = Date.parse(`${todayKey}T00:00:00.000Z`);
+  const out = [];
+  for (let i = len - 1; i >= 0; i--) {
+    const day = new Date(end - i * 86400000).toISOString().slice(0, 10);
+    out.push({ day, count: counts.get(day) || 0 });
+  }
+  return out;
+}
+
+/**
  * Fetch and parse one ledger's headline numbers.
  *
  * The branch is guessed when the reference did not name one, and the branch
