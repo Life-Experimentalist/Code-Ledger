@@ -21,7 +21,6 @@
  */
 
 import { Storage } from "../../../core/storage.js";
-import { CONSTANTS } from "../../../core/constants.js";
 import { LAYOUT_VERSION } from "../../../core/path-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { decodeBase64Utf8 } from "../../../lib/base64.js";
@@ -241,7 +240,67 @@ async function _refreshPagesUrl(owner, repo, token, settings) {
     dbg.log(`_refreshPagesUrl(): Pages URL changed "${stored}" → "${fresh}"`);
   }
   await Storage.updateSettings(patch).catch(() => {});
+  // Piggyback on the daily live read (not just on change): a homepage left
+  // stale before this sync existed would otherwise never be corrected, because
+  // the settings URL has long since caught up and `fresh === stored` forever.
+  await _syncRepoHomepage(owner, repo, token, fresh, stored);
   return fresh;
+}
+
+const _normalizeUrl = (u) =>
+  String(u || "")
+    .replace(/\/+$/, "")
+    .toLowerCase();
+
+/**
+ * Decide whether the repository homepage should be rewritten to `fresh`.
+ * Pure so the guard is testable: only a homepage CodeLedger plausibly wrote is
+ * replaced — empty, the previously stored Pages URL, or the generic
+ * `{owner}.github.io[/{repo}]` address. A homepage the user typed themselves is
+ * never touched.
+ *
+ * @param {string} current  Homepage currently on the repository
+ * @param {string} fresh    The Pages URL GitHub reports now ("" = Pages off)
+ * @param {string} stored   The Pages URL last recorded in settings
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {boolean}
+ */
+export function homepageNeedsSync(current, fresh, stored, owner, repo) {
+  if (_normalizeUrl(current) === _normalizeUrl(fresh)) return false;
+  if (!current) return true;
+  if (stored && _normalizeUrl(current) === _normalizeUrl(stored)) return true;
+  const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const generic = new RegExp(`^https?://${esc(owner)}\\.github\\.io(/${esc(repo)})?/?$`, "i");
+  return generic.test(current);
+}
+
+/**
+ * Keep the repository homepage (the "About" website link) in step with the
+ * Pages URL. Onboarding writes it once with the address GitHub reported at
+ * creation time; when the user later puts a custom domain on the site, GitHub
+ * updates `html_url` but not the homepage, so the repo's public link keeps
+ * pointing at the retired `{owner}.github.io` address. Failures are logged and
+ * swallowed — the homepage is cosmetic and must never cost the commit.
+ */
+async function _syncRepoHomepage(owner, repo, token, fresh, stored) {
+  let current;
+  try {
+    const info = await apiFetch(`/repos/${owner}/${repo}`, token);
+    current = typeof info?.homepage === "string" ? info.homepage : "";
+  } catch (_) {
+    return; // cannot read the current homepage — do not overwrite blind
+  }
+  if (!homepageNeedsSync(current, fresh, stored, owner, repo)) return;
+  try {
+    await apiFetch(`/repos/${owner}/${repo}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({ homepage: fresh }),
+    });
+    dbg.log(`_syncRepoHomepage(): homepage "${current}" → "${fresh}"`);
+  } catch (err) {
+    dbg.warn(`_syncRepoHomepage(): PATCH failed — ${err?.message || err}`);
+  }
 }
 
 async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMetaOverride = null) {
