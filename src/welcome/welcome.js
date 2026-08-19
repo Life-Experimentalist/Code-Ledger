@@ -496,6 +496,33 @@ function WelcomeApp() {
           </div>
         </div>
 
+        <!--
+          The landing page becomes installable as a desktop app once this
+          extension is detected on it — the install button over there is gated
+          on the handshake, so the honest instruction is "open the site",
+          not a fake install button here.
+        -->
+        <div class="mb-4 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3.5">
+          <div class="flex items-start gap-3">
+            <span class="text-base leading-none mt-0.5" aria-hidden="true">🖥️</span>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-xs font-semibold text-slate-300">Install the desktop app</h3>
+              <p class="mt-1 text-[11px] leading-snug text-slate-500">
+                CodeLedger's site can be installed as an app on Windows, macOS or Linux — a
+                dedicated window with a one-click jump into this library. The install button appears
+                on the site once it detects this extension, so open it from here and look for
+                <span class="text-slate-400">“Install app”</span> in the top corner.
+              </p>
+            </div>
+            <button
+              onClick=${() => openTab(CONSTANTS.URLS.LANDING)}
+              class="shrink-0 text-[10px] text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors whitespace-nowrap"
+            >
+              Open site →
+            </button>
+          </div>
+        </div>
+
         <!-- What this setup currently sends, computed rather than promised -->
         <div class="mb-8 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3.5">
           <div class="flex items-center gap-2">

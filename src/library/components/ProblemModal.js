@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { h, useState, useEffect, useCallback } from "../../vendor/preact-bundle.js";
+import { h, useState, useEffect, useCallback, useRef } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
@@ -52,6 +52,18 @@ function aiAwareTabs(problem, settings) {
   const tabs = modalTabRegistry.getTabs(problem?.platform || "leetcode", problem);
   if (isAIActive(settings)) return tabs;
   return tabs.filter((t) => !AI_TAB_IDS.has(t.id) || (t.id === "review" && !!problem?.aiReview));
+}
+
+/**
+ * The tab a problem opens on: the first tab the registry actually offers it.
+ * Codeforces, NeetCode and takeuforward resolve only the global "*" tabs,
+ * which have no "overview" — hardcoding that id rendered "No content." there.
+ *
+ * @param {object} problem
+ * @param {Record<string, any>} settings
+ */
+function defaultTabId(problem, settings) {
+  return aiAwareTabs(problem, settings)[0]?.id || "notes";
 }
 
 export const PLATFORM_META = {
@@ -118,7 +130,7 @@ export function ProblemModal({
   hideCloseButton = false,
   topicKinds = {},
 }) {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => defaultTabId(problem, {}));
   const [copied, setCopied] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
@@ -215,17 +227,30 @@ export function ProblemModal({
     return () => clearInterval(timer);
   }, [fetchQueueStatus]);
 
-  // Update notes when problem changes
+  // Which problem the modal is showing right now. Async work started on an
+  // earlier problem checks this before touching state, so navigating with the
+  // arrows mid-fetch neither leaves a stale spinner on the new problem nor
+  // snaps the modal back to the old one when the fetch lands.
+  const shownIdRef = useRef(problem?.id);
+
+  // Update notes and clear any in-flight visual state when problem changes
   useEffect(() => {
+    shownIdRef.current = problem?.id;
     setNotes(problem?.notes || "");
     setMethods(problem?.methods || []);
     setSelectedMethodIdx(0);
     setShowAddMethod(false);
+    setRefreshing(false);
+    setReviewBusy(false);
+    setReviewError("");
+    setQueueActionBusy(false);
+    setRemoveFromQueueBusy(false);
   }, [problem?.id]);
 
   // Reset (or restore) tab and load chat history when problem changes
   useEffect(() => {
-    if (settings?.remember_modal_tab && _lastModalTab && _lastModalTab !== "overview") {
+    const fallbackTab = defaultTabId(problem, settings);
+    if (settings?.remember_modal_tab && _lastModalTab && _lastModalTab !== fallbackTab) {
       // Check if the remembered tab exists for this problem
       const regTabs = aiAwareTabs(problem, settings);
       const available = new Set([
@@ -233,9 +258,9 @@ export function ProblemModal({
         "notes",
         ...(problem?.methods?.length > 0 ? ["methods"] : []),
       ]);
-      setActiveTab(available.has(_lastModalTab) ? _lastModalTab : "overview");
+      setActiveTab(available.has(_lastModalTab) ? _lastModalTab : fallbackTab);
     } else {
-      setActiveTab("overview");
+      setActiveTab(fallbackTab);
     }
     if (problem) {
       setChatMessages([]);
@@ -365,6 +390,7 @@ export function ProblemModal({
       return;
     }
     setRefreshing(true);
+    const pid = problem.id;
     try {
       const res = await new Promise((resolve) => {
         try {
@@ -383,8 +409,14 @@ export function ProblemModal({
         }
       });
 
+      // The user may have arrowed to another problem while this ran. The data
+      // is already saved to storage; pushing it through onUpdate here would
+      // yank the modal back to the old problem.
+      if (shownIdRef.current !== pid) return;
+
       const updated = await Storage.getProblem(problem.id).catch(() => null);
-      if (updated) onUpdate?.(updated);
+      if (updated && shownIdRef.current === pid) onUpdate?.(updated);
+      if (shownIdRef.current !== pid) return;
 
       if (res?.changed?.length) return; // the page now shows what it fetched
       if (res?.codeQueued) {
@@ -404,10 +436,12 @@ export function ProblemModal({
         setTimeout(() => setChatError(""), 6000);
       }
     } catch (e) {
-      setChatError("Refresh failed: " + (e.message || e));
-      setTimeout(() => setChatError(""), 5000);
+      if (shownIdRef.current === pid) {
+        setChatError("Refresh failed: " + (e.message || e));
+        setTimeout(() => setChatError(""), 5000);
+      }
     } finally {
-      setRefreshing(false);
+      if (shownIdRef.current === pid) setRefreshing(false);
     }
   }, [problem, refreshing, onUpdate]);
 
@@ -552,6 +586,7 @@ export function ProblemModal({
     }
     setReviewBusy(true);
     setReviewError("");
+    const pid = problem.id;
     try {
       dbg.log(`Requesting AI review for problem ${problem.id || problem.titleSlug}`);
       const TIMEOUT_MS = 90000;
@@ -603,14 +638,16 @@ export function ProblemModal({
         });
       });
 
-      if (result?.problem) {
-        onUpdate?.(result.problem);
+      // Review is saved by the service worker; only steer the UI if the user
+      // is still looking at the problem the review belongs to.
+      if (shownIdRef.current === pid) {
+        if (result?.problem) onUpdate?.(result.problem);
+        setActiveTab("review");
       }
-      setActiveTab("review");
     } catch (e) {
-      setReviewError(e.message || String(e));
+      if (shownIdRef.current === pid) setReviewError(e.message || String(e));
     } finally {
-      setReviewBusy(false);
+      if (shownIdRef.current === pid) setReviewBusy(false);
     }
   };
 
@@ -1291,6 +1328,16 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
   const [recovering, setRecovering] = useState(false);
   const [recoveryError, setRecoveryError] = useState("");
 
+  // The tab component survives arrow navigation between problems; a recovery
+  // started on the previous problem must not leave its spinner (or apply its
+  // result) on the one now shown.
+  const codeTabIdRef = useRef(problem?.id);
+  useEffect(() => {
+    codeTabIdRef.current = problem?.id;
+    setRecovering(false);
+    setRecoveryError("");
+  }, [problem?.id]);
+
   if (!problem.code) {
     const isExtensionCtx = typeof chrome !== "undefined" && !!chrome.runtime?.id;
     const isGFG = problem.platform === "geeksforgeeks";
@@ -1305,6 +1352,7 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                 onClick=${async () => {
                   setRecovering(true);
                   setRecoveryError("");
+                  const pid = problem.id;
                   try {
                     const res = await new Promise((resolve) =>
                       chrome.runtime.sendMessage(
@@ -1315,16 +1363,18 @@ function CodeTab({ problem, langName, copied, copyCode, onUpdate }) {
                         resolve,
                       ),
                     );
+                    if (codeTabIdRef.current !== pid) return;
                     if (res?.ok && res.code) {
                       const updated = await Storage.getProblem(problem.id);
-                      if (updated) onUpdate(updated);
+                      if (updated && codeTabIdRef.current === pid) onUpdate(updated);
                     } else {
                       setRecoveryError(res?.error || "Recovery failed — no code returned");
                     }
                   } catch (e) {
-                    setRecoveryError(e?.message || "Recovery failed");
+                    if (codeTabIdRef.current === pid)
+                      setRecoveryError(e?.message || "Recovery failed");
                   } finally {
-                    setRecovering(false);
+                    if (codeTabIdRef.current === pid) setRecovering(false);
                   }
                 }}
                 disabled=${recovering}

@@ -50,7 +50,11 @@ import {
   LAYOUT_VERSION,
 } from "../core/path-builder.js";
 import { canonicalMapper } from "../core/canonical-mapper.js";
-import { countByDifficulty, loadUserDifficultyMap } from "../core/difficulty-map.js";
+import {
+  countByDifficulty,
+  loadUserDifficultyMap,
+  buildUserDifficultyMap,
+} from "../core/difficulty-map.js";
 import { dayKey } from "../core/gamification.js";
 import { refreshIconBadge, registerBadgeAlarm, BADGE_ALARM } from "./gamification-service.js";
 import {
@@ -1470,7 +1474,7 @@ async function handleSolved(data) {
             ? buildCommitMessage(COMMIT_TYPES.CHORE, {
                 count: pendingCount,
               })
-            : buildCommitMessage(commitType, data);
+            : buildCommitMessage(commitType, data, settings.commitMessageTemplate);
         dbg.log(
           `handleSolved(): commit prep - pending=${pendingCount}, type=${commitType}, files=${filesToCommit.length}`,
         );
@@ -1661,7 +1665,7 @@ async function performPendingRenames() {
  * has actually been committed, not the full local library.
  */
 function _buildIndexJsonFromList(problems, settings) {
-  const diff = countByDifficulty(problems, settings?.difficultyMap || {});
+  const diff = countByDifficulty(problems, buildUserDifficultyMap(settings));
   const stats = {
     total: problems.length,
     easy: diff.easy,
@@ -4138,7 +4142,7 @@ try {
             settings: safeSettings,
             stats: {
               total: allProblems.length,
-              ...countByDifficulty(allProblems, settings?.difficultyMap || {}),
+              ...countByDifficulty(allProblems, buildUserDifficultyMap(settings)),
             },
           };
           const date = new Date().toISOString().slice(0, 10);

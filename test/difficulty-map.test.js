@@ -15,7 +15,43 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { countByDifficulty, normalizeDifficulty } from "../src/core/difficulty-map.js";
+import {
+  buildUserDifficultyMap,
+  countByDifficulty,
+  normalizeDifficulty,
+} from "../src/core/difficulty-map.js";
+
+describe("buildUserDifficultyMap", () => {
+  test("inverts per-platform alias maps into raw → canonical", () => {
+    const map = buildUserDifficultyMap({
+      geeksforgeeks_difficultyMap: { Easy: "School", Medium: "Moderate" },
+      codeforces_difficultyMap: { Hard: "Div1-C" },
+    });
+    assert.deepEqual(map, { School: "Easy", Moderate: "Medium", "Div1-C": "Hard" });
+  });
+
+  test("the explicit global difficultyMap wins on conflict", () => {
+    const map = buildUserDifficultyMap({
+      geeksforgeeks_difficultyMap: { Easy: "Peculiar" },
+      difficultyMap: { Peculiar: "Hard" },
+    });
+    assert.equal(map.Peculiar, "Hard");
+  });
+
+  test("ignores blank aliases, non-canonical levels and junk values", () => {
+    const map = buildUserDifficultyMap({
+      geeksforgeeks_difficultyMap: { Easy: "  ", Bizarre: "School", Medium: 3 },
+      leetcode_difficultyMap: null,
+      difficultyMap: { School: "Easy" },
+    });
+    assert.deepEqual(map, { School: "Easy" });
+  });
+
+  test("survives no settings at all", () => {
+    assert.deepEqual(buildUserDifficultyMap(), {});
+    assert.deepEqual(buildUserDifficultyMap(null), {});
+  });
+});
 
 describe("countByDifficulty", () => {
   test("counts the canonical labels", () => {
@@ -74,6 +110,14 @@ describe("countByDifficulty", () => {
   test("survives no arguments and a null list", () => {
     assert.deepEqual(countByDifficulty(), { easy: 0, medium: 0, hard: 0, unknown: 0 });
     assert.deepEqual(countByDifficulty(null), { easy: 0, medium: 0, hard: 0, unknown: 0 });
+  });
+
+  test("counts a per-platform alias written by the Platforms panel", () => {
+    // The panel stores canonical → alias ({ Easy: "Div2-A" }); the merger
+    // inverts it so the raw label the platform reports lands in the bucket.
+    const map = buildUserDifficultyMap({ codeforces_difficultyMap: { Easy: "Div2-A" } });
+    const counts = countByDifficulty([{ difficulty: "Div2-A" }], map);
+    assert.deepEqual(counts, { easy: 1, medium: 0, hard: 0, unknown: 0 });
   });
 
   test("agrees with normalizeDifficulty on every input", () => {

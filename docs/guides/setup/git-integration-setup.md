@@ -111,8 +111,7 @@ all provider-agnostic already — `_commitWithFailover()` reads `target.provider
 and asks the registry for it. What a new provider needs is a handler under
 `src/handlers/git/{name}/` implementing `BaseGitHandler`, an entry in
 `CONSTANTS.GIT_PROVIDERS`, a line in the `gits` array in `src/handlers/init.js`,
-and an entry in `PROVIDERS` in `src/ui/components/MirrorsPanel.js` and
-`MIRROR_PROVIDERS` in `src/library/settings-panels/PanelGit.js`.
+and an entry in `MIRROR_PROVIDERS` in `src/library/settings-panels/PanelGit.js`.
 
 The `gitlab_token` and `bitbucket_token` keys are still in the settings-sync
 denylist. A denylist costs nothing, and a future provider should not have to

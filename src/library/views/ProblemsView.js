@@ -20,6 +20,8 @@ import { cfProblemUrl } from "../../core/cf-utils.js";
 import { isAIActive, isGamificationActive } from "../../core/feature-flags.js";
 import { loadSnapshot } from "../../core/gamification-state.js";
 import { classifyTopic, KIND_ORDER, KIND_LABEL_PLURAL } from "../../core/topic-taxonomy.js";
+import { suggestNextProblems } from "../../core/next-problem.js";
+import { pickActiveRoadmap, summarizeRoadmap } from "../../core/roadmap-progress.js";
 
 const PLATFORMS = [
   {
@@ -121,6 +123,30 @@ export function ProblemsView({
   // Reviews already written stay filterable after the last provider is switched
   // off — they are the user's own text, not a live feature.
   const hasStoredReviews = (problems || []).some((p) => p.aiReview);
+
+  // ── Up next: what to solve now ────────────────────────────────────────────
+  // Roadmaps load once; suggestions recompute when the solve list changes so
+  // solving a suggested problem retires it from the bar on the next commit.
+  const [roadmapSummary, setRoadmapSummary] = useState(null);
+  const [sugPage, setSugPage] = useState(0);
+  useEffect(() => {
+    Storage.getRoadmaps()
+      .then((maps) => {
+        const active = pickActiveRoadmap(maps);
+        setRoadmapSummary(active ? summarizeRoadmap(active, problems || []) : null);
+      })
+      .catch(() => {});
+  }, [(problems || []).length]);
+  const suggestions = useMemo(
+    () => suggestNextProblems(problems || [], roadmapSummary, { limit: 9 }),
+    [problems, roadmapSummary],
+  );
+  const SUG_PER_PAGE = 3;
+  const sugPages = Math.max(1, Math.ceil(suggestions.length / SUG_PER_PAGE));
+  const visibleSuggestions = suggestions.slice(
+    (sugPage % sugPages) * SUG_PER_PAGE,
+    (sugPage % sugPages) * SUG_PER_PAGE + SUG_PER_PAGE,
+  );
 
   const fetchQueueStats = () => {
     // Nothing can be queued with no provider switched on, so the ten-second
@@ -744,6 +770,93 @@ export function ProblemsView({
                 <span class="text-slate-600">→</span>
               </span>
             </button>
+          `
+        : ""}
+
+      <!-- Away-gap rescue — a missed run can be declared a break after the fact -->
+      ${streaksOn && streak?.awayGap
+        ? html`
+            <div
+              class="flex flex-wrap items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-500/[0.06] border border-amber-500/20"
+            >
+              <span class="text-base leading-none">🏝️</span>
+              <span class="flex-1 min-w-[200px] text-[11px] text-slate-300">
+                Away for <b>${streak.awayGap.days} days</b>? Mark them as a break and your streak
+                picks up where it left off.
+              </span>
+              <button
+                onClick=${async () => {
+                  await Storage.addVacation(
+                    streak.awayGap.start,
+                    streak.awayGap.end,
+                    "Marked as a break from the Solutions tab",
+                  );
+                  loadSnapshot(settings)
+                    .then(setStreak)
+                    .catch(() => {});
+                }}
+                class="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 hover:bg-amber-500/20 transition-colors text-[11px]"
+              >
+                Mark as break
+              </button>
+            </div>
+          `
+        : ""}
+
+      <!-- Up next — data-driven suggestions for what to solve now -->
+      ${visibleSuggestions.length
+        ? html`
+            <div class="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/5">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] uppercase tracking-widest text-slate-500">
+                  🎯 Up next
+                </span>
+                ${sugPages > 1
+                  ? html`
+                      <button
+                        onClick=${() => setSugPage((p) => p + 1)}
+                        title="Show other suggestions"
+                        class="text-[10px] text-slate-500 hover:text-cyan-300 transition-colors"
+                      >
+                        ↻ more
+                      </button>
+                    `
+                  : ""}
+              </div>
+              <div class="grid gap-2 sm:grid-cols-3">
+                ${visibleSuggestions.map(
+                  (s) => html`
+                    <a
+                      href=${s.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      class="group flex flex-col gap-1 p-3 rounded-lg bg-black/20 border border-white/5 hover:border-cyan-500/25 hover:bg-white/[0.05] transition-colors"
+                    >
+                      <span class="flex items-center gap-2 min-w-0">
+                        <span
+                          class="text-sm text-slate-200 group-hover:text-cyan-200 truncate transition-colors"
+                          >${s.title}</span
+                        >
+                        ${s.difficulty
+                          ? html`<span
+                              class="text-[10px] shrink-0 ${{
+                                Easy: "text-emerald-400",
+                                Medium: "text-amber-400",
+                                Hard: "text-rose-400",
+                              }[s.difficulty] || "text-slate-500"}"
+                              >${s.difficulty}</span
+                            >`
+                          : ""}
+                        <span class="ml-auto text-slate-600 group-hover:text-cyan-400 shrink-0"
+                          >↗</span
+                        >
+                      </span>
+                      <span class="text-[10px] leading-snug text-slate-500">${s.reason}</span>
+                    </a>
+                  `,
+                )}
+              </div>
+            </div>
           `
         : ""}
 

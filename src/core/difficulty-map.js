@@ -93,10 +93,38 @@ export function normalizeDifficulty(raw, userMap = {}) {
   return guessCategory(r);
 }
 
+/**
+ * Build the raw→canonical override map from settings.
+ *
+ * Two sources feed it: the global `settings.difficultyMap` (already
+ * raw→canonical), and the per-platform alias maps the Platforms panel writes
+ * as `${pid}_difficultyMap` in the opposite orientation — canonical level →
+ * the label that platform uses ({ Easy: "School" }). The per-platform maps
+ * are inverted here so "School" normalizes to Easy; the global map is applied
+ * last and wins on conflict, since it is the explicit raw-label form.
+ *
+ * @param {Record<string, any>} [settings]
+ * @returns {Record<string, string>} raw label → canonical Easy/Medium/Hard
+ */
+export function buildUserDifficultyMap(settings = {}) {
+  const map = {};
+  for (const [key, val] of Object.entries(settings || {})) {
+    if (key === "difficultyMap" || !key.endsWith("_difficultyMap")) continue;
+    if (!val || typeof val !== "object") continue;
+    for (const [level, alias] of Object.entries(val)) {
+      if (CANONICAL.includes(level) && typeof alias === "string" && alias.trim()) {
+        map[alias.trim()] = level;
+      }
+    }
+  }
+  Object.assign(map, (settings && settings.difficultyMap) || {});
+  return map;
+}
+
 export async function loadUserDifficultyMap() {
   try {
     const settings = await Storage.getSettings();
-    return settings && settings.difficultyMap ? settings.difficultyMap : {};
+    return buildUserDifficultyMap(settings);
   } catch (e) {
     return {};
   }

@@ -36,7 +36,10 @@ const OWNED_BY = {
   pages: "git",
   badges: "streaks",
   shields: "streaks",
-  mermaid: "ai",
+  // No entry for `mermaid` or `party`: neither has a settings-panel control.
+  // Mermaid rendering is a per-diagram button and the party list lives on the
+  // Party tab, so a jump button would land the user somewhere with nothing to
+  // change — an entry here must point at an actual toggle.
   telemetry: "advanced",
 };
 

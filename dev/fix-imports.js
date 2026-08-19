@@ -60,7 +60,6 @@ const uipaths = [
   ...getAllFiles(join(process.cwd(), "src/ui")),
   ...getAllFiles(join(process.cwd(), "src/library")),
   ...getAllFiles(join(process.cwd(), "src/popup")),
-  ...getAllFiles(join(process.cwd(), "src/sidebar")),
 ];
 
 fixPath(uipaths);

@@ -23,7 +23,6 @@ oauthMessageContract:
     - worker/src/index.js (/api/auth/github/callback HTML postMessage)
   consumers:
     - src/library/library.js
-    - src/ui/components/SettingsSchema.js
   shape:
     type: object
     required: [type, provider]

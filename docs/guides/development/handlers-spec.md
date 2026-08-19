@@ -16,7 +16,7 @@ Registration
   - `registry.registerPlatform(id, handler)`
   - `registry.registerGitProvider(id, handler)`
   - `registry.registerAIProvider(id, handler)`
-- If a handler exposes `getSettingsSchema()`, `init.js` will call `registry.registerSettings(id, schema)` to include the handler settings in the Settings UI.
+- If a handler exposes `getSettingsSchema()`, `init.js` will call `registry.registerSettings(id, schema)`. Nothing renders these schemas today — the settings UI is the hand-written panels under `src/library/settings-panels/` — but the registration is kept as the machine-readable description of what a handler can be configured with.
 
 Base Classes & Required Methods
 
