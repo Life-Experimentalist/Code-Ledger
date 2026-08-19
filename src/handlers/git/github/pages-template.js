@@ -168,6 +168,16 @@ export function getPagesHtml(opts = {}) {
     /* Chart */
     .chart-box { position: relative; height: 180px; }
 
+    /* Knowledge graph */
+    .kg-box { position: relative; height: 460px; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,.015); }
+    .kg-box canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+    .kg-box canvas:active { cursor: grabbing; }
+    .kg-tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .4rem .6rem; font-size: .65rem; color: var(--text); max-width: 240px; box-shadow: 0 4px 16px rgba(0,0,0,.4); z-index: 5; }
+    .kg-tip b { display: block; font-size: .7rem; margin-bottom: .1rem; }
+    .kg-legend { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; margin-top: .6rem; font-size: .6rem; color: var(--muted); }
+    .kg-legend .kd { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .3rem; vertical-align: middle; }
+    .kg-legend .kd.hollow { background: transparent !important; border: 1.5px solid var(--muted); }
+
     /* Recent table */
     table.recent { width: 100%; border-collapse: collapse; }
     table.recent th { font-size: .55rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 700; text-align: left; padding: .4rem .625rem; border-bottom: 1px solid var(--border); }
@@ -283,6 +293,24 @@ export function getPagesHtml(opts = {}) {
       <div class="card">
         <div class="card-label">Solving Punch Card</div>
         <div id="pc" style="overflow-x:auto"></div>
+      </div>
+    </div>
+
+    <div class="card" id="kg-card" style="margin-bottom:1rem">
+      <div class="card-label">Knowledge Graph</div>
+      <div class="kg-box">
+        <canvas id="kg"></canvas>
+        <div id="kg-tip" class="kg-tip" style="display:none"></div>
+      </div>
+      <div class="kg-legend">
+        <span><span class="kd" style="background:#22c55e"></span>Strong</span>
+        <span><span class="kd" style="background:#f59e0b"></span>Working</span>
+        <span><span class="kd" style="background:#f87171"></span>Shaky</span>
+        <span><span class="kd" style="background:var(--easy)"></span>Easy</span>
+        <span><span class="kd" style="background:var(--med)"></span>Medium</span>
+        <span><span class="kd" style="background:var(--hard)"></span>Hard</span>
+        <span><span class="kd hollow"></span>Unsolved suggestion</span>
+        <span style="margin-left:auto">Drag to pan · scroll to zoom · click a problem to open it</span>
       </div>
     </div>
 
@@ -572,6 +600,377 @@ export function getPagesHtml(opts = {}) {
         box.innerHTML = htmlStr;
       }
       return matrix;
+    }
+
+    // Topic-centric knowledge graph, the same picture the extension's Graph tab
+    // draws: topics coloured by mastery (volume x recency, half-life 90 days,
+    // recency clocked from the 2nd-most-recent solve so one stray solve does not
+    // repaint a rusty topic), problems coloured by difficulty, unsolved
+    // LeetCode "similar" suggestions as hollow ghosts. Self-contained canvas —
+    // no library, works from the same index.json everything else reads.
+    function buildKnowledgeGraphView(problems) {
+      var card = document.getElementById('kg-card');
+      var canvas = document.getElementById('kg');
+      var tip = document.getElementById('kg-tip');
+      if (!card || !canvas) return;
+      if (!problems.length) { card.style.display = 'none'; return; }
+
+      var BAND = { strong: '#22c55e', working: '#f59e0b', shaky: '#f87171', untouched: '#64748b' };
+      var DIFF = { Easy: '#34d399', Medium: '#fbbf24', Hard: '#f87171' };
+      var HALF_LIFE_DAYS = 90, REGAIN = 2, DAY = 86400000;
+      var GHOST_CAP = 250;
+
+      function normTs(t) {
+        if (!t) return null;
+        return t > 1e12 ? t : t * 1000;
+      }
+      function tagKey(t) { return String(t || '').trim().toLowerCase(); }
+
+      // ---- model ----
+      var topics = {};   // key -> { label, solveCount, times: [], x, y }
+      var probs = {};    // slug -> node
+      var similarEdges = []; // [slugA, slugB]
+      var ghostCount = 0, ghostDropped = 0;
+
+      function ensureTopic(raw) {
+        var k = tagKey(raw);
+        if (!k) return null;
+        if (!topics[k]) topics[k] = { label: String(raw).trim(), solveCount: 0, times: [] };
+        return k;
+      }
+
+      for (var i = 0; i < problems.length; i++) {
+        var p = problems[i];
+        var slug = p.titleSlug || String(p.id || i);
+        var rawTags = (p.tags && p.tags.length) ? p.tags : [p.topic || 'Untagged'];
+        var keys = [];
+        for (var t = 0; t < rawTags.length; t++) {
+          var k = ensureTopic(rawTags[t]);
+          if (k && keys.indexOf(k) === -1) keys.push(k);
+        }
+        if (!keys.length) keys.push(ensureTopic('Untagged'));
+        var ts = normTs(p.timestamp);
+        var node = probs[slug];
+        if (!node) {
+          node = probs[slug] = {
+            slug: slug, label: p.title || slug, difficulty: normDiff(p.difficulty),
+            solved: true, platforms: [], topics: keys, src: p
+          };
+        } else {
+          node.solved = true;
+          if (!node.src) node.src = p;
+          for (var kk = 0; kk < keys.length; kk++) {
+            if (node.topics.indexOf(keys[kk]) === -1) node.topics.push(keys[kk]);
+          }
+        }
+        if (p.platform && node.platforms.indexOf(p.platform) === -1) node.platforms.push(p.platform);
+        for (var ki = 0; ki < keys.length; ki++) {
+          topics[keys[ki]].solveCount++;
+          if (ts) topics[keys[ki]].times.push(ts);
+        }
+      }
+
+      // Ghost nodes: unsolved similar problems (LeetCode metadata)
+      for (var g = 0; g < problems.length; g++) {
+        var gp = problems[g];
+        if (!gp.similar || !gp.similar.length) continue;
+        var parentSlug = gp.titleSlug || String(gp.id || g);
+        for (var s = 0; s < gp.similar.length; s++) {
+          var sim = gp.similar[s];
+          if (!sim || !sim.titleSlug) continue;
+          if (!probs[sim.titleSlug]) {
+            if (ghostCount >= GHOST_CAP) { ghostDropped++; continue; }
+            ghostCount++;
+            var simTags = [];
+            if (sim.topicTags && sim.topicTags.length) {
+              for (var st = 0; st < sim.topicTags.length; st++) {
+                var sk = ensureTopic(sim.topicTags[st].name || sim.topicTags[st]);
+                if (sk && simTags.indexOf(sk) === -1) simTags.push(sk);
+              }
+            }
+            if (!simTags.length && probs[parentSlug]) simTags = [probs[parentSlug].topics[0]];
+            if (!simTags.length) continue;
+            probs[sim.titleSlug] = {
+              slug: sim.titleSlug, label: sim.title || sim.titleSlug,
+              difficulty: normDiff(sim.difficulty), solved: false, platforms: [], topics: simTags, src: null
+            };
+          }
+          if (probs[parentSlug] && probs[sim.titleSlug]) similarEdges.push([parentSlug, sim.titleSlug]);
+        }
+      }
+
+      // ---- mastery per topic (mirrors the extension's topic-taxonomy math) ----
+      var topicKeys = Object.keys(topics);
+      var now = Date.now();
+      for (var m = 0; m < topicKeys.length; m++) {
+        var top = topics[topicKeys[m]];
+        var count = top.solveCount;
+        if (!count) { top.mastery = 0; top.band = 'untouched'; top.daysSince = null; continue; }
+        top.times.sort(function (a, b) { return b - a; });
+        var idx = Math.min(REGAIN, top.times.length) - 1;
+        var last = top.times.length ? top.times[idx] : null;
+        var volume = 1 - Math.exp(-count / 5);
+        var days = last ? Math.max(0, (now - last) / DAY) : Infinity;
+        var recency = 0.25 + 0.75 * Math.pow(0.5, days / HALF_LIFE_DAYS);
+        top.mastery = Math.max(0, Math.min(1, volume * recency));
+        top.band = top.mastery >= 0.7 ? 'strong' : (top.mastery >= 0.4 ? 'working' : 'shaky');
+        top.daysSince = top.times.length ? Math.floor((now - top.times[0]) / DAY) : null;
+      }
+
+      // ---- layout: force-sim the topics, spiral problems around them ----
+      var probKeys = Object.keys(probs);
+      var clusterR = {};
+      var perTopicIdx = {};
+      for (var pc = 0; pc < probKeys.length; pc++) {
+        var pt = probs[probKeys[pc]].topics[0];
+        perTopicIdx[pt] = (perTopicIdx[pt] || 0) + 1;
+      }
+      for (var cr = 0; cr < topicKeys.length; cr++) {
+        clusterR[topicKeys[cr]] = 34 + 9 * Math.sqrt(perTopicIdx[topicKeys[cr]] || 0);
+      }
+      // Deterministic starting ring (no Math.random — same data, same picture)
+      for (var ti = 0; ti < topicKeys.length; ti++) {
+        var ang = (ti / topicKeys.length) * Math.PI * 2;
+        var ring = 260 + 140 * (ti % 3);
+        topics[topicKeys[ti]].x = Math.cos(ang) * ring;
+        topics[topicKeys[ti]].y = Math.sin(ang) * ring;
+      }
+      for (var iter = 0; iter < 260; iter++) {
+        var cool = 1 - iter / 260;
+        for (var a = 0; a < topicKeys.length; a++) {
+          var ta = topics[topicKeys[a]];
+          var fx = -ta.x * 0.012, fy = -ta.y * 0.012; // center gravity
+          for (var b = 0; b < topicKeys.length; b++) {
+            if (a === b) continue;
+            var tb = topics[topicKeys[b]];
+            var dx = ta.x - tb.x, dy = ta.y - tb.y;
+            var d2 = dx * dx + dy * dy || 1;
+            var minD = clusterR[topicKeys[a]] + clusterR[topicKeys[b]] + 26;
+            var f = (minD * minD) / d2;
+            if (f > 4) f = 4;
+            fx += (dx / Math.sqrt(d2)) * f * 2.2;
+            fy += (dy / Math.sqrt(d2)) * f * 2.2;
+          }
+          ta.x += fx * cool; ta.y += fy * cool;
+        }
+      }
+      var spiralIdx = {};
+      for (var pi = 0; pi < probKeys.length; pi++) {
+        var pn = probs[probKeys[pi]];
+        if (pn.topics.length > 1) {
+          var cx = 0, cy = 0;
+          for (var c = 0; c < pn.topics.length; c++) { cx += topics[pn.topics[c]].x; cy += topics[pn.topics[c]].y; }
+          cx /= pn.topics.length; cy /= pn.topics.length;
+          // Nudge toward the primary topic so multi-tag problems do not pile at the midpoint
+          var prim = topics[pn.topics[0]];
+          var h = (pi * 2.399963);
+          pn.x = (cx + prim.x) / 2 + Math.cos(h) * 14;
+          pn.y = (cy + prim.y) / 2 + Math.sin(h) * 14;
+        } else {
+          var tk = pn.topics[0];
+          var n = spiralIdx[tk] = (spiralIdx[tk] || 0) + 1;
+          var sa = n * 2.399963; // golden angle — even spread, no RNG
+          var sr = 16 + 7.5 * Math.sqrt(n);
+          pn.x = topics[tk].x + Math.cos(sa) * sr;
+          pn.y = topics[tk].y + Math.sin(sa) * sr;
+        }
+      }
+
+      // ---- render ----
+      var view = { x: 0, y: 0, k: 1 };
+      var hover = null;
+      var dpr = window.devicePixelRatio || 1;
+      var ctx2 = canvas.getContext('2d');
+
+      function fitView() {
+        var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (var f = 0; f < probKeys.length; f++) {
+          var fn = probs[probKeys[f]];
+          if (fn.x < minX) minX = fn.x; if (fn.x > maxX) maxX = fn.x;
+          if (fn.y < minY) minY = fn.y; if (fn.y > maxY) maxY = fn.y;
+        }
+        if (!isFinite(minX)) { minX = -100; maxX = 100; minY = -100; maxY = 100; }
+        var w = canvas.clientWidth, hgt = canvas.clientHeight;
+        var pad = 50;
+        var kx = (w - pad * 2) / Math.max(1, maxX - minX);
+        var ky = (hgt - pad * 2) / Math.max(1, maxY - minY);
+        view.k = Math.min(kx, ky, 1.6);
+        view.x = w / 2 - ((minX + maxX) / 2) * view.k;
+        view.y = hgt / 2 - ((minY + maxY) / 2) * view.k;
+      }
+
+      function resize() {
+        var w = canvas.clientWidth, hgt = canvas.clientHeight;
+        canvas.width = w * dpr; canvas.height = hgt * dpr;
+        draw();
+      }
+
+      function toScreen(x, y) { return [x * view.k + view.x, y * view.k + view.y]; }
+
+      function draw() {
+        var w = canvas.clientWidth, hgt = canvas.clientHeight;
+        ctx2.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx2.clearRect(0, 0, w, hgt);
+        var css = getComputedStyle(document.documentElement);
+        var mutedCol = (css.getPropertyValue('--muted') || '#64748b').trim();
+        var textCol = (css.getPropertyValue('--text') || '#e2e8f0').trim();
+
+        // Edges: topic -> problem (faint), similar (dashed)
+        ctx2.lineWidth = Math.max(0.4, 0.7 * view.k);
+        ctx2.globalAlpha = 0.13;
+        ctx2.strokeStyle = mutedCol;
+        ctx2.beginPath();
+        for (var e = 0; e < probKeys.length; e++) {
+          var en = probs[probKeys[e]];
+          for (var et = 0; et < en.topics.length; et++) {
+            var tn = topics[en.topics[et]];
+            var s1 = toScreen(tn.x, tn.y), s2 = toScreen(en.x, en.y);
+            ctx2.moveTo(s1[0], s1[1]); ctx2.lineTo(s2[0], s2[1]);
+          }
+        }
+        ctx2.stroke();
+        ctx2.globalAlpha = 0.22;
+        ctx2.setLineDash([3, 3]);
+        ctx2.beginPath();
+        for (var se = 0; se < similarEdges.length; se++) {
+          var pa = probs[similarEdges[se][0]], pb = probs[similarEdges[se][1]];
+          if (!pa || !pb) continue;
+          var q1 = toScreen(pa.x, pa.y), q2 = toScreen(pb.x, pb.y);
+          ctx2.moveTo(q1[0], q1[1]); ctx2.lineTo(q2[0], q2[1]);
+        }
+        ctx2.stroke();
+        ctx2.setLineDash([]);
+        ctx2.globalAlpha = 1;
+
+        // Problem dots
+        for (var pd = 0; pd < probKeys.length; pd++) {
+          var dn = probs[probKeys[pd]];
+          var sp = toScreen(dn.x, dn.y);
+          if (sp[0] < -20 || sp[0] > w + 20 || sp[1] < -20 || sp[1] > hgt + 20) continue;
+          var r = (dn === hover ? 6 : 4) * Math.max(0.6, Math.min(view.k, 1.4));
+          var col = DIFF[dn.difficulty] || mutedCol;
+          ctx2.beginPath();
+          ctx2.arc(sp[0], sp[1], r, 0, Math.PI * 2);
+          if (dn.solved) {
+            ctx2.fillStyle = col; ctx2.fill();
+          } else {
+            ctx2.strokeStyle = col; ctx2.lineWidth = 1.4; ctx2.globalAlpha = 0.75; ctx2.stroke(); ctx2.globalAlpha = 1;
+          }
+        }
+
+        // Topic hubs + labels
+        for (var td = 0; td < topicKeys.length; td++) {
+          var tt = topics[topicKeys[td]];
+          var tsp = toScreen(tt.x, tt.y);
+          if (tsp[0] < -80 || tsp[0] > w + 80 || tsp[1] < -40 || tsp[1] > hgt + 40) continue;
+          var tr = (8 + Math.min(tt.solveCount, 24) * 0.55) * Math.max(0.6, Math.min(view.k, 1.4));
+          if (tt === hover) tr += 2;
+          ctx2.beginPath();
+          ctx2.arc(tsp[0], tsp[1], tr, 0, Math.PI * 2);
+          ctx2.fillStyle = BAND[tt.band] || BAND.untouched;
+          ctx2.globalAlpha = 0.9; ctx2.fill(); ctx2.globalAlpha = 1;
+          if (view.k > 0.35 || tt.solveCount >= 3) {
+            ctx2.font = '600 ' + Math.max(9, Math.min(12, 11 * view.k + 4)) + 'px -apple-system, Segoe UI, Roboto, sans-serif';
+            ctx2.fillStyle = textCol;
+            ctx2.textAlign = 'center';
+            ctx2.fillText(tt.label, tsp[0], tsp[1] - tr - 4);
+          }
+        }
+      }
+
+      function nodeAt(mx, my) {
+        var bestD = 12 * 12, best = null;
+        for (var t2 = 0; t2 < topicKeys.length; t2++) {
+          var tn2 = topics[topicKeys[t2]];
+          var ts2 = toScreen(tn2.x, tn2.y);
+          var tr2 = 8 + Math.min(tn2.solveCount, 24) * 0.55;
+          var dd = (ts2[0] - mx) * (ts2[0] - mx) + (ts2[1] - my) * (ts2[1] - my);
+          if (dd < Math.max(bestD, tr2 * tr2)) { bestD = dd; best = tn2; }
+        }
+        for (var p2 = 0; p2 < probKeys.length; p2++) {
+          var pn2 = probs[probKeys[p2]];
+          var ps2 = toScreen(pn2.x, pn2.y);
+          var dd2 = (ps2[0] - mx) * (ps2[0] - mx) + (ps2[1] - my) * (ps2[1] - my);
+          if (dd2 < bestD) { bestD = dd2; best = pn2; }
+        }
+        return best;
+      }
+
+      function showTip(node, mx, my) {
+        var s = '';
+        if (node.solveCount !== undefined) {
+          s = '<b>' + escHtml(node.label) + '</b>' + node.solveCount + ' solve' + (node.solveCount === 1 ? '' : 's')
+            + ' · ' + node.band
+            + (node.daysSince !== null ? ' · last ' + (node.daysSince === 0 ? 'today' : node.daysSince + 'd ago') : '');
+        } else {
+          s = '<b>' + escHtml(node.label) + '</b>' + (node.difficulty || '?')
+            + (node.solved ? (node.platforms.length ? ' · ' + node.platforms.join(', ') : ' · solved') : ' · unsolved suggestion');
+        }
+        tip.innerHTML = s;
+        tip.style.display = 'block';
+        var box = canvas.getBoundingClientRect();
+        var tx = mx + 14, ty = my + 10;
+        if (tx + tip.offsetWidth > box.width - 8) tx = mx - tip.offsetWidth - 10;
+        if (ty + tip.offsetHeight > box.height - 8) ty = my - tip.offsetHeight - 8;
+        tip.style.left = tx + 'px'; tip.style.top = ty + 'px';
+      }
+
+      var drag = null, moved = false;
+      canvas.addEventListener('pointerdown', function (ev) {
+        drag = { x: ev.clientX, y: ev.clientY, vx: view.x, vy: view.y };
+        moved = false;
+        canvas.setPointerCapture(ev.pointerId);
+      });
+      canvas.addEventListener('pointermove', function (ev) {
+        var box = canvas.getBoundingClientRect();
+        var mx = ev.clientX - box.left, my = ev.clientY - box.top;
+        if (drag) {
+          var ddx = ev.clientX - drag.x, ddy = ev.clientY - drag.y;
+          if (Math.abs(ddx) + Math.abs(ddy) > 3) moved = true;
+          view.x = drag.vx + ddx; view.y = drag.vy + ddy;
+          tip.style.display = 'none';
+          draw();
+          return;
+        }
+        var n2 = nodeAt(mx, my);
+        if (n2 !== hover) { hover = n2; draw(); }
+        if (n2) { showTip(n2, mx, my); canvas.style.cursor = 'pointer'; }
+        else { tip.style.display = 'none'; canvas.style.cursor = 'grab'; }
+      });
+      canvas.addEventListener('pointerup', function (ev) {
+        drag = null;
+        if (moved) return;
+        var box = canvas.getBoundingClientRect();
+        var n3 = nodeAt(ev.clientX - box.left, ev.clientY - box.top);
+        if (n3 && n3.slug) {
+          var url = n3.src ? problemUrl(n3.src) : ('https://leetcode.com/problems/' + n3.slug + '/');
+          if (url) window.open(url, '_blank', 'noopener');
+        }
+      });
+      canvas.addEventListener('pointerleave', function () { hover = null; tip.style.display = 'none'; draw(); });
+      canvas.addEventListener('wheel', function (ev) {
+        ev.preventDefault();
+        var box = canvas.getBoundingClientRect();
+        var mx = ev.clientX - box.left, my = ev.clientY - box.top;
+        var factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+        var nk = Math.max(0.15, Math.min(5, view.k * factor));
+        view.x = mx - ((mx - view.x) / view.k) * nk;
+        view.y = my - ((my - view.y) / view.k) * nk;
+        view.k = nk;
+        tip.style.display = 'none';
+        draw();
+      }, { passive: false });
+
+      window.addEventListener('resize', resize);
+      // Redraw when the theme flips — colours are read from CSS variables at draw time
+      new MutationObserver(function () { draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+      fitView();
+      resize();
+      if (ghostDropped > 0) {
+        var lg = card.querySelector('.kg-legend span:last-child');
+        if (lg) lg.textContent = ghostDropped + ' more suggestions not shown · drag to pan · scroll to zoom';
+      }
     }
 
     function dayKey(d) {
@@ -1013,6 +1412,9 @@ export function getPagesHtml(opts = {}) {
         buildDifficultyDonut(sEasy, sMed, sHard);
         var monthlyDiff = buildDifficultyTrend(problems);
         var punchCard = buildPunchCard(problems);
+
+        // Knowledge graph
+        buildKnowledgeGraphView(problems);
 
         // Language donut
         var langMap = countBy(problems, function(p) {
