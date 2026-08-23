@@ -6,6 +6,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Imported Codeforces problems now fill in their own statements. An import reads every accepted submission from `user.status`, which states the title, the tags and the rating but has no room for the problem text — so a back catalogue of hundreds arrived with hundreds of empty README sections, and the background repair pass skipped them all because Codeforces publishes no statement API. It has no API, but it does serve the problem page, at an address CodeLedger already builds from the same slug it stores. The repair pass now reads that page: a plain public GET the extension makes itself, no tab opened, nothing on screen, and deliberately signed out so the request is not made as you. The statement it lifts is the same fragment the extension captures when you solve one live, so a healed problem and a solved one read identically. Tags come from the same page, which closes the other gap for the handful of problems the API tags with nothing. A page that comes back truncated, or as one of Codeforces' challenge interstitials, yields nothing rather than half a statement, and is retried on the same widening schedule as everything else.
+
+- CodeLedger now works out for itself whether you have TUF+, instead of leaving takeuforward's card silent about why nothing is being committed. There is no endpoint that answers "is this account a subscriber", and the GitHub account you sign in with cannot say — it is a different identity on a different site. But takeuforward's own problem endpoint answers to anyone and replaces difficulty and tags with the literal text "Subscribe to TUF+" when the request is not a subscriber's, and CodeLedger already reads that response for its metadata. Opening any TUF+ problem page is therefore enough to settle it, with no extra request, endpoint or permission. The platform card then says which side of the paywall you are on: with a subscription, that accepted submissions commit automatically; without one, that sheet mark-up works but a commit needs TUF+, because that is the only place takeuforward's judge runs. Nothing is switched off on your behalf — a toggle turned off automatically stays off after you subscribe, and one left on costs nothing while you are on the free tier, because the judge it listens for never fires.
+
+---
+
 ## [1.8.0] — 2026-08-12
 
 ### Added

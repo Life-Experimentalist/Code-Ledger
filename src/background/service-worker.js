@@ -23,6 +23,7 @@ import { handleRefreshMetadata, completeRefreshMetadata } from "./refresh-metada
 import { triggerCodeRecovery } from "./code-recovery-handler.js";
 import { fetchGFGProblemData } from "./gfg-api.js";
 import { fetchLeetCodeProblemData } from "./leetcode-api.js";
+import { fetchCFProblemData } from "./codeforces-api.js";
 import {
   HEAL_STATE_KEY,
   healProblem,
@@ -2901,6 +2902,7 @@ const _healDeps = {
   fetchers: {
     leetcode: fetchLeetCodeProblemData,
     geeksforgeeks: fetchGFGProblemData,
+    codeforces: fetchCFProblemData,
   },
 };
 
