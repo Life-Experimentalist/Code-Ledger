@@ -210,11 +210,15 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
             </div>
 
             <!--
-              takeuforward is the one platform whose tracking depends on a
-              subscription CodeLedger cannot buy or check for you. The tier is
-              read off the site's own problem responses, which redact
-              difficulty and tags for non-subscribers, so this line appears
-              only once you have opened a TUF+ problem page.
+              takeuforward is the one platform where a subscription changes what
+              CodeLedger receives. The tier is read off the site's own problem
+              responses, which replace difficulty and topic tags with "Subscribe
+              to TUF+" for everyone else, so this line appears only once you have
+              opened a TUF+ problem page.
+
+              It states only that redaction, which is observed. Whether the code
+              judge itself runs for a free account is not something the extension
+              can determine without an account of each kind, so it does not say.
             -->
             ${p.id === "takeuforward" &&
             settings?.[TIER_KEY] &&
@@ -225,8 +229,8 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                   : "text-amber-400/80"}"
               >
                 ${settings[TIER_KEY] === TIER.PLUS
-                  ? "TUF+ detected — accepted submissions are committed automatically."
-                  : "TUF+ not detected. Sheet mark-up works without it, but a commit needs a TUF+ subscription: takeuforward's judge only runs there."}
+                  ? "TUF+ detected — problems here arrive with their difficulty and topic tags."
+                  : "TUF+ not detected. Sheet mark-up is unaffected, but takeuforward withholds difficulty and topic tags from free accounts, so anything committed from here arrives without them."}
               </p>
             `}
             ${enabled &&

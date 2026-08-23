@@ -51,7 +51,7 @@ Every time you solve a LeetCode problem and it's accepted, CodeLedger commits it
 Accepted submissions are committed the instant they're accepted via the GitHub Trees API. One commit, all files, atomic.
 
 **🌐 Five platforms**
-LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward. LeetCode and GeeksForGeeks are stable; the other three are marked beta in the extension. On takeuforward the free sheets are marked up with what you have already solved, and committing a solve there needs a TUF+ subscription, because that is where its judge lives.
+LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward. LeetCode and GeeksForGeeks are stable; the other three are marked beta in the extension. On takeuforward the free sheets are marked up with what you have already solved; its own code editor is part of TUF+, and the free sheets link out to other sites, so a solve is normally committed from wherever you actually solved it.
 
 **📥 Bulk history import**
 Already have hundreds of solutions? Import your LeetCode, GeeksForGeeks or Codeforces history in one click, dated when you actually solved each problem. Codeforces publishes which problems you solved and when, but not the code, so those arrive as dated entries with an empty solution.
