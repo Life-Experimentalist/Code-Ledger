@@ -13,8 +13,9 @@ import { registry } from "../../core/handler-registry.js";
 import { getPagesHtml } from "../../handlers/git/github/pages-template.js";
 import { importFromRepo, applyImport } from "../../background/sync-engine.js";
 import {
-  fetchTokenScopes,
+  fetchAccountContext,
   canCreatePrivateRepo,
+  canPagesServePrivateRepo,
   describeGitHubError,
   PRIVATE_SCOPE,
 } from "../../handlers/git/github/permissions.js";
@@ -40,6 +41,37 @@ const DEFAULT_REPO_TOPICS = [
 ];
 
 /**
+ * What ticking "private" actually means for this account.
+ *
+ * Three different situations used to share one sentence about the free tier,
+ * which was right for some readers and wrong for the rest. The plan is read
+ * from the same `GET /user` that reports the token's scopes, so where it is
+ * known this can name the consequence instead of hedging.
+ *
+ * @param {boolean} allowed     token scope permits creating a private repo
+ * @param {string|null} plan    account plan, or null when it could not be read
+ * @param {boolean} pagesWork   plan can serve Pages from a private repo
+ * @returns {string}
+ */
+function privateNote(allowed, plan, pagesWork) {
+  if (!allowed) return "Your GitHub connection currently covers public repositories only.";
+  if (!pagesWork) {
+    return (
+      `Only you can see this repository. GitHub Pages needs a paid plan to serve a private ` +
+      `repo, so on your ${plan} plan the stats page is skipped and the badges render from ` +
+      `inside the repository instead.`
+    );
+  }
+  if (plan) {
+    return (
+      `Only you can see this repository. Your ${plan} plan can still serve the stats page ` +
+      `from it — the page itself is public once published.`
+    );
+  }
+  return "Only you can see this repository. GitHub Pages needs a paid plan to serve a private repo.";
+}
+
+/**
  * GitHub Onboarding Modal
  *
  * Steps: check → choice → new | existing → done
@@ -63,6 +95,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   // privateAllowed below.
   const [isPrivate, setIsPrivate] = useState(false);
   const [scopes, setScopes] = useState(null); // Set<string> | null (unknown)
+  const [plan, setPlan] = useState(null); // "free" | "pro" | … | null (unknown)
   // Non-fatal problems from optional setup steps, shown on the final screen.
   const [setupWarnings, setSetupWarnings] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -147,13 +180,19 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   // Read the token's granted scopes so the private-repo option is only offered
   // when it can actually succeed. Without this the user picks "private", and
   // GitHub answers a bare 403 several steps later.
+  //
+  // The same request carries the account's plan, which decides a different
+  // question the user is about to answer: a private repository can only serve a
+  // Pages stats page on a paid plan. Knowing it here means the checkbox can say
+  // what ticking it costs *this* account instead of a general caveat.
   useEffect(() => {
     if (!isOpen || !token) return;
     let cancelled = false;
-    fetchTokenScopes(token)
-      .then((s) => {
+    fetchAccountContext(token)
+      .then(({ scopes: s, plan: p }) => {
         if (cancelled) return;
         setScopes(s);
+        setPlan(p);
         if (s && !canCreatePrivateRepo(s)) setIsPrivate(false);
       })
       .catch(() => {
@@ -167,6 +206,9 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
   if (!isOpen) return null;
 
   const privateAllowed = canCreatePrivateRepo(scopes);
+  // False only when the plan is known to be one that cannot serve Pages from a
+  // private repository. Unknown stays true — see canPagesServePrivateRepo.
+  const privatePagesWork = canPagesServePrivateRepo(plan);
 
   /** Re-runs the OAuth flow asking for the wider `repo` scope. */
   const grantPrivateAccess = () => {
@@ -811,9 +853,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     <label for="private-repo-toggle" class="flex flex-col cursor-pointer">
                       <span class="text-sm font-medium text-slate-200">Private Repository</span>
                       <span class="text-xs text-slate-400">
-                        ${privateAllowed
-                          ? "Only you can see this repository. GitHub Pages needs a public repo on the free tier."
-                          : "Your GitHub connection currently covers public repositories only."}
+                        ${privateNote(privateAllowed, plan, privatePagesWork)}
                       </span>
                     </label>
                     ${!privateAllowed
@@ -1248,13 +1288,23 @@ async function enableGitHubPages(owner, repo, token) {
   // Give GitHub a moment to provision the Pages site
   await new Promise((r) => setTimeout(r, 1500));
 
-  // Fetch the actual Pages URL and set it as the repo homepage
+  // Fetch the actual Pages URL and set it as the repo homepage.
+  //
+  // Only a URL GitHub itself served is recorded. Guessing
+  // `{owner}.github.io/{repo}` here looked harmless but was not: Pages is a
+  // paid-plan feature on a private repository, so a free account that chose
+  // "private" gets no site at all — and `github_pages_url` is what
+  // infra-builder feeds to `badgeMarkdown` as the base for every badge `src`.
+  // A guessed URL therefore filled the README with 404s, while an unset key
+  // makes badgeMarkdown address them relative to the repository, which needs no
+  // Pages site. The same applies to any repo whose Pages provisioning failed.
   try {
     const pagesRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
       headers,
     });
     const pagesData = pagesRes.ok ? await pagesRes.json() : null;
-    const pagesUrl = pagesData?.html_url || `https://${owner}.github.io/${repo}/`;
+    const pagesUrl = pagesData?.html_url;
+    if (!pagesUrl) return;
 
     // Save Pages URL to settings so infra-builder uses the real URL
     await Storage.updateSettings({ github_pages_url: pagesUrl });
