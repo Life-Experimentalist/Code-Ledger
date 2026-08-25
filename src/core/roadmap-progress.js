@@ -19,12 +19,39 @@ import { Storage } from "./storage.js";
 const DEFAULT_TARGET = 5;
 
 /**
+ * One comparable form for a tag, whichever side of the match it came from.
+ *
+ * Tags do NOT arrive lowercase-hyphenated, which is what this used to assume.
+ * Every platform stores the display name it shows on the page: LeetCode reads
+ * `topicTags[].name`, so "Hash Table" and "Depth-First Search"; NeetCode and
+ * takeuforward pass their own tag text through unchanged. Template subtopics,
+ * meanwhile, are written as slugs ("hash-table", "heap-priority-queue"). A
+ * plain lowercase comparison therefore matched only the accidental cases —
+ * "Array", "Greedy", "Trie" — and every multi-word milestone scored zero
+ * forever, which reads as a stuck progress bar rather than as a bug.
+ *
+ * Folding both sides to the same slug fixes that and joins the platforms up:
+ * "Heap (Priority Queue)", "heap-priority-queue" and "Heap Priority Queue" are
+ * one key, so a solve counts towards a milestone no matter which site it came
+ * from or which spelling that site uses.
+ *
+ * @param {any} value
+ * @returns {string} "" when there is nothing to match on
+ */
+function tagKey(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
  * Count the solved problems that belong to a milestone.
  *
  * A problem counts if any of its tags — or its folder topic — matches the
- * milestone's topic or one of its subtopics. Matching is case-insensitive
- * because milestone topics are written for humans ("Arrays & Hashing") while
- * tags arrive lowercase-hyphenated from the platforms.
+ * milestone's topic or one of its subtopics, compared as slugs so that a
+ * human-readable milestone topic ("Arrays & Hashing") and a platform's own tag
+ * text land on the same key.
  *
  * @param {Object} milestone
  * @param {Array<Object>} problems
@@ -33,14 +60,12 @@ const DEFAULT_TARGET = 5;
 export function countMilestoneSolves(milestone, problems) {
   if (!milestone || !Array.isArray(problems) || !problems.length) return 0;
   const targets = new Set(
-    [milestone.topic || "", ...(milestone.subtopics || [])]
-      .map((s) => String(s).trim().toLowerCase())
-      .filter(Boolean),
+    [milestone.topic || "", ...(milestone.subtopics || [])].map(tagKey).filter(Boolean),
   );
   if (!targets.size) return 0;
   return problems.filter((p) => {
-    const tags = (p?.tags || []).map((t) => String(t).toLowerCase());
-    return tags.some((t) => targets.has(t)) || targets.has(String(p?.topic || "").toLowerCase());
+    const tags = (p?.tags || []).map(tagKey);
+    return tags.some((t) => t && targets.has(t)) || targets.has(tagKey(p?.topic));
   }).length;
 }
 
