@@ -325,6 +325,66 @@ describe("OAuth callback — XSS (attacker-controlled error_description)", () =>
   });
 });
 
+/**
+ * The callback page hands the extension a repo-scoped OAuth token through the
+ * DOM. The escaping tests above are the first lock. These cover the second:
+ * if markup ever does reach the page, it should not be able to run, and if it
+ * runs it should not be able to reach the network to send the token anywhere.
+ */
+describe("OAuth callback — response headers", () => {
+  const csp = async () => {
+    const res = await req("/api/auth/github/callback?error=x");
+    return { res, policy: res.headers.get("content-security-policy") || "" };
+  };
+
+  test("serves a Content-Security-Policy at all", async () => {
+    const { policy } = await csp();
+    assert.notEqual(policy, "", "the token page must carry a CSP");
+  });
+
+  test("denies everything by default and allows no network destination", async () => {
+    const { policy } = await csp();
+    assert.match(policy, /default-src 'none'/);
+    // No connect-src, so fetch/XHR/beacon have nowhere to go.
+    assert.ok(!/connect-src/.test(policy), "connect-src must not be opened up");
+  });
+
+  test("allows script only by nonce — never unsafe-inline", async () => {
+    const { policy } = await csp();
+    assert.match(policy, /script-src 'nonce-[^']+'/);
+    assert.ok(
+      !/unsafe-inline|unsafe-eval/.test(policy),
+      "a wildcard inline allowance defeats the whole policy",
+    );
+  });
+
+  test("the nonce in the header is the one on the script tag", async () => {
+    const { res, policy } = await csp();
+    const body = await res.text();
+    const nonce = /script-src 'nonce-([^']+)'/.exec(policy)?.[1];
+    assert.ok(nonce, "no nonce in the policy");
+    assert.ok(
+      body.includes(`<script nonce="${nonce}">`),
+      "the inline script does not carry the nonce, so the page is broken",
+    );
+  });
+
+  test("issues a fresh nonce per response", async () => {
+    // A reused nonce is the same as no nonce: injected markup could carry it.
+    const a = (await csp()).policy;
+    const b = (await csp()).policy;
+    const get = (p) => /script-src 'nonce-([^']+)'/.exec(p)?.[1];
+    assert.notEqual(get(a), get(b));
+  });
+
+  test("refuses to be framed, and refuses MIME sniffing", async () => {
+    const { res, policy } = await csp();
+    assert.match(policy, /frame-ancestors 'none'/);
+    assert.equal(res.headers.get("x-frame-options"), "DENY");
+    assert.equal(res.headers.get("x-content-type-options"), "nosniff");
+  });
+});
+
 describe("Webhook", () => {
   test("fails closed when no secret is configured", async () => {
     const res = await req(
