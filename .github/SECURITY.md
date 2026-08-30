@@ -1,70 +1,97 @@
 # Security Policy
 
-## Supported Versions
+## Reporting a vulnerability
 
-| Version         | Supported              |
-| --------------- | ---------------------- |
-| Latest (`main`) | ✅ Actively supported  |
-| Previous minor  | ⚠️ Critical fixes only |
-| Older releases  | ❌ No longer supported |
+**Please do not open a public issue for a security problem.**
 
-We recommend always running the latest release from the [Chrome Web Store](https://chrome.google.com/webstore/detail/codeledger/) or [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/codeledger/).
+Two private channels, either is fine:
 
-## Reporting a Vulnerability
-
-**Do not open a public GitHub issue for security vulnerabilities.**
-
-Report privately via email: **github@vkrishna04.me**
-
-Use the subject line: `[CodeLedger Security] <brief description>`
+- GitHub's private reporting — **Security → Report a vulnerability** on
+  [the repository](https://github.com/Life-Experimentalist/Code-Ledger/security).
+  This is enabled and is the preferred route, because it keeps the report, the
+  discussion and the eventual advisory in one place.
+- Email **github@vkrishna04.me**, subject `[CodeLedger Security] <brief description>`.
 
 ### What to include
 
-- **Component**: which part of the extension or worker is affected (e.g., OAuth callback, the GitHub handler, storage)
-- **Reproduction steps**: minimal, step-by-step instructions to trigger the issue
-- **Impact**: what an attacker could achieve (data exfiltration, token theft, commit injection, etc.)
-- **Affected version**: extension version, shown in the extension's settings and in `package.json`
-- **Suggested fix** _(optional)_: if you have a patch or a mitigation in mind
+- **Component** — which part is affected (the OAuth callback, the GitHub handler,
+  storage, a platform content script)
+- **Reproduction steps** — minimal and step-by-step
+- **Impact** — what an attacker actually gets: token theft, commit injection,
+  data reaching somewhere the user did not choose
+- **Version** — shown in the extension's settings and in `package.json`
+- **Suggested fix**, optional
+
+A proof of concept helps and is not required.
 
 ### What to expect
 
-| Milestone                                          | Target                                              |
-| -------------------------------------------------- | --------------------------------------------------- |
-| Initial acknowledgement                            | Within 72 hours                                     |
-| Triage decision (valid / invalid / need more info) | Within 7 days                                       |
-| Fix ETA communicated                               | Within 14 days of confirmed validity                |
-| Public disclosure                                  | After patch is released (coordinated with reporter) |
+This is a one-person project. There is no bounty, and no response time is
+guaranteed — treat everything below as intent rather than a commitment.
 
-We will credit researchers by name (or handle) in the release notes unless they prefer to remain anonymous.
+In practice you should hear back within a few days. If a fix is warranted it
+ships in the next release, and `docs/CHANGELOG.md` records it under **Security**.
+Public disclosure happens after the fix is released, coordinated with you.
+Researchers are credited by name or handle in the release notes unless you would
+rather stay anonymous.
+
+## Supported versions
+
+The latest release is the supported one. There is no long-term support branch and
+no backporting — releases are tags off `main`. Install from
+[Releases](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest).
 
 ## Scope
 
-Security reports are especially relevant for:
+Anything that lets one user's data reach somewhere the user did not choose is in
+scope, and so is anything that lets a page CodeLedger runs on read a token or an
+API key. Concretely:
 
-- **OAuth and token handling** — GitHub OAuth flow through the Cloudflare Worker; token storage and retrieval paths
-- **Secret and API key storage** — AI provider keys, GitHub PATs stored in `chrome.storage.local`
-- **Git commit pipeline** — tree API calls, commit integrity, ability to forge commits or modify other repos
-- **Worker endpoints** — Cloudflare Worker routes (`/api/auth/*`, `/api/webhook/*`, `/api/admin/*`)
-- **Content script isolation** — XSS from problem pages injected into extension UI
-- **Supply chain** — the vendored bundles under `src/vendor/` (regenerated from npm by `npm run vendor:preact`), and `mermaid.ink`, the one remote service the UI can call and only after an explicit click
-- **Cross-origin message handling** — `postMessage` validation for OAuth callback
+- **OAuth and token handling** — the GitHub flow through the Cloudflare Worker,
+  and every path that stores or reads a token
+- **Secret storage** — AI provider keys and GitHub PATs in `chrome.storage.local`
+- **The commit pipeline** — Trees API calls, commit integrity, anything that can
+  forge a commit or reach a repository the user did not name
+- **Worker endpoints** — `/api/auth/*`, `/api/webhook/*`, `/api/admin/*`
+- **Content script isolation** — a platform page reaching extension state or UI
+- **Sync ingest** — `index.json` is repository content and is treated as
+  untrusted input; anything it can make the extension do is in scope
+- **Supply chain** — the vendored bundles under `src/vendor/`, regenerated from
+  npm by `npm run vendor:preact`, and `mermaid.ink`, the one remote service the
+  UI can call and only after an explicit click
 
-## Out of Scope
+## Out of scope
 
-The following are **not** in scope for the security policy:
+- Vulnerabilities in GitHub, in the coding platforms, or in an AI provider —
+  report those to them
+- The contents of a user's own public repository. A public ledger is public on
+  purpose, and the extension says so before you make one
+- The fact that extension storage is not separately encrypted at rest. It is
+  readable by anyone who already has the OS profile, which is true of the whole
+  browser profile, and it is documented in [PRIVACY.md](../PRIVACY.md)
+- Self-XSS that needs the user to paste hostile code into their own browser
+- Denial of service against third-party services
+- Anything requiring physical access to the user's device
 
-- Self-XSS (requires the user to paste malicious code into their own browser)
-- Denial-of-service against third-party services (LeetCode, GitHub API, Cloudflare)
-- Vulnerabilities in the user's own GitHub repository content
-- Issues requiring physical access to the user's device
+Known and deliberately unfixed weaknesses are written down in
+[docs/THREAT_MODEL.md](../docs/THREAT_MODEL.md) — read it before reporting, so you
+do not spend time on something already documented. Finding a way past one of the
+limits described there is very much in scope.
 
-## Safe Harbor
+## Where the secrets are
 
-CodeLedger welcomes good-faith security research. We will not pursue legal action against researchers who:
+No credential belongs in this repository. The OAuth client ID and secret, the
+session signing key and the optional webhook and upload tokens are Wrangler
+secrets, set with `npx wrangler secret put NAME` from `worker/`, which prompts for
+the value rather than taking it as a command-line argument. `worker/wrangler.toml`
+is git-ignored for the same reason.
 
-- Act in good faith and give us reasonable time to respond before any public disclosure
-- Avoid accessing, modifying, or deleting data that does not belong to them
-- Do not disrupt service availability or degrade user experience
-- Do not violate user privacy (do not access other users' tokens or data)
+If you believe a secret has been exposed, say so in the report and rotate it
+first — rotating is always safe.
 
-We treat responsible disclosure as a contribution to the project.
+## Safe harbour
+
+CodeLedger welcomes good-faith security research, and will not pursue legal action
+against researchers who act in good faith, give reasonable time to respond before
+public disclosure, avoid accessing or destroying data that is not theirs, and do
+not degrade the service for others.

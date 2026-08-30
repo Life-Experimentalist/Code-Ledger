@@ -146,8 +146,11 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
     const authUrl = `${CONSTANTS.URLS.AUTH_WORKER}/auth/github`;
     const popup = window.open(authUrl, "OAuth", "width=600,height=700");
     if (!popup) alert("Please allow popups for this page to connect GitHub.");
-    // library.js handleOAuthMessage picks up the CODELEDGER_AUTH response,
-    // saves the token, and shows the repo onboarding wizard automatically.
+    // Nothing is read back from the popup — it is not the opener, and the
+    // callback page posts to no opener. presence-marker.js reads the token off
+    // the callback page's #codeledger-auth-result and relays it to the service
+    // worker, which writes auth.tokens; library.js watches that key through
+    // storage.onChanged and opens the repo onboarding wizard from there.
   };
 
   const unlinkGitHub = async () => {
