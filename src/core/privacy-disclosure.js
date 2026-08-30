@@ -159,6 +159,24 @@ export function disclosures(settings) {
   for (const [id, meta] of Object.entries(CONSTANTS.AI_PROVIDERS || {})) {
     const enabled = isAIActive(s) && s[`${id}_enabled`] === true;
     const local = meta.local === true;
+    // A provider that answers by asking you is not a destination at all — the
+    // extension opens a box with the prompt in it and waits. Where that text
+    // goes next is a decision you make with your own clipboard, so this is
+    // listed at the same tier as a local model and says so plainly rather than
+    // claiming a privacy property that depends on where you paste.
+    if (meta.requiresHuman === true) {
+      out.push({
+        id: `ai:${id}`,
+        on: enabled,
+        required: false,
+        manual: true,
+        tier: "private",
+        destination: "Your clipboard",
+        what: "The prompt is shown to you. Nothing is sent.",
+        note: "CodeLedger makes no request for this provider. You copy the prompt into whichever AI chat you choose and paste the reply back — so whatever that service does with it is between you and them.",
+      });
+      continue;
+    }
     out.push({
       id: `ai:${id}`,
       on: enabled,

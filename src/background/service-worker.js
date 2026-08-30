@@ -632,6 +632,22 @@ function _targetKey(target = {}) {
   return `${target.provider || "github"}:${target.owner || ""}/${target.repo || ""}`;
 }
 
+/**
+ * Whether a provider answers by asking a person.
+ *
+ * Nothing in this file has a person to ask. The service worker runs a review
+ * after a solve is detected — possibly with the tab already closed — and it is
+ * killed on idle, so a provider that waits for a paste would burn the 30s
+ * timeout on every solve and then fall through to the next one having done
+ * nothing but delay the commit. These providers are reached from a page
+ * instead, where there is somebody looking at the screen.
+ *
+ * @param {string} id
+ */
+function _requiresHuman(id) {
+  return CONSTANTS.AI_PROVIDERS?.[id]?.requiresHuman === true;
+}
+
 function _buildAIReviewProviders(settings = {}) {
   const seen = new Set();
   return [
@@ -646,6 +662,7 @@ function _buildAIReviewProviders(settings = {}) {
     ...CONSTANTS.AI_FALLBACK_CHAIN.map((id) => ({ id, model: "" })),
   ].filter((provider) => {
     if (!provider.id) return false;
+    if (_requiresHuman(provider.id)) return false;
     const key = _providerModelKey(provider);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -2781,6 +2798,10 @@ async function handleAIChat(messages, context = {}) {
     ...CONSTANTS.AI_FALLBACK_CHAIN.map((id) => ({ id, model: "" })),
   ].filter((p) => {
     if (!p.id) return false;
+    // See _requiresHuman: a chat routed through here has no UI attached, so a
+    // provider that answers by asking somebody cannot be one of the attempts.
+    // The page handles those itself before it ever sends AI_CHAT.
+    if (_requiresHuman(p.id)) return false;
     const key = _providerModelKey(p);
     if (seen.has(key)) return false;
     seen.add(key);

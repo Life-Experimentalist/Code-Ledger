@@ -28,6 +28,7 @@ import { ClaudeHandler } from "./ai/claude/index.js";
 import { DeepSeekHandler } from "./ai/deepseek/index.js";
 import { OllamaHandler } from "./ai/ollama/index.js";
 import { OpenRouterHandler } from "./ai/openrouter/index.js";
+import { ManualHandler } from "./ai/manual/index.js";
 
 export function initializeHandlers() {
   dbg.log(`initializeHandlers(): starting handler registration...`);
@@ -68,6 +69,7 @@ export function initializeHandlers() {
     new DeepSeekHandler(),
     new OllamaHandler(),
     new OpenRouterHandler(),
+    new ManualHandler(),
   ];
   ais.forEach((h) => {
     registry.registerAIProvider(h.id, h);

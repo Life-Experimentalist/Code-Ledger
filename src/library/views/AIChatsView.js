@@ -21,6 +21,7 @@ import {
   expandChatVariables,
 } from "../../lib/chat-variables.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
+import { sendAIChat } from "../../lib/ai-chat-send.js";
 import { buildGraphDigest } from "../../core/graph-insights.js";
 import {
   getAllChats,
@@ -305,24 +306,7 @@ export function AIChatsView({
         })),
       });
 
-      const response = await new Promise((resolve, reject) => {
-        if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-          reject(new Error("AI chat is only available inside the extension."));
-          return;
-        }
-        chrome.runtime.sendMessage(
-          {
-            type: "AI_CHAT",
-            messages: [{ role: "user", content: text }],
-            context,
-          },
-          (resp) => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp.response);
-            else reject(new Error(resp?.error || "AI request failed"));
-          },
-        );
-      });
+      const response = await sendAIChat([{ role: "user", content: text }], context);
 
       const now = Date.now();
       const messages = [
@@ -434,24 +418,7 @@ export function AIChatsView({
             : []),
       });
 
-      const response = await new Promise((resolve, reject) => {
-        if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-          reject(new Error("AI chat is only available inside the extension."));
-          return;
-        }
-        chrome.runtime.sendMessage(
-          {
-            type: "AI_CHAT",
-            messages: outboundMessages,
-            context,
-          },
-          (resp) => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp.response);
-            else reject(new Error(resp?.error || "AI request failed"));
-          },
-        );
-      });
+      const response = await sendAIChat(outboundMessages, context);
 
       const nextMessages = [
         ...baseMessages,

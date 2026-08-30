@@ -142,6 +142,12 @@ export async function fetchModelsForProvider(providerId, endpointOverride, optio
   if (!provider) return [];
   const throwOnError = !!options.throwOnError;
 
+  // A provider can have no catalogue to fetch — `manual` has no endpoint at
+  // all, since the model is whichever chat window the person happens to use.
+  // Without this the generic path would build a relative "/models" URL and
+  // fetch the extension itself.
+  if (provider.supportsLiveFetch === false) return staticFallback(provider);
+
   // Normalised once, here, rather than at each use: the override arrives from
   // the settings map and this request carries the user's API key.
   const ep = modelsUrl(provider, safeOverride(endpointOverride));
@@ -213,6 +219,8 @@ export async function fetchAIModels() {
 export async function testAIKey(providerId, key, endpointOverride = "") {
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return { ok: false, error: "Unknown provider" };
+  // Nothing to test: no endpoint, and no key that could be wrong.
+  if (provider.supportsLiveFetch === false) return { ok: true };
   const ep = modelsUrl(provider, safeOverride(endpointOverride));
   try {
     const res = await fetch(ep, { headers: listingHeaders(provider, key) });
