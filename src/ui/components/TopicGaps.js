@@ -21,7 +21,8 @@ import { useMemo } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
 const html = htm.bind(h);
 
-import { topicGaps, KIND_LABEL } from "../../core/topic-taxonomy.js";
+import { topicGaps } from "../../core/topic-taxonomy.js";
+import { absentTopics, EXCLUDED_TOPICS, TIER_LABEL } from "../../core/topic-dependencies.js";
 
 /** Band → the colour that says how solid a topic is at a glance. */
 const BAND = {
@@ -94,14 +95,21 @@ export function TopicGaps({ problems, topicKinds, masteryOpts, onTopic }) {
     [problems, topicKinds, masteryOpts],
   );
 
+  // Never-touched topics, ranked. The taxonomy's own untouched list is in
+  // object-literal order, so "Suffix Array" and "Iterator" took the first slots
+  // and Backtracking, Heap and Trie fell off the end of the twelve — the list
+  // rendered, but the ranking made it useless. This one is ordered by tier and
+  // then by dependency position, so what is missing earliest reads first.
+  const absent = useMemo(
+    () => absentTopics(problems || [], masteryOpts || {}),
+    [problems, masteryOpts],
+  );
+  const blind = absent.slice(0, 12);
+
   const { ds, algo, untouched, summary } = gaps;
   if (!ds.length && !algo.length && !untouched.length) return "";
 
   const algoPct = Math.round(summary.algoRatio * 100);
-  // The blind spots worth naming. The full untouched list is every well-known
-  // topic nobody has met yet, which on a young ledger is most of the table —
-  // a wall of grey that reads as failure rather than as a next step.
-  const blind = untouched.slice(0, 12);
 
   return html`
     <div class="p-4 bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col gap-4">
@@ -144,8 +152,8 @@ export function TopicGaps({ problems, topicKinds, masteryOpts, onTopic }) {
             <div class="flex flex-col gap-2">
               <span class="text-[10px] uppercase tracking-widest text-slate-500"
                 >Never touched<span class="text-slate-600 normal-case tracking-normal ml-2"
-                  >${untouched.length} well-known ${untouched.length === 1 ? "topic" : "topics"}
-                  with no solves at all</span
+                  >${absent.length} reference ${absent.length === 1 ? "topic" : "topics"} with no
+                  solves at all — earliest-needed first</span
                 ></span
               >
               <div class="flex flex-wrap gap-1.5">
@@ -153,14 +161,32 @@ export function TopicGaps({ problems, topicKinds, masteryOpts, onTopic }) {
                   (t) => html`
                     <span
                       key=${t.topic}
-                      title=${KIND_LABEL[t.kind] || ""}
-                      class="px-2 py-0.5 rounded-lg text-[10px] border border-white/5 bg-white/2 text-slate-500"
+                      title=${`${TIER_LABEL[t.tier] || ""}${
+                        t.blockedBy && t.blockedBy.length
+                          ? ` · comes after ${t.blockedBy.join(", ")}`
+                          : ""
+                      }`}
+                      class="px-2 py-0.5 rounded-lg text-[10px] border ${t.tier === 1
+                        ? "border-amber-500/30 bg-amber-500/5 text-amber-300/80"
+                        : "border-white/5 bg-white/2 text-slate-500"}"
                     >
                       ${t.topic}
                     </span>
                   `,
                 )}
               </div>
+              <p class="text-[10px] text-slate-600 leading-relaxed">
+                Not listed on purpose:
+                ${EXCLUDED_TOPICS.map(
+                  (e, i) =>
+                    html`<span key=${e.name}
+                      >${i ? ", " : ""}<span class="text-slate-500" title=${e.reason}
+                        >${e.name}</span
+                      >
+                      (counted under ${e.foldedInto})</span
+                    >`,
+                )}.
+              </p>
             </div>
           `
         : ""}

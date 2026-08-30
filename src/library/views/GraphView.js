@@ -69,6 +69,10 @@ const BAND_LABEL = {
 
 const EDGE_STYLE = {
   "topic-problem": { width: 1, dashes: false },
+  // Topic-to-topic containment. Heavier and solid because it is the skeleton the
+  // problem edges hang off: a Monotonic Stack solve is a Stack solve, and the
+  // line saying so should read as structure rather than as one more association.
+  "topic-parent": { color: "#a78bfa", highlight: "#c4b5fd", width: 2, dashes: false },
   similar: { color: "#3b82f6", highlight: "#60a5fa", width: 1, dashes: [4, 6] },
   canonical: { color: "#f59e0b", highlight: "#fbbf24", width: 2, dashes: [8, 6] },
 };
@@ -643,6 +647,7 @@ export function GraphView({
       settings?.topicMappings,
       settings?.topicKinds,
       masteryOptsFromSettings(settings),
+      settings?.topicParents,
     );
     for (const n of nodes) {
       if (n.type === "topic" && n.paletteColor === undefined) n.paletteColor = n.color;
@@ -1692,6 +1697,10 @@ export function GraphView({
                     <span class="flex items-center gap-1.5">
                       <span class="w-5 border-t border-slate-500/60 shrink-0"></span>Topic ↔
                       problem, tinted by topic
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                      <span class="w-5 border-t-2 border-[#a78bfa] shrink-0"></span>Topic sits
+                      inside topic
                     </span>
                     <span class="flex items-center gap-1.5">
                       <span class="w-5 border-t border-dashed border-[#3b82f6] shrink-0"></span

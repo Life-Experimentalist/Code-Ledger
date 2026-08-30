@@ -79,6 +79,7 @@ export function buildGraphDigest(problems, settings = null) {
     settings?.topicMappings,
     settings?.topicKinds,
     masteryOpts,
+    settings?.topicParents,
   );
 
   const topics = nodes.filter((n) => n.type === "topic");
