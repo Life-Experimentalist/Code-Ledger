@@ -218,3 +218,53 @@ describe("pages template — regexes survive the template literal", () => {
     assert.equal(problemUrl({ platform: "unknown" }), "#");
   });
 });
+
+describe("pages template — counts baked into the served markup", () => {
+  const STATS = { total: 316, easy: 176, medium: 127, hard: 11 };
+
+  test("renders the real counts, not zeros, into the stat cells", () => {
+    const html = getPagesHtml({ stats: STATS });
+    const cell = (id) => html.match(new RegExp('id="' + id + '">([^<]*)<'))?.[1];
+    assert.equal(cell("sn-t"), "316");
+    assert.equal(cell("sn-e"), "176");
+    assert.equal(cell("sn-m"), "127");
+    assert.equal(cell("sn-h"), "11");
+  });
+
+  test("the description and og:description carry the counts", () => {
+    const html = getPagesHtml({ stats: STATS });
+    for (const attr of ['name="description"', 'property="og:description"']) {
+      const content = html.match(new RegExp("<meta " + attr + ' content="([^"]*)"'))?.[1];
+      assert.ok(content, attr + " is missing");
+      assert.match(content, /316 DSA problems solved/);
+      assert.match(content, /176 easy, 127 medium, 11 hard/);
+    }
+  });
+
+  test("no stats at all still renders zeros and the generic blurb", () => {
+    // First-run onboarding writes the page before any solve exists, where zero
+    // is the true answer rather than a stale one.
+    const html = getPagesHtml();
+    assert.match(html, /id="sn-t">0</);
+    assert.match(html, /content="DSA problem solutions tracked by CodeLedger/);
+  });
+
+  test("a hostile stats object cannot inject markup or negative counts", () => {
+    const html = getPagesHtml({
+      stats: { total: '"><script>alert(1)</script>', easy: -5, medium: 1.9, hard: NaN },
+    });
+    assert.ok(!/<script>alert\(1\)/.test(html), "markup injected through stats.total");
+    assert.match(html, /id="sn-t">0</);
+    assert.match(html, /id="sn-e">0</);
+    assert.match(html, /id="sn-m">1</);
+    assert.match(html, /id="sn-h">0</);
+  });
+
+  test("without JavaScript the page shows the stats instead of a spinner", () => {
+    const html = getPagesHtml({ stats: STATS });
+    const noscript = html.match(/<noscript>([\s\S]*?)<\/noscript>/)?.[1];
+    assert.ok(noscript, "no noscript fallback");
+    assert.match(noscript, /#loading\s*\{\s*display:\s*none/);
+    assert.match(noscript, /#app\s*\{\s*display:\s*block/);
+  });
+});

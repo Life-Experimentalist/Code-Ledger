@@ -320,7 +320,7 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
   const items = [];
 
   if (settings?.github_pages !== false) {
-    const pageHtml = await _buildPagesContent(owner, repo, token, pagesTheme, settings);
+    const pageHtml = await _buildPagesContent(owner, repo, token, pagesTheme, settings, indexMeta);
     items.push({
       path: "index.html",
       mode: "100644",
@@ -630,7 +630,7 @@ build/
 
 // ── GitHub Pages builder ──────────────────────────────────────────────────────
 
-async function _buildPagesContent(owner, repo, token, pagesTheme, settings) {
+async function _buildPagesContent(owner, repo, token, pagesTheme, settings, indexMeta = null) {
   let commitSummary = null;
   let commitList = [];
   let reportImages = [];
@@ -670,6 +670,8 @@ async function _buildPagesContent(owner, repo, token, pagesTheme, settings) {
     commitList,
     owner,
     repo,
+    // Same counts the README shields are built from, so the two cannot disagree.
+    stats: indexMeta?.stats || null,
   });
 }
 
