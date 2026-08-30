@@ -110,7 +110,13 @@ export class APIKeyPool {
       dbg.log(`Key failed with ${status}; not a rate limit, leaving it in rotation.`);
       return;
     }
-    dbg.log(`Cooling down key: ${key.substring(0, 8)}...`);
+    // No prefix of the key. `getNextKey` already logged which index it handed
+    // out, so the preceding line says which key this is without printing any
+    // of it.
+    dbg.log(
+      `Cooling down a key for ${this.providerId}` +
+        (status === undefined ? " after a failure with no status." : ` after ${status}.`),
+    );
     this.cooldowns.set(key, Date.now() + CONSTANTS.KEY_POOL_RETRY_AFTER_MS);
   }
 }

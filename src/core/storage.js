@@ -360,7 +360,9 @@ export const Storage = {
     const keys = await browserStorage.local.get(CONSTANTS.SK.AUTH_TOKENS);
     const tokens = keys[CONSTANTS.SK.AUTH_TOKENS] || {};
     tokens[provider] = token;
-    dbg.log(`setAuthToken(${provider}): token set (${String(token || "").substring(0, 20)}...)`);
+    // Deliberately no prefix of the token: debug output gets pasted into bug
+    // reports, and "did it arrive" is answered by the length alone.
+    dbg.log(`setAuthToken(${provider}): token set (${String(token || "").length} chars)`);
     await browserStorage.local.set({ [CONSTANTS.SK.AUTH_TOKENS]: tokens });
   },
 
