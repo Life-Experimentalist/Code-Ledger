@@ -5,6 +5,7 @@
 
 import { createDebugger } from "../lib/debug.js";
 import { normalizeTag } from "./topic-resolver.js";
+import { resolveParents } from "./topic-hierarchy.js";
 import {
   classifyTopic,
   KIND,
@@ -80,12 +81,14 @@ function blendColors(colorsArr) {
  * @param {object} [customMappings] `settings.topicMappings` — alias → canonical name
  * @param {object} [topicKinds] `settings.topicKinds` — canonical name → "ds"|"algo"|"domain"
  * @param {{ halfLifeDays?: number, regainSolves?: number }} [masteryOpts] user-tuned decay knobs
+ * @param {object} [topicParents] `settings.topicParents` — canonical name → parent name
  */
 export function buildKnowledgeGraph(
   problems,
   customMappings = {},
   topicKinds = {},
   masteryOpts = {},
+  topicParents = {},
 ) {
   dbg.log(`buildKnowledgeGraph(): building from ${(problems || []).length} problems`);
   const nodes = new Map(); // id → node
@@ -366,6 +369,23 @@ export function buildKnowledgeGraph(
     node.daysSince = Number.isFinite(stat.lastSolved)
       ? Math.floor((now - stat.lastSolved) / 86_400_000)
       : null;
+  }
+
+  // Containment edges between the topics themselves — Monotonic Stack under
+  // Stack, Binary Search Tree under Binary Tree under Tree. Only drawn when both
+  // ends already exist: a parent nobody has solved has no node, and an edge
+  // pointing at a missing node is a render error in vis-network rather than an
+  // empty line. So the tree thins out to match the ledger instead of pulling in
+  // headings the user has never touched.
+  const parents = resolveParents(topicParents);
+  for (const node of nodes.values()) {
+    if (node.type !== "topic") continue;
+    const parentTopic = parents[node.label] || null;
+    node.parentTopic = parentTopic;
+    if (!parentTopic) continue;
+    const parentId = `topic:${parentTopic}`;
+    if (!nodes.has(parentId)) continue;
+    finalEdges.push({ source: parentId, target: node.id, type: "topic-parent" });
   }
 
   const result = {

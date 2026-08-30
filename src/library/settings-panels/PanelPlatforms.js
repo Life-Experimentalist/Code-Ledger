@@ -20,6 +20,13 @@ import {
   KIND_LABEL,
   masteryOptsFromSettings,
 } from "../../core/topic-taxonomy.js";
+import {
+  DEFAULT_PARENT,
+  TOPIC_PARENTS,
+  descendantsOf,
+  resolveParents,
+  topicForest,
+} from "../../core/topic-hierarchy.js";
 import { TIER, TIER_KEY } from "../../handlers/platforms/takeuforward/api.js";
 
 const PLATFORMS = Object.values(CONSTANTS.PLATFORMS);
@@ -44,6 +51,40 @@ const PLATFORM_SYNC_URLS = {
     profile: CONSTANTS.PLATFORMS.codeforces.baseUrl + "/",
   },
 };
+
+/**
+ * The nested forest as a flat list, parents before children.
+ *
+ * Rendering it flat with an indent rather than as nested boxes keeps every row
+ * the same shape, which matters when the row carries a control: a select nested
+ * five levels deep in padded divs ends up too narrow to read its own options.
+ *
+ * @param {Array<{topic: string, depth: number, known: boolean, children: any[]}>} nodes
+ * @returns {Array<{topic: string, depth: number, known: boolean}>}
+ */
+function flattenForest(nodes) {
+  const out = [];
+  const walk = (list) => {
+    for (const node of list) {
+      out.push({ topic: node.topic, depth: node.depth, known: node.known });
+      walk(node.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
+/**
+ * Where a row would sit with no override — which for a topic the user invented
+ * is the catch-all heading, not the top level.
+ *
+ * @param {{topic: string, known: boolean}} row
+ * @returns {string}
+ */
+function builtinParentLabel(row) {
+  if (!row.known) return DEFAULT_PARENT;
+  return TOPIC_PARENTS[row.topic] || "top level";
+}
 
 export function PanelPlatforms({ settings, onSettingsChange }) {
   const [importMsg, setImportMsg] = useState({});
@@ -119,6 +160,40 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
     if (next === undefined) delete map[topic];
     else map[topic] = next;
     onSettingsChange("topicKinds", map);
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* Topic hierarchy                                                   */
+  /* ---------------------------------------------------------------- */
+
+  /** The user's own calls on what sits under what, keyed on canonical name. */
+  const topicParents = settings?.topicParents || {};
+  const resolvedParents = resolveParents(topicParents);
+  /** Topics the user invented are part of the tree too, so they can be placed. */
+  const hierarchyRows = flattenForest(
+    topicForest({ overrides: topicParents, extraTopics: customTopics }),
+  );
+
+  /**
+   * Re-parent a topic, or send it back to the built-in placement.
+   *
+   * The dropdown cannot offer a topic's own descendants, so the obvious way to
+   * make a cycle is closed off here rather than caught later. The walks in
+   * `topic-hierarchy.js` are cycle-safe anyway — settings can be edited by hand
+   * and by AI healing — but a UI that lets you build a broken tree and then
+   * quietly copes with it is a worse UI than one that does not offer the move.
+   */
+  const setTopicParent = (topic, value) => {
+    const map = { ...topicParents };
+    if (value === "__builtin__") delete map[topic];
+    else map[topic] = value;
+    onSettingsChange("topicParents", map);
+  };
+
+  /** Parents a topic may be given: anything that is not itself or below it. */
+  const parentOptionsFor = (topic) => {
+    const blocked = new Set([topic, ...descendantsOf(topic, resolvedParents)]);
+    return hierarchyRows.map((r) => r.topic).filter((t) => !blocked.has(t));
   };
 
   const isPlatformEnabled = (pid) => {
@@ -662,6 +737,90 @@ export function PanelPlatforms({ settings, onSettingsChange }) {
                             `,
                           )}
                     </div>
+                  </div>
+                `;
+              })}
+            </div>
+          </div>
+        </details>
+
+        <!-- Topic hierarchy -->
+        <details
+          class="group bg-white/2 border border-white/5 rounded-xl overflow-hidden transition-all duration-300"
+        >
+          <summary
+            class="flex items-center justify-between p-4 cursor-pointer select-none text-xs font-semibold text-slate-300 hover:bg-white/5 list-none"
+          >
+            <span class="flex items-center gap-2">
+              <span class="group-open:hidden">▸</span>
+              <span class="hidden group-open:inline">▾</span>
+              Topic Hierarchy
+            </span>
+            <span class="text-[10px] text-slate-500 font-normal">
+              ${Object.keys(topicParents).length
+                ? `${Object.keys(topicParents).length} moved`
+                : "Built-in placement"}
+            </span>
+          </summary>
+          <div class="p-4 border-t border-white/5 bg-black/40 space-y-4">
+            <p class="text-xs text-slate-400">
+              What sits under what. A Monotonic Stack solve is a Stack solve and a Binary Search
+              Tree solve is a Tree solve, so a count shown against a parent includes everything
+              below it while the specific topic keeps its own name. This is containment, not order
+              of study — the study plan decides what to learn before what, and the two disagree on
+              purpose. Move anything you disagree with; a topic cannot be filed under itself or
+              under something already beneath it.
+            </p>
+            ${Object.keys(topicParents).length
+              ? html`<button
+                  onClick=${() => onSettingsChange("topicParents", {})}
+                  class="text-[11px] text-rose-300 hover:text-rose-200 hover:bg-rose-500/10 px-2 py-1 rounded-md transition-colors"
+                >
+                  Reset all to built-in placement
+                </button>`
+              : ""}
+            <div
+              class="border border-white/5 rounded-lg divide-y divide-white/5 bg-black/20 max-h-96 overflow-y-auto"
+            >
+              ${hierarchyRows.map((row) => {
+                const moved = Object.prototype.hasOwnProperty.call(topicParents, row.topic);
+                const current = resolvedParents[row.topic] || "";
+                return html`
+                  <div
+                    key=${row.topic}
+                    class="flex items-center justify-between gap-3 p-2 text-xs"
+                    style=${`padding-left: ${0.5 + row.depth * 1.1}rem`}
+                  >
+                    <span class="truncate text-slate-200">
+                      ${row.depth > 0 ? html`<span class="text-slate-600 mr-1">└</span>` : ""}
+                      ${row.topic}
+                      ${row.known
+                        ? ""
+                        : html`<span
+                            class="ml-1.5 text-[9px] uppercase tracking-wider text-cyan-400"
+                            >yours</span
+                          >`}
+                      ${moved
+                        ? html`<span
+                            class="ml-1.5 text-[9px] uppercase tracking-wider text-amber-400"
+                            >moved</span
+                          >`
+                        : ""}
+                    </span>
+                    <select
+                      value=${moved ? current : "__builtin__"}
+                      onChange=${(e) => setTopicParent(row.topic, e.target.value)}
+                      title=${moved
+                        ? `Your call. Built-in placement: ${builtinParentLabel(row)}.`
+                        : "Built-in placement."}
+                      class="shrink-0 bg-black/40 border border-white/10 rounded-md px-2 py-1 text-[11px] text-slate-300 max-w-[14rem]"
+                    >
+                      <option value="__builtin__">Built-in (${builtinParentLabel(row)})</option>
+                      <option value="">Top level</option>
+                      ${parentOptionsFor(row.topic).map(
+                        (t) => html`<option key=${t} value=${t}>Under ${t}</option>`,
+                      )}
+                    </select>
                   </div>
                 `;
               })}

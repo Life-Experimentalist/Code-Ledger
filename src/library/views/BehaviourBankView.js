@@ -33,6 +33,7 @@ import {
   buildWeakAreaRoadmap,
   instantiateTemplate,
 } from "../../core/roadmap-templates.js";
+import { StudyPlanPanel } from "../../ui/components/StudyPlanPanel.js";
 
 const dbg = createDebugger("BehaviourBankView");
 
@@ -578,6 +579,19 @@ function RoadmapSection({ problems, onNavigate }) {
   // list / viewing screen
   return html`
     <div class="flex flex-col gap-4">
+      <!--
+        The computed plan. Saved roadmaps below are chosen once and then tracked;
+        this one is rebuilt from the ledger on every render, so it is always
+        current and never needs a "regenerate" button.
+      -->
+      <${StudyPlanPanel} problems=${problems} />
+
+      <div class="flex items-center gap-3 pt-1">
+        <div class="h-px flex-1 bg-white/8"></div>
+        <span class="text-[10px] uppercase tracking-widest text-slate-600">saved roadmaps</span>
+        <div class="h-px flex-1 bg-white/8"></div>
+      </div>
+
       <!-- Header row -->
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">

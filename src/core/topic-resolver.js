@@ -7,55 +7,176 @@
  * DSA Topic Hierarchy & Weights
  * Lower weight = higher priority (selected first)
  * This ranking reflects the primary classification for each problem
+ *
+ * The weight decides which of a problem's tags names its folder, so renumbering
+ * moves files. The original ranks are whole numbers and are left exactly as they
+ * were; every topic added since slots in on a decimal beside the one it
+ * specialises. "Monotonic Stack" sits at 12.5 because it is a Stack (12) and
+ * should beat Array (100) the same way Stack did before it was a topic of its
+ * own — an unweighted topic scores 1000 and would have lost to everything.
+ *
+ * Two rules are inherited rather than invented, and both are debatable:
+ * the parent wins ties with its own children (Math at 7 beats Geometry at 8),
+ * and the family headings this file added — Searching, Ad Hoc, Other — are
+ * parked above 900 so they never win a folder name. A path called
+ * `problems/Other/` helps nobody.
  */
 const TOPIC_WEIGHTS = {
   // Core Algorithms & Techniques (highest priority)
   "Dynamic Programming": 1,
+  Memoization: 1.5,
+  "Game Theory": 1.6,
   Greedy: 2,
+  Schedules: 2.5,
   Recursion: 3,
   Backtracking: 4,
   "Divide and Conquer": 5,
+  "Meet In The Middle": 5.5,
   "Bit Manipulation": 6,
+  Bitmask: 6.5,
   Math: 7,
+  "Number Theory": 7.1,
+  "Chinese Remainder Theorem": 7.2,
+  Combinatorics: 7.3,
+  Probability: 7.4,
+  Randomized: 7.5,
+  "Reservoir Sampling": 7.6,
+  "Rejection Sampling": 7.7,
+  "Fast Fourier Transform": 7.8,
   Geometry: 8,
 
   // Data Structures
   "Hash Table": 10,
+  Counting: 10.5,
+  "Hash Function": 10.6,
   "Linked List": 11,
+  "Doubly Linked List": 11.5,
   Stack: 12,
+  "Monotonic Stack": 12.5,
   Queue: 13,
+  Deque: 13.4,
+  "Monotonic Queue": 13.5,
   "Heap (Priority Queue)": 14,
   Trie: 15,
   "Binary Search Tree": 16,
+  "Ordered Set": 16.5,
   "Segment Tree": 17,
   "Binary Indexed Tree": 18,
   Graph: 19,
+  "Topological Sort": 19.1,
+  "Shortest Path": 19.2,
+  "Minimum Spanning Tree": 19.3,
+  "Strongly Connected Component": 19.4,
+  "Biconnected Component": 19.5,
+  "Eulerian Circuit": 19.6,
+  "Max Flow": 19.7,
+  Matching: 19.8,
+  "2-SAT": 19.9,
   "Union Find": 20,
 
   // Fundamental Techniques
   "Two Pointers": 30,
   "Sliding Window": 31,
   "Binary Search": 32,
+  "Ternary Search": 32.5,
   Sorting: 33,
+  "Merge Sort": 33.1,
+  "Counting Sort": 33.2,
+  "Bucket Sort": 33.3,
+  "Radix Sort": 33.4,
+  Quickselect: 33.5,
+  "Line Sweep": 33.6,
 
   // Lower Priority - Usually secondary classification
   "Depth-First Search": 50,
   "Breadth-First Search": 51,
   Array: 100,
+  Matrix: 100.5,
+  "Prefix Sum": 100.6,
   String: 101,
+  "String Matching": 101.1,
+  "Rolling Hash": 101.2,
+  "Suffix Array": 101.3,
+  "Expression Parsing": 101.4,
   Tree: 102,
+  "Binary Tree": 102.5,
   Design: 103,
+  Iterator: 103.1,
+  "Data Stream": 103.2,
   Database: 104,
+  Pandas: 104.5,
   Shell: 105,
+  Concurrency: 106,
+  Interactive: 107,
+
+  // Descriptions of a problem rather than of its solution. Real tags — every
+  // Codeforces problem carries at least one — but a folder named after them
+  // tells you nothing, so they rank below everything that does.
+  Brainteaser: 200,
+  Simulation: 201,
+  Implementation: 202,
+  "Brute Force": 203,
+  Constructive: 204,
+  Enumeration: 205,
+
+  // Family headings. See the note above: these must never win a folder name.
+  Searching: 940,
+  "Ad Hoc": 960,
+  Other: 970,
 };
 
+/**
+ * Alias → canonical.
+ *
+ * Two things to know before editing this table.
+ *
+ * **A fold here is destructive.** Whatever is listed as an alias stops existing:
+ * it is rewritten at the moment a solve is stored and cannot be recovered from
+ * the ledger afterwards. `monotonic stack` used to be an alias of `Stack` for
+ * exactly the wrong reason — to give Stack the count — and the cost was that
+ * nobody could ever see, chart or plan a monotonic-stack problem. Containment
+ * belongs in `topic-hierarchy.js`, which rolls the count up *and* keeps the
+ * specific name. Only put a spelling here if it is genuinely the same topic.
+ *
+ * **Codeforces passes its tags through untouched.** Its vocabulary is its own —
+ * `sortings`, `dfs and similar`, `constructive algorithms`, `flows`,
+ * `probabilities` — and anything unlisted survives title-cased, so `sortings`
+ * becomes a second topic sitting next to `Sorting` with its own separate count.
+ * The entries below exist to stop that from happening for every tag those
+ * platforms are known to emit.
+ */
 const RAW_MAPPINGS = {
   Array: ["array", "arrays"],
+  Matrix: ["matrix", "matrices", "grid", "2d array", "2-d array", "two dimensional array"],
+  "Prefix Sum": ["prefix sum", "prefix-sum", "prefixsum", "prefix sums", "cumulative sum"],
   String: ["string", "strings"],
+  "String Matching": [
+    "string matching",
+    "string-matching",
+    "pattern matching",
+    "pattern searching",
+  ],
+  "Suffix Array": ["suffix array", "suffix-array", "string suffix structures"],
+  "Expression Parsing": ["expression parsing", "expression-parsing"],
   Tree: ["tree", "trees"],
+  "Binary Tree": ["binary tree", "binary-tree", "binarytree"],
   Graph: ["graph", "graphs"],
+  "Topological Sort": ["topological sort", "topological-sort", "topological sorting", "toposort"],
+  "Shortest Path": ["shortest path", "shortest paths", "shortest-path", "shortestpath"],
+  "Minimum Spanning Tree": ["minimum spanning tree", "minimum-spanning-tree", "mst"],
+  "Max Flow": ["max flow", "maximum flow", "max-flow", "flows"],
+  Matching: ["matching", "matchings", "graph matchings"],
+  "2-SAT": ["2 sat", "2-sat", "two sat"],
+  "Strongly Connected Component": [
+    "strongly connected component",
+    "strongly connected components",
+    "scc",
+  ],
+  "Biconnected Component": ["biconnected component", "biconnected components"],
+  "Eulerian Circuit": ["eulerian circuit", "eulerian path", "euler tour"],
   "Heap (Priority Queue)": ["heap", "heaps", "priority queue", "priority-queue", "priorityqueue"],
   "Linked List": ["linked list", "linked-list", "linkedlist", "linked lists"],
+  "Doubly Linked List": ["doubly linked list", "doubly-linked list", "doubly-linked-list"],
   "Hash Table": [
     "hash table",
     "hash-table",
@@ -74,6 +195,8 @@ const RAW_MAPPINGS = {
     "unordered-map",
     "dict",
   ],
+  "Hash Function": ["hash function", "hash-function", "hashfunction"],
+  Counting: ["counting", "frequency count", "frequency counting"],
   "Two Pointers": [
     "two pointers",
     "two-pointers",
@@ -85,13 +208,19 @@ const RAW_MAPPINGS = {
     "two-pointer strategy",
     "two-pointer-algorithm",
   ],
+  Searching: ["searching", "search"],
   "Binary Search": ["binary search", "binary-search", "binarysearch"],
+  "Ternary Search": ["ternary search", "ternary-search", "ternarysearch"],
   "Sliding Window": ["sliding window", "sliding-window", "slidingwindow"],
   "Dynamic Programming": ["dynamic programming", "dynamic-programming", "dynamicprogramming", "dp"],
+  Memoization: ["memoization", "memoisation", "memo"],
+  "Game Theory": ["game theory", "game-theory", "games", "gametheory"],
   Greedy: ["greedy", "greedy algorithms", "greedy-algorithms", "greedyalgorithms"],
+  Schedules: ["schedules", "scheduling"],
   Recursion: ["recursion"],
   Backtracking: ["backtracking"],
   "Divide and Conquer": ["divide and conquer", "divide-and-conquer", "divideandconquer"],
+  "Meet In The Middle": ["meet in the middle", "meet-in-the-middle", "meetinthemiddle"],
   "Bit Manipulation": [
     "bit manipulation",
     "bit-manipulation",
@@ -100,11 +229,31 @@ const RAW_MAPPINGS = {
     "bit-magic",
     "bitmagic",
   ],
-  Math: ["math", "mathematical", "mathematics"],
-  Geometry: ["geometry"],
-  Stack: ["stack", "stacks", "monotonic stack", "monotonic-stack", "monotonicstack"],
-  Queue: ["queue", "queues", "monotonic queue", "monotonic-queue", "monotonicqueue"],
-  Trie: ["trie", "tries"],
+  Bitmask: ["bitmask", "bitmasks", "bit mask", "bitmasking"],
+  Math: ["math", "mathematical", "mathematics", "maths"],
+  "Number Theory": ["number theory", "number-theory", "numbertheory"],
+  "Chinese Remainder Theorem": ["chinese remainder theorem", "crt"],
+  Combinatorics: ["combinatorics", "combinatorial", "combinatorial mathematics"],
+  Probability: ["probability", "probabilities", "probability and statistics", "statistics"],
+  Randomized: ["randomized", "randomised", "randomization"],
+  "Reservoir Sampling": ["reservoir sampling", "reservoir-sampling"],
+  "Rejection Sampling": ["rejection sampling", "rejection-sampling"],
+  "Fast Fourier Transform": ["fast fourier transform", "fft", "ntt"],
+  Geometry: ["geometry", "geometric", "computational geometry"],
+  // `monotonic stack` and `monotonic queue` were aliases of Stack and Queue
+  // until the hierarchy existed. That gave the parents their count and threw the
+  // specific topic away — the trade is no longer necessary, because
+  // `topic-hierarchy.js` rolls a Monotonic Stack solve up into Stack while
+  // leaving it visible as itself. Note the split is forward-only: solves already
+  // in the ledger were normalised when they were written and say `Stack` on
+  // disk. Re-tagging them means re-fetching the tags, which is what the
+  // self-heal pass does when it next runs against those problems.
+  Stack: ["stack", "stacks"],
+  "Monotonic Stack": ["monotonic stack", "monotonic-stack", "monotonicstack"],
+  Queue: ["queue", "queues"],
+  Deque: ["deque", "double ended queue", "double-ended queue"],
+  "Monotonic Queue": ["monotonic queue", "monotonic-queue", "monotonicqueue"],
+  Trie: ["trie", "tries", "prefix tree"],
   "Binary Search Tree": ["binary search tree", "bst", "binary-search-tree", "binarysearchtree"],
   "Segment Tree": ["segment tree", "segment-tree", "segmenttree"],
   "Binary Indexed Tree": [
@@ -125,11 +274,35 @@ const RAW_MAPPINGS = {
     "disjoint set union",
     "dsu",
   ],
-  Sorting: ["sorting", "sort"],
+  "Ordered Set": ["ordered set", "ordered-set", "sorted set", "tree map", "treemap"],
+  Sorting: ["sorting", "sort", "sortings", "sorts"],
+  "Merge Sort": ["merge sort", "merge-sort", "mergesort"],
+  "Counting Sort": ["counting sort", "counting-sort", "countingsort"],
+  "Bucket Sort": ["bucket sort", "bucket-sort", "bucketsort"],
+  "Radix Sort": ["radix sort", "radix-sort", "radixsort"],
+  Quickselect: ["quickselect", "quick select", "quick-select"],
+  "Line Sweep": ["line sweep", "line-sweep", "sweep line", "sweepline"],
   Design: ["design"],
-  Database: ["database", "databases"],
-  Shell: ["shell"],
-  "Depth-First Search": ["depth-first search", "depth first search", "depthfirstsearch", "dfs"],
+  Iterator: ["iterator", "iterators"],
+  "Data Stream": ["data stream", "data-stream", "datastream", "streaming"],
+  Database: ["database", "databases", "sql"],
+  Pandas: ["pandas"],
+  Shell: ["shell", "bash"],
+  Concurrency: ["concurrency", "concurrent", "multithreading", "threading"],
+  Interactive: ["interactive", "interactive problem"],
+  Simulation: ["simulation", "simulations"],
+  Implementation: ["implementation"],
+  "Brute Force": ["brute force", "brute-force", "bruteforce"],
+  Constructive: ["constructive", "constructive algorithms", "constructive-algorithms"],
+  Enumeration: ["enumeration", "enumerate"],
+  Brainteaser: ["brainteaser", "brain teaser", "brainteasers", "puzzle", "puzzles"],
+  "Depth-First Search": [
+    "depth-first search",
+    "depth first search",
+    "depthfirstsearch",
+    "dfs",
+    "dfs and similar",
+  ],
   "Breadth-First Search": [
     "breadth-first search",
     "breadth first search",

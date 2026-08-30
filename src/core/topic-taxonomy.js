@@ -82,8 +82,10 @@ export const BUILT_IN_KINDS = Object.freeze({
   "Linked List": KIND.DS,
   "Doubly Linked List": KIND.DS,
   Stack: KIND.DS,
+  "Monotonic Stack": KIND.DS,
   Queue: KIND.DS,
   Deque: KIND.DS,
+  "Monotonic Queue": KIND.DS,
   "Heap (Priority Queue)": KIND.DS,
   Tree: KIND.DS,
   "Binary Tree": KIND.DS,
@@ -149,18 +151,32 @@ export const BUILT_IN_KINDS = Object.freeze({
   "Meet In The Middle": KIND.ALGO,
   "Max Flow": KIND.ALGO,
   Matching: KIND.ALGO,
-  // No "Monotonic Stack" / "Monotonic Queue" entries: topic-resolver folds those
-  // aliases into Stack and Queue, so keys for them would never be reached.
+  "2-SAT": KIND.ALGO,
+  Searching: KIND.ALGO,
+  Schedules: KIND.ALGO,
+  "Chinese Remainder Theorem": KIND.ALGO,
+  "Fast Fourier Transform": KIND.ALGO,
+  "Expression Parsing": KIND.ALGO,
 
   // ── Neither ────────────────────────────────────────────────────────
   Design: KIND.DOMAIN,
   Database: KIND.DOMAIN,
   Shell: KIND.DOMAIN,
+  // Needs its own entry: "pandas" matches none of the heuristics, so without
+  // this it falls to the default and LeetCode's dataframe problems count as
+  // algorithm solves. "SQL" is already caught by the domain heuristic.
+  Pandas: KIND.DOMAIN,
   Concurrency: KIND.DOMAIN,
   Interactive: KIND.DOMAIN,
   Brainteaser: KIND.DOMAIN,
   Implementation: KIND.DOMAIN,
   Untagged: KIND.DOMAIN,
+  // Family headings from `topic-hierarchy.js`. No platform emits either, so
+  // these are reached only if a user maps a tag onto one by hand — but the
+  // heuristics would read "Ad Hoc" as an unrecognised technique and count it as
+  // an algorithm solve, which is the opposite of what the heading means.
+  "Ad Hoc": KIND.DOMAIN,
+  Other: KIND.DOMAIN,
 });
 
 /**

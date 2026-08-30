@@ -330,6 +330,10 @@ export const CONSTANTS = Object.freeze({
     // Shape: { vacations: [{ start, end, note }], seenAchievements: string[],
     //          achievementsSeeded: boolean }
     GAMIFICATION: "gamification.state",
+    // The three inputs to the study plan. The plan itself is always recomputed
+    // from the ledger, so only what the user chose is stored.
+    // Shape: { targetDate: "YYYY-MM-DD", hoursPerDay: number, role: string }
+    STUDY_PLAN: "study.plan",
   },
 
   IDB_NAME: "codeledger",

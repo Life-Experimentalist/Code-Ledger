@@ -27,6 +27,7 @@ import { Storage } from "../../core/storage.js";
 import { ShareStreak } from "../../ui/components/ShareStreak.js";
 import { Achievements } from "../../ui/components/Achievements.js";
 import { TopicGaps } from "../../ui/components/TopicGaps.js";
+import { GapReport } from "../../ui/components/GapReport.js";
 import { loadSnapshot } from "../../core/gamification-state.js";
 import { isGamificationActive } from "../../core/feature-flags.js";
 
@@ -1500,6 +1501,15 @@ export function AnalyticsView({ problems, onNavigate }) {
           </button>
         </div>
       </div>
+
+      <!-- The short version: at most three findings, each with its number -->
+      <${GapReport}
+        problems=${problems}
+        topicKinds=${topicKinds}
+        difficultyMap=${userMap}
+        masteryOpts=${masteryOpts}
+        onTopic=${handleTopicClick}
+      />
 
       <!-- Where the gaps are: the same topics ranked by mastery instead of volume -->
       <${TopicGaps}
