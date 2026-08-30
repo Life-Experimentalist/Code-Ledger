@@ -159,11 +159,17 @@ on:
     # Only re-deploy when site content actually changes.
     # README-only commits (e.g. from external stats bots) are skipped,
     # preventing the tug-of-war where two workflows fight over README.md.
+    #
+    # badges/** must stay in this list. The README's streak card is an <img>
+    # pointing at the Pages copy of badges/card.svg, so a nightly refresh that
+    # rewrites the SVG but never redeploys leaves the card showing whatever
+    # numbers were true on the day Pages last built.
     paths:
       - "index.html"
       - "index.json"
       - "problems/**"
       - "chats/**"
+      - "badges/**"
 
 # Cancel any queued/running build when a newer commit arrives.
 concurrency:

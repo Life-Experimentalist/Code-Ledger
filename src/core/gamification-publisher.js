@@ -350,8 +350,11 @@ jobs:
         run: node ${REFRESH_SCRIPT_PATH}
       - name: Commit if changed
         run: |
-          if [ -z "$(git status --porcelain badges)" ]; then
-            echo "badges unchanged"
+          # Check everything the next line stages. Checking only badges meant a
+          # README whose block had moved or been re-rendered was staged, found
+          # to be the only change, and then never committed.
+          if [ -z "$(git status --porcelain badges README.md)" ]; then
+            echo "badges and README unchanged"
             exit 0
           fi
           git config user.name "github-actions[bot]"

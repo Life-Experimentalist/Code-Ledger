@@ -34,6 +34,9 @@ import {
   README_START,
   README_END,
   BADGE_DIR,
+  DEFAULT_PICKS,
+  badgeSpecs,
+  BADGE_NAMES,
 } from "../src/core/badge-svg.js";
 import { computeSnapshot } from "../src/core/gamification.js";
 
@@ -373,13 +376,49 @@ describe("badgeUrl", () => {
   });
 });
 
+describe("badgeSpecs", () => {
+  test("no two badges share a label", () => {
+    // `solved` and `difficulty` were both labelled "solved". A README picking
+    // both showed two adjacent badges whose left half read the same word, and
+    // because the label is what the shields endpoint JSON carries too, it was
+    // wrong in both renderings at once.
+    const labels = BADGE_NAMES.map((n) => badgeSpecs(SNAP)[n].label);
+    assert.equal(new Set(labels).size, labels.length, `duplicate label in: ${labels.join(", ")}`);
+  });
+
+  test("every name in BADGE_NAMES has a spec", () => {
+    const specs = badgeSpecs(SNAP);
+    for (const n of BADGE_NAMES) {
+      assert.ok(specs[n], `no spec for ${n}`);
+    }
+  });
+});
+
 describe("badgeMarkdown", () => {
-  test("includes the card and every badge", () => {
+  test("includes the card and every default badge", () => {
     const md = badgeMarkdown(SNAP, { pagesUrl: "https://x.github.io/r" });
     assert.match(md, /<img src="https:\/\/x\.github\.io\/r\/badges\/card\.svg/);
-    for (const n of ["streak", "points", "level", "difficulty", "freezes"]) {
+    for (const n of DEFAULT_PICKS) {
       assert.ok(md.includes(`/badges/${n}.svg`), `missing ${n}`);
     }
+  });
+
+  // The README's own stats block renders Solutions/Easy/Medium/Hard directly
+  // above this row, from a different counter. Defaulting to these two put the
+  // same four numbers on the page twice, able to disagree with each other.
+  test("solved and difficulty are not defaults", () => {
+    const md = badgeMarkdown(SNAP, { pagesUrl: "https://x.github.io/r" });
+    assert.ok(!md.includes("/badges/solved.svg"));
+    assert.ok(!md.includes("/badges/difficulty.svg"));
+  });
+
+  test("but both still render when a user picks them", () => {
+    const md = badgeMarkdown(SNAP, {
+      pagesUrl: "https://x.github.io/r",
+      picks: ["solved", "difficulty"],
+    });
+    assert.ok(md.includes("/badges/solved.svg"));
+    assert.ok(md.includes("/badges/difficulty.svg"));
   });
 
   test("omits the card when asked", () => {

@@ -5,6 +5,7 @@
 
 import { CONSTANTS } from "../../../core/constants.js";
 import { CHART_JS_INLINE } from "../../../vendor/chart-source.js";
+import { README_START, README_END } from "../../../core/badge-svg.js";
 
 /**
  * Escapes a value for interpolation into HTML text or a double-quoted attribute.
@@ -1726,6 +1727,25 @@ export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMet
   const languages = stats?.byLang ? Object.keys(stats.byLang).length : 0;
   const platforms = stats?.byPlatform ? Object.keys(stats.byPlatform).length : 0;
 
+  // One shape for all six, so the row cannot drift apart again the way it had:
+  // a single style, no per-badge logo (only `Solutions` carried one, which made
+  // it the odd one out), and six colours distinct from each other *and* from the
+  // gamification row rendered directly below. That rules out 8b5cf6, which is
+  // the points badge, and 64748b, which is the colour a gamification badge uses
+  // to mean "zero" — a slate `Platforms` badge read as a disabled one.
+  const shield = (label, value, color) =>
+    "[![" +
+    label +
+    "](https://img.shields.io/badge/" +
+    label +
+    "-" +
+    value +
+    "-" +
+    color +
+    "?style=flat-square)](" +
+    url +
+    ")";
+
   const lines = [
     "<!-- CODELEDGER_AUTO_GENERATED_START -->",
     "",
@@ -1735,73 +1755,53 @@ export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMet
     "",
     "# " + owner + "'s DSA Solutions",
     "",
-    "[![Solutions](https://img.shields.io/badge/Solutions-" +
-      total +
-      "-06b6d4?style=flat-square&logo=github)](" +
-      url +
-      ")" +
-      "  [![Easy](https://img.shields.io/badge/Easy-" +
-      easy +
-      "-22c55e?style=flat-square)](" +
-      url +
-      ")" +
-      "  [![Medium](https://img.shields.io/badge/Medium-" +
-      medium +
-      "-f59e0b?style=flat-square)](" +
-      url +
-      ")" +
-      "  [![Hard](https://img.shields.io/badge/Hard-" +
-      hard +
-      "-ef4444?style=flat-square)](" +
-      url +
-      ")" +
-      "  [![Languages](https://img.shields.io/badge/Languages-" +
-      languages +
-      "-8b5cf6?style=flat-square)](" +
-      url +
-      ")" +
-      "  [![Platforms](https://img.shields.io/badge/Platforms-" +
-      platforms +
-      "-64748b?style=flat-square)](" +
-      url +
-      ")",
+    [
+      shield("Solutions", total, "06b6d4"),
+      shield("Easy", easy, "22c55e"),
+      shield("Medium", medium, "f59e0b"),
+      shield("Hard", hard, "ef4444"),
+      shield("Languages", languages, "14b8a6"),
+      shield("Platforms", platforms, "6366f1"),
+    ].join(" "),
+    "",
+    // The gamification markers are emitted here, inside the centered div and
+    // empty, purely to reserve the position. `upsertReadmeBlock` fills them in
+    // the same commit (infra-builder runs it against this merged text), and the
+    // nightly refresh workflow rewrites them in place afterwards.
+    //
+    // They have to be written by this template rather than left to
+    // `upsertReadmeBlock`'s own fallback: with no markers to find, it prepends
+    // the block to the top of the file, which put the streak card above the
+    // `<div align="center">` and therefore left-aligned above the title.
+    README_START,
+    README_END,
     "",
     "> Automatically tracked by [CodeLedger](https://codeledger.vkrishna04.me) — every problem solved, committed to Git.",
     "",
     "**[View Live Dashboard →](" + url + ")**",
-    updatedAt ? "*Last updated: " + updatedAt + "*" : "",
-    "",
-    "[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")",
-    "",
-    "</div>",
-    "",
-    "---",
     "",
   ];
 
-  // Stats table
+  // Its own paragraph. Pushed onto the previous line it rendered as
+  // "View Live Dashboard →Last updated: Jan 1, 2026", and the empty string that
+  // stood in for it when absent left a stray blank line behind.
+  if (updatedAt) lines.push("*Last updated: " + updatedAt + "*", "");
+
+  lines.push("[![CodeLedger](" + SOCIAL_URL + ")](" + url + ")", "", "</div>", "", "---", "");
+
+  // Stats — breakdowns only. The four-column Total/Easy/Medium/Hard table that
+  // used to open this section restated the Solutions/Easy/Medium/Hard badge row
+  // from the same `stats` object, about ten lines further up the same page.
   if (stats) {
-    lines.push("## Stats", "");
-    lines.push("| Total | Easy | Medium | Hard |");
-    lines.push("|:-----:|:----:|:------:|:----:|");
-    lines.push(
-      "| **" +
-        (stats.total || 0) +
-        "** | " +
-        (stats.easy || 0) +
-        " | " +
-        (stats.medium || 0) +
-        " | " +
-        (stats.hard || 0) +
-        " |",
-    );
-    lines.push("");
+    const breakdowns = [];
 
     // Platform breakdown
     if (stats.byPlatform && Object.keys(stats.byPlatform).length) {
       const platRows = Object.entries(stats.byPlatform).sort((a, b) => b[1] - a[1]);
-      lines.push("**By Platform:** " + platRows.map(([p, n]) => p + " (" + n + ")").join(" · "));
-      lines.push("");
+      breakdowns.push(
+        "**By Platform:** " + platRows.map(([p, n]) => p + " (" + n + ")").join(" · "),
+      );
+      breakdowns.push("");
     }
 
     // Language breakdown
@@ -1809,8 +1809,10 @@ export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMet
       const langRows = Object.entries(stats.byLang)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8);
-      lines.push("**Top Languages:** " + langRows.map(([l, n]) => l + " (" + n + ")").join(" · "));
-      lines.push("");
+      breakdowns.push(
+        "**Top Languages:** " + langRows.map(([l, n]) => l + " (" + n + ")").join(" · "),
+      );
+      breakdowns.push("");
     }
 
     // Topic breakdown
@@ -1818,11 +1820,16 @@ export function getRepoReadme(owner, repo, pagesUrl, _theme, _settings, indexMet
       const topicRows = Object.entries(stats.byTopic)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
-      lines.push("**Top Topics:** " + topicRows.map(([t, n]) => t + " (" + n + ")").join(" · "));
-      lines.push("");
+      breakdowns.push(
+        "**Top Topics:** " + topicRows.map(([t, n]) => t + " (" + n + ")").join(" · "),
+      );
+      breakdowns.push("");
     }
 
-    lines.push("---", "");
+    // Only when there is something under it. The counts table used to guarantee
+    // the section had a body; with that gone, a `stats` carrying no breakdown
+    // maps would leave a bare "## Stats" heading against a horizontal rule.
+    if (breakdowns.length) lines.push("## Stats", "", ...breakdowns, "---", "");
   }
 
   // Recent solves
