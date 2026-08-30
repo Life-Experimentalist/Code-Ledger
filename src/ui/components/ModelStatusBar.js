@@ -5,17 +5,24 @@
 
 import { h } from "../../vendor/preact-bundle.js";
 import { htm } from "../../vendor/preact-bundle.js";
+import { CONSTANTS } from "../../core/constants.js";
 const html = htm.bind(h);
 
-const PROVIDER_LABELS = {
-  gemini: "Gemini",
-  openai: "OpenAI",
-  claude: "Claude",
-  anthropic: "Claude",
-  deepseek: "DeepSeek",
-  ollama: "Ollama",
-  openrouter: "OpenRouter",
-};
+/**
+ * Every id that can appear in `settings.aiProvider`, mapped to the short label
+ * this bar has room for — built from each provider's own entry so a new one is
+ * named correctly rather than falling through to its raw id.
+ *
+ * The aliases matter as much as the ids: settings written by an older build can
+ * still say `anthropic`, and an unmapped alias would render the bar as
+ * "AI: anthropic".
+ */
+const PROVIDER_LABELS = Object.fromEntries(
+  Object.values(CONSTANTS.AI_PROVIDERS).flatMap((meta) => {
+    const label = meta.shortName || meta.name;
+    return [meta.id, ...(meta.aliases || [])].map((id) => [id, label]);
+  }),
+);
 
 function shortModel(model) {
   if (!model) return "";

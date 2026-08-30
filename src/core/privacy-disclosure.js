@@ -58,20 +58,18 @@ export const TIER_META = Object.freeze({
   },
 });
 
-/** AI providers that run on the user's own machine and reach no third party. */
-const LOCAL_AI = new Set(["ollama"]);
-
 /**
- * Providers whose useful tier costs nothing when used at a sane rate.
+ * Whether a provider runs on the user's own machine and reaches no third party,
+ * and how it is priced when there is a genuine no-cost path — both read off the
+ * provider's own entry in `CONSTANTS.AI_PROVIDERS`, so a new provider is
+ * disclosed correctly the moment it is declared rather than the moment somebody
+ * remembers to add it to a second list here.
  *
- * Stated as a fact about how they are priced, not a promise about what they
- * will charge tomorrow — hence "free tier" rather than "free".
+ * `freeTier` is stated as a fact about how a provider is priced today, not a
+ * promise about tomorrow — hence "free tier" rather than "free". A provider
+ * that declares none reads as paid, which is the safe direction to be wrong in.
  */
-const FREE_TIER_AI = Object.freeze({
-  gemini: "has a free tier that covers ordinary review volume",
-  openrouter: "offers models with a `:free` suffix at no cost",
-  ollama: "runs on your own machine, so there is nothing to pay",
-});
+const PAID_NOTE = "bills per token — check their pricing before you lean on it";
 
 function repoOf(settings) {
   return settings?.github_repo || settings?.gitRepo || "";
@@ -160,7 +158,7 @@ export function disclosures(settings) {
 
   for (const [id, meta] of Object.entries(CONSTANTS.AI_PROVIDERS || {})) {
     const enabled = isAIActive(s) && s[`${id}_enabled`] === true;
-    const local = LOCAL_AI.has(id);
+    const local = meta.local === true;
     out.push({
       id: `ai:${id}`,
       on: enabled,
@@ -248,8 +246,9 @@ export function privacyTier(settings) {
  *
  * Reviews are the feature people get the most out of and the one most likely to
  * be left off out of vague unease, so the encouragement is worth making — but
- * only alongside the accurate version of "free". Three of the six providers
- * have a genuine no-cost path; the other three bill you.
+ * only alongside the accurate version of "free". Some providers have a genuine
+ * no-cost path and the rest bill you; which is which comes from each entry's
+ * own `freeTier`, so this stays true as providers are added.
  *
  * @returns {Array<{id: string, name: string, free: boolean, why: string}>}
  */
@@ -257,7 +256,7 @@ export function aiCostNotes() {
   return Object.entries(CONSTANTS.AI_PROVIDERS || {}).map(([id, meta]) => ({
     id,
     name: meta.name,
-    free: id in FREE_TIER_AI,
-    why: FREE_TIER_AI[id] || "bills per token — check their pricing before you lean on it",
+    free: !!meta.freeTier,
+    why: meta.freeTier || PAID_NOTE,
   }));
 }

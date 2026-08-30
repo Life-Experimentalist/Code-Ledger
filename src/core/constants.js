@@ -99,61 +99,132 @@ export const CONSTANTS = Object.freeze({
   },
 
   // ── AI Providers ──
+  //
+  // This map is the whole description of a provider. Everything else derives
+  // from it: the privacy disclosure, the cost notes, the `@mention` list, the
+  // status bar label, the settings-sync prefix allow-list and the model
+  // fetcher. Adding a provider means adding an entry here plus its handler
+  // class — see `docs/guides/development/adding-ai-provider.md`.
+  //
+  // Fields beyond the endpoint wiring:
+  //   shortName    — the label with the vendor stripped, for tight UI
+  //   blurb        — one line describing it, for the `@mention` picker
+  //   local        — runs on the user's own machine; nothing leaves it
+  //   freeTier     — how it is priced when there is a genuine no-cost path.
+  //                  A fact about today's pricing, not a promise about
+  //                  tomorrow's; omit it and the provider reads as paid.
+  //   requiresHuman — answers come from a person pasting them, not an API.
+  //                  Never called unattended; see AI_FALLBACK_CHAIN below.
+  //   aliases      — other ids that have meant this provider
+  //
+  // Model-listing wire format, read by `core/model-fetch.js`:
+  //   auth         — {header, prefix} for the API key; omit if none is needed
+  //   headers      — fixed headers the provider requires alongside the key
+  //   modelsPath   — appended to `endpoint` when `modelsEndpoint` is null
+  //   modelList    — {path, id, label}: where the array is in the response and
+  //                  which fields name a model. Everything else is generic, so
+  //                  an ordinary provider needs no code in model-fetch.js.
+  //   timeoutMs    — abort the listing after this long. Worth setting for a
+  //                  local endpoint, where "nothing is listening" should fail
+  //                  fast instead of hanging the settings panel.
   AI_PROVIDERS: {
     gemini: {
       id: "gemini",
       name: "Google Gemini",
+      shortName: "Gemini",
+      blurb: "Google Gemini provider",
       endpoint: "https://generativelanguage.googleapis.com/v1beta",
       modelsEndpoint: "https://generativelanguage.googleapis.com/v1beta/models",
       defaultModel: "gemini-2.0-flash",
       supportsLiveFetch: true,
       keyRequired: true,
+      freeTier: "has a free tier that covers ordinary review volume",
+      auth: { header: "x-goog-api-key" },
+      modelList: { path: "models", label: "displayName" },
     },
     openai: {
       id: "openai",
       name: "OpenAI",
+      shortName: "OpenAI",
+      blurb: "OpenAI provider",
       endpoint: "https://api.openai.com/v1",
       modelsEndpoint: "https://api.openai.com/v1/models",
       defaultModel: "gpt-4o-mini",
       supportsLiveFetch: true,
       keyRequired: true,
+      auth: { header: "Authorization", prefix: "Bearer " },
+      modelList: { path: "data" },
     },
     claude: {
       id: "claude",
       name: "Anthropic Claude",
+      shortName: "Claude",
+      blurb: "Anthropic Claude provider",
+      aliases: ["anthropic"],
       endpoint: "https://api.anthropic.com/v1",
       modelsEndpoint: "https://api.anthropic.com/v1/models",
       defaultModel: "claude-haiku-4-5-20251001",
       supportsLiveFetch: true,
       keyRequired: true,
+      auth: { header: "x-api-key" },
+      headers: {
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerously-allow-browser": "true",
+      },
+      modelList: { path: "data", label: "display_name" },
     },
     deepseek: {
       id: "deepseek",
       name: "DeepSeek",
+      shortName: "DeepSeek",
+      blurb: "DeepSeek provider",
       endpoint: "https://api.deepseek.com/v1",
       modelsEndpoint: null,
+      // Used when the live listing returns nothing — an expired key, a blocked
+      // request — so the model picker still offers the two models that exist
+      // rather than going empty. `supportsLiveFetch` said false here while the
+      // code fetched live anyway; the fetch works, so the flag was the wrong
+      // half of the contradiction.
       staticModels: ["deepseek-chat", "deepseek-reasoner"],
       defaultModel: "deepseek-chat",
-      supportsLiveFetch: false,
+      supportsLiveFetch: true,
       keyRequired: true,
+      auth: { header: "Authorization", prefix: "Bearer " },
+      modelList: { path: "data", label: "name" },
     },
     ollama: {
       id: "ollama",
       name: "Ollama (local)",
+      shortName: "Ollama",
+      blurb: "Local Ollama provider",
       endpoint: "http://localhost:11434/api",
       modelsEndpoint: "http://localhost:11434/api/tags",
       defaultModel: "llama3.2",
       supportsLiveFetch: true,
       keyRequired: false,
+      modelsPath: "/tags",
+      modelList: { path: "models", id: "name" },
+      timeoutMs: 3000,
+      local: true,
+      freeTier: "runs on your own machine, so there is nothing to pay",
     },
     openrouter: {
       id: "openrouter",
       name: "OpenRouter",
+      shortName: "OpenRouter",
+      blurb: "OpenRouter provider",
       endpoint: "https://openrouter.ai/api/v1",
       modelsEndpoint: "https://openrouter.ai/api/v1/models",
       defaultModel: "meta-llama/llama-3.1-8b-instruct:free",
       supportsLiveFetch: true,
       keyRequired: true,
+      freeTier: "offers models with a `:free` suffix at no cost",
+      auth: { header: "Authorization", prefix: "Bearer " },
+      headers: {
+        "HTTP-Referer": "https://codeledger.vkrishna04.me",
+        "X-Title": "CodeLedger",
+      },
+      modelList: { path: "data", label: "name" },
     },
   },
 

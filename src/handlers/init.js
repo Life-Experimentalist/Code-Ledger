@@ -6,6 +6,7 @@
  */
 
 import { registry } from "../core/handler-registry.js";
+import { CONSTANTS } from "../core/constants.js";
 import { createDebugger } from "../lib/debug.js";
 
 const dbg = createDebugger("HandlersInit");
@@ -55,6 +56,11 @@ export function initializeHandlers() {
     dbg.log(`initializeHandlers(): ✓ git provider ${h.id} registered`);
   });
 
+  // These stay written out: a static import is what lets the packager see the
+  // file, and a computed `import()` of a path built from an id would not be
+  // reviewable by a store reviewer reading the source. So this is the second
+  // and last file adding an AI provider touches — `CONSTANTS.AI_PROVIDERS` is
+  // the first, and every list that names providers derives from it.
   const ais = [
     new GeminiHandler(),
     new OpenAIHandler(),
@@ -69,6 +75,18 @@ export function initializeHandlers() {
       registry.registerSettings(h.id, h.getSettingsSchema());
     dbg.log(`initializeHandlers(): ✓ AI provider ${h.id} registered`);
   });
+
+  // Declared but not wired is the one failure this split can produce, and it is
+  // a quiet one: the mention picker, the status bar, the privacy disclosure and
+  // the settings-sync prefixes all read the descriptor, so a provider missing
+  // from `ais` is advertised everywhere and works nowhere. Say so at startup
+  // rather than letting the first review fail with "no handler".
+  const missing = Object.keys(CONSTANTS.AI_PROVIDERS).filter((id) => !ais.some((h) => h.id === id));
+  if (missing.length) {
+    dbg.error(
+      `initializeHandlers(): declared in AI_PROVIDERS but no handler registered: ${missing.join(", ")}`,
+    );
+  }
 
   dbg.log(
     `initializeHandlers(): ✓ complete — ${platforms.length} platform(s), ${gits.length} git provider(s), ${ais.length} AI provider(s) registered`,
