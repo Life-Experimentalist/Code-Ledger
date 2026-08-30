@@ -499,7 +499,7 @@ export function PanelAI({ settings, onSettingsChange }) {
             View Queue
             ${queueStats.total > 0
               ? html`<span class="ml-1 text-[10px] opacity-70"
-                  >(${queueStats.pending}p
+                  >(${queueStats.pending}p${" "}
                   ${queueStats.done}d${queueStats.failed > 0 ? ` ${queueStats.failed}!` : ""})</span
                 >`
               : ""}
@@ -591,8 +591,8 @@ export function PanelAI({ settings, onSettingsChange }) {
           </label>
         </div>
         <p class="text-[11px] text-slate-600">
-          Default: ${CONSTANTS.SNAIL_MODE.BATCH_SIZE} problems every
-          ${CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS / 3600000}h. Pauses automatically after
+          Default: ${CONSTANTS.SNAIL_MODE.BATCH_SIZE} problems every${" "}
+          ${CONSTANTS.SNAIL_MODE.BATCH_INTERVAL_MS / 3600000}h. Pauses automatically after${" "}
           ${CONSTANTS.SNAIL_MODE.ERROR_THRESHOLD} consecutive errors.
         </p>
       </div>

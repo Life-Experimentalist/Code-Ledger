@@ -299,7 +299,7 @@ function Detail({ summary, mineTopics, today }) {
 
       ${summary.truncated
         ? html`<p class="text-[11px] text-amber-400/80">
-            Their ledger is larger than this view reads — the counts above cover the first
+            Their ledger is larger than this view reads — the counts above cover the first${" "}
             ${summary.counted} entries.
           </p>`
         : ""}
@@ -687,7 +687,7 @@ export function PartyView({ problems, settings, onSettingsChange }) {
                     ? html`
                         <div class="mt-1.5"><${Bar} share=${row.share} mine=${row.self} /></div>
                         <p class="text-[11px] text-slate-500 mt-1">
-                          ${row.stats.currentStreak}d streak · ${row.stats.totalPoints} pts ·
+                          ${row.stats.currentStreak}d streak · ${row.stats.totalPoints} pts ·${" "}
                           ${row.stats.totalSolves} solved · Lv ${row.stats.level}
                           ${row.stats.levelName ? ` ${row.stats.levelName}` : ""} ·
                           <${Freshness} asOf=${row.stats.asOf} today=${mine?.today} />

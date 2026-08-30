@@ -261,7 +261,7 @@ export function QueueModal({ onClose, onOpenProblem }) {
                               >
                               ${item.retryCount > 0
                                 ? html`<span class="text-[10px] text-slate-600"
-                                    >${item.retryCount}
+                                    >${item.retryCount}${" "}
                                     retr${item.retryCount === 1 ? "y" : "ies"}</span
                                   >`
                                 : ""}

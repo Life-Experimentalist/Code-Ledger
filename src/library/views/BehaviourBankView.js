@@ -396,12 +396,16 @@ function RoadmapSection({ problems, onNavigate }) {
 
     // The personalised template goes first when there is enough history to
     // build one honestly; below that threshold it simply is not offered.
-    buildBehaviorProfile()
-      .then((profile) => {
-        const mine = buildWeakAreaRoadmap(profile?.topicsUnderStrain || []);
+    (async () => {
+      try {
+        const [entries, chatStats] = await Promise.all([getAllEntries(), getChatStats()]);
+        const profile = buildBehaviorProfile(entries, chatStats);
+        const mine = buildWeakAreaRoadmap(profile.topicsUnderStrain);
         if (mine) setTemplates([mine, ...ROADMAP_TEMPLATES]);
-      })
-      .catch(() => {});
+      } catch (e) {
+        dbg.error("RoadmapSection profile:", e?.message);
+      }
+    })();
   }, []);
 
   const currentRoadmap = roadmaps.find((r) => r.id === active) || null;
@@ -1189,7 +1193,7 @@ ${promptBlock}</pre
                     class="px-3 pb-3 pt-1 text-[11px] text-slate-400 flex flex-col gap-1 border-t border-white/5"
                   >
                     <div>
-                      Difficulty: ${e.difficulty || "—"} · Solves: ${solves.length} · Timed:
+                      Difficulty: ${e.difficulty || "—"} · Solves: ${solves.length} · Timed:${" "}
                       ${timed.length ? timed.map(formatDuration).join(", ") : "none"}
                     </div>
                     ${e.tags?.length > 0 && html`<div>Tags: ${e.tags.join(", ")}</div>`}

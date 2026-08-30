@@ -898,7 +898,8 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
         <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest">Sync</h3>
         <p class="text-[11px] text-slate-500">
           Pulls any new problems from the repository into the local library, then pushes all
-          unsynced local solutions — one commit per problem, backdated to the original solve time.
+          unsynced local solutions — one commit per problem, backdated to the original solve
+          time.${" "}
           ${syncCount !== null && syncCount > 0
             ? html`<span class="text-amber-400">
                 ${syncCount} problem${syncCount !== 1 ? "s" : ""} pending.</span

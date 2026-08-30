@@ -741,7 +741,7 @@ export function ConflictResolutionModal({
                 ? "bg-cyan-500 text-black hover:bg-cyan-400"
                 : "bg-white/5 text-slate-600 cursor-not-allowed")}
             >
-              Apply & Import ${remoteOnly.length + classified.length}
+              Apply & Import ${remoteOnly.length + classified.length}${" "}
               problem${remoteOnly.length + classified.length !== 1 ? "s" : ""}
             </button>
           </div>

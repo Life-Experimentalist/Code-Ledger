@@ -240,7 +240,7 @@ function ManualBackups({ settings }) {
                     <div class="flex-1 min-w-0">
                       <p class="text-xs text-slate-200 truncate">${b.name || "Backup"}</p>
                       <p class="text-[11px] text-slate-500">
-                        ${fmtTime(b.ts)} · ${(b.data?.problems || []).length} problems ·
+                        ${fmtTime(b.ts)} · ${(b.data?.problems || []).length} problems ·${" "}
                         ${fmtSize(b.data)}
                       </p>
                     </div>
@@ -405,8 +405,8 @@ function ScheduledBackups({ settings, onSettingsChange }) {
                   <div key=${b.id} class="flex items-center gap-3 px-3 py-2.5 bg-white/[0.02]">
                     <div class="flex-1 min-w-0">
                       <p class="text-[11px] text-slate-500">
-                        ${fmtTime(b.ts)} · via ${b.trigger} · ${(b.data?.problems || []).length}
-                        problems
+                        ${fmtTime(b.ts)} · via ${b.trigger} ·${" "}
+                        ${(b.data?.problems || []).length} problems
                       </p>
                     </div>
                     <div class="flex gap-1 shrink-0">
@@ -849,8 +849,8 @@ function BehaviorBankData() {
         this is where the data itself is exported, imported or wiped.
       </p>
       <p class="text-xs text-slate-400">
-        <b class="text-slate-200">${entryCount}</b> problem entr${entryCount === 1 ? "y" : "ies"}
-        stored on this device.
+        <b class="text-slate-200">${entryCount}</b> problem
+        entr${entryCount === 1 ? "y" : "ies"}${" "} stored on this device.
       </p>
       <div class="flex flex-wrap gap-3">
         <button

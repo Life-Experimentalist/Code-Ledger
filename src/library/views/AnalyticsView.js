@@ -1683,7 +1683,7 @@ export function AnalyticsView({ problems, onNavigate }) {
                   <div class="flex flex-col">
                     <span class="text-sm font-bold text-white">${drilldown.label}</span>
                     <span class="text-[11px] text-slate-500"
-                      >${drilldown.problems.length}
+                      >${drilldown.problems.length}${" "}
                       problem${drilldown.problems.length !== 1 ? "s" : ""}</span
                     >
                   </div>
