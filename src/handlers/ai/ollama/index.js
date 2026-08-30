@@ -7,6 +7,7 @@ import { BaseAIHandler } from "../../_base/BaseAIHandler.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { buildReviewPrompt } from "../../../core/ai-prompts.js";
+import { resolveEndpoint } from "../../../core/ai-endpoint.js";
 import { createDebugger } from "../../../lib/debug.js";
 
 const dbg = createDebugger("OllamaHandler");
@@ -58,7 +59,7 @@ export class OllamaHandler extends BaseAIHandler {
       problemContext?.aiModelOverride ||
       settings.ollama_model ||
       CONSTANTS.AI_PROVIDERS.ollama.defaultModel;
-    const endpoint = settings.ollama_endpoint || CONSTANTS.AI_PROVIDERS.ollama.endpoint;
+    const endpoint = resolveEndpoint("ollama", settings);
 
     const prompts = await Storage.getAIPrompts();
     const prompt = buildReviewPrompt(problemContext, code, prompts);

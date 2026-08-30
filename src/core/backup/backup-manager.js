@@ -15,6 +15,7 @@ import { decodeBase64Utf8 } from "../../lib/base64.js";
 import { Storage } from "../storage.js";
 import { getAllInsights, importInsights } from "../memory/knowledge-bank.js";
 import { autoPopulateFromHistory } from "../behavior-bank.js";
+import { isPortableSetting } from "../settings-sync.js";
 
 const dbg = createDebugger("BackupManager");
 
@@ -67,12 +68,16 @@ export async function buildSnapshot() {
     Storage.getRoadmaps().catch(() => []),
   ]);
 
-  // Strip transient/private keys from settings
+  // Keep only settings the portability gate calls safe to move between installs.
+  // This used to be a denylist — anything not matching `_`, "token", "key" or
+  // "secret" was written into a backup that lives in the ledger repository. It
+  // let `openai_endpoint` through (a URL that decides where solutions and API
+  // keys get posted), and it let `openai_apiKey` through too, because
+  // `includes("key")` is case-sensitive and that key spells it with a capital.
+  // A denylist has to anticipate every dangerous key ever added; the allow-list
+  // in settings-sync already exists and fails closed instead.
   const safeSettings = Object.fromEntries(
-    Object.entries(settings).filter(
-      ([k]) =>
-        !k.startsWith("_") && !k.includes("token") && !k.includes("key") && !k.includes("secret"),
-    ),
+    Object.entries(settings).filter(([k]) => isPortableSetting(k)),
   );
 
   return {
@@ -349,17 +354,19 @@ export async function restoreSnapshot(snapshot) {
     await Storage.setRoadmaps([...roadmapsMap.values()]);
   }
 
-  // 4. Restore Settings (merge non-sensitive settings)
+  // 4. Restore Settings (merge the ones the portability gate accepts)
+  //
+  // A snapshot is untrusted input: it comes out of a repository, or out of a
+  // file the user was handed. The same allow-list that decides what may be
+  // written decides what may be read back, so a hand-edited backup cannot
+  // introduce a key the extension would never have put there itself.
   if (
     snapshot.settings &&
     typeof snapshot.settings === "object" &&
     !Array.isArray(snapshot.settings)
   ) {
     const safeSettings = Object.fromEntries(
-      Object.entries(snapshot.settings).filter(
-        ([k]) =>
-          !k.startsWith("_") && !k.includes("token") && !k.includes("key") && !k.includes("secret"),
-      ),
+      Object.entries(snapshot.settings).filter(([k]) => isPortableSetting(k)),
     );
     await Storage.updateSettings(safeSettings);
   }

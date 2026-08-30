@@ -156,7 +156,31 @@ const SECRET_KEYS = [
 const SECRET_SUFFIXES = ["_keys", "_token", "_secret", "_apiKey", "_api_key", "_password"];
 
 /**
+ * Keys that stay on the device that set them, credential or not.
+ *
+ * An AI endpoint override is not a secret — it is a URL the user types into an
+ * Advanced field — but it decides where their solution and their API key get
+ * posted. `PORTABLE_PREFIXES` waved `openai_endpoint` through on the strength of
+ * its `openai_` prefix, in both directions, so anyone who could write to the
+ * ledger repository could add one line to `sync.json` and have the next pull
+ * point every AI review at a server they control. The extension would then send
+ * the user's code there and put the user's API key in the Authorization header.
+ *
+ * Syncing it buys very little — it is typed once per device, by hand, in a
+ * panel most users never open — so the honest trade is to not sync it at all
+ * rather than to sync it in one direction and quietly ignore it in the other.
+ * `resolveEndpoint` in `core/ai-endpoint.js` is the second line: it rejects a
+ * value that is not `https:` (or loopback `http:`) at the point of use.
+ */
+const LOCAL_ONLY_KEYS = ["aiEndpoint"];
+const LOCAL_ONLY_SUFFIXES = ["_endpoint"];
+
+/**
  * Whether a settings key may leave the device.
+ *
+ * The pull path in `syncSettingsFromGitHub` runs the same test on the way in,
+ * so a `false` here means both "never written to the repo" and "never accepted
+ * from it".
  *
  * @param {string} key
  * @returns {boolean}
@@ -165,6 +189,8 @@ export function isPortableSetting(key) {
   if (typeof key !== "string" || !key) return false;
   if (SECRET_KEYS.some((sk) => key.startsWith(sk))) return false;
   if (SECRET_SUFFIXES.some((sfx) => key.endsWith(sfx))) return false;
+  if (LOCAL_ONLY_KEYS.includes(key)) return false;
+  if (LOCAL_ONLY_SUFFIXES.some((sfx) => key.endsWith(sfx))) return false;
   if (PORTABLE_SETTINGS.includes(key)) return true;
   if (PORTABLE_PREFIXES.some((p) => key.startsWith(p))) return true;
   return false;
