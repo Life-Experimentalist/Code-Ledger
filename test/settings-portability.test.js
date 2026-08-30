@@ -35,8 +35,18 @@ describe("isPortableSetting", () => {
     for (const p of AI_PROVIDERS) {
       assert.equal(isPortableSetting(`${p}_enabled`), true);
       assert.equal(isPortableSetting(`${p}_model`), true);
-      assert.equal(isPortableSetting(`${p}_endpoint`), true);
     }
+  });
+
+  it("never lets an endpoint override travel in either direction", () => {
+    // Not a secret, but it decides where the solution and the API key are
+    // posted. The pull path runs this same test, so `false` here is what stops
+    // a line added to sync.json by anyone with write access to the repo from
+    // redirecting every AI review to a server they control.
+    for (const p of AI_PROVIDERS) {
+      assert.equal(isPortableSetting(`${p}_endpoint`), false, `${p}_endpoint must stay local`);
+    }
+    assert.equal(isPortableSetting("aiEndpoint"), false);
   });
 
   it("never lets a git credential out", () => {

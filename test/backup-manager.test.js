@@ -18,9 +18,11 @@ import { Storage } from "../src/core/storage.js";
 import {
   BACKUP_STATUS_KEY,
   backupFilePath,
+  buildSnapshot,
   commitBackupToGitHub,
   fetchBackupSnapshot,
   maybeCommitRollingBackup,
+  restoreSnapshot,
   saveLocalSnapshots,
 } from "../src/core/backup/backup-manager.js";
 
@@ -220,6 +222,67 @@ describe("fetchBackupSnapshot", () => {
       },
     };
     assert.equal(await fetchBackupSnapshot("o", "r", "backups/x.json", git), null);
+  });
+});
+
+describe("what a snapshot may carry", () => {
+  // A backup file lives in the ledger repository and is handed around as a
+  // file. Both halves used to run the same denylist — skip `_*`, "token",
+  // "key", "secret" — which let two dangerous shapes through: `*_endpoint`,
+  // which decides where solutions and API keys are posted, and `*_apiKey`,
+  // because `includes("key")` is case-sensitive. Both now go through the
+  // portability allow-list, which fails closed.
+
+  test("does not write an endpoint override into the backup", async () => {
+    settings = {
+      theme_preset: "midnight",
+      openai_endpoint: "https://gateway.example/v1",
+      aiEndpoint: "https://gateway.example/v1",
+    };
+    const snap = await buildSnapshot();
+    assert.equal(snap.settings.theme_preset, "midnight");
+    assert.equal("openai_endpoint" in snap.settings, false);
+    assert.equal("aiEndpoint" in snap.settings, false);
+  });
+
+  test("does not write a credential the old denylist spelled past", async () => {
+    settings = { openai_apiKey: "sk-live-1", openai_keys: "sk-live-2", github_token: "ghp_x" };
+    const snap = await buildSnapshot();
+    assert.deepEqual(Object.keys(snap.settings), []);
+  });
+
+  test("a restored snapshot cannot set an endpoint override", async () => {
+    // The attack: hand someone a backup, or edit one in a repo you can write
+    // to, and every later AI review posts their code and their key to you.
+    settings = {};
+    await restoreSnapshot({
+      settings: {
+        theme_preset: "midnight",
+        openai_endpoint: "https://evil.example/v1",
+        aiEndpoint: "https://evil.example/v1",
+      },
+    });
+    assert.equal(settings.theme_preset, "midnight");
+    assert.equal(settings.openai_endpoint, undefined);
+    assert.equal(settings.aiEndpoint, undefined);
+  });
+
+  test("a restored snapshot cannot introduce a credential", async () => {
+    settings = {};
+    await restoreSnapshot({ settings: { github_token: "ghp_evil", openai_keys: "sk-evil" } });
+    assert.deepEqual(settings, {});
+  });
+
+  test("a restore still carries the preferences it is for", async () => {
+    settings = {};
+    await restoreSnapshot({
+      settings: { theme_preset: "midnight", gamificationEnabled: true, github_repo: "r" },
+    });
+    assert.deepEqual(settings, {
+      theme_preset: "midnight",
+      gamificationEnabled: true,
+      github_repo: "r",
+    });
   });
 });
 

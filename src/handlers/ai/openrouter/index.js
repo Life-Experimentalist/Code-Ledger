@@ -8,6 +8,7 @@ import { APIKeyPool } from "../../../core/api-key-pool.js";
 import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import { buildReviewPrompt } from "../../../core/ai-prompts.js";
+import { resolveEndpoint } from "../../../core/ai-endpoint.js";
 import { createDebugger } from "../../../lib/debug.js";
 
 const dbg = createDebugger("OpenRouterHandler");
@@ -67,10 +68,7 @@ export class OpenRouterHandler extends BaseAIHandler {
       settings.openrouter_model ||
       settings.aiModel ||
       CONSTANTS.AI_PROVIDERS.openrouter.defaultModel;
-    const endpoint =
-      settings.openrouter_endpoint ||
-      settings.aiEndpoint ||
-      CONSTANTS.AI_PROVIDERS.openrouter.endpoint;
+    const endpoint = resolveEndpoint("openrouter", settings);
     dbg.log(`review(): model=${model}, endpoint=${endpoint}`);
 
     const prompts = await Storage.getAIPrompts();

@@ -6,8 +6,28 @@
 import { Storage } from "./storage.js";
 import { CONSTANTS } from "./constants.js";
 import { createDebugger } from "../lib/debug.js";
+import { isSafeEndpoint } from "./ai-endpoint.js";
 
 const dbg = createDebugger("ModelFetch");
+
+/**
+ * Drop an endpoint override this extension will not send an API key to.
+ *
+ * These three functions all put the user's key in a header, and their override
+ * comes out of settings (`ModelSelector` reads `{provider}_endpoint` straight
+ * from the settings map), so the same poisoned value that would redirect a
+ * review would redirect the model listing. Returning a falsy value here puts
+ * the caller back on the `baseOverride` branch it already has for "no override
+ * given", so a rejected value degrades to the shipped endpoint.
+ *
+ * @param {unknown} value
+ * @returns {string} the override, or "" if it is not one we will use
+ */
+function safeOverride(value) {
+  if (isSafeEndpoint(value)) return String(value).trim();
+  if (value) dbg.warn("ignoring an endpoint override that is not https (or loopback http)");
+  return "";
+}
 
 async function getFirstKeyForProvider(providerId) {
   const aiKeys = await Storage.getAIKeys();
@@ -22,8 +42,13 @@ export async function fetchModelsForProvider(providerId, endpointOverride, optio
   const models = [];
   const throwOnError = !!options.throwOnError;
 
+  // Normalise once, here, rather than at each use. Every provider branch below
+  // re-implements the override join against the raw parameter, so a check
+  // buried in `epFor` would have covered one of eight paths.
+  endpointOverride = safeOverride(endpointOverride);
+
   const epFor = (useModelsEndpoint = false) => {
-    const baseOverride = endpointOverride ? String(endpointOverride).replace(/\/$/, "") : null;
+    const baseOverride = endpointOverride ? endpointOverride.replace(/\/$/, "") : null;
     const me = provider.modelsEndpoint;
     if (useModelsEndpoint && me) {
       if (baseOverride && provider.endpoint && me.startsWith(provider.endpoint)) {
@@ -228,7 +253,7 @@ export async function fetchAIModels() {
 export async function testAIKey(providerId, key, endpointOverride = "") {
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return { ok: false, error: "Unknown provider" };
-  const baseOverride = endpointOverride ? String(endpointOverride).replace(/\/$/, "") : "";
+  const baseOverride = safeOverride(endpointOverride).replace(/\/$/, "");
   const endpointForModels = () => {
     const me = provider.modelsEndpoint;
     if (me) {
@@ -336,7 +361,12 @@ export async function testProviderEndpoint(providerId, endpointOverride) {
   const provider = CONSTANTS.AI_PROVIDERS[providerId];
   if (!provider) return { ok: false, error: "Unknown provider" };
 
-  const baseOverride = endpointOverride ? String(endpointOverride).replace(/\/$/, "") : null;
+  if (endpointOverride && !isSafeEndpoint(endpointOverride)) {
+    // Say so rather than silently testing the shipped endpoint and reporting a
+    // pass for a URL that would never have been used.
+    return { ok: false, error: "Endpoint must be an https:// URL (or http:// on localhost)" };
+  }
+  const baseOverride = safeOverride(endpointOverride).replace(/\/$/, "") || null;
   const me = provider.modelsEndpoint;
   const ep = me
     ? baseOverride && provider.endpoint && me.startsWith(provider.endpoint)
