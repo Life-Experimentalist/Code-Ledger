@@ -75,7 +75,27 @@ export async function triggerCodeRecovery(problem) {
       });
     }, RECOVERY_TIMEOUT_MS);
 
-    function listener(msg) {
+    /**
+     * Is this message from the tab we opened?
+     *
+     * The recovery URL carries the problem id in its query string and hash, so
+     * any tab on a matched host can be given one: a link to
+     * `leetcode.com/problems/foo/?codeledger_code_fetch=1&codeledger_problemid=<id>`
+     * makes that page's content script harvest and report under an id we are
+     * waiting on. Matching the id alone would let that reply resolve this
+     * recovery, and the result is saved and queued for commit to the user's
+     * repository. The tab id is the part of the message the page cannot choose.
+     *
+     * A message that arrives before `tabs.create` has resolved cannot be
+     * checked, so it is refused; the tab handle exists long before the page it
+     * loads can run anything.
+     */
+    function fromOurTab(sender) {
+      return tabId != null && sender?.tab?.id === tabId;
+    }
+
+    function listener(msg, sender) {
+      if (!fromOurTab(sender)) return;
       // Fast-fail when URL redirect stripped the problemId — the content script
       // reports this separately so we don't silently wait the full 30 s timeout.
       if (msg?.type === "CODELEDGER_CODE_FETCH_ID_MISSING" && !settled) {

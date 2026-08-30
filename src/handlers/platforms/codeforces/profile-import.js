@@ -16,6 +16,7 @@
 import { createDebugger } from "../../../lib/debug.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { runtime } from "../../../lib/browser-compat.js";
+import { onTrustedClick } from "../../../lib/trusted-click.js";
 import {
   buildUserStatusUrl,
   extractSolves,
@@ -106,7 +107,7 @@ export function injectProfileImportBtn(makeProblemId, pageHandle) {
     document.body.appendChild(wrapper);
   }
 
-  btn.addEventListener("click", () => runProfileImport(makeProblemId, btn, handle));
+  onTrustedClick(btn, () => runProfileImport(makeProblemId, btn, handle));
 }
 
 function _createImportButton() {

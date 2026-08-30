@@ -14,6 +14,7 @@ import { gql as _gqlCall, fetchMetadata, buildBulkReadme } from "./file-builder.
 import { resolveLang } from "./lang-utils.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { solutionPath, readmePath } from "../../../core/path-builder.js";
+import { onTrustedClick } from "../../../lib/trusted-click.js";
 
 const dbg = createDebugger("LCProfileImport");
 
@@ -36,7 +37,7 @@ function createImportBtn(handler, pageUsername) {
     `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">` +
     `<path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm1 14H11v-4H8l4-4 4 4h-3v4z"/>` +
     `</svg> Import All Solves to CodeLedger`;
-  btn.addEventListener("click", () => runProfileImport(handler, pageUsername, btn));
+  onTrustedClick(btn, () => runProfileImport(handler, pageUsername, btn));
   return btn;
 }
 
@@ -339,7 +340,7 @@ async function runProfileImport(handler, pageUsername, btn) {
       commitBtn.onmouseleave = () => {
         commitBtn.style.background = "rgba(6,182,212,0.08)";
       };
-      commitBtn.addEventListener("click", async () => {
+      onTrustedClick(commitBtn, async () => {
         commitBtn.disabled = true;
         commitBtn.textContent = "⏳ Committing…";
         show("Committing to GitHub…");

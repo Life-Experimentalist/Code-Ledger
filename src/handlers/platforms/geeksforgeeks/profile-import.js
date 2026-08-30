@@ -13,6 +13,7 @@ import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
 import { runtime } from "../../../lib/browser-compat.js";
 import { detectPage, PAGE_TYPES } from "./page-detector.js";
 import { cleanGfgSlug } from "../../../core/gfg-utils.js";
+import { onTrustedClick } from "../../../lib/trusted-click.js";
 
 const dbg = createDebugger("GFGProfileImport");
 
@@ -518,7 +519,7 @@ export async function injectProfileImportBtn(makeProblemId) {
         }
       }
 
-      btn.addEventListener("click", () => runProfileImport(makeProblemId, btn));
+      onTrustedClick(btn, () => runProfileImport(makeProblemId, btn));
       return;
     }
 
@@ -540,7 +541,7 @@ export async function injectProfileImportBtn(makeProblemId) {
     floater.appendChild(prog);
     floater.appendChild(btn);
     document.body.appendChild(floater);
-    btn.addEventListener("click", () => runProfileImport(makeProblemId, btn));
+    onTrustedClick(btn, () => runProfileImport(makeProblemId, btn));
   }
 }
 

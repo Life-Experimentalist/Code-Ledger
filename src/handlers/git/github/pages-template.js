@@ -904,8 +904,12 @@ export function getPagesHtml(opts = {}) {
             + ' · ' + node.band
             + (node.daysSince !== null ? ' · last ' + (node.daysSince === 0 ? 'today' : node.daysSince + 'd ago') : '');
         } else {
+          // Platform names come straight out of index.json, which is repository
+          // content — same trust level as the commit list below. The difficulty
+          // is safe because normDiff() only ever returns one of four literals.
+          // No backticks in here: this whole script is inside a template literal.
           s = '<b>' + escHtml(node.label) + '</b>' + (node.difficulty || '?')
-            + (node.solved ? (node.platforms.length ? ' · ' + node.platforms.join(', ') : ' · solved') : ' · unsolved suggestion');
+            + (node.solved ? (node.platforms.length ? ' · ' + escHtml(node.platforms.join(', ')) : ' · solved') : ' · unsolved suggestion');
         }
         tip.innerHTML = s;
         tip.style.display = 'block';

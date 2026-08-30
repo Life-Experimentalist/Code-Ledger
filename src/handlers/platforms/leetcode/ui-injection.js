@@ -10,6 +10,7 @@ import { runtime, tabs } from "../../../lib/browser-compat.js";
 import { Storage } from "../../../core/storage.js";
 import { PAGE_TYPES, detectPage } from "./page-detector.js";
 import { processSubmission } from "./submission-detector.js";
+import { onTrustedClick } from "../../../lib/trusted-click.js";
 
 const dbg = createDebugger("LCUIInjection");
 
@@ -73,7 +74,7 @@ export function injectDetailSyncBtn(handler, page) {
     btn.className =
       "group whitespace-nowrap focus:outline-none flex items-center justify-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors";
     btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`;
-    btn.addEventListener("click", () => manualSync(handler, page, btn));
+    onTrustedClick(btn, () => manualSync(handler, page, btn));
     row.appendChild(btn);
   };
 
@@ -106,7 +107,7 @@ export function injectSubmissionListSyncBtn(handler, page) {
   btn.className =
     "fixed right-4 bottom-4 z-[2147483646] whitespace-nowrap focus:outline-none flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border border-cyan-500/30 text-cyan-300 bg-slate-950/90 shadow-lg hover:bg-cyan-500/10 transition-colors";
   btn.textContent = "Sync latest accepted";
-  btn.addEventListener("click", () => manualSync(handler, page, btn));
+  onTrustedClick(btn, () => manualSync(handler, page, btn));
   document.body.appendChild(btn);
 }
 
