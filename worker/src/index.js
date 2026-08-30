@@ -250,20 +250,21 @@ function readCookie(c, name) {
  * Every interpolation below is escaped: `error` originates from GitHub's
  * redirect query string and is therefore attacker-controlled.
  */
-function authCallbackHtml(provider, token, error = "") {
+function authCallbackHtml(provider, token, error = "", nonce = "") {
   const payload = { type: "CODELEDGER_AUTH", provider, token, error };
   const attr = escapeHtml(JSON.stringify(payload));
   const status = token
     ? "Authentication successful. Closing…"
     : `Authentication failed: ${escapeHtml(error || "unknown error")}`;
+  const n = escapeHtml(nonce);
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>CodeLedger Auth</title>
-<style>body{font-family:system-ui,sans-serif;background:#050508;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
+<style nonce="${n}">body{font-family:system-ui,sans-serif;background:#050508;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
 </head><body>
 <div id="codeledger-auth-result" data-auth="${attr}" style="display:none"></div>
 <p>${status}</p>
-<script>
+<script nonce="${n}">
 (function(){
   var msg = ${jsonForScript(payload)};
   // Fallback only: delivered to this window alone, never broadcast with '*'.
@@ -353,16 +354,35 @@ app.get("/api/auth/:provider", async (c) => {
 // GitHub OAuth callback
 app.get("/api/auth/github/callback", async (c) => {
   const clearCookie = `${STATE_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
-  const reply = (token, error) =>
-    new Response(authCallbackHtml("github", token, error), {
+  // This page carries a repo-scoped OAuth token in the DOM, so it is the one
+  // response in the worker where an escaping mistake costs the user their
+  // repository. The interpolations below it are escaped, and this is the
+  // second lock: a per-response nonce means injected markup cannot execute
+  // even if it reaches the page, and `default-src 'none'` means it cannot
+  // reach a network endpoint to send the token to. `frame-ancestors 'none'`
+  // because nothing should ever embed the sign-in result.
+  const reply = (token, error) => {
+    const nonce = crypto.randomUUID();
+    return new Response(authCallbackHtml("github", token, error, nonce), {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Set-Cookie": clearCookie,
         "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": [
+          "default-src 'none'",
+          `script-src 'nonce-${nonce}'`,
+          `style-src 'nonce-${nonce}'`,
+          "base-uri 'none'",
+          "form-action 'none'",
+          "frame-ancestors 'none'",
+        ].join("; "),
       },
     });
+  };
 
   const code = c.req.query("code");
   const error = c.req.query("error");

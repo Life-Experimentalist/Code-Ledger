@@ -125,7 +125,35 @@
           type: string
     responses:
       "200":
-        description: HTML page posting the token (or an error string) back to the opener
+        description: |
+          HTML page carrying the token (or an error string) in `data-auth`.
+
+          This is the one response in the worker that hands out a repo-scoped GitHub
+          token through the DOM, so the page is locked down: `default-src 'none'` with
+          no `connect-src`, meaning an injected script has nowhere to send the token
+          even if one ran. The inline `<style>` and `<script>` carry a per-response
+          nonce; a static hash would not work, because the script embeds the token and
+          so differs on every response.
+        headers:
+          Content-Security-Policy:
+            description: |
+              `default-src 'none'; script-src 'nonce-…'; style-src 'nonce-…';
+              base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
+              The nonce is fresh per response and matches the one on the inline tags.
+            schema:
+              type: string
+          X-Frame-Options:
+            description: "`DENY` — the same as `frame-ancestors`, for older browsers"
+            schema:
+              type: string
+          X-Content-Type-Options:
+            schema:
+              type: string
+              enum: [nosniff]
+          Set-Cookie:
+            description: Clears the `state` cookie
+            schema:
+              type: string
         content:
           text/html:
             schema:
