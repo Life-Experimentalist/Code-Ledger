@@ -9,6 +9,7 @@ import { detectPage, PAGE_TYPES } from "./page-detector.js";
 import { Storage } from "../../../core/storage.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { runtime } from "../../../lib/browser-compat.js";
+import { onTrustedClick } from "../../../lib/trusted-click.js";
 import { registerPlatformPrompt } from "../../../core/ai-prompts.js";
 import { normalizeDifficulty } from "../../../core/difficulty-map.js";
 import { resolvePrimaryTopic } from "../../../core/topic-resolver.js";
@@ -615,7 +616,7 @@ Be concise. Max 200 words.`;
 
     btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync to Ledger`;
 
-    btn.addEventListener("click", async (e) => {
+    onTrustedClick(btn, async (e) => {
       e.stopPropagation();
       const originalHTML = btn.innerHTML;
       try {
@@ -746,7 +747,7 @@ Be concise. Max 200 words.`;
 
     btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;"><path d="M12 4a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H5a1 1 0 110-2h6V5a1 1 0 011-1z"/></svg> Add to Library`;
 
-    btn.addEventListener("click", async (e) => {
+    onTrustedClick(btn, async (e) => {
       e.stopPropagation();
       const originalHTML = btn.innerHTML;
       try {
@@ -1344,7 +1345,7 @@ Be concise. Max 200 words.`;
 
         syncBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;"><path d="M4 12a8 8 0 018-8V2.5a.5.5 0 01.854-.354l3 3a.5.5 0 010 .708l-3 3A.5.5 0 0112 8.5V7a5 5 0 105 5h1.5a6.5 6.5 0 11-14.5 0z"/></svg> Sync`;
 
-        syncBtn.addEventListener("click", async (e) => {
+        onTrustedClick(syncBtn, async (e) => {
           e.stopPropagation();
           const originalHTML = syncBtn.innerHTML;
           try {

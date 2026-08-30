@@ -127,6 +127,22 @@ describe("pages template — embedded commit list", () => {
     assert.ok(html.includes("function countDiff("), "countDiff must exist to do that counting");
   });
 
+  test("the graph tooltip escapes the platform names it reads from index.json", () => {
+    // The tooltip writes into innerHTML. Platform names arrive from index.json,
+    // which is repository content — on a public repo, or one with a leaked
+    // token, anyone who can land a commit chooses them. The label beside them
+    // was escaped from the start, which is what made this easy to miss.
+    const html = getPagesHtml();
+    assert.ok(
+      html.includes("escHtml(node.platforms.join(', '))"),
+      "platform names must be escaped before reaching innerHTML",
+    );
+    assert.ok(
+      !/\+ node\.platforms\.join\(', '\)/.test(html),
+      "an unescaped platform join survived",
+    );
+  });
+
   test("the renderer restricts the commit URL to http(s)", () => {
     const html = getPagesHtml();
     assert.ok(
