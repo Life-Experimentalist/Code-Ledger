@@ -64,6 +64,41 @@ function _fieldsEqual(a, b) {
 }
 
 /**
+ * Drop the fields a record coming back from index.json does not get to set.
+ *
+ * Everything the extension stores on a problem for its own bookkeeping is
+ * underscore-prefixed, so this is a namespace rule rather than a list of
+ * known-bad names — a field added later is covered without anyone remembering
+ * to come back here. An allow-list would be the other way round, and would
+ * silently drop whatever a future version legitimately adds.
+ *
+ * Two of these fields are why this matters rather than being tidiness:
+ *
+ *   `_committedPaths` is the list of files a problem last wrote. The
+ *   maintenance pass deletes every path in it that the problem no longer
+ *   writes, so a record naming `.github/workflows/release.yml` would have that
+ *   file deleted from the user's repository on the next Resync All. It comes
+ *   back on its own: `_inferCommittedPaths` derives it from the actual remote
+ *   tree, which is the ground truth the stored copy is only a cache of.
+ *
+ *   `_conflictResolvedAt` is this device's record that the user already
+ *   settled a disagreement. Dated far enough ahead it makes every later remote
+ *   edit lose the timestamp comparison, and the problem stops raising
+ *   conflicts for good.
+ *
+ * Only the remote side is stripped. The local copies of these fields are this
+ * device's own truth, and stripping those too would resurrect every resolved
+ * conflict on every sync.
+ */
+function _stripLocalFields(record) {
+  const out = {};
+  for (const key of Object.keys(record)) {
+    if (!key.startsWith("_")) out[key] = record[key];
+  }
+  return out;
+}
+
+/**
  * Fetch index.json from the connected repo and categorise remote problems.
  * Returns { remoteOnly, conflicts } — does NOT write to storage (caller decides).
  *
@@ -112,7 +147,14 @@ export async function importFromRepo(owner, repo, git) {
     dbg.warn("importFromRepo(): failed to parse index.json; treating as empty", e?.message || e);
     index = { problems: [] };
   }
-  const rawRemote = Array.isArray(index.problems) ? index.problems : [];
+  // index.json is repository content, not extension state: it can be edited by
+  // hand, by a collaborator, or by anyone who can write to a repo the user is
+  // persuaded to sync from. Everything below treats it that way — non-records
+  // are dropped rather than crashing the whole import on the first `null`, and
+  // local bookkeeping fields do not survive the trip.
+  const rawRemote = (Array.isArray(index.problems) ? index.problems : [])
+    .filter((p) => p && typeof p === "object" && !Array.isArray(p))
+    .map(_stripLocalFields);
   dbg.log(`importFromRepo(): parsed ${rawRemote.length} remote problem(s)`);
   if (rawRemote.length > 0) {
     const sample = rawRemote.slice(0, 5).map((p) => p.id || p.titleSlug || "?");
@@ -141,13 +183,20 @@ export async function importFromRepo(owner, repo, git) {
   const localByCommitKey = new Map(
     localProblems.map((p) => [_syncCommitKey(p), p]).filter(([key]) => Boolean(key)),
   );
+  // The commit key is `id::lang`, but the problems store is keyed on `id`
+  // alone, so two records that differ only in language are one row. Matching on
+  // the commit key by itself called the second one remote-only, and
+  // `Storage.saveProblem` then merged it over the first — a solve replaced
+  // without asking. This second map catches the case: same slot, different
+  // commit key still has to go past the user.
+  const localById = new Map(localProblems.map((p) => [p.id, p]).filter(([id]) => Boolean(id)));
   dbg.log(`importFromRepo(): mapped ${localByCommitKey.size} local problem(s) by commit key`);
 
   const remoteOnly = [];
   const conflicts = [];
 
   for (const remote of remoteProblems) {
-    const local = localByCommitKey.get(_syncCommitKey(remote));
+    const local = localByCommitKey.get(_syncCommitKey(remote)) || localById.get(remote.id);
     if (!local) {
       remoteOnly.push(remote);
       continue;
