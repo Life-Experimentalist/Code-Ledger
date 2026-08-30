@@ -120,7 +120,20 @@ describe("importFromRepo", () => {
     assert.equal(conflicts[0].remote.code, "remote version");
   });
 
-  test("the same problem in another language is a separate entry, not a conflict", async () => {
+  test("the same problem in another language does not silently replace the local one", async () => {
+    // This used to assert the opposite — that the Java solve was "new work, not
+    // a rewrite of the Python one", and so belonged in remoteOnly. The intent
+    // was right and the mechanism could not deliver it. Matching is by commit
+    // key (`id::lang`), but the problems store is keyed on `id` alone and
+    // `Storage.saveProblem` merges `{...existing, ...problem}`. A record
+    // classified remote-only here therefore lands in the local record's slot
+    // moments later and overwrites its code and language. The user is never
+    // asked, and nothing is left to recover from.
+    //
+    // Two languages cannot coexist as separate entries while one id means one
+    // row, so the honest answer is the conflict prompt: both records want the
+    // same slot, and a person picks. Making them genuinely separate entries is
+    // a storage-key change, not a sync change.
     Storage.getAllProblems = async () => [problem()];
     const remote = problem({
       id: "lc-two-sum",
@@ -129,12 +142,57 @@ describe("importFromRepo", () => {
     });
     const git = fakeGit({ "index.json": JSON.stringify({ problems: [remote] }) });
     const { remoteOnly, conflicts } = await importFromRepo("o", "r", git);
+    assert.deepEqual(remoteOnly, [], "importing this would overwrite the local Python solve");
     assert.equal(
-      remoteOnly.length,
+      conflicts.length,
       1,
-      "the Java solve is new work, not a rewrite of the Python one",
+      "the collision must be shown to the user, not resolved for them",
     );
-    assert.deepEqual(conflicts, []);
+    assert.equal(conflicts[0].local.code, "return [];");
+  });
+
+  test("a remote record cannot dictate which repository files get deleted", async () => {
+    // `_committedPaths` is local bookkeeping: the files a problem last wrote.
+    // The maintenance pass in service-worker.js deletes every path in it that
+    // the problem no longer writes. `buildIndexJson` publishes the field into
+    // index.json, and applyImport used to store whatever came back verbatim —
+    // so a hand-edited index.json could name any file in the repository and
+    // have it deleted on the next Resync All.
+    const remote = problem({
+      id: "lc-three-sum",
+      titleSlug: "three-sum",
+      _committedPaths: ["README.md", ".github/workflows/release.yml"],
+    });
+    const git = fakeGit({ "index.json": JSON.stringify({ problems: [remote] }) });
+    const { remoteOnly } = await importFromRepo("o", "r", git);
+    assert.equal(remoteOnly.length, 1);
+    assert.equal(
+      remoteOnly[0]._committedPaths,
+      undefined,
+      "a claim about which files to delete must not survive the import",
+    );
+  });
+
+  test("a remote record cannot suppress its own conflict prompt", async () => {
+    // The same trick against the other bookkeeping field. `_conflictResolvedAt`
+    // set far enough in the future makes every later remote edit lose the
+    // timestamp comparison, so that problem never raises a conflict again — a
+    // quiet way to keep one record from ever being reviewed.
+    Storage.getAllProblems = async () => [problem({ code: "local" })];
+    const remote = problem({ code: "remote", _conflictResolvedAt: 4_100_000_000_000 });
+    const git = fakeGit({ "index.json": JSON.stringify({ problems: [remote] }) });
+    const { conflicts } = await importFromRepo("o", "r", git);
+    assert.equal(conflicts.length, 1, "the disagreement is real and must still surface");
+    assert.equal(conflicts[0].remote._conflictResolvedAt, undefined);
+  });
+
+  test("a junk entry in the problems array is skipped, not imported", async () => {
+    const git = fakeGit({
+      "index.json": JSON.stringify({ problems: [null, "lc-two-sum", 42, ["nested"], problem()] }),
+    });
+    const { remoteOnly } = await importFromRepo("o", "r", git);
+    assert.equal(remoteOnly.length, 1, "only the one real record survives");
+    assert.equal(remoteOnly[0].id, "lc-two-sum");
   });
 
   test("a conflict already resolved locally is not raised again before the push", async () => {
