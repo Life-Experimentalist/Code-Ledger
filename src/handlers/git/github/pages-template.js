@@ -49,6 +49,21 @@ export function getPagesHtml(opts = {}) {
   // GitHub owner and repo embedded at generation time so custom domains work correctly
   const repoOwner = opts.owner || "";
   const repoName = opts.repo || "";
+  // Counts baked into the markup so the page says something true before its own
+  // JavaScript runs. The runtime render still overwrites all four from
+  // index.json — this is the value a crawler, a link unfurl, `curl` or a reader
+  // with JavaScript off gets to see, and zero was a wrong answer for all of them.
+  // Absent (first-run onboarding, where the repo genuinely has no solves yet)
+  // falls back to 0, which is then correct rather than merely stale.
+  const n = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : 0);
+  const stats = opts.stats || null;
+  const sTotal = n(stats?.total);
+  const sEasy = n(stats?.easy);
+  const sMed = n(stats?.medium);
+  const sHard = n(stats?.hard);
+  const blurb = sTotal
+    ? `${sTotal} DSA problems solved and committed automatically by CodeLedger — ${sEasy} easy, ${sMed} medium, ${sHard} hard.`
+    : "DSA problem solutions tracked by CodeLedger — GitHub-backed, AI-reviewed, owned by you.";
   // Default raw image URLs (can be overridden via settings passed to generator)
   const ASSETS = {
     iconDark:
@@ -72,9 +87,9 @@ export function getPagesHtml(opts = {}) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CodeLedger — DSA Stats</title>
-  <meta name="description" content="DSA problem solutions tracked by CodeLedger — GitHub-backed, AI-reviewed, owned by you." />
+  <meta name="description" content="${esc(blurb)}" />
   <meta property="og:title" content="CodeLedger — DSA Stats" />
-  <meta property="og:description" content="DSA solutions committed automatically to GitHub." />
+  <meta property="og:description" content="${esc(blurb)}" />
   <meta property="og:image" content="${safeHttpUrl(ASSETS.social)}" />
   <meta property="og:type" content="website" />
   <script>${CHART_JS_INLINE}</script>
@@ -217,6 +232,16 @@ export function getPagesHtml(opts = {}) {
     .pg-btn:hover, .pg-btn.active { background: rgba(6,182,212,.1); border-color: rgba(6,182,212,.35); color: var(--cyan); }
     .pg-btn:disabled { opacity: .3; cursor: default; }
   </style>
+  <noscript><style>
+    /* Without JavaScript the fetch that reveals #app never runs, so the page sat
+       on "Loading stats…" forever. The counts above are already in the markup;
+       show them, and drop the parts that only exist once index.json is parsed. */
+    #loading { display: none !important; }
+    #app { display: block !important; }
+    /* Every card below the stats row is drawn by script — heatmap, canvases,
+       knowledge graph, commit list — so each would render as an empty box. */
+    #app .card { display: none !important; }
+  </style></noscript>
 </head>
 <body>
   <header>
@@ -238,10 +263,10 @@ export function getPagesHtml(opts = {}) {
 
   <div id="app" style="display:none" class="wrap">
     <div class="stats-row">
-      <div class="stat t"><div class="stat-n" id="sn-t">0</div><div class="stat-l">Total</div></div>
-      <div class="stat e"><div class="stat-n" id="sn-e">0</div><div class="stat-l">Easy</div></div>
-      <div class="stat m"><div class="stat-n" id="sn-m">0</div><div class="stat-l">Medium</div></div>
-      <div class="stat h"><div class="stat-n" id="sn-h">0</div><div class="stat-l">Hard</div></div>
+      <div class="stat t"><div class="stat-n" id="sn-t">${sTotal}</div><div class="stat-l">Total</div></div>
+      <div class="stat e"><div class="stat-n" id="sn-e">${sEasy}</div><div class="stat-l">Easy</div></div>
+      <div class="stat m"><div class="stat-n" id="sn-m">${sMed}</div><div class="stat-l">Medium</div></div>
+      <div class="stat h"><div class="stat-n" id="sn-h">${sHard}</div><div class="stat-l">Hard</div></div>
       <div class="stat s"><div class="stat-n" id="sn-cs">—</div><div class="stat-l">Streak</div></div>
       <div class="stat b"><div class="stat-n" id="sn-ms">—</div><div class="stat-l">Best Streak</div></div>
     </div>
