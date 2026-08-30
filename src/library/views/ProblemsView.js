@@ -687,7 +687,8 @@ export function ProblemsView({
                 class="flex items-center justify-between gap-3 px-4 py-2 rounded-xl bg-white/3 border border-white/5 text-xs"
               >
                 <span class="text-slate-500">
-                  ${(problems || []).filter((p) => !p.aiReview).length} problems missing AI review
+                  ${(problems || []).filter((p) => !p.aiReview).length} problems missing AI
+                  review${" "}
                   ${queueStats?.failed > 0
                     ? html`· <span class="text-rose-400">${queueStats.failed} failed</span>`
                     : ""}

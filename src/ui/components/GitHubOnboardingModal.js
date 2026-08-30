@@ -1099,7 +1099,7 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
                     : postSyncState && typeof postSyncState === "object"
                       ? html`
                           <p class="text-xs text-emerald-400">
-                            ✓
+                            ✓${" "}
                             ${postSyncState.committed > 0
                               ? `Synced ${postSyncState.committed} solution${postSyncState.committed !== 1 ? "s" : ""} to GitHub`
                               : "Repository is already up to date"}

@@ -518,8 +518,8 @@ export function AIChatsView({
         <div>
           <h2 class="text-lg font-bold text-white">AI Conversations</h2>
           <p class="text-xs text-slate-400">
-            ${stats.totalChats} chat${stats.totalChats === 1 ? "" : "s"} • ${stats.uniqueProblems}
-            problem${stats.uniqueProblems === 1 ? "" : "s"}
+            ${stats.totalChats} chat${stats.totalChats === 1 ? "" : "s"} •${" "}
+            ${stats.uniqueProblems} problem${stats.uniqueProblems === 1 ? "" : "s"}
           </p>
         </div>
         <button
@@ -717,7 +717,7 @@ export function AIChatsView({
                               </div>`
                             : ""}
                           <div class="text-[10px] text-slate-500 mt-1">
-                            ${(chat.messages || []).length}
+                            ${(chat.messages || []).length}${" "}
                             message${(chat.messages || []).length === 1 ? "" : "s"}
                           </div>
                         </button>
@@ -764,7 +764,7 @@ export function AIChatsView({
                               </div>`
                             : ""}
                           <div class="text-[10px] text-slate-500 mt-1">
-                            ${(chat.messages || []).length}
+                            ${(chat.messages || []).length}${" "}
                             message${(chat.messages || []).length === 1 ? "" : "s"}
                           </div>
                         </button>
@@ -813,7 +813,7 @@ export function AIChatsView({
                         : ""}
                       ${selectedChat.aiProvider
                         ? html`<div class="text-xs text-cyan-400 mt-1">
-                            🤖
+                            🤖${" "}
                             ${selectedChat.aiModel ||
                             selectedChat.aiProvider}${selectedChat.aiProvider
                               ? ` (${selectedChat.aiProvider})`

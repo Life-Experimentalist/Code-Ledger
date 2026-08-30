@@ -666,12 +666,12 @@ export function DedupReviewQueue({ onClose = () => {} }) {
                             </div>
                             <div class="text-xs text-slate-500 space-y-1">
                               <div>
-                                Original: ${String(currentItem.aiMergeOriginalCode || "").length}
-                                chars
+                                Original:${" "}
+                                ${String(currentItem.aiMergeOriginalCode || "").length} chars
                               </div>
                               <div>
-                                Proposed: ${String(currentItem.aiMergeProposedCode || "").length}
-                                chars
+                                Proposed:${" "}
+                                ${String(currentItem.aiMergeProposedCode || "").length} chars
                               </div>
                             </div>
                             <div class="flex gap-2">

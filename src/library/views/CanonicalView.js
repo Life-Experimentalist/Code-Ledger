@@ -785,7 +785,7 @@ ${aliasLines}
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-white leading-snug">${issue.title}</p>
                   <p class="text-[10px] text-slate-500 mt-0.5">
-                    #${issue.number} · opened by ${issue.user?.login || "unknown"} ·
+                    #${issue.number} · opened by ${issue.user?.login || "unknown"} ·${" "}
                     ${new Date(issue.created_at).toLocaleDateString()}
                     ${ready
                       ? html` <span class="text-emerald-400 font-medium">· Ready to merge ✓</span>`

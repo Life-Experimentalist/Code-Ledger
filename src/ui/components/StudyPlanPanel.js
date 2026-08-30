@@ -246,9 +246,9 @@ export function StudyPlanPanel({ problems, topicKinds, masteryOpts }) {
       </div>
 
       <p class="text-[11px] text-slate-500">
-        ${capacity.days} ${capacity.days === 1 ? "day" : "days"} ×
-        ${minutesLabel(capacity.minutesPerDay)} — ${totals.newProblems} new
-        ${totals.newProblems === 1 ? "problem" : "problems"} and ${totals.revisions}
+        ${capacity.days} ${capacity.days === 1 ? "day" : "days"} ×${" "}
+        ${minutesLabel(capacity.minutesPerDay)} — ${totals.newProblems} new${" "}
+        ${totals.newProblems === 1 ? "problem" : "problems"} and ${totals.revisions}${" "}
         ${totals.revisions === 1 ? "revisit" : "revisits"} queued. ${plan.role.blurb}
       </p>
 
@@ -258,13 +258,13 @@ export function StudyPlanPanel({ problems, topicKinds, masteryOpts }) {
               class="px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/5 flex flex-col gap-1"
             >
               <span class="text-[11px] text-amber-300"
-                >This does not fit in ${capacity.days}
+                >This does not fit in ${capacity.days}${" "}
                 ${capacity.days === 1 ? "day" : "days"}.</span
               >
               <span class="text-[11px] text-slate-400 leading-relaxed">
-                The queue needs ${minutesLabel(shortfall.minutesNeeded)} and the window holds
-                ${minutesLabel(shortfall.minutesAvailable)}. ${shortfall.newUnplaced} problems and
-                ${shortfall.revisionsUnplaced} revisits fall off the
+                The queue needs ${minutesLabel(shortfall.minutesNeeded)} and the window holds${" "}
+                ${minutesLabel(shortfall.minutesAvailable)}. ${shortfall.newUnplaced} problems
+                and${" "} ${shortfall.revisionsUnplaced} revisits fall off the
                 end${shortfall.droppedTopics.length
                   ? `, dropping ${shortfall.droppedTopics.slice(0, 4).join(", ")}${
                       shortfall.droppedTopics.length > 4

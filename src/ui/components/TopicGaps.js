@@ -176,7 +176,7 @@ export function TopicGaps({ problems, topicKinds, masteryOpts, onTopic }) {
                 )}
               </div>
               <p class="text-[10px] text-slate-600 leading-relaxed">
-                Not listed on purpose:
+                Not listed on purpose:${" "}
                 ${EXCLUDED_TOPICS.map(
                   (e, i) =>
                     html`<span key=${e.name}

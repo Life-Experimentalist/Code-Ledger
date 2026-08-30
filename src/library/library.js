@@ -1155,7 +1155,7 @@ function LibraryApp() {
                     <span class="text-amber-400 shrink-0 text-base">⚠</span>
                     <div class="min-w-0">
                       <p class="text-xs font-semibold text-amber-300">
-                        ${pendingCommitCount}
+                        ${pendingCommitCount}${" "}
                         solve${pendingCommitCount === 1 ? " hasn't" : "s haven't"} reached GitHub
                         yet
                       </p>
