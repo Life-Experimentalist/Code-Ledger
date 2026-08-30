@@ -72,7 +72,7 @@ We process your data strictly to provide the extension's core features:
 ## 5. Data Storage, Security, and Retention
 
 - **Local Storage**: All authentication tokens, API keys, solve history, and AI chats are saved in your browser's sandboxed `IndexedDB` and `chrome.storage.local` environment.
-- **Security**: The browser's extension storage boundary isolates this data — other sites and other extensions cannot read it. It is **not** separately encrypted at rest, so anyone with access to your operating system profile can read it, exactly as with the rest of your browser profile.
+- **Security**: Extension storage is per-extension — a website cannot read it, and no other extension can read it through the storage API. That is the boundary the browser enforces, and it is not a guarantee against everything: an extension you install with debugger access, or one injecting scripts into the same pages, has other routes. The data is also **not** separately encrypted at rest, so anyone with access to your operating system profile can read it, exactly as with the rest of your browser profile. [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) states these limits in full.
 - **Retention**: We retain your local data indefinitely to maintain your solve history. You can purge all data at any time by clicking the "Clear all data" button in the advanced settings tab or by uninstalling the extension.
 - **Remote Copies**: Commits pushed to your GitHub repository are retained according to your repository settings and must be managed or deleted directly through GitHub.
 
