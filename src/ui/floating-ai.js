@@ -14,6 +14,7 @@ import {
   deleteChat,
 } from "../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../lib/ai-chat-context.js";
+import { sendAIChat } from "../lib/ai-chat-send.js";
 import { parseMarkdown } from "./components/AIMarkdownRenderer.js";
 import { Storage } from "../core/storage.js";
 
@@ -1026,36 +1027,10 @@ export function createFloatingAI(slug = "", opts = {}) {
     setThinking(true);
 
     try {
-      const response = await new Promise((resolve, reject) => {
-        try {
-          chrome.runtime.sendMessage(
-            {
-              type: "AI_CHAT",
-              messages: messages.map(({ role, content }) => ({
-                role,
-                content,
-              })),
-              context,
-            },
-            (resp) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else if (resp?.ok) {
-                resolve(resp.response);
-              } else {
-                reject(new Error(resp?.error || "AI request failed"));
-              }
-            },
-          );
-        } catch (ctxErr) {
-          // Extension context invalidated (service worker reloaded) — surface a friendly error
-          reject(
-            new Error(
-              "Extension was updated. Please reload this page to continue using CodeLedger AI.",
-            ),
-          );
-        }
-      });
+      const response = await sendAIChat(
+        messages.map(({ role, content }) => ({ role, content })),
+        context,
+      );
 
       const aiMsg = {
         role: "assistant",

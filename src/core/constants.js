@@ -226,9 +226,37 @@ export const CONSTANTS = Object.freeze({
       },
       modelList: { path: "data", label: "name" },
     },
+    // No API, no key, no account: the extension builds the prompt, you paste it
+    // into whatever chat you already pay for, and paste the answer back. That
+    // makes every other field here inapplicable — there is no endpoint to call
+    // and no catalogue to list — which is what `supportsLiveFetch: false` and
+    // the absent `auth`/`modelList` say.
+    //
+    // `requiresHuman` is the load-bearing one. A provider that waits for a
+    // person cannot be tried unattended: the service worker would sit on it for
+    // its 30s timeout on every solve and then fall through, having achieved
+    // nothing but the delay. So it is excluded from the automatic chain and
+    // only ever reached from a page, where there is somebody to ask.
+    manual: {
+      id: "manual",
+      name: "Manual (copy & paste)",
+      shortName: "Manual",
+      blurb: "Paste an answer from any chat yourself",
+      endpoint: "",
+      modelsEndpoint: null,
+      defaultModel: "",
+      staticModels: [],
+      supportsLiveFetch: false,
+      keyRequired: false,
+      requiresHuman: true,
+      freeTier:
+        "asks CodeLedger for nothing and sends nothing — whatever you paste it into is between you and them",
+    },
   },
 
   AI_DEFAULT_PRIMARY: "gemini",
+  // Tried in order when the primary is unavailable, so everything in it must be
+  // callable without a person present. `manual` is deliberately absent.
   AI_FALLBACK_CHAIN: ["openai", "ollama", "claude", "deepseek"],
 
   FEATURE_STATUS,

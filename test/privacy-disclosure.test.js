@@ -78,10 +78,7 @@ describe("disclosures", () => {
     assert.equal(byId({ ...REPO, gamificationBadgeStyle: "shields" }).shields.on, true);
     // A private repo cannot use shields, so claiming it were reachable would be
     // a disclosure of something that never happens.
-    assert.equal(
-      byId({ ...PRIVATE_REPO, gamificationBadgeStyle: "shields" }).shields.on,
-      false,
-    );
+    assert.equal(byId({ ...PRIVATE_REPO, gamificationBadgeStyle: "shields" }).shields.on, false);
   });
 
   test("an AI provider is listed for every one the extension supports", () => {
@@ -218,8 +215,14 @@ describe("aiCostNotes", () => {
   test("covers every provider and does not overstate what is free", () => {
     const notes = aiCostNotes();
     assert.equal(notes.length, Object.keys(CONSTANTS.AI_PROVIDERS).length);
-    const free = notes.filter((n) => n.free).map((n) => n.id).sort();
-    assert.deepEqual(free, ["gemini", "ollama", "openrouter"]);
+    const free = notes
+      .filter((n) => n.free)
+      .map((n) => n.id)
+      .sort();
+    // `manual` counts as free because it needs no key and makes no request —
+    // whatever the person pastes it into may well cost them, which is why its
+    // note says so rather than claiming the answer is free.
+    assert.deepEqual(free, ["gemini", "manual", "ollama", "openrouter"]);
     for (const n of notes) {
       assert.ok(n.why, `${n.id} has no cost note`);
       assert.ok(n.name, `${n.id} has no display name`);

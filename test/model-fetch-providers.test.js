@@ -91,12 +91,24 @@ describe("fetchModelsForProvider — where the key goes", () => {
     assert.equal(calls.length, 0);
   });
 
-  test("every declared provider produces exactly one request", async () => {
-    for (const id of Object.keys(CONSTANTS.AI_PROVIDERS)) {
+  test("every provider with a catalogue produces exactly one request", async () => {
+    for (const [id, meta] of Object.entries(CONSTANTS.AI_PROVIDERS)) {
+      if (meta.supportsLiveFetch === false) continue;
       calls = [];
       await fetchModelsForProvider(id);
       assert.equal(calls.length, 1, `${id} sent ${calls.length} requests`);
       assert.match(calls[0].url, /^https?:\/\//, `${id} built a URL of ${calls[0].url}`);
+    }
+  });
+
+  test("a provider with no catalogue makes no request at all", async () => {
+    // `manual` has no endpoint — the generic path would otherwise build the
+    // relative URL "/models" and fetch the extension's own origin.
+    for (const [id, meta] of Object.entries(CONSTANTS.AI_PROVIDERS)) {
+      if (meta.supportsLiveFetch !== false) continue;
+      calls = [];
+      assert.deepEqual(await fetchModelsForProvider(id), []);
+      assert.equal(calls.length, 0, `${id} sent a request it has no endpoint for`);
     }
   });
 });
@@ -189,7 +201,11 @@ describe("testAIKey", () => {
 describe("the descriptor is complete", () => {
   test("every provider declares how to read its model list", () => {
     for (const [id, meta] of Object.entries(CONSTANTS.AI_PROVIDERS)) {
-      assert.ok(meta.modelList?.path, `${id} has no modelList.path`);
+      // Unless it has no list — a provider answered by a person has one
+      // "model", whichever chat window they happen to have open.
+      if (meta.supportsLiveFetch !== false) {
+        assert.ok(meta.modelList?.path, `${id} has no modelList.path`);
+      }
       assert.ok(meta.name && meta.shortName, `${id} is missing a name`);
       // Anything that needs a key must say where it goes, or the request would
       // be sent unauthenticated and the failure blamed on the key.

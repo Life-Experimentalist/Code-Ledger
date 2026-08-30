@@ -14,6 +14,7 @@ const dbg = createDebugger("ProblemModal");
 import { cleanCode, highlightCodeWithLines } from "../../lib/syntax-highlight.js";
 import { getChatsByProblem, saveAIChat, updateAIChat } from "../../core/ai-chat-storage.js";
 import { buildAIChatContext } from "../../lib/ai-chat-context.js";
+import { sendAIChat } from "../../lib/ai-chat-send.js";
 import { AIReviewPanel } from "../../ui/components/AIReviewPanel.js";
 import { MultiLineAIChatInput } from "../../ui/components/MultiLineAIChatInput.js";
 import { AIMarkdownRenderer } from "../../ui/components/AIMarkdownRenderer.js";
@@ -505,23 +506,10 @@ export function ProblemModal({
           : [],
       });
 
-      const response = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "AI_CHAT",
-            messages: updatedMsgs.map(({ role, content }) => ({
-              role,
-              content,
-            })),
-            context,
-          },
-          (resp) => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else if (resp?.ok) resolve(resp.response);
-            else reject(new Error(resp?.error || "AI failed"));
-          },
-        );
-      });
+      const response = await sendAIChat(
+        updatedMsgs.map(({ role, content }) => ({ role, content })),
+        context,
+      );
 
       const aiMsg = {
         role: "assistant",
