@@ -21,6 +21,17 @@ import {
   parseWeakAreas,
 } from "../core/ai-prompts.js";
 import { expandChatVariables } from "../lib/chat-variables.js";
+import { AUTH_ORIGIN, isAuthCallbackUrl } from "../lib/oauth-message.js";
+import { isMessageAllowed, originOf } from "../lib/message-guard.js";
+
+/**
+ * Our own chrome-extension:// (or moz-extension://) origin.
+ *
+ * Computed once here rather than per message. Anything sending from this
+ * origin is one of our own pages and is trusted with every message type; see
+ * lib/message-guard.js for why content scripts are not.
+ */
+const EXTENSION_ORIGIN = originOf(chrome.runtime.getURL(""));
 import { buildGraphDigest, isGraphQuestion } from "../core/graph-insights.js";
 import {
   handleRefreshMetadata,
@@ -3576,14 +3587,14 @@ chrome.runtime.onInstalled.addListener((details) => {
 const _processingAuthTabs = new Set(); // dedup guard (same event, not cross-SW-restarts)
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  // Only act when the tab URL changes to the OAuth callback path
-  const changedUrl = changeInfo.url || "";
-  if (
-    !changedUrl.includes("codeledger.vkrishna04.me") ||
-    !changedUrl.includes("/api/auth/") ||
-    !changedUrl.includes("/callback")
-  )
-    return;
+  // Only act when the tab URL changes to the OAuth callback path.
+  //
+  // Parsed, not substring-matched. `includes()` on the raw URL was satisfied by
+  // any host that put the strings anywhere — query, fragment, path segment — so
+  // https://evil.example/api/auth/x/callback#codeledger.vkrishna04.me aimed a
+  // 15-attempt CL_GET_AUTH_DATA probe at an attacker's tab. Nothing answers that
+  // message off-origin today, which is the only reason it was not a token leak.
+  if (!isAuthCallbackUrl(changeInfo.url)) return;
 
   // Deduplicate: one relay per tab (handles rapid re-fires on same URL)
   if (_processingAuthTabs.has(tabId)) return;
@@ -3678,24 +3689,36 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   dbg.log(
     `onMessage(): received msg.type=${msg.type} from ${sender?.id || sender?.tab?.id || sender?.url || "unknown"}`,
   );
+  if (!isMessageAllowed(msg.type, sender, EXTENSION_ORIGIN)) {
+    dbg.warn(`onMessage(): refused ${msg.type} from non-extension sender ${sender?.url}`);
+    return;
+  }
 
   // OAuth relay fallback: content script sends here when chrome.storage write fails.
   // Primary path is direct storage write in presence-marker.js; this is belt-and-suspenders.
   if (msg.type === "CODELEDGER_AUTH_RELAY") {
-    let senderHost;
+    // Origin, not hostname, and the callback path too. Comparing the hostname
+    // alone accepted http://codeledger.vkrishna04.me, which any active network
+    // attacker can answer for; comparing no path accepted every page on the
+    // origin, so a single reflected-XSS or user-content route anywhere on the
+    // site was enough to plant an attacker's token. Both halves matter.
+    let senderOrigin = "";
+    let senderPath = "";
     try {
-      senderHost = new URL(sender?.url || sender?.tab?.url || "").hostname;
+      const u = new URL(sender?.url || sender?.tab?.url || "");
+      senderOrigin = u.origin;
+      senderPath = u.pathname;
     } catch {
-      senderHost = "";
+      /* unparseable sender URL stays rejected */
     }
-    if (senderHost !== "codeledger.vkrishna04.me") {
-      dbg.warn(`CODELEDGER_AUTH_RELAY: rejected relay from unexpected host: ${senderHost}`);
+    if (senderOrigin !== AUTH_ORIGIN || !senderPath.startsWith("/api/auth/")) {
+      dbg.warn(`CODELEDGER_AUTH_RELAY: rejected relay from unexpected sender: ${senderOrigin}`);
       sendResponse({ ok: false });
       return true;
     }
     // Log presence, never content — debug logs end up in bug reports.
     dbg.log(
-      `CODELEDGER_AUTH_RELAY: received from ${senderHost}, provider=${msg.provider}, token=${msg.token ? "present" : "MISSING"}`,
+      `CODELEDGER_AUTH_RELAY: received from ${senderOrigin}, provider=${msg.provider}, token=${msg.token ? "present" : "MISSING"}`,
     );
     if (msg.token && msg.provider) {
       Storage.setAuthToken(msg.provider, msg.token)
@@ -4033,7 +4056,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 try {
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || !msg.type) return;
+    if (!isMessageAllowed(msg.type, sender, EXTENSION_ORIGIN)) {
+      dbg.warn(`onMessage(): refused ${msg.type} from non-extension sender ${sender?.url}`);
+      return;
+    }
+
     if (msg && msg.type === "RESYNC_COUNT") {
       dbg.log(`onMessage(RESYNC_COUNT): counting missing problems...`);
       handleResyncCount()
@@ -4409,7 +4438,7 @@ try {
 
     if (msg && msg.type === "REFRESH_METADATA_DONE") {
       dbg.log(`onMessage(REFRESH_METADATA_DONE): completing metadata refresh...`);
-      const result = completeRefreshMetadata(_sender?.tab?.id);
+      const result = completeRefreshMetadata(sender?.tab?.id);
       dbg.log(`onMessage(REFRESH_METADATA_DONE): completed=${result.completed}`);
       sendResponse({ ok: true, ...result });
       return true;

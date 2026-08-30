@@ -48,7 +48,15 @@ const TAP_DOMAINS = ["*://*.neetcode.io/*", "*://*.takeuforward.org/*"];
 // The auth worker origin. Required for BOTH the OAuth callback relay
 // (background tabs.onUpdated reads changeInfo.url) and the presence-marker
 // content script. Omitting it silently breaks sign-in.
-const WORKER_ORIGIN = "*://codeledger.vkrishna04.me/*";
+//
+// https only, and deliberately so. This is the origin the GitHub token travels
+// over: presence-marker.js reads it out of the callback page's DOM and writes it
+// straight to auth.tokens. Under a `*://` match the same content script also runs
+// on http://codeledger.vkrishna04.me, so anyone able to answer for that host —
+// hostile Wi-Fi, a DNS spoof, an ISP — could serve a page carrying an
+// attacker-owned token and have the extension adopt it, silently repointing the
+// user's ledger at a repository the attacker controls.
+const WORKER_ORIGIN = "https://codeledger.vkrishna04.me/*";
 
 // Every remote API the extension actually calls. Keep this list minimal:
 // each entry is a permission the user is prompted to grant and a reviewer

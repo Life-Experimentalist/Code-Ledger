@@ -21,7 +21,7 @@
         "tabs"
     ],
     "host_permissions": [
-        "*://codeledger.vkrishna04.me/*",
+        "https://codeledger.vkrishna04.me/*",
         "*://*.codeforces.com/*",
         "*://*.geeksforgeeks.org/*",
         "*://*.leetcode.com/*",
@@ -70,7 +70,7 @@
         },
         {
             "matches": [
-                "*://codeledger.vkrishna04.me/*"
+                "https://codeledger.vkrishna04.me/*"
             ],
             "js": [
                 "content/presence-marker.js"
@@ -131,7 +131,7 @@
                 "library/library.html"
             ],
             "matches": [
-                "*://codeledger.vkrishna04.me/*"
+                "https://codeledger.vkrishna04.me/*"
             ]
         }
     ],
