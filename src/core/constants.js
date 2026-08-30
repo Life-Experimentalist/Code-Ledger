@@ -74,11 +74,15 @@ export const CONSTANTS = Object.freeze({
   // Extension store IDs
   EXTENSION_ID_CHROME: "dpalidbhndcbppmjgmbloffehbhfchmb",
   EXTENSION_ID_FIREFOX: "code-ledger",
-  // Precomputed store links (append the extension id to the store URL if empty)
+  // Precomputed store links (append the extension id to the store URL if empty).
+  // Chrome is the only published listing. The Firefox and Edge URLs these two
+  // keys used to hold both 404 — an install button that leads nowhere is worse
+  // than one that admits the listing is not up yet, so they point at the
+  // releases page until each listing actually exists.
   EXTENSION_STORE_URLS: {
     chrome: "https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb",
-    edge: "https://microsoftedge.microsoft.com/addons/detail/codeledger/",
-    firefox: "https://addons.mozilla.org/en-US/firefox/addon/code-ledger/",
+    edge: "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
+    firefox: "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
     github: "https://github.com/Life-Experimentalist/Code-Ledger",
     github_releases: "https://github.com/Life-Experimentalist/Code-Ledger/releases/latest",
   },
