@@ -16,8 +16,25 @@ the page at `https://codeledger.vkrishna04.me/privacy`. Both must agree with
 `src/core/privacy-disclosure.js`, which is what the extension renders live under
 **Settings → Privacy**. Give stores the URL.
 
-Chrome and Edge are not yet published. Firefox is not yet published. The Chrome
-listing was rejected once — see [Before you resubmit](#before-you-resubmit).
+**Chrome is published.** The listing is live at
+`chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb`,
+carrying **1.4.5** from 2026-06-15 with roughly ten users. Everything since then
+is unshipped, so a store user is several security fixes behind this tree. It
+took a rejection to get there — see [Before you resubmit](#before-you-resubmit).
+
+Edge and Firefox are not published. There is no AMO listing at all, which is why
+the README badge and the landing page point Firefox users at the release zip
+rather than at `addons.mozilla.org`.
+
+### The next Chrome update is a re-review, not a silent push
+
+1.4.5 → the current tree adds `tabs` and `unlimitedStorage`, and adds host
+permissions for `codeledger.vkrishna04.me`, `neetcode.io`, `takeuforward.org`
+and `openrouter.ai`; `api.gitlab.com` goes away. `tabs` raises a new permission
+warning, which means a full review **and** every existing install sitting
+disabled until that user re-accepts. Ten people is a small blast radius, but it
+is not zero, and it is worth deciding deliberately whether to ship the whole
+1.8.x jump at once or to stage it.
 
 ---
 
@@ -60,6 +77,9 @@ Chrome, Firefox and source zips into `releases/`. Then confirm:
 - [ ] CSP is `script-src 'self'`; no inline script, no `eval`, no remote import
 - [ ] The only outbound destinations are the ones listed in
       `src/core/privacy-disclosure.js`, and each is either required or user-enabled
+- [ ] `BUILD.md` still lists every generated file and a command that reproduces
+      it. AMO's source review reads this document; a generated file with no
+      command behind it is the failure mode it exists to prevent
 
 ### Functionality, against a real account
 
@@ -67,7 +87,10 @@ Chrome, Firefox and source zips into `releases/`. Then confirm:
 - [ ] Solve one problem on each of LeetCode, GeeksForGeeks, Codeforces and
       NeetCode; each lands as a commit
 - [ ] takeuforward: the free sheets mark up solved problems; a commit needs a
-      TUF+ subscription, so record whether that leg was exercised or skipped
+      TUF+ subscription, so record whether that leg was exercised or skipped.
+      Say so in the reviewer notes too — a reviewer without a subscription
+      cannot exercise that platform and may otherwise score it non-functional,
+      which is the exact category the Chrome listing was rejected under
 - [ ] Runtime and memory are captured
 - [ ] An AI review runs when a key is present, and everything still works with no key
 - [ ] The dashboard, the graph and the streak badges render from the committed data

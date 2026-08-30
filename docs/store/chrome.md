@@ -22,7 +22,7 @@ Solve a problem on LeetCode. The instant it's accepted, CodeLedger commits it to
 
 **WORKS ON**
 
-LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward. LeetCode and GeeksForGeeks are stable; Codeforces, NeetCode and takeuforward are marked beta in the extension, which means the flow is built and tested but has had less exposure to real submissions. On takeuforward, the free A2Z and SDE sheets are marked up with what you have already solved; takeuforward's own code editor is part of TUF+, and the free sheets link out to other sites, so a solve is normally committed from wherever you actually solved it.
+LeetCode, GeeksForGeeks, Codeforces, NeetCode and takeuforward. LeetCode and GeeksForGeeks are stable. Codeforces and NeetCode are marked beta in the extension — the flow is built and tested, with less exposure to real submissions than the two stable ones. takeuforward is beta for a stronger reason: its judge lives behind a TUF+ subscription that we have not held, so the shape of an accepted verdict there is inferred from the API's public behaviour rather than observed. The detector is written conservatively for that reason. What does work without a subscription is the free A2Z and SDE sheets, which are marked up with what you have already solved; the sheets link out to other sites, so a solve is normally committed from wherever you actually solved it.
 
 ---
 
@@ -38,7 +38,7 @@ Already have hundreds of solutions? Import your LeetCode, GeeksForGeeks or Codef
 Connect any AI provider API key and get time/space complexity analysis, optimization suggestions, and hints committed alongside your code. Supports Google Gemini (free tier), OpenAI, Anthropic Claude, DeepSeek, Ollama (local), and OpenRouter.
 
 📊 Live analytics dashboard
-A GitHub-style contribution heatmap, topic radar, difficulty breakdown, and solve velocity chart — all hosted on your own GitHub Pages, built from your own data.
+A GitHub-style contribution heatmap, difficulty breakdown, and solve velocity chart, published to your own GitHub Pages and built from your own data. The topic radar lives in the extension's own Analytics view alongside them.
 
 🕸️ Knowledge graph
 A force-directed graph of everything you've solved, linked by topic. Spot your strengths and coverage gaps instantly.
@@ -50,10 +50,10 @@ A floating AI chat on every problem page. Ask about complexity, request hints, p
 Personal memory for your AI assistant. Save insights, define custom skills that trigger on command, and build a learning roadmap that auto-injects context into every conversation.
 
 🔥 Streaks that survive real life
-A daily target you set yourself, points weighted by difficulty, and freezes you earn on heavy days so one missed evening does not erase a month. Going away? Vacation mode holds the streak. Fell off anyway? Solve a little extra and take the day back. Badges are drawn as SVG files committed to your own repo — no third-party image service, and they work in a private repo.
+A daily target you set yourself, points weighted by difficulty, and freezes you earn on heavy days so one missed evening does not erase a month. Going away? Vacation mode holds the streak. Fell off anyway? Solve a little extra and take the day back. Badges are drawn as SVG files committed to your own repo, so they work in a private repo with no third-party image service involved. If you would rather have shields.io-style badges, there is an opt-in that writes shields endpoint files instead; those are fetched by shields.io, so they need the repo to be public.
 
 👥 Party comparison
-Add a friend's public CodeLedger repo and see your numbers side by side. It is one-sided by design: adding someone does not require them to add you, and nobody is notified. Share a link and it opens for anyone, extension or not.
+Add a friend's public CodeLedger repo and see your numbers side by side. It is one-sided by design: adding someone does not require them to add you, and nobody is notified. Your own streak card can be shared as a link that opens for anyone, extension or not, once your repo is public and its GitHub Pages site is up — the card is a file in that repo, so a private repo has nothing to link to.
 
 🔄 Cross-device sync
 Your entire history synced via your own GitHub repo on every startup. Always current on every machine.
@@ -72,7 +72,7 @@ Out of the box your data goes to your GitHub repo and nowhere else. No sign-ups,
 **REPOSITORY LAYOUT**
 
 problems/two-sum/leetcode/lc-two-sum.py ← your code
-problems/two-sum/leetcode/lc-two-sum.md ← description + AI review + stats
+problems/two-sum/leetcode/README.md ← description + AI review + stats
 index.json ← machine-readable index
 index.html ← live GitHub Pages dashboard
 badges/ ← streak badges as plain SVG
@@ -115,7 +115,7 @@ _(paste as-is into the form)_
 
 **storage**
 
-> Stores the user's GitHub repository settings, OAuth token reference, problem cache, AI provider configuration, and sync state locally in the browser. If the user opts in to anonymous usage stats (disabled by default), a solve-event counter `{ platform, version }` is sent to `counter.vkrishna04.me`. No other data leaves the browser.
+> Stores the user's GitHub repository settings, OAuth token reference, problem cache, AI provider configuration, and sync state locally in the browser. Nothing in local storage is transmitted by this permission itself. What the extension does send is listed under Host permissions below, and the live list for a given configuration is rendered in the extension under Settings → Privacy.
 
 **unlimitedStorage**
 
@@ -123,7 +123,7 @@ _(paste as-is into the form)_
 
 **alarms**
 
-> Schedules the periodic repository sync check (every 30 minutes) and the batched maintenance commit (every 10 minutes) that push new solutions to the user's own GitHub repository. Three further alarms drain the AI-review, code-recovery and self-heal queues; each is created only while its queue actually has work and is cleared when it empties, so the extension does not wake in the background with nothing to do. One hourly alarm redraws the streak count on the toolbar icon from data already in local storage, without any network request.
+> Schedules the periodic repository sync check (every 30 minutes) and the batched maintenance commit (every 10 minutes) that push new solutions to the user's own GitHub repository. Three further alarms drain the AI-review, code-recovery and self-heal queues; each is created only while its queue actually has work and is cleared when it empties, so the extension does not wake in the background with nothing to do. One hourly alarm redraws the streak count on the toolbar icon from data already in local storage, without any network request. A seventh fires once, 45 seconds out, to resume a bulk history import the user started and that was interrupted when the service worker was suspended; it is created only if such an import is actually pending.
 
 **sidePanel**
 
@@ -137,10 +137,14 @@ _(paste as-is into the form)_
 
 > • `*.leetcode.com`, `*.geeksforgeeks.org`, `*.codeforces.com`, `*.neetcode.io`, `*.takeuforward.org` — content scripts detect accepted submissions and inject UI on these platforms. NeetCode and takeuforward are single-page apps whose verdict is rendered and then discarded before a DOM watcher can read it, so on those two hosts — and only those two — a second content script wraps `fetch` and `XMLHttpRequest` and forwards a response only when its URL matches a short fixed list: those sites' own judge endpoints, plus takeuforward's problem-metadata endpoint, whose API replaces `difficulty` and `topic_tags` with the literal text "Subscribe to TUF+" unless the page's own bearer token is attached. Every other request is passed through untouched and never read, request headers are never forwarded, and nothing is modified. The source is `src/content/net-tap.js`; the endpoint list is the `ENDPOINTS` array at the top of it.
 > • `api.github.com` — commits solution files to the user's own repository via the GitHub Trees API.
-> • `codeledger.vkrishna04.me` — starts the GitHub OAuth sign-in flow and serves the shared canonical problem-ID map.
-> • `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `openrouter.ai`, `localhost:11434` — AI code review providers; only contacted if the user has enabled AI review and entered their own API key for that provider.
+> • `codeledger.vkrishna04.me` — three things: it starts the GitHub OAuth sign-in flow, it serves the shared canonical problem-ID map, and a small content script on the landing page announces that the extension is installed so the page can link straight into the library instead of offering an install button to somebody who already has it.
+> • `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.deepseek.com`, `openrouter.ai`, `localhost:11434` — AI code review providers; only contacted if the user has enabled AI review and entered their own API key for that provider. The user's solution code is part of that request, which is why AI review is off until a key is entered.
 >
-> No host permission is requested for `raw.githubusercontent.com`. If the user adds a friend's repository to the party comparison, the extension reads that repository's public `badges/stats.json` with an ordinary anonymous `fetch` — GitHub serves it with `Access-Control-Allow-Origin: *`, so no permission is needed and no credential is sent. An empty friend list makes no such request.
+> Three destinations are reached without a host permission, because each is an anonymous cross-origin `GET` that the server answers with `Access-Control-Allow-Origin: *`. No credential is attached to any of them.
+>
+> • `raw.githubusercontent.com` — four uses. Reading a friend's public `badges/stats.json` for the party comparison (nothing happens with an empty friend list); a fallback read of the user's own `index.json` during sync, used only when the authenticated API read comes back empty; a fallback source for the canonical problem-ID map when the worker is unreachable; and, if the user turns on shields-style badges, the endpoint files shields.io itself fetches.
+> • `img.shields.io` — off by default. Turning shields badges on embeds `img.shields.io/endpoint?url=…` images in the user's README, pointing at the endpoint files above. shields.io then reads those public files; the extension embeds a URL rather than uploading anything.
+> • `mermaid.ink` — off unless pressed. An AI reply containing a diagram is shown as source with a Render button; pressing it sends that one diagram's source, which describes the shape of a solution but not its code, to be drawn. Nothing is sent if the button is never pressed.
 
 ---
 
@@ -150,7 +154,7 @@ _(paste as-is into the form)_
 
 **Justification:**
 
-> All JavaScript—including external libraries such as Preact, htm, and Chart.js—is bundled statically inside the extension package under `src/vendor/`. No `<script>` tags reference external URLs, and no dynamic evaluation functions (`eval()` or `new Function()`) are used.
+> All JavaScript—including the external libraries Preact, htm, Chart.js and vis-network—is bundled statically inside the extension package under `src/vendor/`. Each of those files carries a header naming the script that generated it and the npm version it came from, and `BUILD.md` gives the commands that reproduce them. No `<script>` tags reference external URLs, and no dynamic evaluation functions (`eval()` or `new Function()`) are used.
 
 ---
 
@@ -161,12 +165,12 @@ _(paste as-is into the form)_
 | Personally identifiable information | **No**  | No name, address, email, or ID is collected.                                                                                                                                                                                                                                                                                    |
 | Health information                  | **No**  | Not applicable.                                                                                                                                                                                                                                                                                                                 |
 | Financial and payment information   | **No**  | Not applicable. CodeLedger is free.                                                                                                                                                                                                                                                                                             |
-| Authentication information          | **Yes** | The extension uses GitHub OAuth to commit solved problems to the user's repository. The access token is stored securely in the browser's local storage (`chrome.storage.local`) and is sent only to the official GitHub API (`api.github.com`). No credentials or tokens are ever sent to or stored on the developer's servers. |
+| Authentication information          | **Yes** | The extension uses GitHub OAuth to commit solved problems to the user's repository. The access token is held in the browser's extension-local storage (`chrome.storage.local`), which is readable only by this extension and is not additionally encrypted by it, and is sent only to the official GitHub API (`api.github.com`). No credentials or tokens are ever sent to or stored on the developer's servers. |
 | Personal communications             | **No**  | Not applicable.                                                                                                                                                                                                                                                                                                                 |
 | Location                            | **No**  | No IP, GPS, or region data is collected.                                                                                                                                                                                                                                                                                        |
 | Web history                         | **No**  | Content scripts run only on the five configured coding platforms; no general browsing history is accessed.                                                                                                                                                                                                                      |
 | **User activity**                   | **Yes** | If the user opts in to "Anonymous Usage Stats" (off by default), a solve hit carrying only `{ platform: "leetcode", version: "x.y.z" }` is sent to `counter.vkrishna04.me`. No clicks, scrolls, or keystrokes. Anonymous, no user identifier.                                                                                   |
-| Website content                     | **No**  | Submitted code is read from the platform DOM and committed to the user's own GitHub repo only — never sent to the developer.                                                                                                                                                                                                    |
+| Website content                     | **Yes** | Submitted code is read from the platform page and committed to the user's own GitHub repo. It is never sent to the developer. It does go to a third party in one case the user turns on themselves: enabling AI review and entering an API key sends the solution to that provider for analysis. The optional Render button on an AI diagram likewise sends that diagram's source to `mermaid.ink`.                                                                        |
 
 **Certifications — all three apply:**
 
@@ -180,7 +184,7 @@ _(paste as-is into the form)_
 
 ## CWS Reviewer Notes
 
-No remote code. All libraries (Preact, htm, Chart.js) are committed under `src/vendor/` as esbuild bundles built from npm — they are readable source in the package, not minified CDN drops. No `<script src>` points off-origin, and no `eval()` or `new Function()` is used anywhere.
+No remote code. All libraries (Preact, htm, Chart.js, vis-network) are committed under `src/vendor/` as esbuild bundles built from npm, each with a header naming its generator script and npm version; `BUILD.md` lists the command that reproduces every one of them. No `<script src>` points off-origin, and no `eval()` or `new Function()` is used anywhere.
 OAuth: this is a **classic OAuth App**, not a GitHub App. The token is proxy-exchanged via `codeledger.vkrishna04.me`, saved only in local storage, and sent directly to `api.github.com`. The worker retains nothing and signs the OAuth `state` into an `HttpOnly` cookie it verifies on the callback.
 Repository creation: the extension calls `POST /user/repos` with the user's own OAuth token. Sign-in asks for `public_repo,workflow` — least privilege, and enough to create the public ledger that is the default. The "make it private" tick box is disabled unless the token actually carries `repo`; choosing private re-runs sign-in asking for `repo,workflow` rather than calling the API and letting GitHub answer a bare 403 several steps later. If sign-in ever returns a GitHub-App-shaped token (which cannot create repositories at all), the callback detects it and says so at sign-in rather than letting it surface later as a permission error.
 Telemetry: disabled by default (opt-in). If enabled, POSTs `{ version, platform }` to `counter.vkrishna04.me`; the event name is a path segment, not a field. No code, IDs, repository names or problem data.

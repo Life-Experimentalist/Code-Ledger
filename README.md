@@ -19,7 +19,7 @@ _Zero-click commits · AI code review · Live analytics · Knowledge graph · Bu
 
 <br/>
 
-[![Chrome](https://img.shields.io/badge/Chrome-Install-green?style=flat-square&logo=googlechrome)](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb) [![Firefox](https://img.shields.io/badge/Firefox-Install-orange?style=flat-square&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/code-ledger/) [![Releases](https://img.shields.io/badge/GitHub-Releases-181717?style=flat-square&logo=github)](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest)
+[![Chrome](https://img.shields.io/badge/Chrome-Install-green?style=flat-square&logo=googlechrome)](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb) [![Firefox](https://img.shields.io/badge/Firefox-not%20yet%20listed-lightgrey?style=flat-square&logo=firefox)](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) [![Releases](https://img.shields.io/badge/GitHub-Releases-181717?style=flat-square&logo=github)](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest)
 
 <br/>
 
@@ -102,7 +102,7 @@ index.html               ← GitHub Pages dashboard, same commit
 | Browser               | Install                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Chrome / Edge / Brave | [Chrome Web Store](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb)           |
-| Firefox               | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/code-ledger/)                                     |
+| Firefox               | Not on Firefox Add-ons yet — [download the Firefox zip](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) |
 | Any                   | [Download a release zip](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) and load it unpacked |
 
 **Loading unpacked from source:**
@@ -174,7 +174,7 @@ Keys are stored in your browser under `ai.keys` and are sent only to the provide
 | **Zero-click commits** | Every accepted submission is committed the moment it is accepted — solution file and problem statement in one atomic commit.                                           |
 | **Bulk import**        | Pull your existing LeetCode or GeeksForGeeks history in from your profile page: past accepted solutions with code, statements and stats, committed in batched commits. |
 | **AI code review**     | Complexity analysis, optimisation suggestions and hints, committed alongside your code. Six providers, your own keys.                                                  |
-| **Live dashboard**     | A heatmap, topic radar, difficulty breakdown and solve-velocity chart, generated into your repo and served from your own GitHub Pages.                                 |
+| **Live dashboard**     | A heatmap, difficulty breakdown and solve-velocity chart, generated into your repo and served from your own GitHub Pages. The topic radar sits with them in the extension's own Analytics view.                                 |
 | **Knowledge graph**    | A force-directed graph of everything you have solved, linked by topic.                                                                                                 |
 | **AI chat panel**      | A floating panel on every problem page. Ask about complexity, request hints, paste errors — your code is available to the chat via `/mycode`.                          |
 | **AI Behaviour Bank**  | Personal memory for the assistant: saved insights, named skills that trigger on command, and learning roadmaps that inject context into every chat.                    |
