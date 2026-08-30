@@ -192,8 +192,10 @@ export function badgeSpecs(snapshot) {
       value: formatCount(s.totalSolves || 0),
       color: COLORS.slate,
     },
+    // Not "solved" — that is `solved`'s label, and a README carrying both
+    // showed two adjacent badges whose left half read the same word.
     difficulty: {
-      label: "solved",
+      label: "by difficulty",
       value: `${d.Easy || 0} easy · ${d.Medium || 0} medium · ${d.Hard || 0} hard`,
       color: COLORS.medium,
     },
@@ -493,7 +495,19 @@ export const BADGE_ALT = Object.freeze({
  * Hardcoding the default there instead would let the checkboxes disagree with
  * what actually gets committed.
  */
-export const DEFAULT_PICKS = Object.freeze(["streak", "points", "level", "difficulty", "freezes"]);
+/**
+ * Neither `solved` nor `difficulty` is a default.
+ *
+ * The stats block that `getRepoReadme` writes directly above this row already
+ * carries Solutions / Easy / Medium / Hard, and it carries them for every user
+ * whether gamification is on or not. Defaulting to them here rendered the same
+ * four numbers twice, from two different counters — `indexMeta.stats` and the
+ * gamification snapshot — which do not always agree, so the duplicate was not
+ * merely redundant, it could contradict itself. This row is the one that shows
+ * what the stats block cannot: streak, points, level, freezes. Both remain
+ * available for a user who ticks them.
+ */
+export const DEFAULT_PICKS = Object.freeze(["streak", "points", "level", "freezes"]);
 
 /**
  * The gamification block for the ledger's README, between stable HTML comment
