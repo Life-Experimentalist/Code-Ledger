@@ -11,7 +11,11 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { trustedAuthOrigins, isTrustedAuthMessage } from "../src/lib/oauth-message.js";
+import {
+  trustedAuthOrigins,
+  isTrustedAuthMessage,
+  isAuthCallbackUrl,
+} from "../src/lib/oauth-message.js";
 
 const WORKER = "https://codeledger.vkrishna04.me/api";
 const SELF = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
@@ -41,6 +45,52 @@ describe("trustedAuthOrigins", () => {
   test("a malformed worker URL does not widen the allowlist", () => {
     const origins = trustedAuthOrigins("not a url", SELF);
     assert.deepEqual(origins, [SELF]);
+  });
+});
+
+describe("isAuthCallbackUrl", () => {
+  const CB = "https://codeledger.vkrishna04.me/api/auth/github/callback";
+
+  test("accepts the real callback URL", () => {
+    assert.equal(isAuthCallbackUrl(CB), true);
+  });
+
+  test("accepts the callback URL with a query string", () => {
+    assert.equal(isAuthCallbackUrl(`${CB}?code=abc&state=xyz`), true);
+  });
+
+  test("rejects http — an active network attacker can answer for that host", () => {
+    assert.equal(isAuthCallbackUrl(CB.replace("https:", "http:")), false);
+  });
+
+  // The three substring `includes()` tests this replaced were all satisfied by
+  // this URL, which aimed a repeated CL_GET_AUTH_DATA probe at an attacker tab.
+  test("rejects a hostile host that puts the expected strings in path and fragment", () => {
+    assert.equal(
+      isAuthCallbackUrl("https://evil.test/api/auth/x/callback#codeledger.vkrishna04.me"),
+      false,
+    );
+  });
+
+  test("rejects a look-alike host", () => {
+    assert.equal(
+      isAuthCallbackUrl("https://codeledger.vkrishna04.me.evil.test/api/auth/github/callback"),
+      false,
+    );
+  });
+
+  test("rejects another page on the right origin", () => {
+    assert.equal(isAuthCallbackUrl("https://codeledger.vkrishna04.me/privacy"), false);
+  });
+
+  test("rejects the auth start route, which carries no token", () => {
+    assert.equal(isAuthCallbackUrl("https://codeledger.vkrishna04.me/api/auth/github"), false);
+  });
+
+  test("rejects junk without throwing", () => {
+    for (const v of [undefined, null, "", "not a url", 42, {}]) {
+      assert.equal(isAuthCallbackUrl(/** @type {any} */ (v)), false);
+    }
   });
 });
 

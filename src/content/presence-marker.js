@@ -140,6 +140,24 @@
 
   const AUTH_TOKENS_KEY = "auth.tokens";
 
+  // Only the OAuth callback path may hand us a token.
+  //
+  // Everything below writes straight to auth.tokens, so whatever can satisfy this
+  // check controls which GitHub account the user's ledger commits to. Without the
+  // path test that was every page on the origin: a comment field, an error page
+  // that reflects a query string, a future user-content route — any one of them
+  // could carry `#codeledger-auth-result` and the extension would adopt the token
+  // in it. The scheme test is redundant with the https-only manifest match and is
+  // kept anyway, because a manifest edit is one line and this file is where the
+  // consequence lands.
+  function isAuthCallbackPage() {
+    return (
+      window.location.protocol === "https:" &&
+      window.location.hostname === "codeledger.vkrishna04.me" &&
+      window.location.pathname.startsWith("/api/auth/")
+    );
+  }
+
   function writeAuthToken(provider, token) {
     if (!provider || !token) {
       dbg.warn(`writeAuthToken(): skipped — provider=${provider}, token=${!!token}`);
@@ -180,6 +198,10 @@
 
   // Path A: DOM element (primary)
   function relayAuthFromDOM() {
+    if (!isAuthCallbackPage()) {
+      dbg.log(`relayAuthFromDOM(): not the OAuth callback path — skipping`);
+      return;
+    }
     dbg.log(`relayAuthFromDOM(): checking for #codeledger-auth-result`);
     const el = document.getElementById("codeledger-auth-result");
     if (!el) {
@@ -216,6 +238,11 @@
   // This is the primary relay path for both Chrome and Firefox.
   _rt.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type !== "CL_GET_AUTH_DATA") return false;
+    if (!isAuthCallbackPage()) {
+      dbg.log(`CL_GET_AUTH_DATA: not the OAuth callback path — refusing`);
+      sendResponse(null);
+      return true;
+    }
     dbg.log(`CL_GET_AUTH_DATA received from background`);
     const el = document.getElementById("codeledger-auth-result");
     if (!el) {
@@ -245,6 +272,7 @@
   // event.source !== window guards against cross-frame injection.
   window.addEventListener("message", (event) => {
     if (!event.data || event.data.type !== "CODELEDGER_AUTH") return;
+    if (!isAuthCallbackPage()) return;
     // Same document only, and belt-and-braces on the origin. event.source ===
     // window already implies this page posted it, but an explicit origin check
     // means a future refactor that relaxes the source check cannot open a hole.

@@ -11,7 +11,6 @@ const html = htm.bind(h);
 import { Storage } from "/core/storage.js";
 import { CONSTANTS } from "/core/constants.js";
 import { initDebug, setDebug, createDebugger, rawError } from "/lib/debug.js";
-import { trustedAuthOrigins, isTrustedAuthMessage } from "/lib/oauth-message.js";
 const dbg = createDebugger("LibraryApp");
 import { applyThemeFromStorage, setupThemeListener } from "/core/theme-engine.js";
 import { getQueryParam, updateQueryParams } from "/core/url-state.js";
@@ -388,17 +387,22 @@ function LibraryApp() {
     }
   }, []); // useState setters are stable references — no deps needed
 
-  // Listen for OAuth messages from Worker (popup path, non-COOP browsers)
-  useEffect(() => {
-    const allowedOrigins = trustedAuthOrigins(CONSTANTS.URLS.AUTH_WORKER, window.location.origin);
-    const handleOAuthMessage = async (event) => {
-      if (!isTrustedAuthMessage(event, allowedOrigins, "github")) return;
-      dbg.log(`handleOAuthMessage(): received CODELEDGER_AUTH from origin=${event.origin}`);
-      await processOAuthToken(event.data.token, event.data.provider);
-    };
-    window.addEventListener("message", handleOAuthMessage);
-    return () => window.removeEventListener("message", handleOAuthMessage);
-  }, [processOAuthToken]);
+  // There is deliberately no window.message OAuth listener here.
+  //
+  // It used to trust CONSTANTS.URLS.AUTH_WORKER's origin, which is the same
+  // origin as the whole public marketing site — and library.html is web-accessible
+  // to that origin. So any script running anywhere on codeledger.vkrishna04.me
+  // could window.open() this page and post itself a CODELEDGER_AUTH carrying an
+  // attacker's token, repointing the user's ledger at the attacker's repository.
+  // An origin allowlist cannot fix that when the trusted origin *is* the site.
+  //
+  // Nothing was lost by removing it: the worker's callback page posts with
+  // targetOrigin = its own origin and to its own window only (see
+  // authCallbackHtml in worker/src/index.js), so it could never reach this
+  // chrome-extension:// page in the first place. The real delivery path is
+  // presence-marker.js → auth.tokens → the storage.onChanged listener below.
+  // If a cross-window listener is ever genuinely needed, use
+  // isTrustedAuthMessage() from lib/oauth-message.js and bind it to a nonce.
 
   // Listen for import complete broadcast from the service worker
   useEffect(() => {

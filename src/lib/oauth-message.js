@@ -14,6 +14,33 @@
  * Any new OAuth listener must call this rather than re-deriving the rules.
  */
 
+/** The one origin any part of the OAuth flow is allowed to come from. */
+export const AUTH_ORIGIN = "https://codeledger.vkrishna04.me";
+
+/**
+ * True only for the worker's own OAuth callback URL.
+ *
+ * Used by the background tabs.onUpdated relay, which previously matched three
+ * substrings against the raw URL. That accepted any host willing to put those
+ * strings in a path or fragment, and pointed a repeated CL_GET_AUTH_DATA probe
+ * at the resulting tab. Parse the URL and compare the origin.
+ *
+ * @param {string|undefined|null} url
+ */
+export function isAuthCallbackUrl(url) {
+  if (typeof url !== "string" || !url) return false;
+  try {
+    const u = new URL(url);
+    return (
+      u.origin === AUTH_ORIGIN &&
+      u.pathname.startsWith("/api/auth/") &&
+      u.pathname.endsWith("/callback")
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Origins permitted to deliver a CODELEDGER_AUTH message.
  *
