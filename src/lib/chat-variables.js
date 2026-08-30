@@ -14,6 +14,8 @@
  * /constraints → constraints only
  */
 
+import { CONSTANTS } from "../core/constants.js";
+
 export const CHAT_COMMANDS = [
   {
     id: "mycode",
@@ -148,42 +150,17 @@ export const AI_MENTION_OPTIONS = [
     description: "GitHub sync / repo context",
     kind: "git",
   },
-  {
-    id: "gemini",
-    label: "@gemini",
-    description: "Google Gemini provider",
+  // The platform and git entries above are written out because each needs its
+  // own wording. The AI half is not: it is exactly whatever is declared in
+  // `CONSTANTS.AI_PROVIDERS`, so a provider cannot ship with no way to
+  // `@mention` it, and removing one cannot leave a mention behind that resolves
+  // to nothing.
+  ...Object.values(CONSTANTS.AI_PROVIDERS).map((meta) => ({
+    id: meta.id,
+    label: `@${meta.id}`,
+    description: meta.blurb || `${meta.name} provider`,
     kind: "ai",
-  },
-  {
-    id: "openai",
-    label: "@openai",
-    description: "OpenAI provider",
-    kind: "ai",
-  },
-  {
-    id: "claude",
-    label: "@claude",
-    description: "Anthropic Claude provider",
-    kind: "ai",
-  },
-  {
-    id: "deepseek",
-    label: "@deepseek",
-    description: "DeepSeek provider",
-    kind: "ai",
-  },
-  {
-    id: "ollama",
-    label: "@ollama",
-    description: "Local Ollama provider",
-    kind: "ai",
-  },
-  {
-    id: "openrouter",
-    label: "@openrouter",
-    description: "OpenRouter provider",
-    kind: "ai",
-  },
+  })),
 ];
 
 export function getCommandSuggestions(query = "") {

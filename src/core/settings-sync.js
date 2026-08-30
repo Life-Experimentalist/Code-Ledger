@@ -13,6 +13,7 @@ import { createDebugger } from "../lib/debug.js";
 import { decodeBase64Utf8 } from "../lib/base64.js";
 import { Storage } from "./storage.js";
 import { registry } from "./handler-registry.js";
+import { CONSTANTS } from "./constants.js";
 
 const dbg = createDebugger("SettingsSync");
 
@@ -113,17 +114,23 @@ export const PORTABLE_SETTINGS = [
   "darkMode",
 ];
 
-/** Key prefixes whose entries are all portable (e.g. leetcode_enabled, claude_enabled). */
+/**
+ * Key prefixes whose entries are all portable (e.g. leetcode_enabled,
+ * claude_enabled).
+ *
+ * Derived rather than listed. A platform or provider that is declared but
+ * missing from this list keeps none of its per-device settings when the user
+ * reinstalls, and it fails silently — nothing errors, the toggles are simply
+ * back at their defaults on the new machine. That had already happened: the
+ * hand-written list stopped at Codeforces, so `neetcode_*` and `takeuforward_*`
+ * did not travel.
+ *
+ * `SECRET_SUFFIXES` below is what keeps the derivation from carrying an API key
+ * along with the toggles, and it is checked first for exactly that reason.
+ */
 const PORTABLE_PREFIXES = [
-  "leetcode_",
-  "geeksforgeeks_",
-  "codeforces_",
-  "claude_",
-  "openai_",
-  "gemini_",
-  "deepseek_",
-  "ollama_",
-  "openrouter_",
+  ...Object.keys(CONSTANTS.PLATFORMS).map((id) => `${id}_`),
+  ...Object.keys(CONSTANTS.AI_PROVIDERS).map((id) => `${id}_`),
 ];
 
 /** Keys that must NEVER be overridden from remote even if present in sync.json. */
