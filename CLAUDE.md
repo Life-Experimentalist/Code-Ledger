@@ -482,6 +482,21 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 4. If the provider needs a non-standard response shape, override
    `fetchModels()` on the handler rather than adding a new module
 
+Two rules the handler has to respect, both because `init.js` is imported by the
+service worker:
+
+- **Nothing an AI handler imports may touch the DOM.** The worker has no
+  `document`. A handler that needs a page — `manual`, which asks a person —
+  reaches its UI through an indirection installed at runtime
+  (`src/core/manual-bridge.js`), never through a static import.
+- **A provider that cannot answer without a person sets `requiresHuman: true`**
+  on its `AI_PROVIDERS` entry. The worker filters those out of both provider
+  chains it builds, and they must stay out of `AI_FALLBACK_CHAIN` — a solve
+  review runs with the tab possibly closed, so one entry that waits for input
+  burns the 30s timeout and answers nothing. Set `supportsLiveFetch: false`
+  alongside it if there is no model endpoint, or the generic listing path
+  builds the relative URL `/models` and fetches the extension's own origin.
+
 ---
 
 ## GitHub Onboarding Flow
