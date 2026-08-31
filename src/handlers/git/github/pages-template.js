@@ -38,6 +38,68 @@ function assetPath(value) {
 }
 
 /**
+ * How far back a streak is counted. Must stay equal to the window the inline
+ * `computeStreaks()` below walks, or the number baked into the markup and the
+ * number the script draws over it would disagree on the same data.
+ */
+const STREAK_WINDOW_DAYS = 730;
+
+/** Local calendar day key. Mirrors the inline `dayKey()` in the page script. */
+function localDayKey(d) {
+  return (
+    d.getFullYear() +
+    "-" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(d.getDate()).padStart(2, "0")
+  );
+}
+
+/**
+ * Longest run of consecutive days with at least one solve.
+ *
+ * A generation-time twin of the inline `computeStreaks().max`, so the "Best
+ * Streak" cell can say something true before the page's own JavaScript runs.
+ * Deliberately computed here rather than read from index.json: the counters
+ * there are per-difficulty totals and have never carried a streak.
+ *
+ * Only the *best* streak is baked. The current streak is not, and the reason is
+ * in the markup where the placeholder lives.
+ *
+ * @param {Array<{timestamp?: number}>} problems full list, not a slice
+ * @returns {number} days
+ */
+export function bestStreakFrom(problems) {
+  const daySet = new Set();
+  for (const p of Array.isArray(problems) ? problems : []) {
+    const raw = Number(p?.timestamp);
+    if (!Number.isFinite(raw) || raw <= 0) continue;
+    // Same second-vs-millisecond sniff the page script uses.
+    const d = new Date(raw > 1e12 ? raw : raw * 1000);
+    if (Number.isNaN(d.getTime())) continue;
+    daySet.add(localDayKey(d));
+  }
+
+  const today = new Date();
+  let max = 0;
+  let run = 0;
+  for (let i = 0; i < STREAK_WINDOW_DAYS; i++) {
+    const d = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() - (STREAK_WINDOW_DAYS - 1 - i),
+    );
+    if (daySet.has(localDayKey(d))) {
+      run++;
+      if (run > max) max = run;
+    } else {
+      run = 0;
+    }
+  }
+  return max;
+}
+
+/**
  * Returns a self-contained HTML stats page for GitHub Pages.
  * The page fetches ./index.json at runtime and renders a full dashboard.
  */
@@ -64,6 +126,48 @@ export function getPagesHtml(opts = {}) {
   const blurb = sTotal
     ? `${sTotal} DSA problems solved and committed automatically by CodeLedger — ${sEasy} easy, ${sMed} medium, ${sHard} hard.`
     : "DSA problem solutions tracked by CodeLedger — GitHub-backed, AI-reviewed, owned by you.";
+  // Best streak only. It can change only when a solve happens, and a solve is
+  // what triggers the infra refresh that rewrites this file — so the baked
+  // value is regenerated at the same moment it could go stale.
+  const sBest = n(opts.bestStreak);
+  // The address GitHub reports for the live site, custom domain included. Empty
+  // whenever Pages is off or has not been checked yet, in which case no
+  // canonical is emitted at all: a guessed `{owner}.github.io/{repo}` would
+  // point the crawler at the wrong host on every custom-domain site.
+  const canonical = /^https?:\/\//i.test(String(opts.pagesUrl || ""))
+    ? String(opts.pagesUrl).trim()
+    : "";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "CodeLedger — DSA Stats",
+    description: blurb,
+  };
+  if (canonical) jsonLd.url = canonical;
+  if (repoOwner) {
+    jsonLd.author = {
+      "@type": "Person",
+      name: repoOwner,
+      url: "https://github.com/" + repoOwner,
+    };
+  }
+  // Same defence as the commit-list block below: "<" is escaped so a value that
+  // contains a closing script tag cannot end this one, and U+2028/U+2029 are
+  // escaped because JSON.stringify emits them raw and they terminate a line to
+  // any parser predating ES2019.
+  const jsonLdText = JSON.stringify(jsonLd)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+  // Assembled here rather than inline: the markup below is one template literal,
+  // so a conditional written inside it would need a nested backtick.
+  const canonicalTag = canonical
+    ? '<link rel="canonical" href="' +
+      safeHttpUrl(canonical) +
+      '" />\n  <meta property="og:url" content="' +
+      safeHttpUrl(canonical) +
+      '" />'
+    : "";
   // Default raw image URLs (can be overridden via settings passed to generator)
   const ASSETS = {
     iconDark:
@@ -92,6 +196,8 @@ export function getPagesHtml(opts = {}) {
   <meta property="og:description" content="${esc(blurb)}" />
   <meta property="og:image" content="${safeHttpUrl(ASSETS.social)}" />
   <meta property="og:type" content="website" />
+  ${canonicalTag}
+  <script type="application/ld+json">${jsonLdText}</script>
   <script>${CHART_JS_INLINE}</script>
   <style>
     :root {
@@ -206,7 +312,13 @@ export function getPagesHtml(opts = {}) {
     .bh { background: rgba(248,113,113,.15); color: var(--hard); }
 
     /* Loading / error */
-    #loading { display: flex; align-items: center; justify-content: center; min-height: 50vh; color: var(--muted); font-size: .85rem; letter-spacing: .05em; }
+    /* Slim, because the stats row underneath is already populated from the
+       markup and no longer waits on the fetch. A half-viewport spinner over
+       numbers the reader could already have seen was pure invented latency. */
+    #loading { display: flex; align-items: center; justify-content: center; padding: 1rem 0; color: var(--muted); font-size: .85rem; letter-spacing: .05em; }
+    /* Everything below the stats row is drawn by the script from index.json, so
+       it is hidden until there is data to draw. The class comes off in main(). */
+    #app.pending .card { display: none; }
     #err { color: var(--hard); font-size: .85rem; padding: 2rem; text-align: center; max-width: 600px; margin: 0 auto; display: none; }
     .footer { font-size: .6rem; color: var(--muted); text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 
@@ -233,9 +345,9 @@ export function getPagesHtml(opts = {}) {
     .pg-btn:disabled { opacity: .3; cursor: default; }
   </style>
   <noscript><style>
-    /* Without JavaScript the fetch that reveals #app never runs, so the page sat
-       on "Loading stats…" forever. The counts above are already in the markup;
-       show them, and drop the parts that only exist once index.json is parsed. */
+    /* Without JavaScript nothing ever clears "Loading stats…", so hide it. The
+       #app rule is belt-and-braces now that the markup no longer ships it
+       hidden — it costs nothing and survives a future restyle of #app. */
     #loading { display: none !important; }
     #app { display: block !important; }
     /* Every card below the stats row is drawn by script — heatmap, canvases,
@@ -261,14 +373,20 @@ export function getPagesHtml(opts = {}) {
   <div id="loading">Loading stats…</div>
   <div id="err"></div>
 
-  <div id="app" style="display:none" class="wrap">
+  <div id="app" class="wrap pending">
     <div class="stats-row">
       <div class="stat t"><div class="stat-n" id="sn-t">${sTotal}</div><div class="stat-l">Total</div></div>
       <div class="stat e"><div class="stat-n" id="sn-e">${sEasy}</div><div class="stat-l">Easy</div></div>
       <div class="stat m"><div class="stat-n" id="sn-m">${sMed}</div><div class="stat-l">Medium</div></div>
       <div class="stat h"><div class="stat-n" id="sn-h">${sHard}</div><div class="stat-l">Hard</div></div>
+      <!-- The current streak stays a placeholder on purpose. Unlike every other
+           cell here it decays with the wall clock: a repository that goes quiet
+           for a week does not commit, so nothing regenerates this file, and a
+           baked "12d" would keep telling crawlers and no-script readers a
+           streak is running days after it ended. "—" is not knowing; a stale
+           number is a false claim. The script overwrites it on load. -->
       <div class="stat s"><div class="stat-n" id="sn-cs">—</div><div class="stat-l">Streak</div></div>
-      <div class="stat b"><div class="stat-n" id="sn-ms">—</div><div class="stat-l">Best Streak</div></div>
+      <div class="stat b"><div class="stat-n" id="sn-ms">${sBest ? sBest + "d" : "—"}</div><div class="stat-l">Best Streak</div></div>
     </div>
 
     <div class="card hm-outer">
@@ -1552,7 +1670,9 @@ export function getPagesHtml(opts = {}) {
         renderAllTable();
 
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
+        // #app was visible all along, carrying the counts baked into the markup.
+        // Only the script-drawn cards were held back.
+        document.getElementById('app').classList.remove('pending');
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
         var errEl = document.getElementById('err');

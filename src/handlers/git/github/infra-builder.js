@@ -24,7 +24,7 @@ import { Storage } from "../../../core/storage.js";
 import { LAYOUT_VERSION } from "../../../core/path-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { decodeBase64Utf8 } from "../../../lib/base64.js";
-import { getPagesHtml, getRepoReadme } from "./pages-template.js";
+import { getPagesHtml, getRepoReadme, bestStreakFrom } from "./pages-template.js";
 import { fetchAccountContext, canWriteWorkflows, dropWorkflowItems } from "./permissions.js";
 import {
   apiFetch,
@@ -319,8 +319,21 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
 
   const items = [];
 
+  // Resolved before the page is built, because the page now emits a canonical
+  // link and this is the only thing that knows the real serving address —
+  // GitHub reports the custom domain here, which nothing else in the tree does.
+  const pagesUrl = await _refreshPagesUrl(owner, repo, token, settings);
+
   if (settings?.github_pages !== false) {
-    const pageHtml = await _buildPagesContent(owner, repo, token, pagesTheme, settings, indexMeta);
+    const pageHtml = await _buildPagesContent(
+      owner,
+      repo,
+      token,
+      pagesTheme,
+      settings,
+      indexMeta,
+      pagesUrl,
+    );
     items.push({
       path: "index.html",
       mode: "100644",
@@ -334,7 +347,6 @@ async function _buildDynamicFiles(owner, repo, branch, token, settings, indexMet
   // rather than to a guessed `{owner}.github.io` address. That guess is a 404
   // for anyone who never enabled Pages, and cannot be anything else for a
   // private repository on a free plan, where Pages is not offered at all.
-  const pagesUrl = await _refreshPagesUrl(owner, repo, token, settings);
   const newStatsBlock = getRepoReadme(owner, repo, pagesUrl, pagesTheme, settings, indexMeta);
   let currentText = null;
   let merged = newStatsBlock;
@@ -630,7 +642,15 @@ build/
 
 // ── GitHub Pages builder ──────────────────────────────────────────────────────
 
-async function _buildPagesContent(owner, repo, token, pagesTheme, settings, indexMeta = null) {
+async function _buildPagesContent(
+  owner,
+  repo,
+  token,
+  pagesTheme,
+  settings,
+  indexMeta = null,
+  pagesUrl = "",
+) {
   let commitSummary = null;
   let commitList = [];
   let reportImages = [];
@@ -672,6 +692,8 @@ async function _buildPagesContent(owner, repo, token, pagesTheme, settings, inde
     repo,
     // Same counts the README shields are built from, so the two cannot disagree.
     stats: indexMeta?.stats || null,
+    bestStreak: indexMeta?.bestStreak || 0,
+    pagesUrl,
   });
 }
 
@@ -724,6 +746,9 @@ async function _readIndexMeta(owner, repo, token) {
       stats: parsed.stats || null,
       summary: parsed.meta?.summary || null,
       updatedAt: parsed.updatedAt || null,
+      // Computed before the slice: the streak needs every solve, and the ten
+      // most recent would report at most ten days.
+      bestStreak: bestStreakFrom(parsed.problems || []),
       problems: (parsed.problems || []).slice(0, 10),
     };
   } catch (_) {

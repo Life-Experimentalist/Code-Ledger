@@ -20,6 +20,7 @@ import { Storage } from "../../../core/storage.js";
 import { CONSTANTS } from "../../../core/constants.js";
 import * as api from "./api-client.js";
 import { resolveRepoTopics, buildInfraFiles } from "./infra-builder.js";
+import { bestStreakFrom } from "./pages-template.js";
 import { buildTreeItems, buildCommitPayload } from "./commit-builder.js";
 import { createDebugger } from "../../../lib/debug.js";
 import { withLock } from "../../../core/async-lock.js";
@@ -194,6 +195,9 @@ export class GitHubHandler extends BaseGitHandler {
         stats: parsed.stats || null,
         summary: parsed.meta?.summary || null,
         updatedAt: parsed.updatedAt || null,
+        // Computed before the slice: the streak needs every solve, and the
+        // ten most recent would report at most ten days.
+        bestStreak: bestStreakFrom(parsed.problems || []),
         problems: (parsed.problems || []).slice(0, 10),
       };
     } catch (_) {
