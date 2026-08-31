@@ -13,7 +13,10 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { getPagesHtml } from "../src/handlers/git/github/pages-template.js";
+import {
+  getPagesHtml,
+  bestStreakFrom,
+} from "../src/handlers/git/github/pages-template.js";
 
 const SEP = String.fromCharCode(0x2028);
 const BACKSLASH = String.fromCharCode(92);
@@ -266,5 +269,181 @@ describe("pages template — counts baked into the served markup", () => {
     assert.ok(noscript, "no noscript fallback");
     assert.match(noscript, /#loading\s*\{\s*display:\s*none/);
     assert.match(noscript, /#app\s*\{\s*display:\s*block/);
+  });
+});
+
+// ── Streaks ──────────────────────────────────────────────────────────────────
+// The four counts above are read straight out of index.json's `stats` block.
+// Streaks are not in there: they have to be derived from the solve timestamps,
+// and `_indexMetaFromFiles` hands the page only the ten most recent problems.
+// So the derivation happens before that slice, and only the *best* streak is
+// baked — see the comment beside #sn-cs in the template for why the current one
+// deliberately stays a placeholder.
+
+const DAY_MS = 86400000;
+
+/** Midday, `daysAgo` local days back. Midday so a DST shift cannot move the day. */
+function midday(daysAgo) {
+  const t = new Date();
+  t.setHours(12, 0, 0, 0);
+  return t.getTime() - daysAgo * DAY_MS;
+}
+
+/** Solves on each of `days`, expressed as whole days before today. */
+const solvesOn = (days) => days.map((d) => ({ timestamp: midday(d) }));
+
+describe("pages template — best streak baked into the markup", () => {
+  test("finds the longest run, not the most recent one", () => {
+    // Five straight days three weeks ago, then a two-day run just now.
+    const problems = solvesOn([24, 23, 22, 21, 20, 1, 0]);
+    assert.equal(bestStreakFrom(problems), 5);
+  });
+
+  test("counts a run that the ten-problem slice would have truncated", () => {
+    // The bug this guards: thirty consecutive days is a thirty-day streak, but
+    // the ten most recent solves can only ever describe ten days.
+    const problems = solvesOn(Array.from({ length: 30 }, (_, i) => i));
+    assert.equal(bestStreakFrom(problems), 30);
+    assert.equal(bestStreakFrom(problems.slice(0, 10)), 10, "slicing loses 20 days");
+  });
+
+  test("second-precision timestamps count the same as millisecond ones", () => {
+    const ms = solvesOn([3, 2, 1]);
+    const secs = ms.map((p) => ({ timestamp: Math.floor(p.timestamp / 1000) }));
+    assert.equal(bestStreakFrom(secs), bestStreakFrom(ms));
+    assert.equal(bestStreakFrom(secs), 3);
+  });
+
+  test("junk timestamps are skipped rather than counted or thrown on", () => {
+    assert.equal(bestStreakFrom([]), 0);
+    assert.equal(bestStreakFrom(null), 0);
+    assert.equal(bestStreakFrom(undefined), 0);
+    assert.equal(
+      bestStreakFrom([{}, { timestamp: 0 }, { timestamp: -1 }, { timestamp: "x" }]),
+      0,
+    );
+  });
+
+  test("renders the streak into the Best Streak cell", () => {
+    const html = getPagesHtml({ bestStreak: 12 });
+    assert.match(html, /id="sn-ms">12d</);
+  });
+
+  test("no streak renders the placeholder, not a zero-day claim", () => {
+    assert.match(getPagesHtml(), /id="sn-ms">—</);
+    assert.match(getPagesHtml({ bestStreak: 0 }), /id="sn-ms">—</);
+  });
+
+  test("the current streak stays a placeholder even when a streak is known", () => {
+    // It decays with the wall clock, and nothing regenerates this file while the
+    // repository is quiet — so a baked value would outlive the streak itself.
+    assert.match(getPagesHtml({ bestStreak: 12, stats: { total: 316 } }), /id="sn-cs">—</);
+  });
+
+  test("a hostile bestStreak cannot inject markup", () => {
+    const html = getPagesHtml({ bestStreak: '"><script>alert(1)</scr' + "ipt>" });
+    assert.ok(!/<script>alert\(1\)/.test(html), "markup injected through bestStreak");
+    assert.match(html, /id="sn-ms">—</);
+  });
+});
+
+describe("pages template — canonical URL and structured data", () => {
+  const LIVE = "https://dsa.example.com/";
+  const LD = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/;
+
+  test("emits a canonical link and og:url for the address GitHub reports", () => {
+    const html = getPagesHtml({ pagesUrl: LIVE });
+    assert.match(html, /<link rel="canonical" href="https:\/\/dsa\.example\.com\/" \/>/);
+    assert.match(html, /<meta property="og:url" content="https:\/\/dsa\.example\.com\/" \/>/);
+  });
+
+  test("emits no canonical at all when the serving address is unknown", () => {
+    // A guessed {owner}.github.io/{repo} would point the crawler at the wrong
+    // host on every custom-domain site, so silence is the correct output.
+    const html = getPagesHtml({ owner: "o", repo: "r" });
+    assert.ok(!/rel="canonical"/.test(html), "canonical guessed from owner/repo");
+    assert.ok(!/property="og:url"/.test(html), "og:url guessed from owner/repo");
+  });
+
+  test("a non-http scheme is never promoted to canonical", () => {
+    for (const bad of ["javascript:alert(1)", "data:text/html,x", "//evil.test/"]) {
+      const html = getPagesHtml({ pagesUrl: bad });
+      assert.ok(!/rel="canonical"/.test(html), bad + " became a canonical");
+    }
+  });
+
+  test("ships JSON-LD describing the page", () => {
+    const html = getPagesHtml({ pagesUrl: LIVE, owner: "octocat", stats: { total: 316 } });
+    const block = html.match(LD)?.[1];
+    assert.ok(block, "no JSON-LD block");
+    const ld = JSON.parse(block);
+    assert.equal(ld["@context"], "https://schema.org");
+    assert.equal(ld["@type"], "WebPage");
+    assert.equal(ld.url, LIVE);
+    assert.equal(ld.author.name, "octocat");
+    assert.equal(ld.author.url, "https://github.com/octocat");
+    assert.match(ld.description, /316 DSA problems solved/);
+  });
+
+  test("JSON-LD omits url when there is nothing truthful to put there", () => {
+    const ld = JSON.parse(getPagesHtml().match(LD)[1]);
+    assert.equal(ld.url, undefined);
+    assert.equal(ld.author, undefined);
+  });
+
+  test("an owner carrying a closing script tag cannot end the JSON-LD block", () => {
+    const hostile = "</scr" + "ipt><img src=x onerror=alert(1)>";
+    const block = getPagesHtml({ owner: hostile }).match(LD)?.[1];
+    assert.ok(block, "no JSON-LD block");
+    assert.ok(!block.includes("</scr" + "ipt"), "the block was terminated early");
+    // Still valid JSON, and the value round-trips intact.
+    assert.equal(JSON.parse(block).author.name, hostile);
+  });
+
+  test("separator characters in the JSON-LD are escaped", () => {
+    const block = getPagesHtml({ owner: "a" + SEP + "b" }).match(LD)[1];
+    assert.ok(!block.includes(SEP), "raw U+2028 left in the JSON-LD");
+    assert.ok(block.includes(BACKSLASH + "u2028"), "U+2028 was not escaped");
+  });
+});
+
+describe("pages template — the stats row does not wait on the fetch", () => {
+  test("#app is not hidden by an inline style", () => {
+    // The counts are in the markup already; hiding the whole dashboard behind
+    // the index.json fetch made JS readers watch a spinner over data they had.
+    const html = getPagesHtml({ stats: { total: 316 } });
+    const app = html.match(/<div id="app"[^>]*>/)?.[0];
+    assert.ok(app, "no #app element");
+    assert.ok(!/display\s*:\s*none/.test(app), "#app still ships hidden: " + app);
+  });
+
+  test("only the script-drawn cards are held back, via a class", () => {
+    const html = getPagesHtml();
+    assert.match(html, /<div id="app" class="wrap pending">/);
+    assert.match(html, /#app\.pending \.card \{ display: none; \}/);
+  });
+
+  test("the load handler drops the class instead of unhiding #app", () => {
+    const html = getPagesHtml();
+    assert.match(html, /getElementById\('app'\)\.classList\.remove\('pending'\)/);
+  });
+});
+
+describe("pages template — the onboarding path", () => {
+  test("a freshly created repo emits zeros and placeholders, never a guess", () => {
+    // GitHubOnboardingModal calls getPagesHtml({ owner, repo }) and nothing
+    // else: at that point the repo has no solves, no streak, and no Pages site.
+    // Every figure below is therefore true rather than merely absent, and this
+    // test is here so a later argument added to the generator cannot quietly
+    // start inventing one for it.
+    const html = getPagesHtml({ owner: "octocat", repo: "dsa" });
+    assert.match(html, /id="sn-t">0</);
+    assert.match(html, /id="sn-e">0</);
+    assert.match(html, /id="sn-m">0</);
+    assert.match(html, /id="sn-h">0</);
+    assert.match(html, /id="sn-cs">—</);
+    assert.match(html, /id="sn-ms">—</);
+    assert.ok(!/rel="canonical"/.test(html), "canonical invented for a repo with no Pages site");
+    assert.match(html, /content="DSA problem solutions tracked by CodeLedger/);
   });
 });

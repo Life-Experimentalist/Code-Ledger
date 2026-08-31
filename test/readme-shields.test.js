@@ -91,3 +91,31 @@ describe("GitHubHandler._indexMetaFromFiles", () => {
     assert.equal(h._indexMetaFromFiles([{ path: "index.json", content: "{nope" }]), null);
   });
 });
+
+describe("GitHubHandler._indexMetaFromFiles — streaks are derived before the slice", () => {
+  const h = Object.create(GitHubHandler.prototype);
+
+  // Twenty consecutive days of solves, newest first — the shape index.json has.
+  const midday = (daysAgo) => {
+    const t = new Date();
+    t.setHours(12, 0, 0, 0);
+    return t.getTime() - daysAgo * 86400000;
+  };
+  const files = (problems) => [
+    { path: "index.json", content: JSON.stringify({ stats: STATS, problems }) },
+  ];
+
+  test("reports the full streak even though only ten problems are kept", () => {
+    // The page's Best Streak cell is built from this. Deriving it after the
+    // slice would cap every streak at ten days no matter how long the real one.
+    const problems = Array.from({ length: 20 }, (_, i) => ({ id: i, timestamp: midday(i) }));
+    const meta = h._indexMetaFromFiles(files(problems));
+    assert.equal(meta.bestStreak, 20);
+    assert.equal(meta.problems.length, 10, "the slice itself is unchanged");
+  });
+
+  test("no timestamps means no streak, not a crash", () => {
+    const meta = h._indexMetaFromFiles(files([{ id: 1 }, { id: 2 }]));
+    assert.equal(meta.bestStreak, 0);
+  });
+});
