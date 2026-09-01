@@ -80,7 +80,7 @@
     "vis-network": "10.1.1"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.0.0",
+    "@tailwindcss/cli": "^4.3.3",
     "@types/chrome": "^0.0.308",
     "@types/node": "^22.13.10",
     "adm-zip": "0.6.0",
