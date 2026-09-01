@@ -85,7 +85,7 @@
     "@types/node": "^22.13.10",
     "adm-zip": "0.6.0",
     "esbuild": "0.28.1",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.4.1",
     "octokit": "^4.0.0",
     "prettier": "^3.8.3",
     "puppeteer": "25.8.0",
