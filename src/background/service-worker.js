@@ -1430,7 +1430,10 @@ async function handleSolved(data) {
 
         filesToCommit.push({
           path: "index.json",
-          content: await buildIndexJson(),
+          // `allProblems` was read above and nothing has written since — the
+          // loop only reads from it — so this is the same set buildIndexJson
+          // would fetch again.
+          content: await buildIndexJson(allProblems),
         });
 
         // Bundle .codeledger/* so settings/bank/roadmaps stay in sync with every solve
@@ -1707,8 +1710,20 @@ function _buildIndexJsonFromList(problems, settings) {
   );
 }
 
-async function buildIndexJson() {
-  const problems = await Storage.getAllProblems();
+/**
+ * Build index.json.
+ *
+ * `preloaded` lets a caller that has *just* read the full problem set hand it
+ * over instead of paying for a second read. Only pass it when nothing has been
+ * written since that read: getAllProblems() is not a plain fetch — it loads the
+ * canonical map, reads settings, then resolves and re-normalises the tags of
+ * every problem — so the duplicate call is the expensive kind. Omit it and the
+ * read happens here, which is what every other caller wants.
+ *
+ * @param {any[]} [preloaded]
+ */
+async function buildIndexJson(preloaded) {
+  const problems = preloaded || (await Storage.getAllProblems());
   dbg.log(`buildIndexJson(): building index for ${problems.length} problem(s)`);
   const userDifficultyMap = await loadUserDifficultyMap();
   const diff = countByDifficulty(problems, userDifficultyMap);
