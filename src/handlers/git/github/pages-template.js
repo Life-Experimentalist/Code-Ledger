@@ -1358,17 +1358,39 @@ export function getPagesHtml(opts = {}) {
       return ALL_REPO_URL + '/blob/main/' + problem.files[0].path;
     }
 
+    // Mirrors safeSegment() in src/core/path-builder.js, which is the writer
+    // that produced the paths this function links to. A reader that skips the
+    // writer's normalisation builds a path that was never committed, and the
+    // link 404s. The parity test in test/pages-template.test.js runs this
+    // function against the real one so the two cannot drift apart.
+    function safeSeg(value) {
+      var cleaned = String(value == null ? '' : value)
+        .normalize('NFKD')
+        .replace(/[\\u0300-\\u036f]/g, '')
+        .replace(/[/\\\\]+/g, '-')
+        .replace(/\\s+/g, '-')
+        .replace(/[^A-Za-z0-9._-]/g, '')
+        .replace(/\\.{2,}/g, '.')
+        .replace(/-+/g, '-')
+        .replace(/^[.\\-]+|[.\\-]+$/g, '');
+      return cleaned || 'untitled';
+    }
+
     function repoFileUrl(problem) {
       // Reconstruct v3 path: problems/{canonicalId}/{platform}/README.md
       //                   or: problems/{platformId}/README.md
       if (!ALL_REPO_URL) return '';
-      var PLAT_CODE = { leetcode: 'lc', geeksforgeeks: 'gfg', codeforces: 'cf' };
+      // Interpolated from CONSTANTS.PLATFORM_CODE rather than restated: the
+      // hand-written copy listed three of the five platforms, so every
+      // NeetCode and takeuforward link fell through to plat.slice(0, 3) and
+      // pointed at problems/nee-… and problems/tak-… instead of nc-… / tuf-….
+      var PLAT_CODE = ${JSON.stringify(CONSTANTS.PLATFORM_CODE)};
       var plat = (problem.platform || '').toLowerCase();
       var prefix = PLAT_CODE[plat] || plat.slice(0, 3) || 'xx';
-      var rawId = String(problem.id || problem.titleSlug || '').split('::')[0];
+      var rawId = safeSeg(String(problem.id || problem.titleSlug || '').split('::')[0]);
       var pid = rawId.startsWith(prefix + '-') ? rawId : (prefix + '-' + rawId);
       var dir = (problem.canonical && problem.canonical.canonicalId)
-        ? 'problems/' + problem.canonical.canonicalId + '/' + plat
+        ? 'problems/' + safeSeg(problem.canonical.canonicalId) + '/' + safeSeg(plat)
         : 'problems/' + pid;
       return ALL_REPO_URL + '/blob/main/' + dir + '/README.md';
     }
