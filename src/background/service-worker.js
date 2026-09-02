@@ -23,6 +23,13 @@ import {
 import { expandChatVariables } from "../lib/chat-variables.js";
 import { AUTH_ORIGIN, isAuthCallbackUrl } from "../lib/oauth-message.js";
 import { isMessageAllowed, originOf } from "../lib/message-guard.js";
+import {
+  targetKey as _targetKey,
+  isMirrorEnabled,
+  normalizeGitTarget as _normalizeGitTarget,
+  getDefaultPrimaryTarget as _getDefaultPrimaryTarget,
+  getOrderedTargets as _getOrderedTargets,
+} from "../core/git-targets.js";
 
 /**
  * Our own chrome-extension:// (or moz-extension://) origin.
@@ -628,10 +635,6 @@ function _providerModelKey(provider) {
   return `${id}::${model}`;
 }
 
-function _targetKey(target = {}) {
-  return `${target.provider || "github"}:${target.owner || ""}/${target.repo || ""}`;
-}
-
 /**
  * Whether a provider answers by asking a person.
  *
@@ -1049,46 +1052,6 @@ async function _broadcastAuthExpired() {
   chrome.runtime.sendMessage({ type: "GITHUB_REAUTH_REQUIRED" }, () => {
     void chrome.runtime.lastError;
   });
-}
-
-function _normalizeGitTarget(target) {
-  if (!target?.repo) return null;
-  return {
-    provider: target.provider || "github",
-    owner: target.owner || "",
-    repo: String(target.repo || "")
-      .replace(/\s+/g, "-")
-      .trim(),
-  };
-}
-
-function _getDefaultPrimaryTarget(settings = {}) {
-  const repo = (settings.github_repo || settings.gitRepo || "").replace(/\s+/g, "-").trim();
-  if (!repo) return null;
-  return _normalizeGitTarget({
-    provider: settings.gitProvider || "github",
-    owner: settings.github_owner || settings.github_username || "",
-    repo,
-  });
-}
-
-function _getOrderedTargets(settings = {}) {
-  const ordered = [];
-  const seen = new Set();
-  const active = _normalizeGitTarget(settings.git_active_primary || null);
-  const primary = _getDefaultPrimaryTarget(settings);
-  const mirrors = Array.isArray(settings.git_mirrors)
-    ? settings.git_mirrors.map(_normalizeGitTarget).filter(Boolean)
-    : [];
-
-  for (const t of [active, primary, ...mirrors]) {
-    if (!t) continue;
-    const key = _targetKey(t);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    ordered.push(t);
-  }
-  return ordered;
 }
 
 async function _commitWithFailover(files, message, repoName, commitOpts, settings) {
@@ -1573,7 +1536,10 @@ async function handleSolved(data) {
         // Fire-and-forget: rename files to canonical paths if needed
         performPendingRenames().catch(() => {});
 
-        // Push to any configured mirrors (fire-and-forget; failures are non-fatal)
+        // Replicate to the enabled mirrors. Awaited, not fire-and-forget as this
+        // comment used to claim: dropping the promise lets MV3 kill the worker
+        // mid-push. Individual failures stay non-fatal — pushToMirrors settles
+        // them all and never rejects.
         await pushToMirrors(
           filesToCommit,
           commitMsg,
@@ -1606,7 +1572,7 @@ async function pushToMirrors(files, message, commitOpts, settings, skipTargetKey
   await Promise.allSettled(
     mirrors.map(async (mirror) => {
       if (!mirror?.repo) return;
-      if (mirror.enabled === false) return;
+      if (!isMirrorEnabled(mirror)) return;
       const normalized = _normalizeGitTarget(mirror);
       if (normalized && skipTargetKey && _targetKey(normalized) === skipTargetKey) return;
       const handler = registry.getGitProvider(mirror.provider || "github");
