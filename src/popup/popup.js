@@ -8,7 +8,7 @@ import { useState, useEffect } from "../vendor/preact-bundle.js";
 import { htm } from "../vendor/preact-bundle.js";
 const html = htm.bind(h);
 import { Storage } from "../core/storage.js";
-import { tabs, runtime } from "../lib/browser-compat.js";
+import { tabs, runtime, openOrFocusTab } from "../lib/browser-compat.js";
 import { createDebugger } from "../lib/debug.js";
 import { applyThemeFromStorage, setupThemeListener } from "../core/theme-engine.js";
 import { isAIActive, isGamificationActive } from "../core/feature-flags.js";
@@ -129,6 +129,12 @@ function PopupApp() {
     const timer = setInterval(readPending, 15 * 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // The welcome page's own footer says it "can be reopened from the extension
+  // popup at any time" — this is the entry that makes that true.
+  const openWelcome = () => {
+    openOrFocusTab(runtime.getURL("welcome/welcome.html")).catch(() => {});
+  };
 
   const openLibrary = (tab = "solutions", settingsTab = null) => {
     let url = runtime.getURL(`library/library.html?tab=${tab}`);
@@ -322,6 +328,13 @@ function PopupApp() {
           ></div>
           <span class="text-[9px] uppercase tracking-widest text-emerald-500/70">Ready</span>
         </div>
+        <button
+          onClick=${openWelcome}
+          title="Reopen the setup guide"
+          class="text-[9px] uppercase tracking-widest text-slate-600 hover:text-cyan-400 transition-colors"
+        >
+          Setup guide
+        </button>
         <span class="text-[9px] text-slate-600">${stats.total} tracked</span>
       </div>
     </div>

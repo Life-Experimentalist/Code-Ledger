@@ -36,6 +36,29 @@ import {
 import { BrokenImportsModal } from "./components/BrokenImportsModal.js";
 import { markSettingsPendingCommit } from "/core/settings-auto-commit.js";
 import { pendingCommitStatus, formatRetryEta } from "/core/pending-commits.js";
+import { openOrFocusTab } from "/lib/browser-compat.js";
+import { ErrorBoundary } from "../ui/components/ErrorBoundary.js";
+
+const WELCOME_URL =
+  typeof chrome !== "undefined" && chrome.runtime?.id
+    ? chrome.runtime.getURL("welcome/welcome.html")
+    : "#";
+
+/**
+ * The "Complete setup" links stay real anchors — middle-click, copy-link-address
+ * and the hover URL preview all keep working — but a plain left click is taken
+ * over so it lands on the welcome tab that is already open instead of stacking a
+ * second one. Modified clicks are left alone: those are the user explicitly
+ * asking for another tab or window.
+ */
+function onWelcomeClick(e) {
+  if (WELCOME_URL === "#") return;
+  if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || (e.button != null && e.button !== 0)) {
+    return;
+  }
+  e.preventDefault();
+  openOrFocusTab(WELCOME_URL).catch(() => {});
+}
 
 initializeHandlers();
 initDebug().catch(() => {});
@@ -1031,10 +1054,10 @@ function LibraryApp() {
               : setupIncomplete && !setupDismissed && !sidebarCollapsed
                 ? html`
                     <a
-                      href=${typeof chrome !== "undefined" && chrome.runtime?.id
-                        ? chrome.runtime.getURL("welcome/welcome.html")
-                        : "#"}
+                      href=${WELCOME_URL}
                       target="_blank"
+                      rel="noopener noreferrer"
+                      onClick=${onWelcomeClick}
                       class="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 hover:bg-amber-500/15 transition-colors"
                     >
                       <span>⚠</span>
@@ -1044,10 +1067,10 @@ function LibraryApp() {
                 : setupIncomplete && !setupDismissed && sidebarCollapsed
                   ? html`
                       <a
-                        href=${typeof chrome !== "undefined" && chrome.runtime?.id
-                          ? chrome.runtime.getURL("welcome/welcome.html")
-                          : "#"}
+                        href=${WELCOME_URL}
                         target="_blank"
+                        rel="noopener noreferrer"
+                        onClick=${onWelcomeClick}
                         title="Setup incomplete — click to complete"
                         class="flex items-center justify-center w-10 h-10 mx-auto mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/15 transition-colors"
                         >⚠</a
@@ -1128,10 +1151,10 @@ function LibraryApp() {
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                       <a
-                        href=${typeof chrome !== "undefined" && chrome.runtime?.id
-                          ? chrome.runtime.getURL("welcome/welcome.html")
-                          : "#"}
+                        href=${WELCOME_URL}
                         target="_blank"
+                        rel="noopener noreferrer"
+                        onClick=${onWelcomeClick}
                         class="text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 px-2 py-1 rounded transition-colors whitespace-nowrap"
                         >Complete setup →</a
                       >
@@ -1268,4 +1291,7 @@ function LibraryApp() {
   `;
 }
 
-render(html`<${LibraryApp} />`, document.getElementById("root"));
+render(
+  html`<${ErrorBoundary} label="The library"><${LibraryApp} /><//>`,
+  document.getElementById("root"),
+);
