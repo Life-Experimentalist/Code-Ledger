@@ -166,6 +166,26 @@ async function _getGitContext() {
 }
 
 /**
+ * The three maintenance operations below rebuild the remote repository from
+ * local storage and delete whatever the rebuild does not produce. That is only
+ * safe while local storage holds the solves.
+ *
+ * It does not on a second device: link an existing repository, and until the
+ * first sync pull lands, IndexedDB is empty. "Rebuild from local" then means
+ * "delete every solution in the repository and commit nothing back". The repo
+ * is the only copy at that moment, so there is no recovery.
+ *
+ * Refuse instead. The caller turns the throw into a message on the button.
+ */
+function assertLocalNotEmpty(problems, deleteCount, op) {
+  if ((problems?.length ?? 0) > 0 || deleteCount === 0) return;
+  throw new Error(
+    `${op} would delete ${deleteCount} file(s) and commit nothing back — no problems ` +
+      `are stored on this device. Sync from the repository first, then run this again.`,
+  );
+}
+
+/**
  * Read layoutVersion from the repo's index.json.
  * Returns 1 if absent (pre-v2 repo), null if repo has no index.json yet.
  */
@@ -209,6 +229,7 @@ export async function migrateRepo() {
 
   // 3. Build complete new-layout file set from stored problems
   const problems = await Storage.getAllProblems();
+  assertLocalNotEmpty(problems, oldPaths.length, "Repo migration");
   dbg.log(`migrateRepo(): building new-layout files for ${problems.length} problem(s)...`);
   const newFiles = [];
 
@@ -314,6 +335,7 @@ export async function resetRepo() {
   // 3. Stray files: in repo but not in desired set and not infra
   const INFRA = new Set(["index.html", "README.md", ".github/workflows/deploy-pages.yml"]);
   const strayPaths = [...existingPaths].filter((p) => !desiredFiles.has(p) && !INFRA.has(p));
+  assertLocalNotEmpty(problems, strayPaths.length, "Repo reset");
 
   const filesToCommit = [...desiredFiles.entries()].map(([path, content]) => ({
     path,
@@ -360,6 +382,12 @@ export async function forceRebuildRepo() {
   const INFRA = new Set(["index.html", "README.md", ".github/workflows/deploy-pages.yml"]);
   const deletable = [...existingPaths].filter((p) => !INFRA.has(p));
 
+  // Read local storage before committing the deletion. The clear is its own
+  // commit, so anything that throws after it — an empty store, or getAllProblems()
+  // itself failing — leaves the repository cleared with nothing to restore it.
+  const problems = await Storage.getAllProblems();
+  assertLocalNotEmpty(problems, deletable.length, "Force rebuild");
+
   if (deletable.length > 0) {
     await git.commit(
       [],
@@ -373,7 +401,6 @@ export async function forceRebuildRepo() {
   }
 
   // Build historical commits (one per problem) to preserve timestamps
-  const problems = await Storage.getAllProblems();
   const indexContent = _buildIndexJson(problems);
 
   const commits = (problems || [])
