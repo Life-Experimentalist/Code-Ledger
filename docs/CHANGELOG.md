@@ -6,7 +6,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [1.9.0] — 2026-09-03
 
 ### Added
 
@@ -111,6 +111,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The same links dropped the sanitisation the writer applies. A slug is scrubbed on its way into the repository — separators, dot-segments and anything outside `A-Za-z0-9._-` — and the report was rebuilding paths from the unscrubbed value, so any problem whose slug carried one of those characters linked nowhere. The scrubbing now happens on both sides, and the tests pull the report's own copy back out of the generated page and run it against the real one, so the two cannot drift apart again.
 
 - Layout migration no longer orphans the files of a problem with a canonical match. It asks which paths a problem already occupies, and built that question from the raw canonical ID while every file had been written under the scrubbed form of it. Where the two differed the answer was "no files", so the old copies were left behind instead of being moved.
+
+- The library refreshes itself after a solve again. The service worker announces a saved solve to every open library tab, and it looked those tabs up by the exact URL `library/library.html`. A match pattern's path is compared against the path *and* the query string, and every route that opens the library appends one — the popup's three entry points, the welcome page, the floating panel, a problem card, the importer, the injected button and the worker's own tab opener. So the announcement reached no tab at all, and the library only picked up a new solve when you reloaded it by hand. Fixed by matching `library.html*`, which is the same rule `browser-compat.js` already documents for the tab it focuses.
 
 ### Security
 
