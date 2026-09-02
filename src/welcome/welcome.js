@@ -10,6 +10,8 @@ const html = htm.bind(h);
 
 import { Storage } from "../core/storage.js";
 import { createDebugger } from "../lib/debug.js";
+import { ErrorBoundary } from "../ui/components/ErrorBoundary.js";
+import { openOrFocusTab } from "../lib/browser-compat.js";
 import { CONSTANTS } from "../core/constants.js";
 import { privacyTier } from "../core/privacy-disclosure.js";
 import { isGamificationActive } from "../core/feature-flags.js";
@@ -70,13 +72,19 @@ const STEPS = [
 ];
 
 // ── Helper: open a tab ────────────────────────────────────────────────────────
+// External destinations always get their own tab — this page is a checklist, and
+// navigating away from it loses the reader's place.
 function openTab(url) {
   if (chrome?.runtime?.id) chrome.tabs.create({ url });
-  else window.open(url, "_blank");
+  else window.open(url, "_blank", "noopener");
 }
 
+// Our own pages reuse one tab instead. Four of the buttons below open
+// library.html with different query strings; without this a run through the
+// checklist leaves four libraries open. The existing tab is re-pointed at the
+// requested section, which is what the button was asking for anyway.
 function openExtTab(path) {
-  openTab(chrome.runtime.getURL(path));
+  openOrFocusTab(chrome.runtime.getURL(path)).catch(() => {});
 }
 
 // ── Main app ──────────────────────────────────────────────────────────────────
@@ -562,4 +570,7 @@ function WelcomeApp() {
   `;
 }
 
-render(html`<${WelcomeApp} />`, document.getElementById("root"));
+render(
+  html`<${ErrorBoundary} label="The setup guide"><${WelcomeApp} /><//>`,
+  document.getElementById("root"),
+);

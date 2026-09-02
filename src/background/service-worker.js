@@ -5,7 +5,7 @@
 
 import { initDebug, setDebug, createDebugger } from "../lib/debug.js";
 import { decodeBase64Utf8 } from "../lib/base64.js";
-import { storage as browserStorage } from "../lib/browser-compat.js";
+import { storage as browserStorage, openOrFocusTab } from "../lib/browser-compat.js";
 import { registry } from "../core/handler-registry.js";
 import { eventBus } from "../core/event-bus.js";
 import { Storage } from "../core/storage.js";
@@ -3590,7 +3590,7 @@ async function processAIReviewQueue(options = {}) {
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
     // Open the welcome page on first install so the user is guided through setup
-    chrome.tabs.create({ url: chrome.runtime.getURL("welcome/welcome.html") });
+    openOrFocusTab(chrome.runtime.getURL("welcome/welcome.html")).catch(() => {});
   }
   init();
 });
@@ -4707,12 +4707,9 @@ try {
 
     if (msg && msg.type === "OPEN_WELCOME") {
       dbg.log(`onMessage(OPEN_WELCOME): opening welcome tab...`);
-      try {
-        chrome.tabs.create({
-          url: chrome.runtime.getURL("welcome/welcome.html"),
-        });
-        dbg.log(`onMessage(OPEN_WELCOME): tab created`);
-      } catch (_) {}
+      openOrFocusTab(chrome.runtime.getURL("welcome/welcome.html"))
+        .then((id) => dbg.log(`onMessage(OPEN_WELCOME): tab ${id} shown`))
+        .catch(() => {});
       sendResponse({ ok: true });
       return true;
     }
