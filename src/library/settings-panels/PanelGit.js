@@ -438,12 +438,13 @@ export function PanelGit({ settings, onSettingsChange, onSetupRepo, onConnect })
 
   // ── Mirror helpers ────────────────────────────────────────────────────────
 
-  const mirrors = (
-    Array.isArray(settings?.git_mirrors)
-      ? settings.git_mirrors
-      : // De-duplicate: remove any mirror whose owner/repo matches the main repo
-        []
-  ).filter((m) => !(repoName && m.repo === repoName && (m.owner || "") === (repoOwner || "")));
+  // The main repo is not a mirror of itself, so an entry pointing at it is
+  // dropped from the list. removeMirror and toggleMirrorEnabled index into this
+  // filtered array and save it, so such an entry is also cleared from settings
+  // on the next mirror edit — which is the intent, not a side effect.
+  const mirrors = (Array.isArray(settings?.git_mirrors) ? settings.git_mirrors : []).filter(
+    (m) => !(repoName && m.repo === repoName && (m.owner || "") === (repoOwner || "")),
+  );
 
   const saveMirrors = (updated) => onSettingsChange("git_mirrors", updated);
 
