@@ -178,7 +178,7 @@ Do not reintroduce a provider anywhere in the UI before its `commit()` works.
 New code should call extension APIs through `src/lib/browser-compat.js`, which
 is what makes a call work on both targets.
 
-This is a direction, not a verified invariant: 37 files besides it still reach
+This is a direction, not a verified invariant: 31 files besides it still reach
 for the namespaces directly — `chrome.runtime.sendMessage` in 51 places,
 `chrome.storage.local` in 15, `chrome.tabs.*` across the tab helpers. It works
 because Firefox MV3 aliases `chrome.*`, so treat those as debt rather than as
