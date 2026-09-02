@@ -118,8 +118,8 @@ manifest-chromium.json / manifest-firefox.json   — the build emits one manifes
 │   ├── canonical-mapper.js           — resolves platform problem → canonical ID
 │   └── ai-prompts.js                 — prompt templates + normalizeAIPrompts()
 ├── lib/
-│   ├── browser-compat.js             — THE ONLY FILE that uses chrome.* or browser.*
-│   ├── sanitize-html.js              — the allow-list sanitiser every rendered HTML string goes through
+│   ├── browser-compat.js             — the cross-browser wrapper for the extension APIs
+│   ├── sanitize-html.js              — allow-list sanitiser; one importer (leetcode/modal-tabs.js)
 │   └── debug.js                      — createDebugger() with console.bind() trick
 ├── ui/
 │   ├── components/                   — shared Preact components (ModelSelector, panels, modals)
@@ -173,9 +173,16 @@ Do not reintroduce a provider anywhere in the UI before its `commit()` works.
 
 ## Critical Rules
 
-### Never use `chrome.*` or `browser.*` directly
+### Prefer `browser-compat.js` over `chrome.*` / `browser.*`
 
-All extension API calls must go through `src/lib/browser-compat.js`. This is the only file that touches those namespaces.
+New code should call extension APIs through `src/lib/browser-compat.js`, which
+is what makes a call work on both targets.
+
+This is a direction, not a verified invariant: 37 files besides it still reach
+for the namespaces directly — `chrome.runtime.sendMessage` in 51 places,
+`chrome.storage.local` in 15, `chrome.tabs.*` across the tab helpers. It works
+because Firefox MV3 aliases `chrome.*`, so treat those as debt rather than as
+precedent, and do not read the wrapper as the only door.
 
 ### Never use `console.log` directly
 
