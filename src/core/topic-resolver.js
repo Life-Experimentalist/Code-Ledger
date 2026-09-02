@@ -328,6 +328,50 @@ for (const [canonicalName, aliases] of Object.entries(RAW_MAPPINGS)) {
  * @param {object} customMappings - Optional settings mappings (lowerKey -> canonicalValue)
  * @returns {string} The normalized tag name
  */
+/**
+ * Generic category labels that say nothing about a problem. Discarded rather
+ * than normalized.
+ *
+ * Module scope, not inside normalizeTag: that function runs once per tag per
+ * problem on every storage read, every graph build and every migration, so a
+ * Set built in its body is rebuilt thousands of times per call site.
+ */
+const IGNORED_TAGS = new Set([
+  "data structure",
+  "data structures",
+  "algorithm",
+  "algorithms",
+  "dsa",
+  "programming",
+  "coding",
+  "computer science",
+]);
+
+/**
+ * Lowercased view of a user's topicMappings, memoized per settings object.
+ *
+ * The lookup is case-insensitive and callers pass the same mappings object for
+ * every tag in a loop, so lowercasing every key on every tag made the cost the
+ * product of two things the user controls: how many problems they have and how
+ * many rename rules they wrote. A WeakMap keyed on the object they already hold
+ * does it once and lets it go when they do.
+ *
+ * On a case collision the first key wins, which is what the linear scan did.
+ */
+const lowerMappingCache = new WeakMap();
+
+function lowerMappings(customMappings) {
+  let m = lowerMappingCache.get(customMappings);
+  if (m) return m;
+  m = new Map();
+  for (const [from, to] of Object.entries(customMappings)) {
+    const k = from.toLowerCase();
+    if (!m.has(k)) m.set(k, to);
+  }
+  lowerMappingCache.set(customMappings, m);
+  return m;
+}
+
 export function normalizeTag(tag, customMappings = {}) {
   if (!tag || typeof tag !== "string") return "";
   const cleaned = tag.trim();
@@ -335,27 +379,13 @@ export function normalizeTag(tag, customMappings = {}) {
 
   // 1. Check custom user mappings first (case-insensitive keys)
   if (customMappings && typeof customMappings === "object") {
-    for (const [from, to] of Object.entries(customMappings)) {
-      if (from.toLowerCase() === lowerTag) {
-        return to;
-      }
-    }
+    const hit = lowerMappings(customMappings).get(lowerTag);
+    if (hit !== undefined) return hit;
   }
 
   // 2. Fall back to built-in mapping
   const cleanedLower = lowerTag.replace(/[\s-_]+/g, " ");
 
-  // Discard generic high-level category tags
-  const IGNORED_TAGS = new Set([
-    "data structure",
-    "data structures",
-    "algorithm",
-    "algorithms",
-    "dsa",
-    "programming",
-    "coding",
-    "computer science",
-  ]);
   if (IGNORED_TAGS.has(cleanedLower)) {
     return "";
   }

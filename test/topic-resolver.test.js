@@ -111,3 +111,39 @@ describe("a user topic in the resolver", () => {
     );
   });
 });
+
+/**
+ * normalizeTag memoizes the lowercased view of `settings.topicMappings` in a
+ * WeakMap keyed on the mappings object, because it is called once per tag per
+ * problem with the same object for a whole library. That is only safe while the
+ * two writers in PanelPlatforms keep replacing the object rather than mutating
+ * it, and while two different objects never share an entry. Both are pinned
+ * here, along with the collision rule the linear scan used to give for free.
+ */
+describe("normalizeTag custom mappings", () => {
+  test("matches a key case-insensitively", () => {
+    assert.equal(normalizeTag("MY tag", { "my TAG": "Graph" }), "Graph");
+  });
+
+  test("the first key wins a case collision", () => {
+    assert.equal(normalizeTag("dup", { Dup: "First", DUP: "Second" }), "First");
+  });
+
+  test("two mapping objects do not share a cached view", () => {
+    const a = { alias: "Array" };
+    const b = { alias: "Binary Search" };
+    assert.equal(normalizeTag("alias", a), "Array");
+    assert.equal(normalizeTag("alias", b), "Binary Search");
+    assert.equal(normalizeTag("alias", a), "Array");
+  });
+
+  test("a mapping to an empty string does not fall through to the built-ins", () => {
+    // `hit !== undefined` is the test, not truthiness: "" is a deliberate
+    // "drop this tag", and `||` would have sent it on to title-casing.
+    assert.equal(normalizeTag("Array", { array: "" }), "");
+  });
+
+  test("an unmapped tag still normalizes normally", () => {
+    assert.equal(normalizeTag("dynamic programming", { other: "X" }), "Dynamic Programming");
+  });
+});
