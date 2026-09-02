@@ -17,6 +17,8 @@ import {
   getPagesHtml,
   bestStreakFrom,
 } from "../src/handlers/git/github/pages-template.js";
+import { safeSegment, problemDir } from "../src/core/path-builder.js";
+import { CONSTANTS } from "../src/core/constants.js";
 
 const SEP = String.fromCharCode(0x2028);
 const BACKSLASH = String.fromCharCode(92);
@@ -445,5 +447,101 @@ describe("pages template — the onboarding path", () => {
     assert.match(html, /id="sn-ms">—</);
     assert.ok(!/rel="canonical"/.test(html), "canonical invented for a repo with no Pages site");
     assert.match(html, /content="DSA problem solutions tracked by CodeLedger/);
+  });
+});
+
+describe("pages template — repoFileUrl reconstructs what the writer wrote", () => {
+  // The published page links to files it did not commit. It rebuilds their
+  // paths from the problem records in index.json, so its reconstruction has to
+  // agree with src/core/path-builder.js exactly. Two things had drifted: the
+  // platform-code table was a hand-written copy that listed three of the five
+  // platforms, and neither branch applied the writer's sanitisation. Both are
+  // now derived, and these tests are what keeps them derived.
+
+  /** Pulls the generated helpers out of the emitted page and makes them callable. */
+  function extractHelpers(repoUrl = "https://github.com/o/r") {
+    const html = getPagesHtml();
+    const seg = html.match(/function safeSeg\(value\)\s*\{[\s\S]*?\n {4}\}/);
+    const url = html.match(/function repoFileUrl\(problem\)\s*\{[\s\S]*?\n {4}\}/);
+    assert.ok(seg, "safeSeg missing from generated page");
+    assert.ok(url, "repoFileUrl missing from generated page");
+    return {
+      safeSeg: new Function(`${seg[0]}; return safeSeg;`)(),
+      repoFileUrl: new Function(
+        "ALL_REPO_URL",
+        `${seg[0]};${url[0]}; return repoFileUrl;`,
+      )(repoUrl),
+    };
+  }
+
+  test("the inlined safeSeg agrees with path-builder's safeSegment", () => {
+    const { safeSeg } = extractHelpers();
+    // Includes the cases safeSegment exists to handle: traversal, separators,
+    // combining marks, and a value that survives as nothing at all.
+    const inputs = [
+      "two-sum",
+      "Two Sum",
+      "a/../../etc",
+      "..",
+      "...",
+      "a..b",
+      ".github",
+      "héllo wörld",
+      `a${BACKSLASH}b`,
+      "  padded  ",
+      "",
+      "日本語",
+      "-lead-",
+      "sum::123",
+    ];
+    for (const input of inputs) {
+      assert.equal(
+        safeSeg(input),
+        safeSegment(input),
+        `page and path-builder disagree on ${JSON.stringify(input)}`,
+      );
+    }
+  });
+
+  test("every shipped platform rebuilds the directory the writer used", () => {
+    const { repoFileUrl } = extractHelpers();
+    // neetcode and takeuforward are the regression: the old hand-written table
+    // omitted them, so they fell through to platform.slice(0, 3) and produced
+    // problems/nee-… and problems/tak-… for files committed at nc-… and tuf-….
+    for (const platform of Object.keys(CONSTANTS.PLATFORM_CODE)) {
+      const rebuilt = repoFileUrl({ id: "some-slug", platform })
+        .replace("https://github.com/o/r/blob/main/", "")
+        .replace("/README.md", "");
+      assert.equal(
+        rebuilt,
+        problemDir("some-slug", platform, null),
+        `${platform} link points somewhere the writer never committed`,
+      );
+    }
+  });
+
+  test("a canonical match rebuilds the shared directory the writer used", () => {
+    const { repoFileUrl } = extractHelpers();
+    const canonical = { canonicalId: "two-sum" };
+    const rebuilt = repoFileUrl({ id: "1", platform: "leetcode", canonical })
+      .replace("https://github.com/o/r/blob/main/", "")
+      .replace("/README.md", "");
+    assert.equal(rebuilt, problemDir("1", "leetcode", canonical));
+  });
+
+  test("a dirty id cannot escape the problems directory in a link", () => {
+    const { repoFileUrl } = extractHelpers();
+    const url = repoFileUrl({
+      id: "../../../etc/passwd",
+      platform: "leetcode",
+      canonical: { canonicalId: "../../.github/workflows" },
+    });
+    assert.ok(!url.includes(".."), `traversal survived into ${url}`);
+    assert.ok(url.includes("/blob/main/problems/"));
+  });
+
+  test("no repo URL yields no link rather than a broken one", () => {
+    const { repoFileUrl } = extractHelpers("");
+    assert.equal(repoFileUrl({ id: "x", platform: "leetcode" }), "");
   });
 });
