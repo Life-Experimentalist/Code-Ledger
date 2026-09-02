@@ -289,8 +289,22 @@ export class GitHubHandler extends BaseGitHandler {
         latestSha = ref.object.sha;
         dbg.log(`commit(): branch HEAD = ${latestSha.slice(0, 7)}`);
       } catch (err) {
-        if (err.status !== 404) throw err;
+        // A repository with no commits at all answers the git-data endpoints
+        // with 409 "Git Repository is empty" rather than 404 — the repo is
+        // there, the branch simply does not exist yet. Nothing to create: go
+        // straight to a root commit. health-check.js and the onboarding modal
+        // already read 409 this way.
+        if (err.status === 409) {
+          dbg.log(`commit(): ${owner}/${name} is empty (409) — root commit`);
+          isNewRepo = true;
+          latestSha = null;
+        } else if (err.status !== 404) {
+          throw err;
+        }
+      }
 
+      // 404 means the repository itself is missing, so create it first.
+      if (latestSha === undefined) {
         dbg.log(`commit(): repo not found — creating ${owner}/${name}…`);
         const isOrg = owner !== userRes.login;
         // Opt-in, not opt-out: the default OAuth scope cannot create a private repo.
@@ -298,12 +312,12 @@ export class GitHubHandler extends BaseGitHandler {
         try {
           await api.createRepository(name, token, isOrg ? owner : null, isPrivate);
         } catch (createErr) {
-          // 422 "name already exists": the repo is there but the branch is not
-          // — an empty repository created on github.com and linked through
-          // settings. The ref lookup 404s on those forever, so without this
-          // branch every commit to such a repo failed with a name-collision
-          // error. Build a root commit instead. Anything but a 422 is a real
-          // failure.
+          // 422 "name already exists": the repo is there but the branch is not.
+          // Reached when the ref lookup 404s despite the repo existing — a
+          // repository that has commits on some other branch, or one GitHub
+          // has not finished exposing. (A repo with no commits at all answers
+          // 409 instead and is handled above, before we ever get here.) Build a
+          // root commit instead. Anything but a 422 is a real failure.
           if (createErr.status !== 422) throw createErr;
           dbg.log(`commit(): ${owner}/${name} exists but is empty — root commit`);
           isNewRepo = true;
@@ -465,7 +479,8 @@ export class GitHubHandler extends BaseGitHandler {
 
   /**
    * Wait for a freshly auto_init'd repository to expose its first commit.
-   * Returns the branch HEAD sha; throws the last 404 if it never appears.
+   * Returns the branch HEAD sha; throws the last not-ready error if it never
+   * appears.
    */
   async _awaitInitialCommit(owner, name, token) {
     let lastErr;
@@ -475,7 +490,10 @@ export class GitHubHandler extends BaseGitHandler {
         const ref = await api.getRepoRef(owner, name, BRANCH, token);
         return ref.object.sha;
       } catch (err) {
-        if (err.status !== 404) throw err;
+        // 404 (branch not exposed yet) and 409 ("Git Repository is empty") are
+        // both states a repository passes through while its first commit
+        // settles. Either one means "not ready", not "give up".
+        if (err.status !== 404 && err.status !== 409) throw err;
         lastErr = err;
         dbg.warn(`_awaitInitialCommit(): ${BRANCH} not ready yet (attempt ${attempt + 1})`);
       }

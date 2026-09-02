@@ -203,6 +203,54 @@ describe("commit pipeline — repository auto-creation", () => {
     );
   });
 
+  test("bootstraps an empty repository that answers the ref lookup with 409", async () => {
+    // A repository with zero commits answers the git-data endpoints with 409
+    // "Git Repository is empty", not 404 — the status health-check.js and
+    // GitHubOnboardingModal.js both already recognise. A guard admitting only
+    // 404 rethrows it, so every commit into a freshly created empty repo fails
+    // for as long as it stays empty. This is what a new user hits on day one.
+    const gh = install({
+      "GET /git/ref/heads/main": (_c, _s, json) =>
+        json({ message: "Git Repository is empty." }, 409),
+    });
+
+    const sha = await new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", {
+      skipInfra: true,
+    });
+    assert.equal(sha, "c".repeat(40));
+
+    const commitCall = gh.calls.find((c) => c.method === "POST" && c.path.endsWith("/git/commits"));
+    assert.deepEqual(commitCall.body.parents, [], "a root commit has no parents");
+    const treeCall = gh.calls.find((c) => c.method === "POST" && c.path.endsWith("/git/trees"));
+    assert.ok(!("base_tree" in treeCall.body), "a root tree carries no base_tree");
+    assert.ok(
+      gh.calls.some((c) => c.method === "POST" && c.path.endsWith("/git/refs")),
+      "the branch must be created, not patched",
+    );
+    assert.ok(
+      !gh.calls.some((c) => c.method === "POST" && c.path === "/user/repos"),
+      "a repo answering 409 demonstrably exists — it must not be re-created",
+    );
+  });
+
+  test("a repository still warming up may answer 409 mid-poll", async () => {
+    // GitHub can serve 409 for a moment after auto_init while the first commit
+    // settles. Aborting the poll on it strands a repo that was about to work.
+    let refCalls = 0;
+    install({
+      "GET /git/ref/heads/main": (_c, _s, json) => {
+        refCalls += 1;
+        if (refCalls === 1) return json({ message: "Not Found" }, 404);
+        if (refCalls === 2) return json({ message: "Git Repository is empty." }, 409);
+        return json({ object: { sha: "d".repeat(40) } });
+      },
+    });
+
+    const sha = await new GitHubHandler().commit(FILES, "msg", "New-Repo", { skipInfra: true });
+    assert.equal(sha, "c".repeat(40));
+    assert.ok(refCalls >= 3, "the poll must survive a 409, not abort on it");
+  });
+
   test("a non-422 repository-creation failure still propagates", async () => {
     const gh = install({
       "POST /user/repos": (_c, _s, json) => json({ message: "Forbidden" }, 403),
@@ -232,7 +280,8 @@ describe("commit pipeline — repository auto-creation", () => {
 describe("commit pipeline — failures surface, they do not vanish", () => {
   test("a 401 propagates to the caller", async () => {
     install({
-      "GET /user": () => new Response(JSON.stringify({ message: "Bad credentials" }), { status: 401 }),
+      "GET /user": () =>
+        new Response(JSON.stringify({ message: "Bad credentials" }), { status: 401 }),
     });
     await assert.rejects(
       () => new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", { skipInfra: true }),
@@ -303,9 +352,15 @@ describe("commit payload assembly", () => {
   });
 
   test("backdates author and committer together", () => {
-    const payload = buildCommitPayload("msg", "t1", "p1", { date: "2024-01-02T03:04:05Z" }, {
-      login: "octocat",
-    });
+    const payload = buildCommitPayload(
+      "msg",
+      "t1",
+      "p1",
+      { date: "2024-01-02T03:04:05Z" },
+      {
+        login: "octocat",
+      },
+    );
     assert.equal(payload.author.date, "2024-01-02T03:04:05.000Z");
     assert.deepEqual(payload.committer, payload.author);
   });
