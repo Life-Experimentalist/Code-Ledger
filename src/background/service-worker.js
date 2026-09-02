@@ -1245,7 +1245,12 @@ async function handleSolved(data) {
 
   // Notify open library tabs so they refresh the problem list immediately
   try {
-    const libUrl = chrome.runtime.getURL("library/library.html");
+    // Trailing "*" is required: a match pattern's path component is compared
+    // against the path AND the query string, so a bare library.html misses every
+    // tab opened as library.html?tab=... — which is all of them, since the popup
+    // and every deep link append a tab param. Same rule browser-compat.js
+    // openOrFocusTab() documents.
+    const libUrl = `${chrome.runtime.getURL("library/library.html")}*`;
     chrome.tabs.query({ url: libUrl }, (tabs) => {
       (tabs || []).forEach((tab) => {
         chrome.tabs.sendMessage(tab.id, { type: "PROBLEM_SAVED", id: data.id }).catch(() => {});
