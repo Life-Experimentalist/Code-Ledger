@@ -1,0 +1,40 @@
+{
+	"$schema": "https://vkrishna04.me/schemas/project-manifest.schema.json",
+	"manifestVersion": 2,
+	"tagline": "Your DSA grind, on your GitHub. Automatically.",
+	"summary": "A browser extension that commits every accepted competitive-programming solution to your own GitHub repository — code, problem statement and an optional AI review — with no extra steps after install. Practice that used to vanish into a judge's servers becomes a reviewable history.",
+	"status": "active",
+	"icon": "SiTypescript",
+	"readme": true,
+	"technologies": [
+		"TypeScript",
+		"Manifest V3",
+		"IndexedDB",
+		"GitHub Trees API",
+		"Cloudflare Workers"
+	],
+	"tags": [
+		"browser-extension",
+		"dsa",
+		"github",
+		"automation",
+		"leetcode"
+	],
+	"highlights": [
+		"Commits accepted solutions automatically, so a months-long practice habit shows up as real repository history.",
+		"Keeps the commit path and the AI review path separate, so a slow or failing AI provider never delays or blocks a commit.",
+		"Batches finished reviews through a ten-minute maintenance alarm into one atomic commit, rather than one commit per review.",
+		"Maps the same problem across different judges to a canonical identity, so solving it twice does not create two entries.",
+		"Uses your own AI provider key and your own repository — the extension is the plumbing, not the host."
+	],
+	"links": {
+		"repo": "https://github.com/Life-Experimentalist/Code-Ledger"
+	},
+	"sections": [
+		{
+			"type": "prose",
+			"heading": "Why the two paths are separate",
+			"body": "The obvious design runs the AI review and then commits the result. It fails the moment a provider is slow or down: the commit — the part that actually matters — is held hostage by the part that does not. Here the commit goes out immediately on acceptance, the review is queued in IndexedDB, and a maintenance alarm folds completed reviews into a later atomic commit. A dead provider costs you review text, never a commit."
+		}
+	]
+}
