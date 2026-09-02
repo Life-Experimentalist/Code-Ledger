@@ -364,22 +364,12 @@ export function ProblemsView({
       const structured = buildSearchSpec(query);
 
       out = out.filter((p) => {
-        const title = String(p.title || "").toLowerCase();
+        // Cheap fields first. The three structured predicates below only need
+        // these, and each one that fails ends the problem before anything
+        // expensive is touched.
         const platform = String(p.platform || "").toLowerCase();
         const tags = Array.isArray(p.tags) ? p.tags.map((t) => String(t || "").toLowerCase()) : [];
         const topic = String(p.topic || "").toLowerCase();
-        const lang = String(p.lang?.name || p.language || "").toLowerCase();
-        const review = String(p.aiReview || "").toLowerCase();
-        const code = String(p.code || "").toLowerCase();
-        const statement = String(p.problemStatement || p.description || "").toLowerCase();
-        const hints = Array.isArray(p.hints) ? p.hints.join(" ").toLowerCase() : "";
-        const similar = Array.isArray(p.similar)
-          ? p.similar
-              .map((s) => s?.title || s?.titleSlug || "")
-              .join(" ")
-              .toLowerCase()
-          : "";
-        const haystack = `${title} ${platform} ${topic} ${tags.join(" ")} ${lang} ${review} ${code} ${statement} ${hints} ${similar}`;
 
         if (
           structured.platforms.length &&
@@ -398,9 +388,29 @@ export function ProblemsView({
           !structured.tags.every((tag) => tags.some((t) => t.includes(tag)) || topic.includes(tag))
         )
           return false;
-        if (structured.free.length && !structured.free.every((term) => haystack.includes(term)))
-          return false;
-        return true;
+
+        if (!structured.free.length) return true;
+
+        // Only a free-text term reads the haystack, and only here. Building it
+        // means lowercasing the whole stored solution and problem statement for
+        // every problem, on every keystroke — the largest strings the library
+        // holds. A query of `platform:leetcode` alone used to pay all of it and
+        // then look at none of it.
+        const review = String(p.aiReview || "").toLowerCase();
+        const code = String(p.code || "").toLowerCase();
+        const statement = String(p.problemStatement || p.description || "").toLowerCase();
+        const hints = Array.isArray(p.hints) ? p.hints.join(" ").toLowerCase() : "";
+        const similar = Array.isArray(p.similar)
+          ? p.similar
+              .map((sim) => sim?.title || sim?.titleSlug || "")
+              .join(" ")
+              .toLowerCase()
+          : "";
+        const title = String(p.title || "").toLowerCase();
+        const lang = String(p.lang?.name || p.language || "").toLowerCase();
+        const haystack = `${title} ${platform} ${topic} ${tags.join(" ")} ${lang} ${review} ${code} ${statement} ${hints} ${similar}`;
+
+        return structured.free.every((term) => haystack.includes(term));
       });
     }
     // Apply sort
