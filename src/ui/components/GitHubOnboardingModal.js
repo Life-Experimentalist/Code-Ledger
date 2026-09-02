@@ -203,6 +203,20 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
     };
   }, [isOpen, token]);
 
+  // Cancel the pending repo-name check when the modal closes. The debounce
+  // otherwise fires 600ms later and spends a GitHub request on a name the user
+  // walked away from, then writes state nobody reads — the init effect resets
+  // `nameCheck` on the next open anyway. Keyed off `isOpen` rather than
+  // unmount because this component is never unmounted: library.js keeps it
+  // rendered and it returns null when closed.
+  useEffect(() => {
+    if (isOpen) return;
+    if (nameCheckTimer.current) {
+      clearTimeout(nameCheckTimer.current);
+      nameCheckTimer.current = null;
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const privateAllowed = canCreatePrivateRepo(scopes);
