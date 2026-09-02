@@ -338,7 +338,15 @@ function LibraryApp() {
     ]);
     if (allowed.has(tab)) setActiveTab(tab === "archive" ? "solutions" : tab);
     if (q) setSearchQuery(q);
-    if (getQueryParam("openSetup") === "true") setPendingAutoSetup(true);
+    // A one-shot instruction, so it has to leave the URL the moment it is read.
+    // Two things break otherwise: a reload of this tab re-opens the modal, and
+    // — because `openOrFocusTab` only navigates when the wanted URL differs
+    // from the open one — a second "Set up repository" click from the welcome
+    // page just focuses this tab without remounting, so nothing happens at all.
+    if (getQueryParam("openSetup") === "true") {
+      setPendingAutoSetup(true);
+      updateQueryParams({ openSetup: null });
+    }
   }, []);
 
   // Auto-open repo setup modal when navigated here with ?openSetup=true

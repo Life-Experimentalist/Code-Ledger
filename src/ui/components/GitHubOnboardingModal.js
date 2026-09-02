@@ -462,12 +462,20 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
         );
       });
 
-      // Only a 404 proves the repository is empty. Swallowing every error here
-      // let a rate-limit or network blip read as "empty", after which
+      // Only 404 or 409 proves the repository is empty. Swallowing every error
+      // here let a rate-limit or network blip read as "empty", after which
       // initializeRepository committed on top of an arbitrary non-empty repo.
+      //
+      // 409 is the "Git Repository is empty" status the git-data endpoints
+      // answer with — health-check reads it off /commits and initializeRepository
+      // off /git/ref. Whether /contents ever returns it is not something this
+      // code should depend on either way, and accepting it costs nothing:
+      // initializeRepository re-derives emptiness from its own ref lookup, so a
+      // repo that does have commits still gets a child commit with a base_tree,
+      // not a root commit.
       const contents = await ghFetch(`/repos/${selectedOwner}/${repoToLink}/contents`).catch(
         (e) => {
-          if (e?.status === 404) return [];
+          if (e?.status === 404 || e?.status === 409) return [];
           throw new Error(
             describeGitHubError(e, {
               action: "read that repository's contents",
@@ -487,14 +495,40 @@ export function GitHubOnboardingModal({ isOpen, onComplete, username, token }) {
         );
       }
 
+      // Validation is done, so link before the optional steps — same order as
+      // createNewRepo, and for the same reason: a throw in setup must not leave
+      // a validated repository unlinked.
+      await saveRepoConfig(repoData.owner.login, repoData.name);
+
       if (!Array.isArray(contents) || contents.length === 0) {
-        setProgress("Initializing repository structure…");
-        await initializeRepository(repoData.owner.login, repoData.name, token);
-        setProgress("Applying repository settings…");
-        await configureRepositoryPresentation(repoData.owner.login, repoData.name, token);
+        // An empty repo linked here gets exactly what an empty repo created
+        // here gets. It used to get less: these two ran unguarded, so a failure
+        // in either aborted the whole link, and Pages was never enabled at all —
+        // which left `github_pages_url` unset and every README badge pointing at
+        // a repository-relative path instead of the site.
+        const warnings = [];
+        const bestEffort = async (label, fn) => {
+          setProgress(label);
+          try {
+            await fn();
+          } catch (e) {
+            dbg.warn(`${label} failed:`, e.message);
+            warnings.push(describeGitHubError(e, { owner: repoData.owner.login }));
+          }
+        };
+
+        await bestEffort("Initializing repository structure…", () =>
+          initializeRepository(repoData.owner.login, repoData.name, token),
+        );
+        await bestEffort("Applying repository settings…", () =>
+          configureRepositoryPresentation(repoData.owner.login, repoData.name, token),
+        );
+        await bestEffort("Enabling GitHub Pages…", () =>
+          enableGitHubPages(repoData.owner.login, repoData.name, token),
+        );
+        setSetupWarnings(warnings);
       }
 
-      await saveRepoConfig(repoData.owner.login, repoData.name);
       setFinalRepo(repoData.name);
       setFinalOwner(repoData.owner.login);
 
@@ -1263,7 +1297,12 @@ async function configureRepositoryPresentation(owner, repo, token) {
     "X-GitHub-Api-Version": "2022-11-28",
   };
 
-  await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+  // Both responses are checked. Callers wrap this in `bestEffort`, which turns a
+  // throw into a visible warning and lets setup continue — discarding the
+  // responses instead made that wrapper dead code, so a token without `repo`
+  // scope silently produced a repository with none of these settings applied and
+  // no topics, and the step still reported success.
+  const settingsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
     method: "PATCH",
     headers,
     body: JSON.stringify({
@@ -1276,14 +1315,32 @@ async function configureRepositoryPresentation(owner, repo, token) {
       delete_branch_on_merge: true,
     }),
   });
+  await throwIfNotOk(settingsRes);
 
-  await fetch(`https://api.github.com/repos/${owner}/${repo}/topics`, {
+  const topicsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/topics`, {
     method: "PUT",
     headers: {
       ...headers,
       Accept: "application/vnd.github.mercy-preview+json",
     },
     body: JSON.stringify({ names: DEFAULT_REPO_TOPICS }),
+  });
+  await throwIfNotOk(topicsRes);
+}
+
+/**
+ * Raise a `describeGitHubError`-shaped error for a failed response.
+ *
+ * The status has to survive onto the Error — every message in
+ * `describeGitHubError` is chosen by `err.status`, so a plain `new Error(text)`
+ * degrades all of them to the generic fallback.
+ */
+async function throwIfNotOk(res) {
+  if (res.ok) return;
+  const body = await res.json().catch(() => ({}));
+  throw Object.assign(new Error(body.message || `GitHub API ${res.status}`), {
+    status: res.status,
+    body,
   });
 }
 
