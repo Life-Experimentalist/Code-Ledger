@@ -64,6 +64,7 @@ import {
   buildProblemFiles,
   problemBase,
   platformId,
+  safeSegment,
   PROBLEMS_ROOT,
   LAYOUT_VERSION,
 } from "../core/path-builder.js";
@@ -1946,7 +1947,14 @@ function _inferCommittedPaths(problem, remoteFileTree) {
   const prefixes = [`${PROBLEMS_ROOT}/${cleanPid}/`];
   if (rawPid !== cleanPid) prefixes.push(`${PROBLEMS_ROOT}/${rawPid}/`);
   if (problem.canonical?.canonicalId) {
-    prefixes.push(`${PROBLEMS_ROOT}/${problem.canonical.canonicalId}/${platform}/`);
+    // Sanitised exactly as problemDir() sanitises it when writing. A canonicalId
+    // arrives from the shared map rather than from us, so it is not guaranteed
+    // to be a clean slug; comparing a raw id against paths that were written
+    // through safeSegment() finds nothing and the caller concludes the problem
+    // has no committed files at all.
+    prefixes.push(
+      `${PROBLEMS_ROOT}/${safeSegment(problem.canonical.canonicalId)}/${safeSegment(platform)}/`,
+    );
   }
 
   return remoteFileTree

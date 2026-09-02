@@ -299,6 +299,24 @@ function buildCanonicalEntry(issue, payload, voteCount, validation) {
         ),
     );
 
+  // Slugify whichever source supplies it, not just the title fallback. The
+  // first two both trace back to the issue body — one parsed from it directly,
+  // one via Gemini, which reads it — and this value becomes a directory name in
+  // every user's repository. path-builder's safeSegment() is the backstop that
+  // makes a dirty id harmless, but a map entry that only survives because the
+  // reader scrubs it is a bad entry; clean it where it is written.
+  const canonicalId = slugify(
+    validation.canonicalId ||
+      payload.canonicalId ||
+      payload.canonicalTitle ||
+      issue.title,
+  );
+  if (!canonicalId) {
+    throw new Error(
+      "Could not derive a canonical ID — supply one, or a title with letters in it.",
+    );
+  }
+
   const difficulty = String(validation.difficulty || "").trim();
   if (!/^(easy|medium|hard)$/i.test(difficulty)) {
     throw new Error(
@@ -307,11 +325,7 @@ function buildCanonicalEntry(issue, payload, voteCount, validation) {
   }
 
   return {
-    canonicalId: String(
-      validation.canonicalId ||
-        payload.canonicalId ||
-        slugify(payload.canonicalTitle || issue.title),
-    ),
+    canonicalId,
     canonicalTitle: String(
       validation.canonicalTitle || payload.canonicalTitle || issue.title,
     ),
