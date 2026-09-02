@@ -948,7 +948,11 @@ async function commitUpdatedProblem(problem, settings) {
       path: ".codeledger/sync.json",
       content: await buildSyncPayload(),
     });
-  } catch (_) {}
+  } catch (e) {
+    // Skipping the payload is survivable — the solve still commits — but the
+    // other devices then read a stale sync.json and nothing says why.
+    dbg.warn("commitUpdatedProblem(): sync.json not bundled:", e?.message || e);
+  }
   try {
     const bank = await Storage.getBehaviorBank();
     filesToCommit.push({
@@ -1435,7 +1439,10 @@ async function handleSolved(data) {
             path: ".codeledger/sync.json",
             content: await buildSyncPayload(),
           });
-        } catch (_) {}
+        } catch (e) {
+          // Same as above: the commit survives, cross-device state does not.
+          dbg.warn("handleSolved(): sync.json not bundled:", e?.message || e);
+        }
         try {
           const bank = await Storage.getBehaviorBank();
           filesToCommit.push({
