@@ -348,7 +348,7 @@ const initPromise = new Promise((resolve) => {
 eventBus.on("problem:solved", handleSolved);
 
 // Init background
-async function init() {
+async function _init() {
   await initDebug();
   dbg.log(`init(): ✓ debug initialized, background starting...`);
 
@@ -509,8 +509,23 @@ async function init() {
   refreshQueueAlarms().catch(() => {});
 
   dbg.log("init(): ✓ background initialized");
-  if (initResolve) {
-    initResolve();
+}
+
+// Every solve waits on initPromise before it is saved, so the promise has to
+// settle on every path. _init() awaits initDebug(), applyFirstRunDefaults(),
+// initMCPConfig() and initializeReviewQueueStore() unguarded; a throw in any of
+// them used to skip the resolve, leaving initPromise pending for the life of the
+// worker. handleSolved() then hung at its first line and every solve was lost
+// silently -- no error, no record, nothing in the library. Resolving in finally
+// trades a degraded worker for a hung one: Storage does not depend on init, so
+// the solve is still written even when a later init step failed.
+async function init() {
+  try {
+    await _init();
+  } catch (e) {
+    dbg.error("init(): failed -- continuing in a degraded state:", e);
+  } finally {
+    if (initResolve) initResolve();
   }
 }
 
