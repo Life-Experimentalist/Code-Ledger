@@ -31,8 +31,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   solve into a freshly created empty repo failed for as long as it stayed empty. Both
   now seed one file through `PUT /contents` — the only endpoint such a repository
   accepts — which writes a genuine root commit and creates the branch; everything after
-  that runs as the ordinary non-empty case. The seeded README is overwritten by the
-  real generated one in the same commit, so no placeholder is left behind. A ref lookup
+  that runs as the ordinary non-empty case. On the solve path the seeded README is
+  overwritten by the real generated one in that same commit; onboarding's init
+  tree does not write a README, so there the placeholder stands until the first
+  solve replaces it. A ref lookup
   that answers 404 is a different case — the branch is missing but the repository has
   commits elsewhere — and still takes the parentless-commit path, which is correct
   there and would break if seeded.
