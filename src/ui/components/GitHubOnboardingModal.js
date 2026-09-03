@@ -11,6 +11,7 @@ import { CONSTANTS } from "../../core/constants.js";
 import { createDebugger } from "../../lib/debug.js";
 import { registry } from "../../core/handler-registry.js";
 import { getPagesHtml } from "../../handlers/git/github/pages-template.js";
+import { bootstrapEmptyRepo } from "../../handlers/git/github/api-client.js";
 import { importFromRepo, applyImport } from "../../background/sync-engine.js";
 import {
   fetchAccountContext,
@@ -1199,7 +1200,7 @@ async function initializeRepository(owner, repo, token) {
 
   // Check if repository is empty or already has commits
   let latestSha, baseTreeSha;
-  let isRootCommit = false;
+  let wasEmpty = false;
   let defaultBranch = "main";
 
   try {
@@ -1215,7 +1216,19 @@ async function initializeRepository(owner, repo, token) {
     // nothing about the repo, and attempting a root commit against a repo
     // that has commits only produces a confusing "Reference already exists".
     if (e?.status !== 404 && e?.status !== 409) throw e;
-    isRootCommit = true;
+    wasEmpty = true;
+  }
+
+  // Detecting the empty repository was never the problem — the root commit that
+  // followed was.  A repository with no commits rejects POST /git/blobs and
+  // POST /git/trees with the same 409, so the tree below could never be built
+  // and onboarding died right here.  PUT /contents is the one endpoint an empty
+  // repo accepts: it writes a real root commit and creates the branch, after
+  // which the ordinary base_tree + parents path works.
+  if (wasEmpty) {
+    latestSha = await bootstrapEmptyRepo(owner, repo, defaultBranch, token);
+    const seedCommit = await ghFetch(`/repos/${owner}/${repo}/git/commits/${latestSha}`);
+    baseTreeSha = seedCommit.tree.sha;
   }
 
   const now = new Date().toISOString();
@@ -1253,9 +1266,7 @@ async function initializeRepository(owner, repo, token) {
     ],
   };
 
-  if (!isRootCommit) {
-    treePayload.base_tree = baseTreeSha;
-  }
+  treePayload.base_tree = baseTreeSha;
 
   const treeRes = await ghFetch(`/repos/${owner}/${repo}/git/trees`, {
     method: "POST",
@@ -1265,42 +1276,19 @@ async function initializeRepository(owner, repo, token) {
   const commitPayload = {
     message: "chore: initialize CodeLedger structure",
     tree: treeRes.sha,
+    parents: [latestSha],
   };
-
-  if (!isRootCommit) {
-    commitPayload.parents = [latestSha];
-  }
 
   const commitRes = await ghFetch(`/repos/${owner}/${repo}/git/commits`, {
     method: "POST",
     body: JSON.stringify(commitPayload),
   });
 
-  if (isRootCommit) {
-    // Create new main branch since repository is empty
-    await ghFetch(`/repos/${owner}/${repo}/git/refs`, {
-      method: "POST",
-      body: JSON.stringify({
-        ref: "refs/heads/main",
-        sha: commitRes.sha,
-      }),
-    });
-    // Ensure default branch is set to main
-    try {
-      await ghFetch(`/repos/${owner}/${repo}`, {
-        method: "PATCH",
-        body: JSON.stringify({ default_branch: "main" }),
-      });
-    } catch (_) {
-      // Ignore if patching default branch fails
-    }
-  } else {
-    // Advance existing branch
-    await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/${defaultBranch}`, {
-      method: "PATCH",
-      body: JSON.stringify({ sha: commitRes.sha, force: false }),
-    });
-  }
+  // The branch exists either way by now — seeding created it on an empty repo.
+  await ghFetch(`/repos/${owner}/${repo}/git/refs/heads/${defaultBranch}`, {
+    method: "PATCH",
+    body: JSON.stringify({ sha: commitRes.sha, force: false }),
+  });
 }
 
 async function configureRepositoryPresentation(owner, repo, token) {

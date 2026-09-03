@@ -250,7 +250,16 @@ If commits fail, check in this order:
 2. **Token is valid** — `Storage.getAuthToken('github')` is non-empty; if empty, OAuth failed
 3. **GitHub response status** — Check response.status before parsing body; 404 usually means repo doesn't exist
 4. **Files array is valid** — Each file has `path` (string), `content` (string); if missing, commit prep was incomplete
-5. **Base branch exists** — If `git/ref/heads/{branch}` 404s the repo is empty, so the commit must be built as a root commit (no `base_tree`, no `parents`) and the ref created rather than patched
+5. **Base branch exists** — the ref lookup fails in two different ways and they need different remedies:
+   - **409** means the repository has **zero commits**. It rejects every git-data
+     write, `POST /git/blobs` and `POST /git/trees` included, so no tree can be
+     built yet. Seed it first with `api.bootstrapEmptyRepo()`, which writes one
+     file through `PUT /contents` — the only endpoint an empty repo accepts — and
+     then continue as the ordinary non-empty case.
+   - **404** means the repo has commits but this **branch** does not exist. Build a
+     root commit (no `base_tree`, no `parents`) and create the ref rather than
+     patching it. Seeding is wrong here: `PUT /contents` onto a branch that does
+     not exist 404s.
 
 If all checks pass but commit still fails, the issue is likely in the Trees API call itself (check OPENAPI.yaml for the exact endpoint contract).
 
@@ -510,8 +519,8 @@ service worker:
 
 The `GitHubOnboardingModal` (`src/ui/components/GitHubOnboardingModal.js`) handles first-time repo setup:
 
-- **Create new repo**: Uses `auto_init: false`, then writes the first commit itself. `initializeRepository()` detects the empty repo (the `git/ref/heads/{branch}` lookup fails), omits `base_tree` and `parents` to build a **root commit**, and then creates `refs/heads/main` explicitly. This keeps the repo free of a GitHub-generated README. Note `api-client.js` `createRepo()` still passes `auto_init: true` for the non-onboarding path — both work, but the two paths differ.
-- **Repo init**: Uses the **Trees API** (`POST /git/trees` → `POST /git/commits` → `PATCH /git/refs/heads/main`) for atomic multi-file creation. Never use the Contents API (`PUT /contents/`) — it creates one commit per file and requires `btoa()` which breaks on non-ASCII (emoji).
+- **Create new repo**: Uses `auto_init: false`, then writes the first commit itself. `initializeRepository()` detects the empty repo (the `git/ref/heads/{branch}` lookup fails) and calls `bootstrapEmptyRepo()` to give it a HEAD before building anything; the Trees API commit that follows then carries a normal `base_tree` and `parents`. The placeholder README the seed writes is overwritten by the generated one in the same init commit, so no placeholder survives. Note `api-client.js` `createRepo()` still passes `auto_init: true` for the non-onboarding path — both work, but the two paths differ.
+- **Repo init**: Uses the **Trees API** (`POST /git/trees` → `POST /git/commits` → `PATCH /git/refs/heads/main`) for atomic multi-file creation. Never use the Contents API (`PUT /contents/`) for a multi-file write — it creates one commit per file. The single exception is `bootstrapEmptyRepo()`: a repository with no commits 409s every git-data endpoint, so `PUT /contents` is the only way to author its first commit. It goes through `utf8ToBase64()` rather than bare `btoa()`, which throws above U+00FF (emoji).
 - **Token flow**: OAuth token is already saved to `auth.tokens` by the time the modal opens (saved by `library.js` handleOAuthMessage). The modal should NOT re-save the token to settings.
 - **Trigger**: Only `library.js` shows the modal (via `showGitHubOnboarding` state). The Git settings panel does NOT trigger onboarding — it only stores the token and fetches the username.
 

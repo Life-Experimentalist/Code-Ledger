@@ -276,6 +276,10 @@ export class GitHubHandler extends BaseGitHandler {
     // ── Resolve branch HEAD (create repo if missing) ──────────────────────
     let latestSha;
     let isNewRepo = false;
+    // Distinct from "the branch is missing": a repository with zero commits
+    // rejects every git-data write, so it needs seeding before a tree can be
+    // built.  A repo that has commits on some other branch does not.
+    let isEmptyRepo = false;
 
     if (opts.knownParentSha) {
       // Caller tracked the last commit SHA — skip the round-trip to GitHub.
@@ -291,12 +295,13 @@ export class GitHubHandler extends BaseGitHandler {
       } catch (err) {
         // A repository with no commits at all answers the git-data endpoints
         // with 409 "Git Repository is empty" rather than 404 — the repo is
-        // there, the branch simply does not exist yet. Nothing to create: go
-        // straight to a root commit. health-check.js and the onboarding modal
-        // already read 409 this way.
+        // there, it just has nothing in it.  Nothing to create; it needs a
+        // first commit seeded below.  health-check.js and the onboarding
+        // modal already read 409 this way.
         if (err.status === 409) {
-          dbg.log(`commit(): ${owner}/${name} is empty (409) — root commit`);
+          dbg.log(`commit(): ${owner}/${name} is empty (409) — seeding`);
           isNewRepo = true;
+          isEmptyRepo = true;
           latestSha = null;
         } else if (err.status !== 404) {
           throw err;
@@ -342,8 +347,22 @@ export class GitHubHandler extends BaseGitHandler {
       }
     }
 
+    // A repository with no commits refuses every git-data write, not just the
+    // ref lookup that detected it: POST /git/blobs and POST /git/trees answer
+    // 409 "Git Repository is empty" as well.  The Trees API therefore cannot
+    // author the root commit that this path used to attempt — verified against
+    // a live empty repo, where only PUT /contents succeeds.  Seed one file with
+    // it and the branch has a head, so the rest of this method runs as the
+    // ordinary non-empty case.  A repo whose *branch* is merely missing (404,
+    // commits on some other branch) still takes the parentless path below.
+    if (isEmptyRepo) {
+      latestSha = await api.bootstrapEmptyRepo(owner, name, BRANCH, token);
+      dbg.log(`commit(): seeded empty repo — HEAD = ${latestSha.slice(0, 7)}`);
+    }
+
     // ── Build tree ────────────────────────────────────────────────────────
-    // latestSha is null on the empty-repo path: no parent commit, no base tree.
+    // latestSha is still null when the branch does not exist but the repo has
+    // commits elsewhere: no parent commit, no base tree.
     const commitObj = latestSha ? await api.getCommit(owner, name, latestSha, token) : null;
     const baseTreeSha = commitObj?.tree?.sha || null;
 

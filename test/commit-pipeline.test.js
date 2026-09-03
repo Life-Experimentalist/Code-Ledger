@@ -25,7 +25,17 @@ import { buildTreeItems, buildCommitPayload } from "../src/handlers/git/github/c
  */
 function fakeGitHub(overrides = {}) {
   const calls = [];
-  const state = { repoExists: true, refSha: "a".repeat(40), createdRepo: null, treeItems: null };
+  const state = {
+    repoExists: true,
+    // A repository with zero commits. GitHub answers every git-data endpoint —
+    // the ref lookup, POST /git/blobs, POST /git/trees — with 409 "Git
+    // Repository is empty", so no tree can be built until something else
+    // creates the first commit. PUT /contents is the only endpoint it accepts.
+    isEmpty: false,
+    refSha: "a".repeat(40),
+    createdRepo: null,
+    treeItems: null,
+  };
 
   const json = (body, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -48,6 +58,19 @@ function fakeGitHub(overrides = {}) {
 
     if (key === "GET /user") return json({ login: "octocat", name: "Octo Cat" });
 
+    if (state.isEmpty && (path.includes("/git/") || path.includes("/commits"))) {
+      return json({ message: "Git Repository is empty." }, 409);
+    }
+    if (method === "PUT" && path.includes("/contents/")) {
+      // Seeding an empty repository: a genuine root commit, and the branch now
+      // exists, so every git-data endpoint works from here on.
+      state.isEmpty = false;
+      state.refSha = "s".repeat(40);
+      return json({
+        commit: { sha: state.refSha },
+        content: { path: path.split("/contents/")[1] },
+      });
+    }
     if (method === "GET" && path.includes("/git/ref/heads/")) {
       return state.repoExists
         ? json({ object: { sha: state.refSha } })
@@ -203,33 +226,63 @@ describe("commit pipeline — repository auto-creation", () => {
     );
   });
 
-  test("bootstraps an empty repository that answers the ref lookup with 409", async () => {
-    // A repository with zero commits answers the git-data endpoints with 409
-    // "Git Repository is empty", not 404 — the status health-check.js and
-    // GitHubOnboardingModal.js both already recognise. A guard admitting only
-    // 404 rethrows it, so every commit into a freshly created empty repo fails
-    // for as long as it stays empty. This is what a new user hits on day one.
-    const gh = install({
-      "GET /git/ref/heads/main": (_c, _s, json) =>
-        json({ message: "Git Repository is empty." }, 409),
-    });
+  test("seeds a repository that has no commits before building any tree", async () => {
+    // A repository with zero commits does not merely 409 the ref lookup: it
+    // 409s POST /git/blobs and POST /git/trees as well, so the parentless
+    // root-commit path this case used to take could never have worked. The one
+    // endpoint such a repo accepts is PUT /contents, which writes a real root
+    // commit and creates the branch; from there the ordinary base_tree +
+    // parents path applies. This is what a new user hits on day one.
+    const gh = install();
+    gh.state.isEmpty = true;
 
     const sha = await new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", {
       skipInfra: true,
     });
     assert.equal(sha, "c".repeat(40));
 
-    const commitCall = gh.calls.find((c) => c.method === "POST" && c.path.endsWith("/git/commits"));
-    assert.deepEqual(commitCall.body.parents, [], "a root commit has no parents");
-    const treeCall = gh.calls.find((c) => c.method === "POST" && c.path.endsWith("/git/trees"));
-    assert.ok(!("base_tree" in treeCall.body), "a root tree carries no base_tree");
+    const seedIdx = gh.calls.findIndex((c) => c.method === "PUT" && c.path.includes("/contents/"));
+    const treeIdx = gh.calls.findIndex((c) => c.method === "POST" && c.path.endsWith("/git/trees"));
+    assert.ok(seedIdx >= 0, "the repository must be seeded through the Contents API");
+    assert.ok(treeIdx > seedIdx, "no tree may be attempted before the repo has a commit");
+
+    const commitCall = gh.calls[treeIdx + 1];
+    assert.deepEqual(
+      commitCall.body.parents,
+      ["s".repeat(40)],
+      "the solve commit sits on top of the seed commit",
+    );
     assert.ok(
-      gh.calls.some((c) => c.method === "POST" && c.path.endsWith("/git/refs")),
-      "the branch must be created, not patched",
+      gh.calls.some((c) => c.method === "PATCH" && c.path.includes("/git/refs/heads/")),
+      "seeding created the branch, so the ref is advanced rather than created",
     );
     assert.ok(
       !gh.calls.some((c) => c.method === "POST" && c.path === "/user/repos"),
       "a repo answering 409 demonstrably exists — it must not be re-created",
+    );
+  });
+
+  test("a missing branch on a repository that has commits still takes the root-commit path", async () => {
+    // Distinct from the case above: the repo is not empty, some other branch
+    // carries its history, and `main` simply is not there. PUT /contents onto a
+    // branch that does not exist 404s, so seeding is wrong here — the
+    // parentless commit plus createRef is both correct and still required.
+    const gh = install({
+      "POST /user/repos": (_c, _s, json) =>
+        json({ message: "name already exists on this account" }, 422),
+    });
+    gh.state.repoExists = false;
+
+    await new GitHubHandler().commit(FILES, "msg", "CodeLedger-Sync", { skipInfra: true });
+
+    assert.ok(
+      gh.calls.some((c) => c.method === "POST" && c.path.endsWith("/git/refs")),
+      "the branch must be created, not patched",
+    );
+
+    assert.ok(
+      !gh.calls.some((c) => c.method === "PUT" && c.path.includes("/contents/")),
+      "a 404 branch lookup must not be treated as an empty repository",
     );
   });
 
