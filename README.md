@@ -15,7 +15,7 @@ _Zero-click commits · AI code review · Live analytics · Knowledge graph · Bu
 
 <br/>
 
-[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members) [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Version](https://img.shields.io/badge/version-1.9.0-blueviolet?style=flat-square)](docs/CHANGELOG.md)
+[![GitHub Stars](https://img.shields.io/github/stars/Life-Experimentalist/Code-Ledger?style=flat-square&color=gold&label=⭐%20Stars)](https://github.com/Life-Experimentalist/Code-Ledger/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Life-Experimentalist/Code-Ledger?style=flat-square&color=blue&label=Forks)](https://github.com/Life-Experimentalist/Code-Ledger/network/members) [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE.md) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange?style=flat-square)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![Version](https://img.shields.io/badge/version-1.9.1-blueviolet?style=flat-square)](docs/CHANGELOG.md)
 
 <br/>
 
@@ -99,11 +99,11 @@ index.html               ← GitHub Pages dashboard, same commit
 
 ## Install
 
-| Browser               | Install                                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Chrome / Edge / Brave | [Chrome Web Store](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb)           |
+| Browser               | Install                                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Chrome / Edge / Brave | [Chrome Web Store](https://chromewebstore.google.com/detail/codeledger/dpalidbhndcbppmjgmbloffehbhfchmb)                     |
 | Firefox               | Not on Firefox Add-ons yet — [download the Firefox zip](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) |
-| Any                   | [Download a release zip](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) and load it unpacked |
+| Any                   | [Download a release zip](https://github.com/Life-Experimentalist/Code-Ledger/releases/latest) and load it unpacked           |
 
 **Loading unpacked from source:**
 
@@ -169,18 +169,18 @@ Keys are stored in your browser under `ai.keys` and are sent only to the provide
 
 ## What You Get
 
-|                        |                                                                                                                                                                        |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Zero-click commits** | Every accepted submission is committed the moment it is accepted — solution file and problem statement in one atomic commit.                                           |
-| **Bulk import**        | Pull your existing LeetCode or GeeksForGeeks history in from your profile page: past accepted solutions with code, statements and stats, committed in batched commits. |
-| **AI code review**     | Complexity analysis, optimisation suggestions and hints, committed alongside your code. Six providers, your own keys.                                                  |
-| **Live dashboard**     | A heatmap, difficulty breakdown and solve-velocity chart, generated into your repo and served from your own GitHub Pages. The topic radar sits with them in the extension's own Analytics view.                                 |
-| **Knowledge graph**    | A force-directed graph of everything you have solved, linked by topic.                                                                                                 |
-| **AI chat panel**      | A floating panel on every problem page. Ask about complexity, request hints, paste errors — your code is available to the chat via `/mycode`.                          |
-| **AI Behaviour Bank**  | Personal memory for the assistant: saved insights, named skills that trigger on command, and learning roadmaps that inject context into every chat.                    |
-| **Cross-device sync**  | A `chrome.alarms` job polls your repo's `index.json` and reconciles it with local IndexedDB, so any machine you install on catches up on its own.                      |
-| **Rolling backups**    | Scheduled snapshots of problems and settings committed to your repo. Restore in one click.                                                                             |
-| **100% yours**         | Your code goes from your browser straight to your repo. The only server this project runs is the OAuth relay.                                                          |
+|                        |                                                                                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zero-click commits** | Every accepted submission is committed the moment it is accepted — solution file and problem statement in one atomic commit.                                                                    |
+| **Bulk import**        | Pull your existing LeetCode or GeeksForGeeks history in from your profile page: past accepted solutions with code, statements and stats, committed in batched commits.                          |
+| **AI code review**     | Complexity analysis, optimisation suggestions and hints, committed alongside your code. Six providers, your own keys.                                                                           |
+| **Live dashboard**     | A heatmap, difficulty breakdown and solve-velocity chart, generated into your repo and served from your own GitHub Pages. The topic radar sits with them in the extension's own Analytics view. |
+| **Knowledge graph**    | A force-directed graph of everything you have solved, linked by topic.                                                                                                                          |
+| **AI chat panel**      | A floating panel on every problem page. Ask about complexity, request hints, paste errors — your code is available to the chat via `/mycode`.                                                   |
+| **AI Behaviour Bank**  | Personal memory for the assistant: saved insights, named skills that trigger on command, and learning roadmaps that inject context into every chat.                                             |
+| **Cross-device sync**  | A `chrome.alarms` job polls your repo's `index.json` and reconciles it with local IndexedDB, so any machine you install on catches up on its own.                                               |
+| **Rolling backups**    | Scheduled snapshots of problems and settings committed to your repo. Restore in one click.                                                                                                      |
+| **100% yours**         | Your code goes from your browser straight to your repo. The only server this project runs is the OAuth relay.                                                                                   |
 
 ---
 

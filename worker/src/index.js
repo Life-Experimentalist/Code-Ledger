@@ -32,7 +32,7 @@ const app = new Hono();
 /* ── Constants ────────────────────────────────────────────────────── */
 
 // Kept in step with package.json by dev/sync-manifests.js — do not hand-edit.
-const VERSION = "1.9.0";
+const VERSION = "1.9.1";
 
 /** Scopes the client may request. Anything else is rejected.
  *  public_repo is the default: it can create and push to public repos but
