@@ -6,6 +6,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- Solves are no longer lost when background start-up fails. Every solve waits on
+  `initPromise` before it is written, and that promise was resolved only as the last
+  statement of `init()`. Four of the steps before it — `initDebug()`,
+  `applyFirstRunDefaults()`, `initMCPConfig()` and `initializeReviewQueueStore()` — were
+  awaited with no `.catch()`, and neither call site guarded `init()` either. A throw in
+  any of them left the promise pending for the life of the service worker, so
+  `handleSolved()` hung on its first line: no record was saved, no error surfaced, and
+  solved problems simply never appeared in the library. The promise now settles in a
+  `finally`, which trades a degraded worker for a hung one — storage does not depend
+  on init, so the solve is still written when a later start-up step fails.
+
+---
+
 ## [1.9.0] — 2026-09-03
 
 ### Added
