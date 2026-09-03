@@ -167,6 +167,81 @@ export function createBlob(owner, repo, base64Content, token) {
   });
 }
 
+/**
+ * Encode a JS string as the base64 the GitHub Contents API expects.
+ * btoa() alone throws on any character above U+00FF, so the string is
+ * flattened to UTF-8 bytes first.
+ *
+ * @param {string} str
+ * @returns {string} base64
+ */
+export function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  // String.fromCharCode(...bytes) overruns the argument limit on a large file.
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 0x8000)));
+  }
+  return btoa(binary);
+}
+
+/** PUT /repos/{owner}/{repo}/contents/{path} — write one file as its own commit.
+ *  Only for bootstrapping a repository that has no commits yet; every other
+ *  write goes through the Trees API so that one solve stays one commit. */
+export function putContentsFile(owner, repo, path, content, message, branch, token) {
+  const encoded = path.split("/").map(encodeURIComponent).join("/");
+  return apiFetch(`/repos/${owner}/${repo}/contents/${encoded}`, token, {
+    method: "PUT",
+    body: JSON.stringify({ message, content: utf8ToBase64(content), branch }),
+  });
+}
+
+/**
+ * Give a repository that has never been committed to a HEAD, and return its SHA.
+ *
+ * Such a repository rejects every git-data write, not only the ref lookup:
+ * POST /git/blobs and POST /git/trees both answer 409 "Git Repository is
+ * empty". The Trees API therefore cannot author the root commit — verified
+ * against a live empty repo, where blobs, trees and commits all 409 and only
+ * PUT /contents succeeds. That endpoint writes a genuine root commit
+ * (parents: []) and creates the branch; every git-data endpoint works
+ * normally afterwards, so the caller's usual tree → commit → ref path applies
+ * unchanged from there.
+ *
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} branch
+ * @param {string} token
+ * @returns {Promise<string>} SHA of the commit now at the branch head
+ */
+export async function bootstrapEmptyRepo(owner, repo, branch, token) {
+  const seed = `# ${repo}\n\nManaged by CodeLedger.\n`;
+  try {
+    const res = await putContentsFile(
+      owner,
+      repo,
+      "README.md",
+      seed,
+      "chore: initialize repository",
+      branch,
+      token,
+    );
+    dbg.log(`bootstrapEmptyRepo(): ${owner}/${repo} seeded at ${res.commit.sha.slice(0, 7)}`);
+    return res.commit.sha;
+  } catch (err) {
+    // 422 means README.md is already there, so the repository was not empty
+    // after all — another device won the race, or the emptiness check was
+    // fooled. Whatever the cause, if the branch has a head now, the caller can
+    // carry on with it; only re-raise when there is still nothing to build on.
+    const ref = await getRepoRef(owner, repo, branch, token).catch(() => null);
+    if (ref?.object?.sha) {
+      dbg.log(`bootstrapEmptyRepo(): seed failed but ${branch} already has a head`);
+      return ref.object.sha;
+    }
+    throw err;
+  }
+}
+
 // ── Repository management ─────────────────────────────────────────────────────
 
 /** POST /user/repos or /orgs/{owner}/repos — create a new repository.

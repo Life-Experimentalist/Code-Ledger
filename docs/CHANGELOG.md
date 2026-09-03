@@ -21,6 +21,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `finally`, which trades a degraded worker for a hung one — storage does not depend
   on init, so the solve is still written when a later start-up step fails.
 
+- Linking a GitHub repository that has no commits no longer breaks onboarding, and
+  committing into one no longer fails forever. Both paths detected the empty repository
+  correctly — the ref lookup answers `409 Git Repository is empty` — and then tried to
+  author its first commit through the Trees API, omitting `base_tree` and `parents` to
+  make a root commit. That could never have worked: a repository with zero commits
+  refuses every git-data write, so `POST /git/blobs` and `POST /git/trees` answer the
+  same 409 as the lookup that detected it. Onboarding died at the tree call, and a
+  solve into a freshly created empty repo failed for as long as it stayed empty. Both
+  now seed one file through `PUT /contents` — the only endpoint such a repository
+  accepts — which writes a genuine root commit and creates the branch; everything after
+  that runs as the ordinary non-empty case. The seeded README is overwritten by the
+  real generated one in the same commit, so no placeholder is left behind. A ref lookup
+  that answers 404 is a different case — the branch is missing but the repository has
+  commits elsewhere — and still takes the parentless-commit path, which is correct
+  there and would break if seeded.
+
 ---
 
 ## [1.9.0] — 2026-09-03
@@ -129,7 +145,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Layout migration no longer orphans the files of a problem with a canonical match. It asks which paths a problem already occupies, and built that question from the raw canonical ID while every file had been written under the scrubbed form of it. Where the two differed the answer was "no files", so the old copies were left behind instead of being moved.
 
-- The library refreshes itself after a solve again. The service worker announces a saved solve to every open library tab, and it looked those tabs up by the exact URL `library/library.html`. A match pattern's path is compared against the path *and* the query string, and every route that opens the library appends one — the popup's three entry points, the welcome page, the floating panel, a problem card, the importer, the injected button and the worker's own tab opener. So the announcement reached no tab at all, and the library only picked up a new solve when you reloaded it by hand. Fixed by matching `library.html*`, which is the same rule `browser-compat.js` already documents for the tab it focuses.
+- The library refreshes itself after a solve again. The service worker announces a saved solve to every open library tab, and it looked those tabs up by the exact URL `library/library.html`. A match pattern's path is compared against the path _and_ the query string, and every route that opens the library appends one — the popup's three entry points, the welcome page, the floating panel, a problem card, the importer, the injected button and the worker's own tab opener. So the announcement reached no tab at all, and the library only picked up a new solve when you reloaded it by hand. Fixed by matching `library.html*`, which is the same rule `browser-compat.js` already documents for the tab it focuses.
 
 ### Security
 
