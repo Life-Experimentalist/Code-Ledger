@@ -291,7 +291,21 @@ npm run release          # validate → build → zip → commit → tag → pus
 npm run release -- --dry-run
 ```
 
-CI runs the same gate on every push and pull request, plus a packaging build.
+### Automation
+
+Seven workflows in `.github/workflows/`. The four that run Node pin Node 24; the three store-publish workflows need none.
+
+| Workflow                       | Trigger                                                          | What it runs, and what it writes                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`                       | push to `main`, any pull request, manual                         | `lint`, `test`, `test:sync-regression`, `validate:openapi`, plus two drift checks: `package.json` and both manifests must agree on the version, and `host_permissions` must be current. Then a packaging build that uploads the zips as run artifacts. On a push it runs the fixers and pushes any drift back to the branch as a `chore: auto-heal…` bot commit; pull requests get the blocking `format:check` instead. |
+| `release.yml`                  | tag matching `v*.*.*`                                            | `lint`, `test`, `test:sync-regression` and `validate:openapi`, with any fixable drift healed in the checkout rather than pushed; then checks the tag against `manifest-chromium.json`, builds the chromium, firefox and source zips into `releases/<version>/`, and publishes a GitHub Release with that version's CHANGELOG section as the notes.                                                                                          |
+| `publish-chrome.yml`           | a published GitHub Release                                       | Downloads the chromium zip from the release and uploads it to the Chrome Web Store.                                                                                                                                                                                                                                    |
+| `publish-edge.yml`             | a published GitHub Release                                       | The same chromium zip to Microsoft Edge Add-ons. A no-op until the Edge secrets are set.                                                                                                                                                                                                                                |
+| `publish-firefox.yml`          | a published GitHub Release                                       | The firefox zip to addons.mozilla.org. A no-op until the AMO secrets are set.                                                                                                                                                                                                                                          |
+| `deploy-worker.yml`            | push to `main` touching `worker/**`, manual                      | `wrangler deploy` of the OAuth relay and its landing page.                                                                                                                                                                                                                                                             |
+| `canonical-map-validator.yml`  | issues and issue comments carrying the `canonical-mapping` label, manual | Validates proposed cross-platform mappings and commits accepted ones to `src/data/canonical-map.json` as a bot commit.                                                                                                                                                                                          |
+
+All three store workflows skip pre-release tags — any tag containing a hyphen.
 
 ### Adding a platform handler
 
