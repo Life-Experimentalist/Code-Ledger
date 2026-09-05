@@ -1,0 +1,17 @@
+{
+  "$schema": "https://devprune.vkrishna04.me/schemas/v1/devprune.schema.json",
+  "prunable": {
+    "directories": [
+      {
+        "path": "node_modules",
+        "rebuild": "npm ci",
+        "why": "Dev dependency tree, git-ignored and restored exactly from the committed package-lock.json. Nothing the browser loads reads it — the vendored Preact bundle in src/vendor/ is committed, so the extension keeps working without it."
+      },
+      {
+        "path": "worker/node_modules",
+        "rebuild": "npm ci --prefix worker",
+        "why": "The Cloudflare Worker's own dependency tree, git-ignored and restored from the committed worker/package-lock.json. Only needed to run the worker tests or deploy the worker."
+      }
+    ]
+  }
+}
