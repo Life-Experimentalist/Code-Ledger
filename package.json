@@ -82,7 +82,7 @@
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
     "@types/chrome": "^0.0.308",
-    "@types/node": "^22.13.10",
+    "@types/node": "^26.6.3",
     "adm-zip": "0.6.0",
     "esbuild": "0.28.1",
     "js-yaml": "^4.1.0",
