@@ -89,7 +89,7 @@
     "octokit": "^4.0.0",
     "prettier": "^3.8.3",
     "puppeteer": "25.10.0",
-    "typescript": "^5.8.2",
+    "typescript": "^7.0.2",
     "wrangler": "^4.85.0"
   }
 }
