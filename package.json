@@ -87,7 +87,7 @@
     "esbuild": "0.28.1",
     "js-yaml": "^4.1.0",
     "octokit": "^4.0.0",
-    "prettier": "^3.8.3",
+    "prettier": "^3.9.9",
     "puppeteer": "25.10.0",
     "typescript": "^5.8.2",
     "wrangler": "^4.85.0"
